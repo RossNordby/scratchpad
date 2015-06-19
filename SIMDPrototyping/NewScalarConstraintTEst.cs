@@ -17,7 +17,7 @@ namespace SIMDPrototyping
             {
                 Position = new Vector3(0, 0, 0),
                 Orientation = identityMatrix,
-                LocalInertiaTensorInverse = identityMatrix,
+                InertiaTensorInverse = identityMatrix,
                 InverseMass = 1,
                 LinearVelocity = new Vector3(0, 0, 0)
             };
@@ -25,7 +25,7 @@ namespace SIMDPrototyping
             {
                 Position = new Vector3(0, 1, 0),
                 Orientation = identityMatrix,
-                LocalInertiaTensorInverse = identityMatrix,
+                InertiaTensorInverse = identityMatrix,
                 InverseMass = 1,
                 LinearVelocity = new Vector3(0, -1, 0)
             };

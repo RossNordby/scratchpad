@@ -14,6 +14,6 @@ namespace SIMDPrototyping
         public Vector3 LinearVelocity;
         public Vector3 AngularVelocity;
         public float InverseMass;
-        public Matrix3x3 LocalInertiaTensorInverse;
+        public Matrix3x3 InertiaTensorInverse;
     }
 }

@@ -55,15 +55,24 @@ namespace SIMDPrototyping
             PenetrationBias = ContactPenetration * inverseDt;
             PenetrationBias = -Math.Min(Math.Min(PenetrationBias, PenetrationBias * 0.2f), 0.2f);
 
-            //The inertia tensor is local only, so any nonunit jacobians must be pulled into local space.
-            Vector3 localAngularJacobianA, localAngularJacobianB;
-            Matrix3x3.TransformTranspose(ref AngularJacobianA, ref ConnectionA->Orientation, out localAngularJacobianA);
-            Matrix3x3.TransformTranspose(ref AngularJacobianB, ref ConnectionB->Orientation, out localAngularJacobianB);
+            ////The inertia tensor is local only, so any nonunit jacobians must be pulled into local space.
+            //Vector3 localAngularJacobianA, localAngularJacobianB;
+            //Matrix3x3.TransformTranspose(ref AngularJacobianA, ref ConnectionA->Orientation, out localAngularJacobianA);
+            //Matrix3x3.TransformTranspose(ref AngularJacobianB, ref ConnectionB->Orientation, out localAngularJacobianB);
+
+            //Vector3 angularA, angularB;
+            //Matrix3x3.Transform(ref localAngularJacobianA, ref ConnectionA->LocalInertiaTensorInverse, out angularA);
+            //Matrix3x3.Transform(ref localAngularJacobianB, ref ConnectionB->LocalInertiaTensorInverse, out angularB);
+            //float inverseEffectiveMass = ConnectionA->InverseMass + ConnectionB->InverseMass + Vector3.Dot(angularA, angularA) + Vector3.Dot(angularB, angularB);
+
+
+            //The inertia tensor is in world space, so no jacobian transformation is required.
 
             Vector3 angularA, angularB;
-            Matrix3x3.Transform(ref localAngularJacobianA, ref ConnectionA->LocalInertiaTensorInverse, out angularA);
-            Matrix3x3.Transform(ref localAngularJacobianB, ref ConnectionB->LocalInertiaTensorInverse, out angularB);
+            Matrix3x3.Transform(ref AngularJacobianA, ref ConnectionA->InertiaTensorInverse, out angularA);
+            Matrix3x3.Transform(ref AngularJacobianB, ref ConnectionB->InertiaTensorInverse, out angularB);
             float inverseEffectiveMass = ConnectionA->InverseMass + ConnectionB->InverseMass + Vector3.Dot(angularA, angularA) + Vector3.Dot(angularB, angularB);
+
             const float CollisionSoftness = 5;
             Softness = CollisionSoftness * inverseEffectiveMass * inverseDt;
             EffectiveMass = 1f / (Softness + inverseEffectiveMass);
@@ -76,16 +85,25 @@ namespace SIMDPrototyping
         {
             ConnectionA->LinearVelocity -= (lambda * ConnectionA->InverseMass) * LinearJacobianA;
             ConnectionB->LinearVelocity -= (lambda * ConnectionB->InverseMass) * LinearJacobianB;
-            //No world inertia available, so rotate in and out.
+            ////No world inertia available, so rotate in and out.
+            //Vector3 angularImpulseA = lambda * AngularJacobianA;
+            //Vector3 angularImpulseB = lambda * AngularJacobianB;
+            //Vector3 velocityChangeA, velocityChangeB;
+            //Matrix3x3.TransformTranspose(ref angularImpulseA, ref ConnectionA->Orientation, out velocityChangeA);
+            //Matrix3x3.TransformTranspose(ref angularImpulseB, ref ConnectionB->Orientation, out velocityChangeB);
+            //Matrix3x3.Transform(ref angularImpulseA, ref ConnectionA->LocalInertiaTensorInverse, out velocityChangeA);
+            //Matrix3x3.Transform(ref angularImpulseB, ref ConnectionB->LocalInertiaTensorInverse, out velocityChangeB);
+            //Matrix3x3.Transform(ref velocityChangeA, ref ConnectionA->Orientation, out velocityChangeA);
+            //Matrix3x3.Transform(ref velocityChangeB, ref ConnectionB->Orientation, out velocityChangeB);
+            //ConnectionA->AngularVelocity -= velocityChangeA;
+            //ConnectionB->AngularVelocity -= velocityChangeB;
+
+            //World inertia available, so no need for extra transforms.
             Vector3 angularImpulseA = lambda * AngularJacobianA;
             Vector3 angularImpulseB = lambda * AngularJacobianB;
             Vector3 velocityChangeA, velocityChangeB;
-            Matrix3x3.TransformTranspose(ref angularImpulseA, ref ConnectionA->Orientation, out velocityChangeA);
-            Matrix3x3.TransformTranspose(ref angularImpulseB, ref ConnectionB->Orientation, out velocityChangeB);
-            Matrix3x3.Transform(ref angularImpulseA, ref ConnectionA->LocalInertiaTensorInverse, out velocityChangeA);
-            Matrix3x3.Transform(ref angularImpulseB, ref ConnectionB->LocalInertiaTensorInverse, out velocityChangeB);
-            Matrix3x3.Transform(ref velocityChangeA, ref ConnectionA->Orientation, out velocityChangeA);
-            Matrix3x3.Transform(ref velocityChangeB, ref ConnectionB->Orientation, out velocityChangeB);
+            Matrix3x3.Transform(ref angularImpulseA, ref ConnectionA->InertiaTensorInverse, out velocityChangeA);
+            Matrix3x3.Transform(ref angularImpulseB, ref ConnectionB->InertiaTensorInverse, out velocityChangeB);
             ConnectionA->AngularVelocity -= velocityChangeA;
             ConnectionB->AngularVelocity -= velocityChangeB;
         }
