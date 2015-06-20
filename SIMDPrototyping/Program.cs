@@ -12,10 +12,10 @@ namespace SIMDPrototyping
     {
         static unsafe void Main(string[] args)
         {
-            MicroFiddling.Test();
-            //VectorizedConstraintTest.Test();
-            //NewScalarConstraintTest.Test();
-            //OldScalarConstraintTest.Test();
+            //MicroFiddling.Test();
+            VectorizedConstraintTest.Test();
+            NewScalarConstraintTest.Test();
+            OldScalarConstraintTest.Test();
             //Console.ReadKey();
         }
     }

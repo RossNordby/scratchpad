@@ -43,17 +43,21 @@ namespace SIMDPrototyping
             constraint.WarmStart();
             constraint.SolveIteration();
 
-            const int testCount = VectorizedConstraintTest.TestCount * 4;
+            const int testCount = VectorizedConstraintTest.TestCount;
             const int iterationCount = VectorizedConstraintTest.IterationCount;
 
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             for (int i = 0; i < testCount; ++i)
             {
-                constraint.Prestep(inverseDt);
-                constraint.WarmStart();
+                for (int j = 0; j < 4; ++j)
+                {
+                    constraint.Prestep(inverseDt);
+                    constraint.WarmStart();
+                }
+
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
                 {
-                    constraint.SolveIteration();
+                    constraint.SolveIteration4();
                 }
             }
 
