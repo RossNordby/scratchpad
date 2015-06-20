@@ -104,10 +104,10 @@ namespace SIMDPrototyping
             Vector3Width4.Multiply(ref LinearJacobianA, ref linearScaleChangeA, out linearChangeA);
             Vector3Width4.Multiply(ref LinearJacobianB, ref linearScaleChangeB, out linearChangeB);
 
-            Vector3* linearChangesA = stackalloc Vector3[4];
-            Vector3* linearChangesB = stackalloc Vector3[4];
-            Vector3Width4.Transpose(ref linearChangeA, linearChangesA);
-            Vector3Width4.Transpose(ref linearChangeB, linearChangesB);
+            Vector3 linearChangeA0, linearChangeA1, linearChangeA2, linearChangeA3;
+            Vector3 linearChangeB0, linearChangeB1, linearChangeB2, linearChangeB3;
+            Vector3Width4.Transpose(ref linearChangeA, out linearChangeA0, out linearChangeA1, out linearChangeA2, out linearChangeA3);
+            Vector3Width4.Transpose(ref linearChangeB, out linearChangeB0, out linearChangeB1, out linearChangeB2, out linearChangeB3);
 
 
             //World inertia available, so no need for extra transforms.
@@ -118,18 +118,30 @@ namespace SIMDPrototyping
             Matrix3x3Width4.Transform(ref angularImpulseA, ref InverseInertiaTensorA, out angularChangeA);
             Matrix3x3Width4.Transform(ref angularImpulseB, ref InverseInertiaTensorB, out angularChangeB);
 
-            Vector3* angularChangesA = stackalloc Vector3[4];
-            Vector3* angularChangesB = stackalloc Vector3[4];
-            Vector3Width4.Transpose(ref angularChangeA, angularChangesA);
-            Vector3Width4.Transpose(ref angularChangeB, angularChangesB);
 
-            for (int i = 0; i < 4; ++i)
-            {
-                ABodies[i].LinearVelocity -= linearChangesA[i];
-                BBodies[i].AngularVelocity -= angularChangesA[i];
-                BBodies[i].LinearVelocity -= linearChangesB[i];
-                BBodies[i].AngularVelocity -= angularChangesB[i];
-            }
+            Vector3 angularChangeA0, angularChangeA1, angularChangeA2, angularChangeA3;
+            Vector3 angularChangeB0, angularChangeB1, angularChangeB2, angularChangeB3;
+            Vector3Width4.Transpose(ref angularChangeA, out angularChangeA0, out angularChangeA1, out angularChangeA2, out angularChangeA3);
+            Vector3Width4.Transpose(ref angularChangeB, out angularChangeB0, out angularChangeB1, out angularChangeB2, out angularChangeB3);
+
+            ABodies[0].LinearVelocity -= linearChangeA0;
+            ABodies[0].AngularVelocity -= angularChangeA0;
+            ABodies[1].LinearVelocity -= linearChangeA1;
+            ABodies[1].AngularVelocity -= angularChangeA1;
+            ABodies[2].LinearVelocity -= linearChangeA2;
+            ABodies[2].AngularVelocity -= angularChangeA2;
+            ABodies[3].LinearVelocity -= linearChangeA3;
+            ABodies[3].AngularVelocity -= angularChangeA3;
+
+            BBodies[0].LinearVelocity -= linearChangeB0;
+            BBodies[0].AngularVelocity -= angularChangeB0;
+            BBodies[1].LinearVelocity -= linearChangeB1;
+            BBodies[1].AngularVelocity -= angularChangeB1;
+            BBodies[2].LinearVelocity -= linearChangeB2;
+            BBodies[2].AngularVelocity -= angularChangeB2;
+            BBodies[3].LinearVelocity -= linearChangeB3;
+            BBodies[3].AngularVelocity -= angularChangeB3;
+
         }
 
         public void WarmStart()
