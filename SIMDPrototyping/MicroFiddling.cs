@@ -30,7 +30,7 @@ namespace SIMDPrototyping
             Console.WriteLine($"t to preload: {t}");
             double time, endTime;
 
-            const int testIterations = 100000000;
+            const int testIterations = 10000000;
 
             time = (double)Stopwatch.GetTimestamp() / Stopwatch.Frequency;
             Vector3 refAccumulator = new Vector3();
