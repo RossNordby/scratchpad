@@ -41,14 +41,18 @@ namespace SIMDPrototyping
             Vector3 up = Vector3.UnitY;
             VectorizedPenetrationConstraint constraint = new VectorizedPenetrationConstraint
             {
-                ABodies0 = a,
-                ABodies1 = a,
-                ABodies2 = a,
-                ABodies3 = a,
-                BBodies0 = b,
-                BBodies1 = b,
-                BBodies2 = b,
-                BBodies3 = b,
+                BodyA0 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3() },
+                BodyA1 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3() },
+                BodyA2 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3() },
+                BodyA3 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3() },
+                BodyB0 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3(0, 1, 0) },
+                BodyB1 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3(0, 1, 0) },
+                BodyB2 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3(0, 1, 0) },
+                BodyB3 = new BodyState { InertiaTensorInverse = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 1, 0) }, InverseMass = 1, Position = new Vector3(0, 1, 0) },
+                VelocitiesB0 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
+                VelocitiesB1 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
+                VelocitiesB2 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
+                VelocitiesB3 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
                 ContactPosition = new Vector3Width4(),
                 ContactNormal = new Vector3Width4(ref up, ref up, ref up, ref up),
                 ContactPenetration = new Vector4()

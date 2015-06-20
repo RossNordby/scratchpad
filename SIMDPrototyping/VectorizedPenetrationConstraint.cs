@@ -9,14 +9,6 @@ using System.Threading.Tasks;
 
 namespace SIMDPrototyping
 {
-    [StructLayout(LayoutKind.Explicit, Size = 64)]
-    public struct Positions
-    {
-        [FieldOffset(0)]
-        public Vector3 Position;
-        [FieldOffset(16)]
-        public Matrix3x3 Orientation;
-    }
     [StructLayout(LayoutKind.Explicit, Size = 32)]
     public struct Velocities
     {
@@ -25,25 +17,39 @@ namespace SIMDPrototyping
         [FieldOffset(16)]
         public Vector3 AngularVelocity;
     }
-    [StructLayout(LayoutKind.Explicit, Size = 64)]
-    public struct Inertia
+    [StructLayout(LayoutKind.Explicit, Size = 80)]
+    public struct BodyState
     {
         [FieldOffset(0)]
-        public Matrix3x3 InertiaTensor;
+        public Matrix3x3 InertiaTensorInverse;
         [FieldOffset(48)]
-        public float Mass;
+        public float InverseMass;
+        [FieldOffset(64)]
+        public Vector3 Position;
     }
     public unsafe struct VectorizedPenetrationConstraint
     {
         //Constraint Descriptions
-        public RigidBody ABodies0;
-        public RigidBody ABodies1;
-        public RigidBody ABodies2;
-        public RigidBody ABodies3;
-        public RigidBody BBodies0;
-        public RigidBody BBodies1;
-        public RigidBody BBodies2;
-        public RigidBody BBodies3;
+
+        public Velocities VelocitiesA0;
+        public Velocities VelocitiesA1;
+        public Velocities VelocitiesA2;
+        public Velocities VelocitiesA3;
+
+        public BodyState BodyA0;
+        public BodyState BodyA1;
+        public BodyState BodyA2;
+        public BodyState BodyA3;
+        
+        public Velocities VelocitiesB0;
+        public Velocities VelocitiesB1;
+        public Velocities VelocitiesB2;
+        public Velocities VelocitiesB3;
+
+        public BodyState BodyB0;
+        public BodyState BodyB1;
+        public BodyState BodyB2;
+        public BodyState BodyB3;
 
         //Per-frame gathered values.
 
@@ -82,16 +88,19 @@ namespace SIMDPrototyping
 
             //var positionA = new Vector3Width4();
             //var positionB = new Vector3Width4();
-            Vector3Width4 positionA = new Vector3Width4(ref ABodies0.Position, ref ABodies1.Position, ref ABodies2.Position, ref ABodies3.Position);
-            Vector3Width4 positionB = new Vector3Width4(ref BBodies0.Position, ref BBodies1.Position, ref BBodies2.Position, ref BBodies3.Position);
 
+            //Given that we're collecting position, inverse mass, and inertia all at once, it makes no sense to store position separately from inversemass and inertia. 
+            //Since you should not expect the 4 involved bodies to be in memory *together*, the best you can do is to ensure that the set of values are together. 
+            //Otherwise you're multiplying cache misses for no reason!
+            InverseMassA = new Vector4(BodyA0.InverseMass, BodyA1.InverseMass, BodyA2.InverseMass, BodyA3.InverseMass);
+            InverseMassB = new Vector4(BodyB0.InverseMass, BodyB1.InverseMass, BodyB2.InverseMass, BodyB3.InverseMass);
+            
+            InverseInertiaTensorA = new Matrix3x3Width4(ref BodyA0.InertiaTensorInverse, ref BodyA1.InertiaTensorInverse, ref BodyA2.InertiaTensorInverse, ref BodyA3.InertiaTensorInverse);
+            InverseInertiaTensorB = new Matrix3x3Width4(ref BodyB0.InertiaTensorInverse, ref BodyB1.InertiaTensorInverse, ref BodyB2.InertiaTensorInverse, ref BodyB3.InertiaTensorInverse);
+            
+            Vector3Width4 positionA = new Vector3Width4(ref BodyA0.Position, ref BodyA1.Position, ref BodyA2.Position, ref BodyA3.Position);
+            Vector3Width4 positionB = new Vector3Width4(ref BodyA0.Position, ref BodyB1.Position, ref BodyB2.Position, ref BodyB3.Position);
 
-            InverseMassA = new Vector4(ABodies0.InverseMass, ABodies1.InverseMass, ABodies2.InverseMass, ABodies3.InverseMass);
-            InverseMassB = new Vector4(BBodies0.InverseMass, BBodies1.InverseMass, BBodies2.InverseMass, BBodies3.InverseMass);
-
-
-            InverseInertiaTensorA = new Matrix3x3Width4(ref ABodies0.InertiaTensorInverse, ref ABodies1.InertiaTensorInverse, ref ABodies2.InertiaTensorInverse, ref ABodies3.InertiaTensorInverse);
-            InverseInertiaTensorB = new Matrix3x3Width4(ref BBodies0.InertiaTensorInverse, ref BBodies1.InertiaTensorInverse, ref BBodies2.InertiaTensorInverse, ref BBodies3.InertiaTensorInverse);
 
             LinearJacobianA = ContactNormal;
             Vector3Width4.Negate(ref ContactNormal, out LinearJacobianB);
@@ -155,23 +164,23 @@ namespace SIMDPrototyping
             Vector3Width4.Transpose(ref angularChangeA, out angularChangeA0, out angularChangeA1, out angularChangeA2, out angularChangeA3);
             Vector3Width4.Transpose(ref angularChangeB, out angularChangeB0, out angularChangeB1, out angularChangeB2, out angularChangeB3);
 
-            ABodies0.LinearVelocity -= linearChangeA0;
-            ABodies0.AngularVelocity -= angularChangeA0;
-            ABodies1.LinearVelocity -= linearChangeA1;
-            ABodies1.AngularVelocity -= angularChangeA1;
-            ABodies2.LinearVelocity -= linearChangeA2;
-            ABodies2.AngularVelocity -= angularChangeA2;
-            ABodies3.LinearVelocity -= linearChangeA3;
-            ABodies3.AngularVelocity -= angularChangeA3;
+            VelocitiesA0.LinearVelocity -= linearChangeA0;
+            VelocitiesA0.AngularVelocity -= angularChangeA0;
+            VelocitiesA1.LinearVelocity -= linearChangeA1;
+            VelocitiesA1.AngularVelocity -= angularChangeA1;
+            VelocitiesA2.LinearVelocity -= linearChangeA2;
+            VelocitiesA2.AngularVelocity -= angularChangeA2;
+            VelocitiesA3.LinearVelocity -= linearChangeA3;
+            VelocitiesA3.AngularVelocity -= angularChangeA3;
 
-            BBodies0.LinearVelocity -= linearChangeB0;
-            BBodies0.AngularVelocity -= angularChangeB0;
-            BBodies1.LinearVelocity -= linearChangeB1;
-            BBodies1.AngularVelocity -= angularChangeB1;
-            BBodies2.LinearVelocity -= linearChangeB2;
-            BBodies2.AngularVelocity -= angularChangeB2;
-            BBodies3.LinearVelocity -= linearChangeB3;
-            BBodies3.AngularVelocity -= angularChangeB3;
+            VelocitiesB0.LinearVelocity -= linearChangeB0;
+            VelocitiesB0.AngularVelocity -= angularChangeB0;
+            VelocitiesB1.LinearVelocity -= linearChangeB1;
+            VelocitiesB1.AngularVelocity -= angularChangeB1;
+            VelocitiesB2.LinearVelocity -= linearChangeB2;
+            VelocitiesB2.AngularVelocity -= angularChangeB2;
+            VelocitiesB3.LinearVelocity -= linearChangeB3;
+            VelocitiesB3.AngularVelocity -= angularChangeB3;
 
         }
 
@@ -185,10 +194,10 @@ namespace SIMDPrototyping
         public void SolveIteration()
         {
             //May be wise to hold pre-transposed from the prestep. Then you could....? asdfasdf
-            Vector3Width4 linearVelocityA = new Vector3Width4(ref ABodies0.LinearVelocity, ref ABodies1.LinearVelocity, ref ABodies2.LinearVelocity, ref ABodies3.LinearVelocity);
-            Vector3Width4 angularVelocityA = new Vector3Width4(ref ABodies0.AngularVelocity, ref ABodies1.AngularVelocity, ref ABodies2.AngularVelocity, ref ABodies3.AngularVelocity);
-            Vector3Width4 linearVelocityB = new Vector3Width4(ref BBodies0.LinearVelocity, ref BBodies1.LinearVelocity, ref BBodies2.LinearVelocity, ref BBodies3.LinearVelocity);
-            Vector3Width4 angularVelocityB = new Vector3Width4(ref BBodies0.AngularVelocity, ref BBodies1.AngularVelocity, ref BBodies2.AngularVelocity, ref BBodies3.AngularVelocity);
+            Vector3Width4 linearVelocityA = new Vector3Width4(ref VelocitiesA0.LinearVelocity, ref VelocitiesA1.LinearVelocity, ref VelocitiesA2.LinearVelocity, ref VelocitiesA3.LinearVelocity);
+            Vector3Width4 angularVelocityA = new Vector3Width4(ref VelocitiesA0.AngularVelocity, ref VelocitiesA1.AngularVelocity, ref VelocitiesA2.AngularVelocity, ref VelocitiesA3.AngularVelocity);
+            Vector3Width4 linearVelocityB = new Vector3Width4(ref VelocitiesB0.LinearVelocity, ref VelocitiesB1.LinearVelocity, ref VelocitiesB2.LinearVelocity, ref VelocitiesB3.LinearVelocity);
+            Vector3Width4 angularVelocityB = new Vector3Width4(ref VelocitiesB0.AngularVelocity, ref VelocitiesB1.AngularVelocity, ref VelocitiesB2.AngularVelocity, ref VelocitiesB3.AngularVelocity);
 
             Vector4 linearA, angularA, linearB, angularB;
             Vector3Width4.Dot(ref LinearJacobianA, ref linearVelocityA, out linearA);
