@@ -10,7 +10,7 @@ namespace SIMDPrototyping
 {
     public class VectorizedConstraintTest
     {
-        public const int TestCount = 10000000;
+        public const int TestCount = 1000000;
         public const int IterationCount = 10;
         public unsafe static void Test()
         {
@@ -41,17 +41,23 @@ namespace SIMDPrototyping
             Vector3 up = Vector3.UnitY;
             VectorizedPenetrationConstraint constraint = new VectorizedPenetrationConstraint
             {
-                ABodies = aBodies,
-                BBodies = bBodies,
+                ABodies0 = a,
+                ABodies1 = a,
+                ABodies2 = a,
+                ABodies3 = a,
+                BBodies0 = b,
+                BBodies1 = b,
+                BBodies2 = b,
+                BBodies3 = b,
                 ContactPosition = new Vector3Width4(),
                 ContactNormal = new Vector3Width4(ref up, ref up, ref up, ref up),
                 ContactPenetration = new Vector4()
             };
             float dt = 1 / 60f;
             float inverseDt = 1 / dt;
-            //constraint.Prestep(inverseDt);
+            constraint.Prestep(inverseDt);
             constraint.WarmStart();
-            //constraint.SolveIteration();
+            constraint.SolveIteration();
 
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             for (int i = 0; i < TestCount; ++i)
