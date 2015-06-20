@@ -31,8 +31,8 @@ namespace SIMDPrototyping
             };
             PenetrationConstraint constraint = new PenetrationConstraint
             {
-                ConnectionA = &a,
-                ConnectionB = &b,
+                ConnectionA = a,
+                ConnectionB = b,
                 ContactPosition = new Vector3(),
                 ContactNormal = new Vector3(0, 1, 0),
                 ContactPenetration = 0
