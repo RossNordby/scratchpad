@@ -3,11 +3,36 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SIMDPrototyping
 {
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    public struct Positions
+    {
+        [FieldOffset(0)]
+        public Vector3 Position;
+        [FieldOffset(16)]
+        public Matrix3x3 Orientation;
+    }
+    [StructLayout(LayoutKind.Explicit, Size = 32)]
+    public struct Velocities
+    {
+        [FieldOffset(0)]
+        public Vector3 LinearVelocity;
+        [FieldOffset(16)]
+        public Vector3 AngularVelocity;
+    }
+    [StructLayout(LayoutKind.Explicit, Size = 64)]
+    public struct Inertia
+    {
+        [FieldOffset(0)]
+        public Matrix3x3 InertiaTensor;
+        [FieldOffset(48)]
+        public float Mass;
+    }
     public unsafe struct VectorizedPenetrationConstraint
     {
         //Constraint Descriptions

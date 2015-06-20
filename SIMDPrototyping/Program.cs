@@ -12,6 +12,7 @@ namespace SIMDPrototyping
     {
         static unsafe void Main(string[] args)
         {
+
             VectorizedConstraintTest.Test();
             NewScalarConstraintTest.Test();
             OldScalarConstraintTest.Test();
