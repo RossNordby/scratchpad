@@ -108,42 +108,6 @@ namespace SIMDPrototyping
             ApplyImpulse(lambda);
         }
 
-        Vector4 EffectiveMass4, PenetrationBias4, AccumulatedImpulse4, Softness4;
-        public void SolveIteration4()
-        {
-            var linearA = new Vector4(
-                Vector3.Dot(LinearJacobianA, ConnectionA.LinearVelocity),
-                Vector3.Dot(LinearJacobianA, ConnectionA.LinearVelocity),
-                Vector3.Dot(LinearJacobianA, ConnectionA.LinearVelocity),
-                Vector3.Dot(LinearJacobianA, ConnectionA.LinearVelocity));
-            var angularA = new Vector4(
-                Vector3.Dot(AngularJacobianA, ConnectionA.LinearVelocity),
-                Vector3.Dot(AngularJacobianA, ConnectionA.LinearVelocity),
-                Vector3.Dot(AngularJacobianA, ConnectionA.LinearVelocity),
-                Vector3.Dot(AngularJacobianA, ConnectionA.LinearVelocity));
-            var linearB = new Vector4(
-                Vector3.Dot(LinearJacobianB, ConnectionB.LinearVelocity),
-                Vector3.Dot(LinearJacobianB, ConnectionB.LinearVelocity),
-                Vector3.Dot(LinearJacobianB, ConnectionB.LinearVelocity),
-                Vector3.Dot(LinearJacobianB, ConnectionB.LinearVelocity));
-            var angularB = new Vector4(
-                Vector3.Dot(AngularJacobianB, ConnectionB.LinearVelocity),
-                Vector3.Dot(AngularJacobianB, ConnectionB.LinearVelocity),
-                Vector3.Dot(AngularJacobianB, ConnectionB.LinearVelocity),
-                Vector3.Dot(AngularJacobianB, ConnectionB.LinearVelocity));
-
-            var lambda = EffectiveMass4 * (
-                linearA + linearB + angularA + angularB +
-                PenetrationBias4 - AccumulatedImpulse4 * Softness4);
-
-            var previous = AccumulatedImpulse4;
-            AccumulatedImpulse4 = Vector4.Max(Vector4.Zero, AccumulatedImpulse4 + lambda);
-            lambda = AccumulatedImpulse4 - previous;
-
-            ApplyImpulse(lambda.X);
-            ApplyImpulse(lambda.Y);
-            ApplyImpulse(lambda.Z);
-            ApplyImpulse(lambda.W);
-        }
+       
     }
 }

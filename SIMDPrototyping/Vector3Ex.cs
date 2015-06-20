@@ -68,6 +68,8 @@ namespace SIMDPrototyping
             result.Y = resultY;
             result.Z = resultZ;
 
+
+
         }
     }
 }

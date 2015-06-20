@@ -66,12 +66,12 @@ namespace SIMDPrototyping
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             for (int i = 0; i < TestCount; ++i)
             {
-                constraint.Prestep(inverseDt);
+                //constraint.Prestep(inverseDt);
                 constraint.WarmStart();
-                for (int iterationIndex = 0; iterationIndex < IterationCount; ++iterationIndex)
-                {
-                    constraint.SolveIteration();
-                }
+                //for (int iterationIndex = 0; iterationIndex < IterationCount; ++iterationIndex)
+                //{
+                //    constraint.SolveIteration();
+                //}
             }
 
 

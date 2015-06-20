@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace SIMDPrototyping
 {
-    public class NewScalarConstraintTest
+    public class HybridConstraintTest
     {
         public unsafe static void Test()
         {
@@ -29,10 +29,16 @@ namespace SIMDPrototyping
                 InverseMass = 1,
                 LinearVelocity = new Vector3(0, -1, 0)
             };
-            PenetrationConstraint constraint = new PenetrationConstraint
+            var constraint = new HybridPenetrationConstraint
             {
-                ConnectionA = a,
-                ConnectionB = b,
+                a0 = a,
+                a1 = a,
+                a2 = a,
+                a3 = a,
+                b0 = b,
+                b1 = b,
+                b2 = b,
+                b3 = b,
                 ContactPosition = new Vector3(),
                 ContactNormal = new Vector3(0, 1, 0),
                 ContactPenetration = 0
@@ -43,7 +49,7 @@ namespace SIMDPrototyping
             constraint.WarmStart();
             constraint.SolveIteration();
 
-            const int testCount = VectorizedConstraintTest.TestCount * 4;
+            const int testCount = VectorizedConstraintTest.TestCount;
             const int iterationCount = VectorizedConstraintTest.IterationCount;
 
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -61,7 +67,7 @@ namespace SIMDPrototyping
 
             var endtime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-            Console.WriteLine($"Scalar New: {endtime - startTime}, acc: {constraint.AccumulatedImpulse}");
+            Console.WriteLine($"Hybrid: {endtime - startTime}, acc: {constraint.AccumulatedImpulse}");
 
 
         }
