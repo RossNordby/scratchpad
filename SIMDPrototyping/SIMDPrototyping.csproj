@@ -81,10 +81,14 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Matrix3x3Width4.cs" />
+    <Compile Include="VectorizedConstraintTest.cs" />
     <Compile Include="OldScalarConstraintTest.cs" />
     <Compile Include="NewScalarConstraintTest.cs" />
     <Compile Include="Matrix3x3.cs" />
     <Compile Include="MicroFiddling.cs" />
+    <Compile Include="Vector3Width4.cs" />
+    <Compile Include="VectorizedPenetrationConstraint.cs" />
     <Compile Include="PenetrationConstraint.cs" />
     <Compile Include="RigidBody.cs" />
     <Compile Include="Program.cs" />

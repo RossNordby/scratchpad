@@ -44,18 +44,18 @@ namespace SIMDPrototyping
             constraint.ExclusiveUpdate();
             constraint.SolveIteration();
 
-            const int testCount = 1000000;
-            const int iterationCount = 10;
+            const int testCount = VectorizedConstraintTest.TestCount * 4;
+            const int iterationCount = VectorizedConstraintTest.IterationCount;
 
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             for (int i = 0; i < testCount; ++i)
             {
-                constraint.Update(dt);
+                //constraint.Update(dt);
                 constraint.ExclusiveUpdate();
-                for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
-                {
-                    constraint.SolveIteration();
-                }
+                //for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+                //{
+                //    constraint.SolveIteration();
+                //}
             }
 
 
