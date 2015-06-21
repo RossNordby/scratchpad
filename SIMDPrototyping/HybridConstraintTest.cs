@@ -27,7 +27,7 @@ namespace SIMDPrototyping
                 Orientation = identityMatrix,
                 InertiaTensorInverse = identityMatrix,
                 InverseMass = 1,
-                LinearVelocity = new Vector3(0, -1, 0)
+                LinearVelocity = new Vector3(0, 0, 0)
             };
             var constraint = new HybridPenetrationConstraint
             {

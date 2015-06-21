@@ -28,7 +28,7 @@ namespace SIMDPrototyping
             {
                 Position = new Vector3(0, 1, 0),
                 Orientation = Quaternion.Identity,
-                LinearVelocity = new Vector3(0, -1, 0)
+                LinearVelocity = new Vector3(0, 0, 0)
             };
             pairHandler.Initialize(a.CollisionInformation, b.CollisionInformation);
             ContactManifoldConstraint manifoldConstraint = new ConvexContactManifoldConstraint(pairHandler);
