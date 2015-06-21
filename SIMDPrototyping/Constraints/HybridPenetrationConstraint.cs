@@ -32,6 +32,12 @@ namespace SIMDPrototyping
         Vector3 linearA1, angularA1, linearB1, angularB1;
         Vector3 linearA2, angularA2, linearB2, angularB2;
         Vector3 linearA3, angularA3, linearB3, angularB3;
+        
+        //"Independently transformed" jacobians. These are jl * invMass and ja * invInertia. 
+        Vector3 linearITA0, angularITA0, linearITB0, angularITB0;
+        Vector3 linearITA1, angularITA1, linearITB1, angularITB1;
+        Vector3 linearITA2, angularITA2, linearITB2, angularITB2;
+        Vector3 linearITA3, angularITA3, linearITB3, angularITB3;
         public Vector4 PenetrationBias;
         public Vector4 Softness;
         public Vector4 EffectiveMass;
@@ -96,21 +102,27 @@ namespace SIMDPrototyping
             PenetrationBias = -Vector4.Min(Vector4.Min(PenetrationBias, PenetrationBias * 0.2f), new Vector4(0.2f));
 
 
+            linearITA0 = linearA0 * a0.InverseMass;
+            linearITA1 = linearA1 * a1.InverseMass;
+            linearITA2 = linearA2 * a2.InverseMass;
+            linearITA3 = linearA3 * a3.InverseMass;
+
+            linearITB0 = linearB0 * b0.InverseMass;
+            linearITB1 = linearB1 * b1.InverseMass;
+            linearITB2 = linearB2 * b2.InverseMass;
+            linearITB3 = linearB3 * b3.InverseMass;
+
             //The inertia tensor is in world space, so no jacobian transformation is required.
-            Vector3 jA0, jB0;
-            Vector3 jA1, jB1;
-            Vector3 jA2, jB2;
-            Vector3 jA3, jB3;
-            Matrix3x3.Transform(ref angularA0, ref a0.InertiaTensorInverse, out jA0);
-            Matrix3x3.Transform(ref angularB0, ref b0.InertiaTensorInverse, out jB0);
-            Matrix3x3.Transform(ref angularA1, ref a1.InertiaTensorInverse, out jA1);
-            Matrix3x3.Transform(ref angularB1, ref b1.InertiaTensorInverse, out jB1);
-            Matrix3x3.Transform(ref angularA2, ref a2.InertiaTensorInverse, out jA2);
-            Matrix3x3.Transform(ref angularB2, ref b2.InertiaTensorInverse, out jB2);
-            Matrix3x3.Transform(ref angularA3, ref a3.InertiaTensorInverse, out jA3);
-            Matrix3x3.Transform(ref angularB3, ref b3.InertiaTensorInverse, out jB3);
-            Vector4 angularContributionsA = new Vector4(Vector3.Dot(jA0, jA0), Vector3.Dot(jA1, jA1), Vector3.Dot(jA2, jA2), Vector3.Dot(jA3, jA3));
-            Vector4 angularContributionsB = new Vector4(Vector3.Dot(jB0, jB0), Vector3.Dot(jB1, jB1), Vector3.Dot(jB2, jB2), Vector3.Dot(jB3, jB3));
+            Matrix3x3.Transform(ref angularA0, ref a0.InertiaTensorInverse, out angularITA0);
+            Matrix3x3.Transform(ref angularB0, ref b0.InertiaTensorInverse, out angularITB0);
+            Matrix3x3.Transform(ref angularA1, ref a1.InertiaTensorInverse, out angularITA1);
+            Matrix3x3.Transform(ref angularB1, ref b1.InertiaTensorInverse, out angularITB1);
+            Matrix3x3.Transform(ref angularA2, ref a2.InertiaTensorInverse, out angularITA2);
+            Matrix3x3.Transform(ref angularB2, ref b2.InertiaTensorInverse, out angularITB2);
+            Matrix3x3.Transform(ref angularA3, ref a3.InertiaTensorInverse, out angularITA3);
+            Matrix3x3.Transform(ref angularB3, ref b3.InertiaTensorInverse, out angularITB3);
+            Vector4 angularContributionsA = new Vector4(Vector3.Dot(angularITA0, angularITA0), Vector3.Dot(angularITA1, angularITA1), Vector3.Dot(angularITA2, angularITA2), Vector3.Dot(angularITA3, angularITA3));
+            Vector4 angularContributionsB = new Vector4(Vector3.Dot(angularITB0, angularITB0), Vector3.Dot(angularITB1, angularITB1), Vector3.Dot(angularITB2, angularITB2), Vector3.Dot(angularITB3, angularITB3));
             var inverseEffectiveMass = InverseMassA + InverseMassB + angularContributionsA + angularContributionsB;
 
             Vector4 CollisionSoftness = new Vector4(5);
@@ -141,51 +153,25 @@ namespace SIMDPrototyping
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ApplyImpulse(ref Vector4 lambda)
         {
-            var linearA = lambda * InverseMassA;
-            var linearB = lambda * InverseMassB;
+            a0.LinearVelocity -= lambda.X * linearITA0;
+            a1.LinearVelocity -= lambda.Y * linearITA1;
+            a2.LinearVelocity -= lambda.Z * linearITA2;
+            a3.LinearVelocity -= lambda.W * linearITA3;
 
+            b0.LinearVelocity -= lambda.X * linearITB0;
+            b1.LinearVelocity -= lambda.Y * linearITB1;
+            b2.LinearVelocity -= lambda.Z * linearITB2;
+            b3.LinearVelocity -= lambda.W * linearITB3;
 
-            a0.LinearVelocity -= linearA.X * linearA0;
-            a1.LinearVelocity -= linearA.Y * linearA1;
-            a2.LinearVelocity -= linearA.Z * linearA2;
-            a3.LinearVelocity -= linearA.W * linearA3;
+            a0.AngularVelocity -= lambda.X * angularITB0;
+            a1.AngularVelocity -= lambda.Y * angularITB1;
+            a2.AngularVelocity -= lambda.Z * angularITB2;
+            a3.AngularVelocity -= lambda.W * angularITB3;
 
-            b0.LinearVelocity -= linearB.X * linearB0;
-            b1.LinearVelocity -= linearB.Y * linearB1;
-            b2.LinearVelocity -= linearB.Z * linearB2;
-            b3.LinearVelocity -= linearB.W * linearB3;
-
-            var angularImpulseA0 = lambda.X * angularA0;
-            var angularImpulseA1 = lambda.Y * angularA1;
-            var angularImpulseA2 = lambda.Z * angularA2;
-            var angularImpulseA3 = lambda.W * angularA3;
-
-            var angularImpulseB0 = lambda.X * angularB0;
-            var angularImpulseB1 = lambda.Y * angularB1;
-            var angularImpulseB2 = lambda.Z * angularB2;
-            var angularImpulseB3 = lambda.W * angularB3;
-
-            Vector3 velocityChangeA0, velocityChangeA1, velocityChangeA2, velocityChangeA3;
-            Matrix3x3.Transform(ref angularImpulseA0, ref a0.InertiaTensorInverse, out velocityChangeA0);
-            Matrix3x3.Transform(ref angularImpulseA1, ref a1.InertiaTensorInverse, out velocityChangeA1);
-            Matrix3x3.Transform(ref angularImpulseA2, ref a2.InertiaTensorInverse, out velocityChangeA2);
-            Matrix3x3.Transform(ref angularImpulseA3, ref a3.InertiaTensorInverse, out velocityChangeA3);
-
-            Vector3 velocityChangeB0, velocityChangeB1, velocityChangeB2, velocityChangeB3;
-            Matrix3x3.Transform(ref angularImpulseB0, ref b0.InertiaTensorInverse, out velocityChangeB0);
-            Matrix3x3.Transform(ref angularImpulseB1, ref b1.InertiaTensorInverse, out velocityChangeB1);
-            Matrix3x3.Transform(ref angularImpulseB2, ref b2.InertiaTensorInverse, out velocityChangeB2);
-            Matrix3x3.Transform(ref angularImpulseB3, ref b3.InertiaTensorInverse, out velocityChangeB3);
-
-            a0.AngularVelocity -= velocityChangeA0;
-            a1.AngularVelocity -= velocityChangeA1;
-            a2.AngularVelocity -= velocityChangeA2;
-            a3.AngularVelocity -= velocityChangeA3;
-
-            b0.AngularVelocity -= velocityChangeB0;
-            b1.AngularVelocity -= velocityChangeB1;
-            b2.AngularVelocity -= velocityChangeB2;
-            b3.AngularVelocity -= velocityChangeB3;
+            b0.AngularVelocity -= lambda.X * angularITB0;
+            b1.AngularVelocity -= lambda.Y * angularITB1;
+            b2.AngularVelocity -= lambda.Z * angularITB2;
+            b3.AngularVelocity -= lambda.W * angularITB3;
 
         }
 
