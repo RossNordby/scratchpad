@@ -41,6 +41,7 @@ namespace SIMDPrototyping
         public Vector4 PenetrationBias;
         public Vector4 Softness;
         public Vector4 AccumulatedImpulse;
+        public Vector4 EffectiveMass;
 
 
 
@@ -126,51 +127,11 @@ namespace SIMDPrototyping
 
             Vector4 CollisionSoftness = new Vector4(5);
             Softness = CollisionSoftness * inverseEffectiveMass * inverseDt;
-            var EffectiveMass = Vector4.One / (Softness + inverseEffectiveMass);
-
-            linearA0 *= EffectiveMass.X;
-            angularA0 *= EffectiveMass.X;
-            linearB0 *= EffectiveMass.X;
-            angularB0 *= EffectiveMass.X;
-
-            linearA1 *= EffectiveMass.Y;
-            angularA1 *= EffectiveMass.Y;
-            linearB1 *= EffectiveMass.Y;
-            angularB1 *= EffectiveMass.Y;
-
-            linearA2 *= EffectiveMass.Z;
-            angularA2 *= EffectiveMass.Z;
-            linearB2 *= EffectiveMass.Z;
-            angularB2 *= EffectiveMass.Z;
-
-            linearA3 *= EffectiveMass.W;
-            angularA3 *= EffectiveMass.W;
-            linearA3 *= EffectiveMass.W;
-            angularB3 *= EffectiveMass.W;
-
-            PenetrationBias *= EffectiveMass;
-            Softness *= EffectiveMass;
+            EffectiveMass = Vector4.One / (Softness + inverseEffectiveMass);
 
 
         }
 
-
-
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void ApplyImpulse(ref RigidBody a, ref RigidBody b, ref Vector3 linearA, ref Vector3 angularA, ref Vector3 linearB, ref Vector3 angularB, float lambda)
-        {
-            a.LinearVelocity -= (lambda * a.InverseMass) * linearA;
-            b.LinearVelocity -= (lambda * b.InverseMass) * linearB;
-
-            //World inertia available, so no need for extra transforms.
-            Vector3 angularImpulseA = lambda * angularA;
-            Vector3 angularImpulseB = lambda * angularB;
-            Vector3 velocityChangeA, velocityChangeB;
-            Matrix3x3.Transform(ref angularImpulseA, ref a.InertiaTensorInverse, out velocityChangeA);
-            Matrix3x3.Transform(ref angularImpulseB, ref b.InertiaTensorInverse, out velocityChangeB);
-            a.AngularVelocity -= velocityChangeA;
-            b.AngularVelocity -= velocityChangeB;
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ApplyImpulse(ref Vector4 lambda)
@@ -200,10 +161,6 @@ namespace SIMDPrototyping
         public void WarmStart()
         {
             ApplyImpulse(ref AccumulatedImpulse);
-            //ApplyImpulse(ref a0, ref b0, ref linearA0, ref angularA0, ref linearB0, ref angularB0, AccumulatedImpulse.X);
-            //ApplyImpulse(ref a1, ref b1, ref linearA1, ref angularA1, ref linearB1, ref angularB1, AccumulatedImpulse.Y);
-            //ApplyImpulse(ref a2, ref b2, ref linearA2, ref angularA2, ref linearB2, ref angularB2, AccumulatedImpulse.Z);
-            //ApplyImpulse(ref a3, ref b3, ref linearA3, ref angularA3, ref linearB3, ref angularB3, AccumulatedImpulse.W);
         }
 
 
@@ -232,20 +189,16 @@ namespace SIMDPrototyping
                 Vector3.Dot(angularB2, b2.AngularVelocity),
                 Vector3.Dot(angularB3, b3.AngularVelocity));
 
-            var lambda =
+            var lambda = EffectiveMass * (
                 linearA + linearB + angularA + angularB +
-                PenetrationBias - AccumulatedImpulse * Softness;
+                PenetrationBias - AccumulatedImpulse * Softness);
 
             var previous = AccumulatedImpulse;
             AccumulatedImpulse = Vector4.Max(Vector4.Zero, AccumulatedImpulse + lambda);
             lambda = AccumulatedImpulse - previous;
 
             ApplyImpulse(ref lambda);
-
-            //ApplyImpulse(ref a0, ref b0, ref linearA0, ref angularA0, ref linearB0, ref angularB0, lambda.X);
-            //ApplyImpulse(ref a1, ref b1, ref linearA1, ref angularA1, ref linearB1, ref angularB1, lambda.Y);
-            //ApplyImpulse(ref a2, ref b2, ref linearA2, ref angularA2, ref linearB2, ref angularB2, lambda.Z);
-            //ApplyImpulse(ref a3, ref b3, ref linearA3, ref angularA3, ref linearB3, ref angularB3, lambda.W);
+            
         }
     }
 }

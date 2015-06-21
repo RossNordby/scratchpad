@@ -10,8 +10,8 @@ namespace SIMDPrototyping
 {
     public class VectorizedConstraintTest
     {
-        public const int TestCount = 10000000;
-        public const int IterationCount = 1;
+        public const int TestCount = 1000000;
+        public const int IterationCount = 10;
         public unsafe static void Test()
         {
             var identityMatrix = new Matrix3x3 { X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 0, 1) };
