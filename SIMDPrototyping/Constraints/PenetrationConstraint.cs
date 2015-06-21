@@ -25,6 +25,12 @@ namespace SIMDPrototyping
         public Vector3 LinearJacobianB;
         public Vector3 AngularJacobianA;
         public Vector3 AngularJacobianB;
+
+        //"Independently transformed" jacobians; takes into account mass/inertia.
+        public Vector3 LinearJacobianITA;
+        public Vector3 LinearJacobianITB;
+        public Vector3 AngularJacobianITA;
+        public Vector3 AngularJacobianITB;
         public float PenetrationBias;
         public float Softness;
         public float EffectiveMass;
@@ -55,12 +61,11 @@ namespace SIMDPrototyping
             PenetrationBias = ContactPenetration * inverseDt;
             PenetrationBias = -Math.Min(Math.Min(PenetrationBias, PenetrationBias * 0.2f), 0.2f);
 
-            //The inertia tensor is in world space, so no jacobian transformation is required.
-
-            Vector3 angularA, angularB;
-            Matrix3x3.Transform(ref AngularJacobianA, ref ConnectionA.InertiaTensorInverse, out angularA);
-            Matrix3x3.Transform(ref AngularJacobianB, ref ConnectionB.InertiaTensorInverse, out angularB);
-            float inverseEffectiveMass = ConnectionA.InverseMass + ConnectionB.InverseMass + Vector3.Dot(angularA, angularA) + Vector3.Dot(angularB, angularB);
+            LinearJacobianITA = LinearJacobianA * ConnectionA.InverseMass;
+            LinearJacobianITB = LinearJacobianB * ConnectionB.InverseMass;
+            Matrix3x3.Transform(ref AngularJacobianA, ref ConnectionA.InertiaTensorInverse, out AngularJacobianITA);
+            Matrix3x3.Transform(ref AngularJacobianB, ref ConnectionB.InertiaTensorInverse, out AngularJacobianITB);
+            float inverseEffectiveMass = ConnectionA.InverseMass + ConnectionB.InverseMass + Vector3.Dot(AngularJacobianITA, AngularJacobianITA) + Vector3.Dot(AngularJacobianITB, AngularJacobianITB);
 
             const float CollisionSoftness = 5;
             Softness = CollisionSoftness * inverseEffectiveMass * inverseDt;
@@ -72,17 +77,11 @@ namespace SIMDPrototyping
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ApplyImpulse(float lambda)
         {
-            ConnectionA.LinearVelocity -= (lambda * ConnectionA.InverseMass) * LinearJacobianA;
-            ConnectionB.LinearVelocity -= (lambda * ConnectionB.InverseMass) * LinearJacobianB;
+            ConnectionA.LinearVelocity -= lambda * LinearJacobianITA;
+            ConnectionB.LinearVelocity -= lambda * LinearJacobianITB;
 
-            //World inertia available, so no need for extra transforms.
-            Vector3 angularImpulseA = lambda * AngularJacobianA;
-            Vector3 angularImpulseB = lambda * AngularJacobianB;
-            Vector3 velocityChangeA, velocityChangeB;
-            Matrix3x3.Transform(ref angularImpulseA, ref ConnectionA.InertiaTensorInverse, out velocityChangeA);
-            Matrix3x3.Transform(ref angularImpulseB, ref ConnectionB.InertiaTensorInverse, out velocityChangeB);
-            ConnectionA.AngularVelocity -= velocityChangeA;
-            ConnectionB.AngularVelocity -= velocityChangeB;
+            ConnectionA.AngularVelocity -= lambda * AngularJacobianITA;
+            ConnectionB.AngularVelocity -= lambda * AngularJacobianITB;
         }
 
         public void WarmStart()
@@ -108,6 +107,6 @@ namespace SIMDPrototyping
             ApplyImpulse(lambda);
         }
 
-       
+
     }
 }
