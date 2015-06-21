@@ -45,6 +45,15 @@ namespace SIMDPrototyping
             result.Y = a.Y * b;
             result.Z = a.Z * b;
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Multiply(ref Vector3Width4 a, float b, out Vector3Width4 result)
+        {
+            result.X = a.X * b;
+            result.Y = a.Y * b;
+            result.Z = a.Z * b;
+        }
+
+
 
 
         /// <summary>
@@ -67,21 +76,21 @@ namespace SIMDPrototyping
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static unsafe void Transpose(ref Vector3Width4 linearChangeA, Vector3* linearChangesA)
+        internal static unsafe void Transpose(ref Vector3Width4 source, Vector3* result)
         {
-            linearChangesA[0] = new Vector3(linearChangeA.X.X, linearChangeA.Y.X, linearChangeA.Z.X);
-            linearChangesA[1] = new Vector3(linearChangeA.X.Y, linearChangeA.Y.Y, linearChangeA.Z.Y);
-            linearChangesA[2] = new Vector3(linearChangeA.X.Z, linearChangeA.Y.Z, linearChangeA.Z.Z);
-            linearChangesA[3] = new Vector3(linearChangeA.X.W, linearChangeA.Y.W, linearChangeA.Z.W);
+            result[0] = new Vector3(source.X.X, source.Y.X, source.Z.X);
+            result[1] = new Vector3(source.X.Y, source.Y.Y, source.Z.Y);
+            result[2] = new Vector3(source.X.Z, source.Y.Z, source.Z.Z);
+            result[3] = new Vector3(source.X.W, source.Y.W, source.Z.W);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static unsafe void Transpose(ref Vector3Width4 linearChangeA, out Vector3 a, out Vector3 b, out Vector3 c, out Vector3 d)
+        internal static unsafe void Transpose(ref Vector3Width4 source, out Vector3 a, out Vector3 b, out Vector3 c, out Vector3 d)
         {
-            a = new Vector3(linearChangeA.X.X, linearChangeA.Y.X, linearChangeA.Z.X);
-            b = new Vector3(linearChangeA.X.Y, linearChangeA.Y.Y, linearChangeA.Z.Y);
-            c = new Vector3(linearChangeA.X.Z, linearChangeA.Y.Z, linearChangeA.Z.Z);
-            d = new Vector3(linearChangeA.X.W, linearChangeA.Y.W, linearChangeA.Z.W);
+            a = new Vector3(source.X.X, source.Y.X, source.Z.X);
+            b = new Vector3(source.X.Y, source.Y.Y, source.Z.Y);
+            c = new Vector3(source.X.Z, source.Y.Z, source.Z.Z);
+            d = new Vector3(source.X.W, source.Y.W, source.Z.W);
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

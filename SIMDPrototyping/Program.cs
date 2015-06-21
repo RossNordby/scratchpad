@@ -16,6 +16,7 @@ namespace SIMDPrototyping
             VectorizedConstraintTest.Test();
             HybridConstraintTest.Test();
             NewScalarConstraintTest.Test();
+            SingleVectorizedConstraintTest.Test();
             OldScalarConstraintTest.Test();
             //Console.ReadKey();
         }
