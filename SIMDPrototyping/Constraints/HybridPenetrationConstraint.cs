@@ -144,6 +144,7 @@ namespace SIMDPrototyping
             var linearA = lambda * InverseMassA;
             var linearB = lambda * InverseMassB;
 
+
             a0.LinearVelocity -= linearA.X * linearA0;
             a1.LinearVelocity -= linearA.Y * linearA1;
             a2.LinearVelocity -= linearA.Z * linearA2;
