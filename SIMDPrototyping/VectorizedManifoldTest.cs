@@ -60,6 +60,13 @@ namespace SIMDPrototyping
                 d = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration }
 
             };
+            const int constraintCount = 4;
+            //var pointer = stackalloc VectorizedManifoldPenetrationConstraint[constraintCount];
+            //constraint.Constraints = pointer;
+            //for (int i = 0; i < constraintCount; ++i)
+            //{
+            //    constraint.Constraints[i] = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration };
+            //}
             float dt = 1 / 60f;
             float inverseDt = 1 / dt;
             constraint.Prestep(inverseDt);
@@ -67,7 +74,7 @@ namespace SIMDPrototyping
             constraint.SolveIteration();
 
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-            for (int i = 0; i < VectorizedConstraintTest.TestCount / 4; ++i)
+            for (int i = 0; i < VectorizedConstraintTest.TestCount / constraintCount; ++i)
             {
                 constraint.Prestep(inverseDt);
                 constraint.WarmStart();
@@ -81,7 +88,7 @@ namespace SIMDPrototyping
 
             var endtime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-            Console.WriteLine($"Vectorized: {endtime - startTime}");
+            Console.WriteLine($"Vectorized Manifold: {endtime - startTime}");
 
 
         }
