@@ -27,12 +27,11 @@ namespace SIMDPrototyping
         public float ContactPenetration;
 
         //Solver-Computed
-        //Jacobians
-        //"Effective mass" transformed jacobians. Used for computing relative velocity.
-        Vector3 linearEMA0, angularEMA0, linearEMB0, angularEMB0;
-        Vector3 linearEMA1, angularEMA1, linearEMB1, angularEMB1;
-        Vector3 linearEMA2, angularEMA2, linearEMB2, angularEMB2;
-        Vector3 linearEMA3, angularEMA3, linearEMB3, angularEMB3;
+        //Jacobians.
+        Vector3 linearA0, angularA0, linearB0, angularB0;
+        Vector3 linearA1, angularA1, linearB1, angularB1;
+        Vector3 linearA2, angularA2, linearB2, angularB2;
+        Vector3 linearA3, angularA3, linearB3, angularB3;
 
         //"Independently transformed" jacobians. These are jl * invMass and ja * invInertia. 
         Vector3 linearITA0, angularITA0, linearITB0, angularITB0;
@@ -64,15 +63,15 @@ namespace SIMDPrototyping
             InverseMassA = new Vector4(a0.InverseMass, a1.InverseMass, a2.InverseMass, a3.InverseMass);
             InverseMassB = new Vector4(b0.InverseMass, b1.InverseMass, b2.InverseMass, b3.InverseMass);
 
-            linearEMA0 = ContactNormal;
-            linearEMA1 = ContactNormal;
-            linearEMA2 = ContactNormal;
-            linearEMA3 = ContactNormal;
+            linearA0 = ContactNormal;
+            linearA1 = ContactNormal;
+            linearA2 = ContactNormal;
+            linearA3 = ContactNormal;
 
-            linearEMB0 = -ContactNormal;
-            linearEMB1 = -ContactNormal;
-            linearEMB2 = -ContactNormal;
-            linearEMB3 = -ContactNormal;
+            linearB0 = -ContactNormal;
+            linearB1 = -ContactNormal;
+            linearB2 = -ContactNormal;
+            linearB3 = -ContactNormal;
 
             Vector3 offsetA0, offsetB0, offsetA1, offsetB1, offsetA2, offsetB2, offsetA3, offsetB3;
             offsetA0 = ContactPosition - a0.Position;
@@ -85,14 +84,14 @@ namespace SIMDPrototyping
             offsetB3 = ContactPosition - b3.Position;
 
             //Oof. All of this is scalar.
-            Vector3Ex.Cross(ref offsetA0, ref ContactNormal, out angularEMA0);
-            Vector3Ex.Cross(ref offsetA1, ref ContactNormal, out angularEMA1);
-            Vector3Ex.Cross(ref offsetA2, ref ContactNormal, out angularEMA2);
-            Vector3Ex.Cross(ref offsetA3, ref ContactNormal, out angularEMA3);
-            Vector3Ex.Cross(ref ContactNormal, ref offsetB0, out angularEMB0);// note negation->parameter reverse
-            Vector3Ex.Cross(ref ContactNormal, ref offsetB1, out angularEMB1);
-            Vector3Ex.Cross(ref ContactNormal, ref offsetB2, out angularEMB2);
-            Vector3Ex.Cross(ref ContactNormal, ref offsetB3, out angularEMB3);
+            Vector3Ex.Cross(ref offsetA0, ref ContactNormal, out angularA0);
+            Vector3Ex.Cross(ref offsetA1, ref ContactNormal, out angularA1);
+            Vector3Ex.Cross(ref offsetA2, ref ContactNormal, out angularA2);
+            Vector3Ex.Cross(ref offsetA3, ref ContactNormal, out angularA3);
+            Vector3Ex.Cross(ref ContactNormal, ref offsetB0, out angularB0);// note negation->parameter reverse
+            Vector3Ex.Cross(ref ContactNormal, ref offsetB1, out angularB1);
+            Vector3Ex.Cross(ref ContactNormal, ref offsetB2, out angularB2);
+            Vector3Ex.Cross(ref ContactNormal, ref offsetB3, out angularB3);
 
             var contactPenetrations = new Vector4(ContactPenetration);
 
@@ -102,25 +101,25 @@ namespace SIMDPrototyping
             PenetrationBias = -Vector4.Min(Vector4.Min(PenetrationBias, PenetrationBias * 0.2f), new Vector4(0.2f));
 
 
-            linearITA0 = linearEMA0 * a0.InverseMass;
-            linearITA1 = linearEMA1 * a1.InverseMass;
-            linearITA2 = linearEMA2 * a2.InverseMass;
-            linearITA3 = linearEMA3 * a3.InverseMass;
+            linearITA0 = linearA0 * a0.InverseMass;
+            linearITA1 = linearA1 * a1.InverseMass;
+            linearITA2 = linearA2 * a2.InverseMass;
+            linearITA3 = linearA3 * a3.InverseMass;
 
-            linearITB0 = linearEMB0 * b0.InverseMass;
-            linearITB1 = linearEMB1 * b1.InverseMass;
-            linearITB2 = linearEMB2 * b2.InverseMass;
-            linearITB3 = linearEMB3 * b3.InverseMass;
+            linearITB0 = linearB0 * b0.InverseMass;
+            linearITB1 = linearB1 * b1.InverseMass;
+            linearITB2 = linearB2 * b2.InverseMass;
+            linearITB3 = linearB3 * b3.InverseMass;
 
             //The inertia tensor is in world space, so no jacobian transformation is required.
-            Matrix3x3.Transform(ref angularEMA0, ref a0.InertiaTensorInverse, out angularITA0);
-            Matrix3x3.Transform(ref angularEMB0, ref b0.InertiaTensorInverse, out angularITB0);
-            Matrix3x3.Transform(ref angularEMA1, ref a1.InertiaTensorInverse, out angularITA1);
-            Matrix3x3.Transform(ref angularEMB1, ref b1.InertiaTensorInverse, out angularITB1);
-            Matrix3x3.Transform(ref angularEMA2, ref a2.InertiaTensorInverse, out angularITA2);
-            Matrix3x3.Transform(ref angularEMB2, ref b2.InertiaTensorInverse, out angularITB2);
-            Matrix3x3.Transform(ref angularEMA3, ref a3.InertiaTensorInverse, out angularITA3);
-            Matrix3x3.Transform(ref angularEMB3, ref b3.InertiaTensorInverse, out angularITB3);
+            Matrix3x3.Transform(ref angularA0, ref a0.InertiaTensorInverse, out angularITA0);
+            Matrix3x3.Transform(ref angularB0, ref b0.InertiaTensorInverse, out angularITB0);
+            Matrix3x3.Transform(ref angularA1, ref a1.InertiaTensorInverse, out angularITA1);
+            Matrix3x3.Transform(ref angularB1, ref b1.InertiaTensorInverse, out angularITB1);
+            Matrix3x3.Transform(ref angularA2, ref a2.InertiaTensorInverse, out angularITA2);
+            Matrix3x3.Transform(ref angularB2, ref b2.InertiaTensorInverse, out angularITB2);
+            Matrix3x3.Transform(ref angularA3, ref a3.InertiaTensorInverse, out angularITA3);
+            Matrix3x3.Transform(ref angularB3, ref b3.InertiaTensorInverse, out angularITB3);
             Vector4 angularContributionsA = new Vector4(Vector3.Dot(angularITA0, angularITA0), Vector3.Dot(angularITA1, angularITA1), Vector3.Dot(angularITA2, angularITA2), Vector3.Dot(angularITA3, angularITA3));
             Vector4 angularContributionsB = new Vector4(Vector3.Dot(angularITB0, angularITB0), Vector3.Dot(angularITB1, angularITB1), Vector3.Dot(angularITB2, angularITB2), Vector3.Dot(angularITB3, angularITB3));
             var inverseEffectiveMass = InverseMassA + InverseMassB + angularContributionsA + angularContributionsB;
@@ -129,14 +128,25 @@ namespace SIMDPrototyping
             Softness = CollisionSoftness * inverseEffectiveMass * inverseDt;
             var EffectiveMass = Vector4.One / (Softness + inverseEffectiveMass);
 
-            angularEMA0 *= EffectiveMass.X;
-            angularEMB0 *= EffectiveMass.X;
-            angularEMA1 *= EffectiveMass.Y;
-            angularEMB1 *= EffectiveMass.Y;
-            angularEMA2 *= EffectiveMass.Z;
-            angularEMB2 *= EffectiveMass.Z;
-            angularEMA3 *= EffectiveMass.W;
-            angularEMB3 *= EffectiveMass.W;
+            linearA0 *= EffectiveMass.X;
+            angularA0 *= EffectiveMass.X;
+            linearB0 *= EffectiveMass.X;
+            angularB0 *= EffectiveMass.X;
+
+            linearA1 *= EffectiveMass.Y;
+            angularA1 *= EffectiveMass.Y;
+            linearB1 *= EffectiveMass.Y;
+            angularB1 *= EffectiveMass.Y;
+
+            linearA2 *= EffectiveMass.Z;
+            angularA2 *= EffectiveMass.Z;
+            linearB2 *= EffectiveMass.Z;
+            angularB2 *= EffectiveMass.Z;
+
+            linearA3 *= EffectiveMass.W;
+            angularA3 *= EffectiveMass.W;
+            linearA3 *= EffectiveMass.W;
+            angularB3 *= EffectiveMass.W;
 
             PenetrationBias *= EffectiveMass;
             Softness *= EffectiveMass;
@@ -202,25 +212,25 @@ namespace SIMDPrototyping
         public void SolveIteration()
         {
             var linearA = new Vector4(
-                Vector3.Dot(linearEMA0, a0.LinearVelocity),
-                Vector3.Dot(linearEMA1, a1.LinearVelocity),
-                Vector3.Dot(linearEMA2, a2.LinearVelocity),
-                Vector3.Dot(linearEMA3, a3.LinearVelocity));
+                Vector3.Dot(linearA0, a0.LinearVelocity),
+                Vector3.Dot(linearA1, a1.LinearVelocity),
+                Vector3.Dot(linearA2, a2.LinearVelocity),
+                Vector3.Dot(linearA3, a3.LinearVelocity));
             var angularA = new Vector4(
-                Vector3.Dot(angularEMA0, a0.AngularVelocity),
-                Vector3.Dot(angularEMA1, a1.AngularVelocity),
-                Vector3.Dot(angularEMA2, a2.AngularVelocity),
-                Vector3.Dot(angularEMA3, a3.AngularVelocity));
+                Vector3.Dot(angularA0, a0.AngularVelocity),
+                Vector3.Dot(angularA1, a1.AngularVelocity),
+                Vector3.Dot(angularA2, a2.AngularVelocity),
+                Vector3.Dot(angularA3, a3.AngularVelocity));
             var linearB = new Vector4(
-                Vector3.Dot(linearEMB0, b0.LinearVelocity),
-                Vector3.Dot(linearEMB1, b1.LinearVelocity),
-                Vector3.Dot(linearEMB2, b2.LinearVelocity),
-                Vector3.Dot(linearEMB3, b3.LinearVelocity));
+                Vector3.Dot(linearB0, b0.LinearVelocity),
+                Vector3.Dot(linearB1, b1.LinearVelocity),
+                Vector3.Dot(linearB2, b2.LinearVelocity),
+                Vector3.Dot(linearB3, b3.LinearVelocity));
             var angularB = new Vector4(
-                Vector3.Dot(angularEMB0, b0.AngularVelocity),
-                Vector3.Dot(angularEMB1, b1.AngularVelocity),
-                Vector3.Dot(angularEMB2, b2.AngularVelocity),
-                Vector3.Dot(angularEMB3, b3.AngularVelocity));
+                Vector3.Dot(angularB0, b0.AngularVelocity),
+                Vector3.Dot(angularB1, b1.AngularVelocity),
+                Vector3.Dot(angularB2, b2.AngularVelocity),
+                Vector3.Dot(angularB3, b3.AngularVelocity));
 
             var lambda =
                 linearA + linearB + angularA + angularB +

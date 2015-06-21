@@ -10,7 +10,7 @@ namespace SIMDPrototyping
 {
     public class VectorizedConstraintTest
     {
-        public const int TestCount = 1000000;
+        public const int TestCount = 10000000;
         public const int IterationCount = 1;
         public unsafe static void Test()
         {
