@@ -96,7 +96,6 @@ namespace SIMDPrototyping
             PenetrationBias = contactPenetrations * inverseDt;
             PenetrationBias = -Vector4.Min(Vector4.Min(PenetrationBias, PenetrationBias * 0.2f), new Vector4(0.2f));
 
-
             linearITA0 = linearA0 * a0.InverseMass;
             linearITA1 = linearA1 * a1.InverseMass;
             linearITA2 = linearA2 * a2.InverseMass;
@@ -107,12 +106,15 @@ namespace SIMDPrototyping
             linearITB2 = linearB2 * b2.InverseMass;
             linearITB3 = linearB3 * b3.InverseMass;
 
+
+
             //You might look at this and wonder, 'why is this sitting in the middle?'
-            //Because it's 30% faster (than at least one other potential spot).
+            //Because it's 15-30% faster than other obvious spots.
             // :)  :)  :)  :)
             //Optimizing Compiler.
             var inverseMassA = new Vector4(a0.InverseMass, a1.InverseMass, a2.InverseMass, a3.InverseMass);
             var inverseMassB = new Vector4(b0.InverseMass, b1.InverseMass, b2.InverseMass, b3.InverseMass);
+
 
             //The inertia tensor is in world space, so no jacobian transformation is required.
             Matrix3x3.Transform(ref angularA0, ref a0.InertiaTensorInverse, out angularITA0);
