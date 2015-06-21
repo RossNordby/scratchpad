@@ -32,36 +32,39 @@ namespace SIMDPrototyping
         public BodyState BodyB2;
         public BodyState BodyB3;
 
-        public VectorizedManifoldPenetrationConstraint a;
-        public VectorizedManifoldPenetrationConstraint b;
-        public VectorizedManifoldPenetrationConstraint c;
-        public VectorizedManifoldPenetrationConstraint d;
-        //public VectorizedManifoldPenetrationConstraint Constraints;
+        //public VectorizedManifoldPenetrationConstraint a;
+        //public VectorizedManifoldPenetrationConstraint b;
+        //public VectorizedManifoldPenetrationConstraint c;
+        //public VectorizedManifoldPenetrationConstraint d;
+        //public VectorizedManifoldPenetrationConstraint[] Constraints;
+        public VectorizedManifoldPenetrationConstraint* Constraints;
+        public int ConstraintCount;
 
         public void Prestep(float inverseDt)
         {
             //Given that we're collecting position, inverse mass, and inertia all at once, it makes no sense to store position separately from inversemass and inertia. 
             //Since you should not expect the 4 involved bodies to be in memory *together*, the best you can do is to ensure that the set of values are together. 
             //Otherwise you're multiplying cache misses for no reason!
-            var InverseMassA = new Vector4(BodyA0.InverseMass, BodyA1.InverseMass, BodyA2.InverseMass, BodyA3.InverseMass);
-            var InverseMassB = new Vector4(BodyB0.InverseMass, BodyB1.InverseMass, BodyB2.InverseMass, BodyB3.InverseMass);
+            var inverseMassA = new Vector4(BodyA0.InverseMass, BodyA1.InverseMass, BodyA2.InverseMass, BodyA3.InverseMass);
+            var inverseMassB = new Vector4(BodyB0.InverseMass, BodyB1.InverseMass, BodyB2.InverseMass, BodyB3.InverseMass);
 
-            var InverseInertiaTensorA = new Matrix3x3Width4(ref BodyA0.InertiaTensorInverse, ref BodyA1.InertiaTensorInverse, ref BodyA2.InertiaTensorInverse, ref BodyA3.InertiaTensorInverse);
-            var InverseInertiaTensorB = new Matrix3x3Width4(ref BodyB0.InertiaTensorInverse, ref BodyB1.InertiaTensorInverse, ref BodyB2.InertiaTensorInverse, ref BodyB3.InertiaTensorInverse);
+            var inverseInertiaTensorA = new Matrix3x3Width4(ref BodyA0.InertiaTensorInverse, ref BodyA1.InertiaTensorInverse, ref BodyA2.InertiaTensorInverse, ref BodyA3.InertiaTensorInverse);
+            var inverseInertiaTensorB = new Matrix3x3Width4(ref BodyB0.InertiaTensorInverse, ref BodyB1.InertiaTensorInverse, ref BodyB2.InertiaTensorInverse, ref BodyB3.InertiaTensorInverse);
+
 
             Vector3Width4 positionA = new Vector3Width4(ref BodyA0.Position, ref BodyA1.Position, ref BodyA2.Position, ref BodyA3.Position);
             Vector3Width4 positionB = new Vector3Width4(ref BodyA0.Position, ref BodyB1.Position, ref BodyB2.Position, ref BodyB3.Position);
 
+            for (int i = 0; i < ConstraintCount; ++i)
+            {
+                Constraints[i].Prestep(inverseDt, ref inverseMassA, ref inverseMassB, ref inverseInertiaTensorA, ref inverseInertiaTensorB, ref positionA, ref positionB);
+            }
+
             //for (int i = 0; i < 4; ++i)
             //{
-            //    Constraints[i].Prestep(inverseDt, ref InverseMassA, ref InverseMassB, ref InverseInertiaTensorA, ref InverseInertiaTensorB, ref positionA, ref positionB);
+            //    a.Prestep(inverseDt, ref InverseMassA, ref InverseMassB, ref InverseInertiaTensorA, ref InverseInertiaTensorB, ref positionA, ref positionB);
+
             //}
-
-            for (int i = 0; i < 4; ++i)
-            {
-                a.Prestep(inverseDt, ref InverseMassA, ref InverseMassB, ref InverseInertiaTensorA, ref InverseInertiaTensorB, ref positionA, ref positionB);
-
-            }
 
             //a.Prestep(inverseDt, ref InverseMassA, ref InverseMassB, ref InverseInertiaTensorA, ref InverseInertiaTensorB, ref positionA, ref positionB);
             //b.Prestep(inverseDt, ref InverseMassA, ref InverseMassB, ref InverseInertiaTensorA, ref InverseInertiaTensorB, ref positionA, ref positionB);
@@ -76,14 +79,14 @@ namespace SIMDPrototyping
             Vector3Width4 linearVelocityB = new Vector3Width4(ref VelocitiesB0.LinearVelocity, ref VelocitiesB1.LinearVelocity, ref VelocitiesB2.LinearVelocity, ref VelocitiesB3.LinearVelocity);
             Vector3Width4 angularVelocityB = new Vector3Width4(ref VelocitiesB0.AngularVelocity, ref VelocitiesB1.AngularVelocity, ref VelocitiesB2.AngularVelocity, ref VelocitiesB3.AngularVelocity);
 
+            for (int i = 0; i < ConstraintCount; ++i)
+            {
+                Constraints[i].WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
+            }
             //for (int i = 0; i < 4; ++i)
             //{
-            //    Constraints[i].WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
+            //    a.WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
             //}
-            for (int i = 0; i < 4; ++i)
-            {
-                a.WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
-            }
             //a.WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
             //b.WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
             //c.WarmStart(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
@@ -104,15 +107,15 @@ namespace SIMDPrototyping
             Vector3Width4 linearVelocityB = new Vector3Width4(ref VelocitiesB0.LinearVelocity, ref VelocitiesB1.LinearVelocity, ref VelocitiesB2.LinearVelocity, ref VelocitiesB3.LinearVelocity);
             Vector3Width4 angularVelocityB = new Vector3Width4(ref VelocitiesB0.AngularVelocity, ref VelocitiesB1.AngularVelocity, ref VelocitiesB2.AngularVelocity, ref VelocitiesB3.AngularVelocity);
 
+            for (int i = 0; i < ConstraintCount; ++i)
+            {
+                Constraints[i].SolveIteration(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
+            }
+
             //for (int i = 0; i < 4; ++i)
             //{
-            //    Constraints[i].SolveIteration(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
+            //    a.SolveIteration(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
             //}
-
-            for (int i = 0; i < 4; ++i)
-            {
-                a.SolveIteration(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
-            }
 
             //a.SolveIteration(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
             //b.SolveIteration(ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);

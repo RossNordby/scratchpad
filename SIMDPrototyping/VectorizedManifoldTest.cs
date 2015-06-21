@@ -54,19 +54,20 @@ namespace SIMDPrototyping
                 VelocitiesB1 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
                 VelocitiesB2 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
                 VelocitiesB3 = new Velocities { LinearVelocity = new Vector3(0, -1, 0) },
-                a = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration },
-                b = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration },
-                c = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration },
-                d = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration }
+                //a = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration },
+                //b = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration },
+                //c = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration },
+                //d = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration }
 
             };
-            const int constraintCount = 4;
-            //var pointer = stackalloc VectorizedManifoldPenetrationConstraint[constraintCount];
-            //constraint.Constraints = pointer;
-            //for (int i = 0; i < constraintCount; ++i)
-            //{
-            //    constraint.Constraints[i] = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration };
-            //}
+            constraint.ConstraintCount = 4;
+            var pointer = stackalloc VectorizedManifoldPenetrationConstraint[constraint.ConstraintCount];
+            constraint.Constraints = pointer;
+            //constraint.Constraints = new VectorizedManifoldPenetrationConstraint[constraintCount];
+            for (int i = 0; i < constraint.ConstraintCount; ++i)
+            {
+                constraint.Constraints[i] = new VectorizedManifoldPenetrationConstraint { ContactPosition = contactPosition, ContactNormal = contactNormal, ContactPenetration = contactPenetration };
+            }
             float dt = 1 / 60f;
             float inverseDt = 1 / dt;
             constraint.Prestep(inverseDt);
@@ -74,7 +75,7 @@ namespace SIMDPrototyping
             constraint.SolveIteration();
 
             var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-            for (int i = 0; i < VectorizedConstraintTest.TestCount / constraintCount; ++i)
+            for (int i = 0; i < VectorizedConstraintTest.TestCount / constraint.ConstraintCount; ++i)
             {
                 constraint.Prestep(inverseDt);
                 constraint.WarmStart();
