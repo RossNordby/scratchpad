@@ -142,12 +142,13 @@ namespace SIMDPrototyping
         void ApplyImpulse(ref Vector4 lambda)
         {
             var linearA = lambda * InverseMassA;
+            var linearB = lambda * InverseMassB;
+
             a0.LinearVelocity -= linearA.X * linearA0;
             a1.LinearVelocity -= linearA.Y * linearA1;
             a2.LinearVelocity -= linearA.Z * linearA2;
             a3.LinearVelocity -= linearA.W * linearA3;
 
-            var linearB = lambda * InverseMassB;
             b0.LinearVelocity -= linearB.X * linearB0;
             b1.LinearVelocity -= linearB.Y * linearB1;
             b2.LinearVelocity -= linearB.Z * linearB2;
@@ -175,17 +176,16 @@ namespace SIMDPrototyping
             Matrix3x3.Transform(ref angularImpulseB2, ref b2.InertiaTensorInverse, out velocityChangeB2);
             Matrix3x3.Transform(ref angularImpulseB3, ref b3.InertiaTensorInverse, out velocityChangeB3);
 
-
+            a0.AngularVelocity -= velocityChangeA0;
+            a1.AngularVelocity -= velocityChangeA1;
+            a2.AngularVelocity -= velocityChangeA2;
+            a3.AngularVelocity -= velocityChangeA3;
 
             b0.AngularVelocity -= velocityChangeB0;
             b1.AngularVelocity -= velocityChangeB1;
             b2.AngularVelocity -= velocityChangeB2;
             b3.AngularVelocity -= velocityChangeB3;
 
-            a0.AngularVelocity -= velocityChangeA0;
-            a1.AngularVelocity -= velocityChangeA1;
-            a2.AngularVelocity -= velocityChangeA2;
-            a3.AngularVelocity -= velocityChangeA3;
         }
 
         public void WarmStart()
@@ -231,11 +231,12 @@ namespace SIMDPrototyping
             AccumulatedImpulse = Vector4.Max(Vector4.Zero, AccumulatedImpulse + lambda);
             lambda = AccumulatedImpulse - previous;
 
+            ApplyImpulse(ref lambda);
 
-            ApplyImpulse(ref a0, ref b0, ref linearA0, ref angularA0, ref linearB0, ref angularB0, lambda.X);
-            ApplyImpulse(ref a1, ref b1, ref linearA1, ref angularA1, ref linearB1, ref angularB1, lambda.Y);
-            ApplyImpulse(ref a2, ref b2, ref linearA2, ref angularA2, ref linearB2, ref angularB2, lambda.Z);
-            ApplyImpulse(ref a3, ref b3, ref linearA3, ref angularA3, ref linearB3, ref angularB3, lambda.W);
+            //ApplyImpulse(ref a0, ref b0, ref linearA0, ref angularA0, ref linearB0, ref angularB0, lambda.X);
+            //ApplyImpulse(ref a1, ref b1, ref linearA1, ref angularA1, ref linearB1, ref angularB1, lambda.Y);
+            //ApplyImpulse(ref a2, ref b2, ref linearA2, ref angularA2, ref linearB2, ref angularB2, lambda.Z);
+            //ApplyImpulse(ref a3, ref b3, ref linearA3, ref angularA3, ref linearB3, ref angularB3, lambda.W);
         }
     }
 }
