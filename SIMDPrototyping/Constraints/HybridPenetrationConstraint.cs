@@ -141,22 +141,27 @@ namespace SIMDPrototyping
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ApplyImpulse(ref Vector4 lambda)
         {
-                var linearA = lambda * InverseMassA;
-                a0.LinearVelocity -= lambda.X * linearA0;
-                a1.LinearVelocity -= lambda.Y * linearA1;
-                a2.LinearVelocity -= lambda.Z * linearA2;
-                a3.LinearVelocity -= lambda.W * linearA3;
+            var linearA = lambda * InverseMassA;
+            a0.LinearVelocity -= linearA.X * linearA0;
+            a1.LinearVelocity -= linearA.Y * linearA1;
+            a2.LinearVelocity -= linearA.Z * linearA2;
+            a3.LinearVelocity -= linearA.W * linearA3;
 
-                var linearB = lambda * InverseMassB;
-                b0.LinearVelocity -= lambda.X * linearB0;
-                b1.LinearVelocity -= lambda.Y * linearB1;
-                b2.LinearVelocity -= lambda.Z * linearB2;
-                b3.LinearVelocity -= lambda.W * linearB3;
+            var linearB = lambda * InverseMassB;
+            b0.LinearVelocity -= linearB.X * linearB0;
+            b1.LinearVelocity -= linearB.Y * linearB1;
+            b2.LinearVelocity -= linearB.Z * linearB2;
+            b3.LinearVelocity -= linearB.W * linearB3;
 
             var angularImpulseA0 = lambda.X * angularA0;
             var angularImpulseA1 = lambda.Y * angularA1;
             var angularImpulseA2 = lambda.Z * angularA2;
             var angularImpulseA3 = lambda.W * angularA3;
+
+            var angularImpulseB0 = lambda.X * angularB0;
+            var angularImpulseB1 = lambda.Y * angularB1;
+            var angularImpulseB2 = lambda.Z * angularB2;
+            var angularImpulseB3 = lambda.W * angularB3;
 
             Vector3 velocityChangeA0, velocityChangeA1, velocityChangeA2, velocityChangeA3;
             Matrix3x3.Transform(ref angularImpulseA0, ref a0.InertiaTensorInverse, out velocityChangeA0);
@@ -164,26 +169,23 @@ namespace SIMDPrototyping
             Matrix3x3.Transform(ref angularImpulseA2, ref a2.InertiaTensorInverse, out velocityChangeA2);
             Matrix3x3.Transform(ref angularImpulseA3, ref a3.InertiaTensorInverse, out velocityChangeA3);
 
-            a0.AngularVelocity -= lambda.X * angularA0;
-            a1.AngularVelocity -= lambda.Y * angularA1;
-            a2.AngularVelocity -= lambda.Z * angularA2;
-            a3.AngularVelocity -= lambda.W * angularA3;
-
-            var angularImpulseB0 = lambda.X * angularB0;
-            var angularImpulseB1 = lambda.Y * angularB1;
-            var angularImpulseB2 = lambda.Z * angularB2;
-            var angularImpulseB3 = lambda.W * angularB3;
-
             Vector3 velocityChangeB0, velocityChangeB1, velocityChangeB2, velocityChangeB3;
             Matrix3x3.Transform(ref angularImpulseB0, ref b0.InertiaTensorInverse, out velocityChangeB0);
             Matrix3x3.Transform(ref angularImpulseB1, ref b1.InertiaTensorInverse, out velocityChangeB1);
             Matrix3x3.Transform(ref angularImpulseB2, ref b2.InertiaTensorInverse, out velocityChangeB2);
             Matrix3x3.Transform(ref angularImpulseB3, ref b3.InertiaTensorInverse, out velocityChangeB3);
-            
-            b0.AngularVelocity -= lambda.X * angularB0;
-            b1.AngularVelocity -= lambda.Y * angularB1;
-            b2.AngularVelocity -= lambda.Z * angularB2;
-            b3.AngularVelocity -= lambda.W * angularB3;
+
+
+
+            b0.AngularVelocity -= velocityChangeB0;
+            b1.AngularVelocity -= velocityChangeB1;
+            b2.AngularVelocity -= velocityChangeB2;
+            b3.AngularVelocity -= velocityChangeB3;
+
+            a0.AngularVelocity -= velocityChangeA0;
+            a1.AngularVelocity -= velocityChangeA1;
+            a2.AngularVelocity -= velocityChangeA2;
+            a3.AngularVelocity -= velocityChangeA3;
         }
 
         public void WarmStart()
