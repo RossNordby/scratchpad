@@ -17,9 +17,6 @@ namespace SIMDPrototyping
 
         //Per-frame gathered values.
 
-        public Vector4 InverseMassA;
-        public Vector4 InverseMassB;
-
         //Just share contact information for now.
         public Vector3 ContactPosition;
         //Normal points out of A.
@@ -61,8 +58,6 @@ namespace SIMDPrototyping
             //Given that we're collecting position, inverse mass, and inertia all at once, it makes no sense to store position separately from inversemass and inertia. 
             //Since you should not expect the 4 involved bodies to be in memory *together*, the best you can do is to ensure that the set of values are together. 
             //Otherwise you're multiplying cache misses for no reason!
-            InverseMassA = new Vector4(a0.InverseMass, a1.InverseMass, a2.InverseMass, a3.InverseMass);
-            InverseMassB = new Vector4(b0.InverseMass, b1.InverseMass, b2.InverseMass, b3.InverseMass);
 
             linearA0 = ContactNormal;
             linearA1 = ContactNormal;
@@ -112,6 +107,13 @@ namespace SIMDPrototyping
             linearITB2 = linearB2 * b2.InverseMass;
             linearITB3 = linearB3 * b3.InverseMass;
 
+            //You might look at this and wonder, 'why is this sitting in the middle?'
+            //Because it's 30% faster (than at least one other potential spot).
+            // :)  :)  :)  :)
+            //Optimizing Compiler.
+            var inverseMassA = new Vector4(a0.InverseMass, a1.InverseMass, a2.InverseMass, a3.InverseMass);
+            var inverseMassB = new Vector4(b0.InverseMass, b1.InverseMass, b2.InverseMass, b3.InverseMass);
+
             //The inertia tensor is in world space, so no jacobian transformation is required.
             Matrix3x3.Transform(ref angularA0, ref a0.InertiaTensorInverse, out angularITA0);
             Matrix3x3.Transform(ref angularB0, ref b0.InertiaTensorInverse, out angularITB0);
@@ -121,9 +123,12 @@ namespace SIMDPrototyping
             Matrix3x3.Transform(ref angularB2, ref b2.InertiaTensorInverse, out angularITB2);
             Matrix3x3.Transform(ref angularA3, ref a3.InertiaTensorInverse, out angularITA3);
             Matrix3x3.Transform(ref angularB3, ref b3.InertiaTensorInverse, out angularITB3);
+
+
             Vector4 angularContributionsA = new Vector4(Vector3.Dot(angularITA0, angularITA0), Vector3.Dot(angularITA1, angularITA1), Vector3.Dot(angularITA2, angularITA2), Vector3.Dot(angularITA3, angularITA3));
             Vector4 angularContributionsB = new Vector4(Vector3.Dot(angularITB0, angularITB0), Vector3.Dot(angularITB1, angularITB1), Vector3.Dot(angularITB2, angularITB2), Vector3.Dot(angularITB3, angularITB3));
-            var inverseEffectiveMass = InverseMassA + InverseMassB + angularContributionsA + angularContributionsB;
+
+            var inverseEffectiveMass = inverseMassA + inverseMassB + angularContributionsA + angularContributionsB;
 
             Vector4 CollisionSoftness = new Vector4(5);
             Softness = CollisionSoftness * inverseEffectiveMass * inverseDt;
