@@ -40,7 +40,7 @@ namespace SIMDPrototyping
         public BodyState BodyA1;
         public BodyState BodyA2;
         public BodyState BodyA3;
-        
+
         public Velocities VelocitiesB0;
         public Velocities VelocitiesB1;
         public Velocities VelocitiesB2;
@@ -52,7 +52,7 @@ namespace SIMDPrototyping
         public BodyState BodyB3;
 
         //Per-frame gathered values.
-        
+
 
         public Vector3Width4 ContactPosition;
         //Normal points out of A.
@@ -94,10 +94,10 @@ namespace SIMDPrototyping
             //Otherwise you're multiplying cache misses for no reason!
             var InverseMassA = new Vector4(BodyA0.InverseMass, BodyA1.InverseMass, BodyA2.InverseMass, BodyA3.InverseMass);
             var InverseMassB = new Vector4(BodyB0.InverseMass, BodyB1.InverseMass, BodyB2.InverseMass, BodyB3.InverseMass);
-            
+
             var InverseInertiaTensorA = new Matrix3x3Width4(ref BodyA0.InertiaTensorInverse, ref BodyA1.InertiaTensorInverse, ref BodyA2.InertiaTensorInverse, ref BodyA3.InertiaTensorInverse);
             var InverseInertiaTensorB = new Matrix3x3Width4(ref BodyB0.InertiaTensorInverse, ref BodyB1.InertiaTensorInverse, ref BodyB2.InertiaTensorInverse, ref BodyB3.InertiaTensorInverse);
-            
+
             Vector3Width4 positionA = new Vector3Width4(ref BodyA0.Position, ref BodyA1.Position, ref BodyA2.Position, ref BodyA3.Position);
             Vector3Width4 positionB = new Vector3Width4(ref BodyA0.Position, ref BodyB1.Position, ref BodyB2.Position, ref BodyB3.Position);
 
@@ -136,6 +136,8 @@ namespace SIMDPrototyping
 
         }
 
+        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ApplyImpulse(ref Vector4 lambda)
         {
@@ -153,7 +155,7 @@ namespace SIMDPrototyping
             Vector3Width4 angularChangeA, angularChangeB;
             Vector3Width4.Multiply(ref AngularJacobianITA, ref lambda, out angularChangeA);
             Vector3Width4.Multiply(ref AngularJacobianITB, ref lambda, out angularChangeB);
-            
+
             Vector3 angularChangeA0, angularChangeA1, angularChangeA2, angularChangeA3;
             Vector3 angularChangeB0, angularChangeB1, angularChangeB2, angularChangeB3;
             Vector3Width4.Transpose(ref angularChangeA, out angularChangeA0, out angularChangeA1, out angularChangeA2, out angularChangeA3);
@@ -181,14 +183,38 @@ namespace SIMDPrototyping
 
         public void WarmStart()
         {
+            //Since the warm start did not have access to the velocities beforehand, just use the transpose-changes approach.
             ApplyImpulse(ref AccumulatedImpulse);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void ApplyImpulse(ref Vector4 lambda, ref Vector3Width4 linearVelocityA, ref Vector3Width4 angularVelocityA, ref Vector3Width4 linearVelocityB, ref Vector3Width4 angularVelocityB)
+        {
+            Vector3Width4 linearChangeA, linearChangeB;
+            Vector3Width4.Multiply(ref LinearJacobianITA, ref lambda, out linearChangeA);
+            Vector3Width4.Multiply(ref LinearJacobianITB, ref lambda, out linearChangeB);
 
+            Vector3Width4.Add(ref linearVelocityA, ref linearChangeA, out linearVelocityA);
+            Vector3Width4.Add(ref linearVelocityB, ref linearChangeB, out linearVelocityB);
+
+
+
+            //World inertia available, so no need for extra transforms.
+            Vector3Width4 angularChangeA, angularChangeB;
+            Vector3Width4.Multiply(ref AngularJacobianITA, ref lambda, out angularChangeA);
+            Vector3Width4.Multiply(ref AngularJacobianITB, ref lambda, out angularChangeB);
+
+
+            Vector3Width4.Add(ref angularVelocityA, ref angularChangeA, out angularVelocityA);
+            Vector3Width4.Add(ref angularVelocityB, ref angularChangeB, out angularVelocityB);
+
+
+
+
+        }
 
         public void SolveIteration()
         {
-            //May be wise to hold pre-transposed from the prestep. Then you could....? asdfasdf
             Vector3Width4 linearVelocityA = new Vector3Width4(ref VelocitiesA0.LinearVelocity, ref VelocitiesA1.LinearVelocity, ref VelocitiesA2.LinearVelocity, ref VelocitiesA3.LinearVelocity);
             Vector3Width4 angularVelocityA = new Vector3Width4(ref VelocitiesA0.AngularVelocity, ref VelocitiesA1.AngularVelocity, ref VelocitiesA2.AngularVelocity, ref VelocitiesA3.AngularVelocity);
             Vector3Width4 linearVelocityB = new Vector3Width4(ref VelocitiesB0.LinearVelocity, ref VelocitiesB1.LinearVelocity, ref VelocitiesB2.LinearVelocity, ref VelocitiesB3.LinearVelocity);
@@ -205,7 +231,13 @@ namespace SIMDPrototyping
             AccumulatedImpulse = Vector4.Max(Vector4.Zero, AccumulatedImpulse + lambda);
             lambda = AccumulatedImpulse - previous;
 
-            ApplyImpulse(ref lambda);
+            ApplyImpulse(ref lambda, ref linearVelocityA, ref angularVelocityA, ref linearVelocityB, ref angularVelocityB);
+
+            Vector3Width4.Transpose(ref linearVelocityA, out VelocitiesA0.LinearVelocity, out VelocitiesA1.LinearVelocity, out VelocitiesA2.LinearVelocity, out VelocitiesA3.LinearVelocity);
+            Vector3Width4.Transpose(ref linearVelocityB, out VelocitiesB0.LinearVelocity, out VelocitiesB1.LinearVelocity, out VelocitiesB2.LinearVelocity, out VelocitiesB3.LinearVelocity);
+            Vector3Width4.Transpose(ref angularVelocityA, out VelocitiesA0.AngularVelocity, out VelocitiesA1.AngularVelocity, out VelocitiesA2.AngularVelocity, out VelocitiesA3.AngularVelocity);
+            Vector3Width4.Transpose(ref angularVelocityB, out VelocitiesB0.AngularVelocity, out VelocitiesB1.AngularVelocity, out VelocitiesB2.AngularVelocity, out VelocitiesB3.AngularVelocity);
+
         }
     }
 }

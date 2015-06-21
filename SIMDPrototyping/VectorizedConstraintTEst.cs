@@ -68,6 +68,7 @@ namespace SIMDPrototyping
             {
                 constraint.Prestep(inverseDt);
                 constraint.WarmStart();
+
                 for (int iterationIndex = 0; iterationIndex < IterationCount; ++iterationIndex)
                 {
                     constraint.SolveIteration();
