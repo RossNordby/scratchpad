@@ -10,16 +10,17 @@ namespace SIMDPrototyping
 {
     public struct Matrix3x3Width4
     {
+        //Note element order; optimized for transform access pattern.
         public Vector4 M11;
-        public Vector4 M12;
-        public Vector4 M13;
-
         public Vector4 M21;
-        public Vector4 M22;
-        public Vector4 M23;
-
         public Vector4 M31;
+
+        public Vector4 M12;
+        public Vector4 M22;
         public Vector4 M32;
+
+        public Vector4 M13;
+        public Vector4 M23;
         public Vector4 M33;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

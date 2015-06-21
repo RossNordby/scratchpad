@@ -14,6 +14,7 @@ namespace SIMDPrototyping
         {
             //MicroFiddling.Cross();
             VectorizedConstraintTest.Test();
+            VectorizedManifoldTest.Test();
             HybridConstraintTest.Test();
             NewScalarConstraintTest.Test();
             SingleVectorizedConstraintTest.Test();

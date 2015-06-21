@@ -82,9 +82,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Constraints\SingleVectorizedPenetrationConstraint.cs" />
+    <Compile Include="Constraints\VectorizedManifoldConstraint.cs" />
     <Compile Include="Matrix3x3Width4.cs" />
     <Compile Include="HybridConstraintTest.cs" />
     <Compile Include="SingleVectorizedConstraintTest.cs" />
+    <Compile Include="VectorizedManifoldTest.cs" />
     <Compile Include="VectorizedConstraintTest.cs" />
     <Compile Include="OldScalarConstraintTest.cs" />
     <Compile Include="NewScalarConstraintTest.cs" />
