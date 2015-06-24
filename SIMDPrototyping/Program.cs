@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SIMDPrototyping.Tests;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,13 +13,14 @@ namespace SIMDPrototyping
     {
         static unsafe void Main(string[] args)
         {
+            VectorAccelerationTest.Test();
             //MicroFiddling.Cross();
-            VectorizedConstraintTest.Test();
-            VectorizedManifoldTest.Test();
-            HybridConstraintTest.Test();
-            NewScalarConstraintTest.Test();
-            SingleVectorizedConstraintTest.Test();
-            OldScalarConstraintTest.Test();
+            //VectorizedConstraintTest.Test();
+            //VectorizedManifoldTest.Test();
+            //HybridConstraintTest.Test();
+            //NewScalarConstraintTest.Test();
+            //SingleVectorizedConstraintTest.Test();
+            //OldScalarConstraintTest.Test();
             //Console.ReadKey();
         }
     }

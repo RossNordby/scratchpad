@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,17 +9,12 @@ using System.Threading.Tasks;
 namespace SIMDPrototyping.Trees
 {
     /// <summary>
-    /// 4-ary simd-friendly tree node.
+    /// 4-wide simd-friendly tree node.
     /// </summary>
-    [StructLayout(LayoutKind.Explicit, Size = 112)]
+    [StructLayout(LayoutKind.Sequential)]
     public unsafe struct Node
     {
-        [FieldOffset(0)]
-        public Vector3Width4 Min;
-        [FieldOffset(48)]
-        public Vector3Width4 Max;
-        [FieldOffset(96)]
-        public fixed int Children[4];
-
+        public BoundingBoxWide BoundingBoxes;
+        public fixed int Children[4]; //TODO: If the vector isn't 4-wide, this breaks. Worry about this later.
     }
 }
