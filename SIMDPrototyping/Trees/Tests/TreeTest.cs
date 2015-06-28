@@ -25,7 +25,8 @@ namespace SIMDPrototyping.Trees.Tests
                         var collidable = new TestCollidableBEPU();
                         BEPUutilities.BoundingBox boundingBox;
                         boundingBox.Min = new BEPUutilities.Vector3(i * offset, j * offset, k * offset);
-                        boundingBox.Max = collidable.BoundingBox.Min + new BEPUutilities.Vector3(size, size, size);
+                        boundingBox.Max = boundingBox.Min + new BEPUutilities.Vector3(size, size, size);
+                        collidable.BoundingBox = boundingBox;
                         leaves[width * height * i + height * j + k] = collidable;
                     }
                 }
@@ -55,6 +56,7 @@ namespace SIMDPrototyping.Trees.Tests
         }
         public static void Test()
         {
+            GC.Collect();
             {
                 var leaves = GetLeaves(2, 2, 2, 10, 10);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>();
@@ -62,7 +64,7 @@ namespace SIMDPrototyping.Trees.Tests
                 {
                     tree.Insert(leaves[i]);
                 }
-                Console.WriteLine($"Cachewarm: {tree.LeafCount}");
+                Console.WriteLine($"Cachewarm Build: {tree.LeafCount}");
             }
 
             {
@@ -71,16 +73,18 @@ namespace SIMDPrototyping.Trees.Tests
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
-                    tree.Insert(leaves[i]);
+                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                    //tree.Insert(leaves[i]);
                 }
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
+                Console.WriteLine($"Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
             }
 
+            GC.Collect();
             {
-                var leaves = GetLeavesBEPU(16, 16, 16, 10, 10);
+                var leaves = GetLeavesBEPU(2, 2, 2, 10, 10);
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
-                Console.WriteLine($"BEPU Cachewarm root AABB: {tree.BoundingBox}");
+                Console.WriteLine($"BEPU Cachewarm Build, root AABB: {tree.BoundingBox}");
             }
             {
 
@@ -88,7 +92,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"BEPU Time: {endTime - startTime}, root AABB: {tree.BoundingBox}");
+                Console.WriteLine($"BEPU Build Time: {endTime - startTime}, root AABB: {tree.BoundingBox}");
             }
 
         }

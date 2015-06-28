@@ -1,4 +1,6 @@
-﻿using BEPUutilities.DataStructures;
+﻿//#define OUTPUT
+
+using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
 using System;
 using System.Collections.Generic;
@@ -7,6 +9,8 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+
+
 
 namespace SIMDPrototyping.Trees
 {
@@ -54,6 +58,9 @@ namespace SIMDPrototyping.Trees
                 }
                 Levels = newLevels;
             }
+            if (nextLevel > maximumDepth)
+                maximumDepth = nextLevel;
+
         }
 
         int vectorSizeMask;
@@ -69,16 +76,15 @@ namespace SIMDPrototyping.Trees
             }
         }
 
+        int maximumDepth;
+        /// <summary>
+        /// Gets the index of the deepest tree layer that contains any nodes.
+        /// </summary>
         public int MaximumDepth
         {
             get
             {
-                for (int i = 0; i < Levels.Length; ++i)
-                {
-                    if (Levels[i].Count == 0)
-                        return i;
-                }
-                return Levels.Length;
+                return maximumDepth;
             }
         }
 
@@ -153,7 +159,9 @@ namespace SIMDPrototyping.Trees
             BoundingBox aosBox;
             leaf.GetBoundingBox(out aosBox);
             var box = new BoundingBoxWide(ref aosBox);
+#if OUTPUT
             List<int> choices = new List<int>();
+#endif
             while (true)
             {
                 var level = Levels[levelIndex];
@@ -178,9 +186,10 @@ namespace SIMDPrototyping.Trees
                         minimum = volumeIncreases[i];
                     }
                 }
+#if OUTPUT
                 Console.WriteLine($"Minimum index: {minimumIndex}, minimum volume increase: {minimum}");
                 choices.Add(minimumIndex);
-
+#endif
 
                 var childIndex = level.Nodes[nodeIndex].Children[minimumIndex];
 
@@ -220,8 +229,10 @@ namespace SIMDPrototyping.Trees
                     level.Nodes[nodeIndex].Children = Vector.ConditionalSelect(singleMasks[minimumIndex], newNodeIndexVector, level.Nodes[nodeIndex].Children);
                     BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
 
+#if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} merged with existing leaf.");// New Node Children: {newNode.Children}, Old Node children: {level.Nodes[nodeIndex].Children}");
                     Console.WriteLine($"Choices: {GetChoiceList(choices)}");
+#endif
 
                     break;
                 }
@@ -234,8 +245,10 @@ namespace SIMDPrototyping.Trees
                     level.Nodes[nodeIndex].Children = Vector.ConditionalSelect(singleMasks[minimumIndex], leafIndexVector, level.Nodes[nodeIndex].Children);
                     BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
 
+#if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} inserted in empty slot.");
                     Console.WriteLine($"Choices: {GetChoiceList(choices)}");
+#endif
                     break;
                 }
                 //It's an internal node. Traverse to the next node.
