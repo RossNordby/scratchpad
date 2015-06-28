@@ -29,8 +29,8 @@ namespace SIMDPrototyping.Trees
             Max = new Vector3Wide(ref boundingBox.Max);
         }
 
-    
-        
+
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static Vector<int> Intersects(ref BoundingBoxWide a, ref BoundingBoxWide b)
         {
@@ -54,7 +54,7 @@ namespace SIMDPrototyping.Trees
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static Vector<int> Intersects2(ref BoundingBoxWide a, ref BoundingBoxWide b)
         {
-            
+
             var minX = Vector.Max(a.Min.X, b.Min.X);
             var minY = Vector.Max(a.Min.Y, b.Min.Y);
             var minZ = Vector.Max(a.Min.Z, b.Min.Z);
@@ -69,15 +69,26 @@ namespace SIMDPrototyping.Trees
 
         }
 
-        void Merge(ref BoundingBoxWide a, ref BoundingBoxWide b, out BoundingBoxWide merged)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ConditionalSelect(ref Vector<int> mask, ref BoundingBoxWide a, ref BoundingBoxWide b, out BoundingBoxWide result)
         {
-            merged = new BoundingBoxWide();
+            Vector3Wide.ConditionalSelect(ref mask, ref a.Min, ref b.Min, out result.Min);
+            Vector3Wide.ConditionalSelect(ref mask, ref a.Max, ref b.Max, out result.Max);
         }
 
-        void ComputeVolume(ref BoundingBoxWide boxes, out Vector<float> volumes)
+        public static void Merge(ref BoundingBoxWide a, ref BoundingBoxWide b, out BoundingBoxWide merged)
+        {
+            Vector3Wide.Min(ref a.Min, ref b.Min, out merged.Min);
+            Vector3Wide.Max(ref a.Max, ref b.Max, out merged.Max);
+        }
+
+        public static void ComputeVolume(ref BoundingBoxWide boxes, out Vector<float> volumes)
         {
             volumes = new Vector<float>();
-            dot proeductsse
+
+            Vector3Wide span;
+            Vector3Wide.Subtract(ref boxes.Max, ref boxes.Min, out span);
+            volumes = span.X * span.Y * span.Z;
         }
     }
 }

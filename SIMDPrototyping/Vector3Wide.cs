@@ -85,6 +85,30 @@ namespace SIMDPrototyping
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void ConditionalSelect(ref Vector<int> mask, ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
+        {
+            result.X = Vector.ConditionalSelect(mask, a.X, b.X);
+            result.Y = Vector.ConditionalSelect(mask, a.Y, b.Y);
+            result.Z = Vector.ConditionalSelect(mask, a.Z, b.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Max(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
+        {
+            result.X = Vector.Max(a.X, b.X);
+            result.Y = Vector.Max(a.Y, b.Y);
+            result.Z = Vector.Max(a.Z, b.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void Min(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
+        {
+            result.X = Vector.Min(a.X, b.X);
+            result.Y = Vector.Min(a.Y, b.Y);
+            result.Z = Vector.Min(a.Z, b.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Negate(ref Vector3Wide v, out Vector3Wide result)
         {
             result.X = -v.X;

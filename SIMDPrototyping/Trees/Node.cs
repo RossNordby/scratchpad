@@ -15,6 +15,6 @@ namespace SIMDPrototyping.Trees
     public unsafe struct Node
     {
         public BoundingBoxWide BoundingBoxes;
-        public fixed int Children[4]; //TODO: If the vector isn't 4-wide, this breaks. Worry about this later.
+        public Vector<int> Children;
     }
 }
