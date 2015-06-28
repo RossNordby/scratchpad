@@ -68,8 +68,8 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             {
-                var leaves = GetLeaves(16, 16, 16, 10, 10);
-                Tree<TestCollidable> tree = new Tree<TestCollidable>();
+                var leaves = GetLeaves(48, 48, 48, 10, 10);
+                Tree<TestCollidable> tree = new Tree<TestCollidable>(131072, 64);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -88,7 +88,7 @@ namespace SIMDPrototyping.Trees.Tests
             }
             {
 
-                var leaves = GetLeavesBEPU(16, 16, 16, 10, 10);
+                var leaves = GetLeavesBEPU(48, 48, 48, 10, 10);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

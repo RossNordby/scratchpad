@@ -114,7 +114,7 @@ namespace SIMDPrototyping.Trees
             var maximumNodeCount = (int)Math.Ceiling(initialTreeDepth / (double)Vector<float>.Count);
             for (int i = 0; i < Levels.Length; ++i)
             {
-                Levels[i] = new Level { Nodes = new Node[Math.Min(initialLeafCapacity, (int)Math.Pow(4, i))] };
+                Levels[i] = new Level { Nodes = new Node[Math.Min(initialLeafCapacity, (long)Math.Pow(4, Math.Min(25, i)))] };
             }
             InitializeNode(out Levels[0].Nodes[0]);
             Levels[0].Count = 1;
