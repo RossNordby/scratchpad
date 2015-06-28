@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BEPUphysics.BroadPhaseSystems;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,4 +15,14 @@ namespace SIMDPrototyping.Trees
             box = this.BoundingBox;
         }
     }
+
+    public class TestCollidableBEPU : IBoundingBoxOwner
+    {
+
+        public BEPUutilities.BoundingBox BoundingBox
+        {
+            get; set;
+        }
+    }
 }
+
