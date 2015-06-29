@@ -44,6 +44,49 @@ namespace SIMDPrototyping.Trees
         }
         Level[] Levels;
 
+
+        struct Leaf
+        {
+            public T Bounded;
+            /// <summary>
+            /// Which level the leaf is in.
+            /// </summary>
+            public int LevelIndex;
+            /// <summary>
+            /// Which node within the level the leaf is in.
+            /// </summary>
+            public int NodeIndex;
+            /// <summary>
+            /// Which child within the node the leaf is in.
+            /// </summary>
+            public int ChildIndex;
+        }
+        Leaf[] leaves;
+        int leafCount;
+
+        public int LeafCount
+        {
+            get
+            {
+                return leafCount;
+            }
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        int AddLeaf(T leaf, int levelIndex, int nodeIndex, int childIndex)
+        {
+            if (leafCount == leaves.Length)
+            {
+                var newLeaves = new Leaf[leafCount * 2];
+                Array.Copy(leaves, newLeaves, leafCount);
+                leaves = newLeaves;
+            }
+            leaves[leafCount].Bounded = leaf;
+            leaves[leafCount].LevelIndex = levelIndex;
+            leaves[leafCount].NodeIndex = nodeIndex;
+            leaves[LeafCount].ChildIndex = childIndex;
+            return leafCount++;
+        }
+
         private void EnsureLevel(int nextLevel)
         {
             if (nextLevel >= Levels.Length)
@@ -66,15 +109,7 @@ namespace SIMDPrototyping.Trees
         int vectorSizeMask;
         Vector<int>[] singleMasks;
 
-        int leafCount;
 
-        public int LeafCount
-        {
-            get
-            {
-                return leafCount;
-            }
-        }
 
         int maximumDepth;
         /// <summary>
@@ -88,7 +123,7 @@ namespace SIMDPrototyping.Trees
             }
         }
 
-        public Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 16)
+        public Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 24)
         {
             if (initialTreeDepth <= 0)
                 throw new ArgumentException("Initial tree depth must be positive.");
@@ -118,6 +153,8 @@ namespace SIMDPrototyping.Trees
             }
             InitializeNode(out Levels[0].Nodes[0]);
             Levels[0].Count = 1;
+
+            leaves = new Leaf[initialLeafCapacity];
 
             vectorSizeMask = Vector<float>.Count - 1;
         }
@@ -220,7 +257,7 @@ namespace SIMDPrototyping.Trees
                       ref newNode.BoundingBoxes,
                       ref box,
                       out newNode.BoundingBoxes);
-                    var leafIndex = leafCount++;
+                    var leafIndex = AddLeaf(leaf, nextLevel, nodeIndex, minimumIndex);
                     var leafIndexVector = new Vector<int>(Encode(leafIndex));
                     newNode.Children = Vector.ConditionalSelect(singleMasks[maskIndex], leafIndexVector, newNode.Children);
 
@@ -240,7 +277,7 @@ namespace SIMDPrototyping.Trees
                 {
                     //There is no child at all.
                     //Put the new leaf here.
-                    var leafIndex = leafCount++;
+                    var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, minimumIndex);
                     var leafIndexVector = new Vector<int>(Encode(leafIndex));
                     level.Nodes[nodeIndex].Children = Vector.ConditionalSelect(singleMasks[minimumIndex], leafIndexVector, level.Nodes[nodeIndex].Children);
                     BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
@@ -255,6 +292,69 @@ namespace SIMDPrototyping.Trees
                 BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
                 nodeIndex = level.Nodes[nodeIndex].Children[minimumIndex];
                 ++levelIndex;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void ComputeBoundingBox(ref BoundingBoxWide boundingBoxes, out BoundingBoxWide mergedWide)
+        {
+            //YIKES transposition
+            BoundingBox merged;
+            merged.Min = new Vector3(float.MaxValue);
+            merged.Max = new Vector3(-float.MaxValue);
+            for (int childIndex = 0; childIndex < Vector<int>.Count; ++childIndex)
+            {
+                var childMin = new Vector3(
+                    boundingBoxes.Min.X[childIndex],
+                    boundingBoxes.Min.Y[childIndex],
+                    boundingBoxes.Min.Z[childIndex]);
+                var childMax = new Vector3(
+                    boundingBoxes.Max.X[childIndex],
+                    boundingBoxes.Max.Y[childIndex],
+                    boundingBoxes.Max.Z[childIndex]);
+                merged.Min = Vector3.Min(merged.Min, childMin);
+                merged.Max = Vector3.Min(merged.Max, childMax);
+            }
+            mergedWide = new BoundingBoxWide(ref merged);
+        }
+
+        public unsafe void Refit()
+        {
+            //Update the bounding boxes of every leaf-owner.
+            //Note the scalar-ness of this. It seems like there should exist some way to vectorize it properly, though it may require changing things around.
+            for (int i = 0; i < leafCount; ++i)
+            {
+                BoundingBox box;
+                leaves[i].Bounded.GetBoundingBox(out box);
+                BoundingBoxWide wideBox = new BoundingBoxWide(ref box);
+                BoundingBoxWide.ConditionalSelect(ref singleMasks[leaves[i].ChildIndex],
+                    ref wideBox,
+                    ref Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].BoundingBoxes,
+                    out Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].BoundingBoxes);
+
+            }
+            //Go through each level, refitting as you go.
+            //Note that the deepest level is skipped. It does not need to be tested; it's all leaves that were already updated.
+            for (int levelIndex = maximumDepth - 1; levelIndex >= 0; --levelIndex)
+            {
+                //consider testing caching Levels[levelIndex]. It may have a minor effect.
+                for (int nodeIndex = 0; nodeIndex < Levels[levelIndex].Count; ++nodeIndex)
+                {
+                    for (int childIndex = 0; childIndex < Vector<int>.Count; ++childIndex)
+                    {
+                        var childNodeIndex = Levels[levelIndex].Nodes[nodeIndex].Children[childIndex];
+                        if (childNodeIndex >= 0)
+                        {
+                            BoundingBoxWide merged;
+                            ComputeBoundingBox(ref Levels[levelIndex + 1].Nodes[childNodeIndex].BoundingBoxes, out merged);
+                            BoundingBoxWide.ConditionalSelect(ref singleMasks[childIndex], 
+                                ref merged,
+                                ref Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes, 
+                                out Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes);
+                        }
+
+                    }
+                }
             }
         }
 
