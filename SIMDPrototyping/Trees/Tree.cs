@@ -4,9 +4,11 @@ using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -257,12 +259,13 @@ namespace SIMDPrototyping.Trees
                       ref newNode.BoundingBoxes,
                       ref box,
                       out newNode.BoundingBoxes);
-                    var leafIndex = AddLeaf(leaf, nextLevel, nodeIndex, minimumIndex);
+                    var newNodeIndex = Levels[nextLevel].Add(ref newNode);
+                    var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, minimumIndex);
                     var leafIndexVector = new Vector<int>(Encode(leafIndex));
-                    newNode.Children = Vector.ConditionalSelect(singleMasks[maskIndex], leafIndexVector, newNode.Children);
+                    Levels[nextLevel].Nodes[newNodeIndex].Children = Vector.ConditionalSelect(singleMasks[maskIndex], leafIndexVector, newNode.Children);
 
                     //Update the original node's child pointer and bounding box.
-                    var newNodeIndexVector = new Vector<int>(Levels[nextLevel].Add(ref newNode));
+                    var newNodeIndexVector = new Vector<int>(newNodeIndex);
                     level.Nodes[nodeIndex].Children = Vector.ConditionalSelect(singleMasks[minimumIndex], newNodeIndexVector, level.Nodes[nodeIndex].Children);
                     BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
 
@@ -327,10 +330,13 @@ namespace SIMDPrototyping.Trees
                 BoundingBox box;
                 leaves[i].Bounded.GetBoundingBox(out box);
                 BoundingBoxWide wideBox = new BoundingBoxWide(ref box);
+                //Console.WriteLine($"index reached: {i}, child index: {leaves[i].ChildIndex}, level: {leaves[i].LevelIndex}, node: { leaves[i].NodeIndex}");
+
                 BoundingBoxWide.ConditionalSelect(ref singleMasks[leaves[i].ChildIndex],
                     ref wideBox,
                     ref Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].BoundingBoxes,
                     out Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].BoundingBoxes);
+                //Console.WriteLine($"comp");
 
             }
             //Go through each level, refitting as you go.
@@ -347,9 +353,9 @@ namespace SIMDPrototyping.Trees
                         {
                             BoundingBoxWide merged;
                             ComputeBoundingBox(ref Levels[levelIndex + 1].Nodes[childNodeIndex].BoundingBoxes, out merged);
-                            BoundingBoxWide.ConditionalSelect(ref singleMasks[childIndex], 
+                            BoundingBoxWide.ConditionalSelect(ref singleMasks[childIndex],
                                 ref merged,
-                                ref Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes, 
+                                ref Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes,
                                 out Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes);
                         }
 
@@ -358,5 +364,90 @@ namespace SIMDPrototyping.Trees
             }
         }
 
+
+        unsafe struct TraversalStack
+        {
+            public TraversalTarget* Stack;
+            public int Count;
+            public void Initialize(TraversalTarget* stack)
+            {
+                this.Stack = stack;
+                this.Count = 0;
+            }
+
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Push(int levelIndex, int nodeIndex)
+            {
+                Stack[Count] = new TraversalTarget { Level = levelIndex, Node = nodeIndex };
+                Count++;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Pop(out TraversalTarget target)
+            {
+                if (Count > 0)
+                {
+                    --Count;
+                    target = Stack[Count];
+                    return true;
+                }
+                target = new TraversalTarget();
+                return false;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void Test<TResultList>(TraversalTarget* stack, ref int count, int stackCapacity, int level,
+            ref BoundingBoxWide query, ref Node node,
+            ref TResultList results) where TResultList : IList<T>
+        {
+            Vector<int> intersectionMask;
+            BoundingBoxWide.Intersects(ref node.BoundingBoxes, ref query, out intersectionMask);
+            for (int i = 0; i < Vector<int>.Count; ++i)
+            {
+                if (intersectionMask[i] < 0)
+                {
+                    if (node.Children[i] >= 0)
+                    {
+                        Debug.Assert(count < stackCapacity);
+                        stack[count++] = new TraversalTarget { Level = level + 1, Node = node.Children[i] };
+                    }
+                    else if (node.Children[i] < -1)
+                    {
+                        results.Add(leaves[Encode(node.Children[i])].Bounded);
+                    }
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
+        {
+            //TODO: could optimize this by keeping the next target out of the stack.
+            //4, 7, 10, 13
+            var stackCapacity = (Vector<int>.Count - 1) * maximumDepth + 1;
+            var stack = stackalloc TraversalTarget[stackCapacity];
+            int count = 0;
+
+            var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
+            Test(stack, ref count, stackCapacity, 0, ref boundingBoxWide, ref Levels[0].Nodes[0], ref results);
+
+            while (count > 0)
+            {
+                --count;
+                var target = stack[count];
+
+                Test(stack, ref count, stackCapacity, target.Level, ref boundingBoxWide, ref Levels[target.Level].Nodes[target.Node], ref results);
+            }
+        }
+
+
+    }
+
+    struct TraversalTarget
+    {
+        public int Level;
+        public int Node;
     }
 }

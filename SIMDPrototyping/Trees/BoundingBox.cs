@@ -32,7 +32,7 @@ namespace SIMDPrototyping.Trees
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe static Vector<int> Intersects(ref BoundingBoxWide a, ref BoundingBoxWide b)
+        public unsafe static void Intersects(ref BoundingBoxWide a, ref BoundingBoxWide b, out Vector<int> intersectionMask)
         {
             //If any minimum exceeds the other maximum, there can be no collision.
             //On the flipside, if the all minimums are less than the opposing maximums, then they must be colliding.
@@ -46,13 +46,13 @@ namespace SIMDPrototyping.Trees
             var or2 = Vector.BitwiseOr(c1Z, c2X);
             var or3 = Vector.BitwiseOr(c2Y, c2Z);
             var or4 = Vector.BitwiseOr(or1, or2);
-            return Vector.BitwiseOr(or3, or4);
+            intersectionMask = Vector.BitwiseOr(or3, or4);
 
 
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe static Vector<int> Intersects2(ref BoundingBoxWide a, ref BoundingBoxWide b)
+        public unsafe static void Intersects2(ref BoundingBoxWide a, ref BoundingBoxWide b, out Vector<int> intersectionMask)
         {
 
             var minX = Vector.Max(a.Min.X, b.Min.X);
@@ -64,7 +64,7 @@ namespace SIMDPrototyping.Trees
             var xLeq = Vector.LessThanOrEqual(minX, maxX);
             var yLeq = Vector.LessThanOrEqual(minX, maxX);
             var zLeq = Vector.LessThanOrEqual(minX, maxX);
-            return Vector.BitwiseAnd(xLeq, Vector.BitwiseAnd(yLeq, zLeq));
+            intersectionMask = Vector.BitwiseAnd(xLeq, Vector.BitwiseAnd(yLeq, zLeq));
 
 
         }

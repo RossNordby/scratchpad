@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SIMDPrototyping
@@ -18,6 +19,11 @@ namespace SIMDPrototyping
         }
         static unsafe void Main(string[] args)
         {
+
+
+
+
+
             //Vector<int> ones = new Vector<int>(1);
             //Vector<int> fives = new Vector<int>(5);
             //int[] maskArray = new[] { 0, -1, 0, 0 };
