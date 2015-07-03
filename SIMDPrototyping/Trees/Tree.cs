@@ -225,6 +225,23 @@ namespace SIMDPrototyping.Trees
                         minimum = volumeIncreases[i];
                     }
                 }
+
+                //var volumeIncreases = mergedVolumes - originalVolumes;
+                //int minimumIndex = 0;
+                //var minimum = float.MaxValue;
+                //for (int i = 0; i < Vector<float>.Count; ++i)
+                //{
+                //    if (level.Nodes[nodeIndex].Children[i] == -1)
+                //    {
+                //        minimumIndex = i;
+                //        break;
+                //    }
+                //    if (volumeIncreases[i] < minimum)
+                //    {
+                //        minimumIndex = i;
+                //        minimum = volumeIncreases[i];
+                //    }
+                //}
 #if OUTPUT
                 Console.WriteLine($"Minimum index: {minimumIndex}, minimum volume increase: {minimum}");
                 choices.Add(minimumIndex);

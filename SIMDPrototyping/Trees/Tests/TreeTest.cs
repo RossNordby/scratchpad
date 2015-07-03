@@ -101,14 +101,14 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             int leafCubeSize = 64;
-            float leafSize = 10, leafGap = 100f;
-            int queryCount = 100000;
+            float leafSize = 10, leafGap = -.5f;
+            int queryCount = 1000;
             float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 5;
             int queryLocationCount = 2048;
             int queryMask = queryLocationCount - 1;
             {
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
-                Tree<TestCollidable> tree = new Tree<TestCollidable>(262144);
+                Tree<TestCollidable> tree = new Tree<TestCollidable>(262144, 128);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
