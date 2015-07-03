@@ -13,6 +13,11 @@ namespace SIMDPrototyping.Trees
     {
         public Vector3 Min;
         public Vector3 Max;
+
+        public override string ToString()
+        {
+            return $"({Min.ToString()}, {Max.ToString()})";
+        }
     }
 
 
@@ -42,11 +47,11 @@ namespace SIMDPrototyping.Trees
             var c2X = Vector.LessThanOrEqual(b.Min.X, a.Max.X);
             var c2Y = Vector.LessThanOrEqual(b.Min.Y, a.Max.Y);
             var c2Z = Vector.LessThanOrEqual(b.Min.Z, a.Max.Z);
-            var or1 = Vector.BitwiseOr(c1X, c1Y);
-            var or2 = Vector.BitwiseOr(c1Z, c2X);
-            var or3 = Vector.BitwiseOr(c2Y, c2Z);
-            var or4 = Vector.BitwiseOr(or1, or2);
-            intersectionMask = Vector.BitwiseOr(or3, or4);
+            var or1 = Vector.BitwiseAnd(c1X, c1Y);
+            var or2 = Vector.BitwiseAnd(c1Z, c2X);
+            var or3 = Vector.BitwiseAnd(c2Y, c2Z);
+            var or4 = Vector.BitwiseAnd(or1, or2);
+            intersectionMask = Vector.BitwiseAnd(or3, or4);
 
 
         }
@@ -62,8 +67,8 @@ namespace SIMDPrototyping.Trees
             var maxY = Vector.Min(a.Max.Y, b.Max.Y);
             var maxZ = Vector.Min(a.Max.Z, b.Max.Z);
             var xLeq = Vector.LessThanOrEqual(minX, maxX);
-            var yLeq = Vector.LessThanOrEqual(minX, maxX);
-            var zLeq = Vector.LessThanOrEqual(minX, maxX);
+            var yLeq = Vector.LessThanOrEqual(minY, maxY);
+            var zLeq = Vector.LessThanOrEqual(minZ, maxZ);
             intersectionMask = Vector.BitwiseAnd(xLeq, Vector.BitwiseAnd(yLeq, zLeq));
 
 
@@ -90,5 +95,22 @@ namespace SIMDPrototyping.Trees
             Vector3Wide.Subtract(ref boxes.Max, ref boxes.Min, out span);
             volumes = span.X * span.Y * span.Z;
         }
+
+        public override string ToString()
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+            for (int i = 0; i < Vector<float>.Count; ++i)
+            {
+                BoundingBox box;
+                box.Min = new Vector3(Min.X[i], Min.Y[i], Min.Z[i]);
+                box.Max = new Vector3(Max.X[i], Max.Y[i], Max.Z[i]);
+                stringBuilder.Append(box.ToString());
+                if (i != Vector<float>.Count - 1)
+                    stringBuilder.Append(", ");
+            }
+            return stringBuilder.ToString();
+        }
+
+
     }
 }

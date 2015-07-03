@@ -48,7 +48,7 @@ namespace SIMDPrototyping.Trees.Tests
                         var collidable = new TestCollidable();
                         collidable.BoundingBox.Min = new Vector3(i * offset, j * offset, k * offset);
                         collidable.BoundingBox.Max = collidable.BoundingBox.Min + new Vector3(size);
-                        leaves[width * height * i + height * j + k] = collidable;
+                        leaves[height * length* i + length * j + k] = collidable;
                     }
                 }
             }
@@ -60,7 +60,7 @@ namespace SIMDPrototyping.Trees.Tests
         {
             GC.Collect();
             {
-                var leaves = GetLeaves(2, 2, 2, 10, 10);
+                var leaves = GetLeaves(1, 4, 1, 10, 10);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>();
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -78,7 +78,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             int queryCount = 1;
             {
-                var leaves = GetLeaves(64, 64, 64, 10, 10);
+                var leaves = GetLeaves(1, 4, 1, 10, 10);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>();
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
@@ -113,12 +113,19 @@ namespace SIMDPrototyping.Trees.Tests
                 var leaves = GetLeavesBEPU(2, 2, 2, 10, 10);
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 Console.WriteLine($"BEPU Cachewarm Build, root AABB: {tree.BoundingBox}");
-                
+
                 tree.Refit();
+
+                RawList<TestCollidableBEPU> results = new RawList<TestCollidableBEPU>();
+                BEPUutilities.BoundingBox aabb = new BEPUutilities.BoundingBox { Min = new BEPUutilities.Vector3(0, 0, 0), Max = new BEPUutilities.Vector3(1, 1, 1) };
+
+                results.Count = 0;
+                tree.GetOverlaps(aabb, results);
             }
+
             {
 
-                var leaves = GetLeavesBEPU(64, 64, 64, 10, 10);
+                var leaves = GetLeavesBEPU(2, 2, 2, 10, 10);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

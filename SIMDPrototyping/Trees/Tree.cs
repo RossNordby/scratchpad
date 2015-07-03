@@ -404,6 +404,8 @@ namespace SIMDPrototyping.Trees
         {
             Vector<int> intersectionMask;
             BoundingBoxWide.Intersects(ref node.BoundingBoxes, ref query, out intersectionMask);
+            Console.WriteLine($"Intersection mask: {intersectionMask}");
+            Console.WriteLine(node.BoundingBoxes);
             for (int i = 0; i < Vector<int>.Count; ++i)
             {
                 if (intersectionMask[i] < 0)
