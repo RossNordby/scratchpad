@@ -48,7 +48,7 @@ namespace SIMDPrototyping.Trees.Tests
                         var collidable = new TestCollidable();
                         collidable.BoundingBox.Min = new Vector3(i * offset, j * offset, k * offset);
                         collidable.BoundingBox.Max = collidable.BoundingBox.Min + new Vector3(size);
-                        leaves[height * length* i + length * j + k] = collidable;
+                        leaves[height * length * i + length * j + k] = collidable;
                     }
                 }
             }
@@ -56,11 +56,35 @@ namespace SIMDPrototyping.Trees.Tests
 
 
         }
+
+        static BoundingBox[] GetQueryLocations(int count, float range, float size)
+        {
+            Random random = new Random(5);
+            BoundingBox[] boxes = new BoundingBox[count];
+            for (int i = 0; i < boxes.Length; ++i)
+            {
+                boxes[i].Min = new Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
+                boxes[i].Max = boxes[i].Min + new Vector3(size);
+            }
+            return boxes;
+        }
+
+        static BEPUutilities.BoundingBox[] GetBEPUQueryLocations(int count, float range, float size)
+        {
+            Random random = new Random(5);
+            BEPUutilities.BoundingBox[] boxes = new BEPUutilities.BoundingBox[count];
+            for (int i = 0; i < boxes.Length; ++i)
+            {
+                boxes[i].Min = new BEPUutilities.Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
+                boxes[i].Max = boxes[i].Min + new BEPUutilities.Vector3(size, size, size);
+            }
+            return boxes;
+        }
         public static void Test()
         {
             GC.Collect();
             {
-                var leaves = GetLeaves(1, 4, 1, 10, 10);
+                var leaves = GetLeaves(2, 2, 2, 10, 10);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>();
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -76,9 +100,14 @@ namespace SIMDPrototyping.Trees.Tests
                 list.Dispose();
             }
 
-            int queryCount = 10000000;
+            int leafCubeSize = 64;
+            float leafSize = 10, leafGap = 100f;
+            int queryCount = 100000;
+            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 5;
+            int queryLocationCount = 2048;
+            int queryMask = queryLocationCount - 1;
             {
-                var leaves = GetLeaves(64, 64, 64, 10, 10);
+                var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>(262144);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
@@ -89,20 +118,24 @@ namespace SIMDPrototyping.Trees.Tests
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
+                int nodeCount, childCount;
+                tree.MeasureNodeOccupancy(out nodeCount, out childCount);
+
+                Console.WriteLine($"Occupancy: {childCount / (double)nodeCount}");
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 tree.Refit();
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Refit Time: {endTime - startTime}");
 
+                var queries = GetQueryLocations(queryLocationCount, queryRange, querySize);
                 var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
-                BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < queryCount; ++i)
                 {
                     list.Count = 0;
                     //tree.Query(ref aabb, ref list);
-                    tree.QueryRecursive(ref aabb, ref list);
+                    tree.QueryRecursive(ref queries[i & queryMask], ref list);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Query Time: {endTime - startTime}, overlaps: {list.Count}");
@@ -126,7 +159,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             {
 
-                var leaves = GetLeavesBEPU(64, 64, 64, 10, 10);
+                var leaves = GetLeavesBEPU(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -137,13 +170,13 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"BEPU Refit Time: {endTime - startTime}");
 
+                var queries = GetBEPUQueryLocations(queryLocationCount, queryRange, querySize);
                 RawList<TestCollidableBEPU> results = new RawList<TestCollidableBEPU>();
-                BEPUutilities.BoundingBox aabb = new BEPUutilities.BoundingBox { Min = new BEPUutilities.Vector3(0, 0, 0), Max = new BEPUutilities.Vector3(1, 1, 1) };
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < queryCount; ++i)
                 {
                     results.Count = 0;
-                    tree.GetOverlaps(aabb, results);
+                    tree.GetOverlaps(queries[i & queryMask], results);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"BEPU Query Time: {endTime - startTime}, overlaps: {results.Count}");

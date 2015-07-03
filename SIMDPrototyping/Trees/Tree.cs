@@ -448,7 +448,7 @@ namespace SIMDPrototyping.Trees
             }
         }
 
-
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive<TResultList>(int level, int nodeIndex,
             ref BoundingBoxWide query,
             ref TResultList results) where TResultList : IList<T>
@@ -473,11 +473,36 @@ namespace SIMDPrototyping.Trees
             }
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
             var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
             TestRecursive(0, 0, ref boundingBoxWide, ref results);
+        }
+
+        void MeasureNodeOccupancy(int levelIndex, int nodeIndex, ref int nodeCount, ref int childCount)
+        {
+            ++nodeCount;
+
+            var children = Levels[levelIndex].Nodes[nodeIndex].Children;
+            for (int i = 0; i < Vector<int>.Count; ++i) 
+            {
+                if (children[i] != -1)
+                {
+                    ++childCount;
+                }
+                if (children[i] >= 0)
+                {
+                    MeasureNodeOccupancy(levelIndex + 1, children[i], ref nodeCount, ref childCount);
+                }
+            }
+        }
+
+        public void MeasureNodeOccupancy(out int nodeCount, out int childCount)
+        {
+            nodeCount = 0;
+            childCount = 0;
+            MeasureNodeOccupancy(0, 0, ref nodeCount, ref childCount);
         }
 
     }
