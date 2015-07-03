@@ -76,7 +76,7 @@ namespace SIMDPrototyping.Trees.Tests
                 list.Dispose();
             }
 
-            int queryCount = 1;
+            int queryCount = 10000000;
             {
                 var leaves = GetLeaves(64, 64, 64, 10, 10);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>(262144);
@@ -101,7 +101,8 @@ namespace SIMDPrototyping.Trees.Tests
                 for (int i = 0; i < queryCount; ++i)
                 {
                     list.Count = 0;
-                    tree.Query(ref aabb, ref list);
+                    //tree.Query(ref aabb, ref list);
+                    tree.QueryRecursive(ref aabb, ref list);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Query Time: {endTime - startTime}, overlaps: {list.Count}");

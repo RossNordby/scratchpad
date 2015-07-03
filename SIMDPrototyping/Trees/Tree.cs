@@ -408,7 +408,7 @@ namespace SIMDPrototyping.Trees
             ref TResultList results) where TResultList : IList<T>
         {
             Vector<int> intersectionMask;
-            BoundingBoxWide.Intersects2(ref node.BoundingBoxes, ref query, out intersectionMask);
+            BoundingBoxWide.Intersects(ref node.BoundingBoxes, ref query, out intersectionMask);
             //Console.WriteLine($"Intersection mask: {intersectionMask}");
             //Console.WriteLine(node.BoundingBoxes);
             for (int i = 0; i < Vector<int>.Count; ++i)
@@ -428,7 +428,7 @@ namespace SIMDPrototyping.Trees
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
             //TODO: could optimize this by keeping the next target out of the stack.
@@ -448,6 +448,37 @@ namespace SIMDPrototyping.Trees
             }
         }
 
+
+        unsafe void TestRecursive<TResultList>(int level, int nodeIndex,
+            ref BoundingBoxWide query,
+            ref TResultList results) where TResultList : IList<T>
+        {
+            Vector<int> intersectionMask;
+            BoundingBoxWide.Intersects(ref Levels[level].Nodes[nodeIndex].BoundingBoxes, ref query, out intersectionMask);
+            //Console.WriteLine($"Intersection mask: {intersectionMask}");
+            //Console.WriteLine(node.BoundingBoxes);
+            for (int i = 0; i < Vector<int>.Count; ++i)
+            {
+                if (intersectionMask[i] < 0)
+                {
+                    if (Levels[level].Nodes[nodeIndex].Children[i] >= 0)
+                    {
+                        TestRecursive(level + 1, Levels[level].Nodes[nodeIndex].Children[i], ref query, ref results);
+                    }
+                    else if (Levels[level].Nodes[nodeIndex].Children[i] < -1)
+                    {
+                        results.Add(leaves[Encode(Levels[level].Nodes[nodeIndex].Children[i])].Bounded);
+                    }
+                }
+            }
+        }
+
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
+        {
+            var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
+            TestRecursive(0, 0, ref boundingBoxWide, ref results);
+        }
 
     }
 
