@@ -236,7 +236,6 @@ namespace SIMDPrototyping.Trees
                 {
                     //It's a leaf node.
                     //Create a new internal node with the new leaf and the old leaf as children.
-                    var oldLeafIndex = Encode(childIndex);
                     var nextLevel = levelIndex + 1;
                     //this is the only place where a new level could potentially be created.
                     EnsureLevel(nextLevel);
@@ -249,20 +248,26 @@ namespace SIMDPrototyping.Trees
                         ref level.Nodes[nodeIndex].BoundingBoxes,
                         ref newNode.BoundingBoxes,
                         out newNode.BoundingBoxes);
-
                     newNode.Children = Vector.ConditionalSelect(singleMasks[minimumIndex], level.Nodes[nodeIndex].Children, newNode.Children);
+
                     //Insert the new leaf into the second child slot.
                     //Just put it in the next slot over from the minimum.
-                    var maskIndex = (minimumIndex + 1) & vectorSizeMask;
+                    var newLeafChildIndex = (minimumIndex + 1) & vectorSizeMask;
                     BoundingBoxWide.ConditionalSelect(
-                      ref singleMasks[maskIndex],
+                      ref singleMasks[newLeafChildIndex],
                       ref box,
                       ref newNode.BoundingBoxes,
                       out newNode.BoundingBoxes);
                     var newNodeIndex = Levels[nextLevel].Add(ref newNode);
-                    var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, minimumIndex);
+                    var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, newLeafChildIndex);
                     var leafIndexVector = new Vector<int>(Encode(leafIndex));
-                    Levels[nextLevel].Nodes[newNodeIndex].Children = Vector.ConditionalSelect(singleMasks[maskIndex], leafIndexVector, newNode.Children);
+                    Levels[nextLevel].Nodes[newNodeIndex].Children = Vector.ConditionalSelect(singleMasks[newLeafChildIndex], leafIndexVector, newNode.Children);
+
+                    //Update the old leaf node with the new index information.
+                    var oldLeafIndex = Encode(childIndex);
+                    leaves[oldLeafIndex].LevelIndex = nextLevel;
+                    leaves[oldLeafIndex].NodeIndex = newNodeIndex;
+                    //Since we inserted it into the same slot of the new node as it was in in the old node, there is no change to the child index.
 
                     //Update the original node's child pointer and bounding box.
                     var newNodeIndexVector = new Vector<int>(newNodeIndex);
@@ -316,7 +321,7 @@ namespace SIMDPrototyping.Trees
                     boundingBoxes.Max.Y[childIndex],
                     boundingBoxes.Max.Z[childIndex]);
                 merged.Min = Vector3.Min(merged.Min, childMin);
-                merged.Max = Vector3.Min(merged.Max, childMax);
+                merged.Max = Vector3.Max(merged.Max, childMax);
             }
             mergedWide = new BoundingBoxWide(ref merged);
         }
@@ -404,8 +409,8 @@ namespace SIMDPrototyping.Trees
         {
             Vector<int> intersectionMask;
             BoundingBoxWide.Intersects2(ref node.BoundingBoxes, ref query, out intersectionMask);
-            Console.WriteLine($"Intersection mask: {intersectionMask}");
-            Console.WriteLine(node.BoundingBoxes);
+            //Console.WriteLine($"Intersection mask: {intersectionMask}");
+            //Console.WriteLine(node.BoundingBoxes);
             for (int i = 0; i < Vector<int>.Count; ++i)
             {
                 if (intersectionMask[i] < 0)
@@ -427,7 +432,6 @@ namespace SIMDPrototyping.Trees
         public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
             //TODO: could optimize this by keeping the next target out of the stack.
-            //4, 7, 10, 13
             var stackCapacity = (Vector<int>.Count - 1) * maximumDepth + 1;
             var stack = stackalloc TraversalTarget[stackCapacity];
             int count = 0;

@@ -29,7 +29,7 @@ namespace SIMDPrototyping.Trees.Tests
                         boundingBox.Min = new BEPUutilities.Vector3(i * offset, j * offset, k * offset);
                         boundingBox.Max = boundingBox.Min + new BEPUutilities.Vector3(size, size, size);
                         collidable.BoundingBox = boundingBox;
-                        leaves[width * height * i + height * j + k] = collidable;
+                        leaves[height * length * i + length * j + k] = collidable;
                     }
                 }
             }
@@ -78,8 +78,8 @@ namespace SIMDPrototyping.Trees.Tests
 
             int queryCount = 1;
             {
-                var leaves = GetLeaves(2, 2, 2, 10, 10);
-                Tree<TestCollidable> tree = new Tree<TestCollidable>();
+                var leaves = GetLeaves(64, 64, 64, 10, 10);
+                Tree<TestCollidable> tree = new Tree<TestCollidable>(262144);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -91,7 +91,7 @@ namespace SIMDPrototyping.Trees.Tests
 
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //tree.Refit();
+                tree.Refit();
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Refit Time: {endTime - startTime}");
 
@@ -125,7 +125,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             {
 
-                var leaves = GetLeavesBEPU(2, 2, 2, 10, 10);
+                var leaves = GetLeavesBEPU(64, 64, 64, 10, 10);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
