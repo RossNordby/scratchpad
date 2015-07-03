@@ -246,8 +246,8 @@ namespace SIMDPrototyping.Trees
                     //Since we don't have a great way of shuffling yet, just let it be in the same index.
                     BoundingBoxWide.ConditionalSelect(
                         ref singleMasks[minimumIndex],
-                        ref newNode.BoundingBoxes,
                         ref level.Nodes[nodeIndex].BoundingBoxes,
+                        ref newNode.BoundingBoxes,
                         out newNode.BoundingBoxes);
 
                     newNode.Children = Vector.ConditionalSelect(singleMasks[minimumIndex], level.Nodes[nodeIndex].Children, newNode.Children);
@@ -256,8 +256,8 @@ namespace SIMDPrototyping.Trees
                     var maskIndex = (minimumIndex + 1) & vectorSizeMask;
                     BoundingBoxWide.ConditionalSelect(
                       ref singleMasks[maskIndex],
-                      ref newNode.BoundingBoxes,
                       ref box,
+                      ref newNode.BoundingBoxes,
                       out newNode.BoundingBoxes);
                     var newNodeIndex = Levels[nextLevel].Add(ref newNode);
                     var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, minimumIndex);
@@ -403,7 +403,7 @@ namespace SIMDPrototyping.Trees
             ref TResultList results) where TResultList : IList<T>
         {
             Vector<int> intersectionMask;
-            BoundingBoxWide.Intersects(ref node.BoundingBoxes, ref query, out intersectionMask);
+            BoundingBoxWide.Intersects2(ref node.BoundingBoxes, ref query, out intersectionMask);
             Console.WriteLine($"Intersection mask: {intersectionMask}");
             Console.WriteLine(node.BoundingBoxes);
             for (int i = 0; i < Vector<int>.Count; ++i)

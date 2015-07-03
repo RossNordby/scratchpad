@@ -78,7 +78,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             int queryCount = 1;
             {
-                var leaves = GetLeaves(1, 4, 1, 10, 10);
+                var leaves = GetLeaves(2, 2, 2, 10, 10);
                 Tree<TestCollidable> tree = new Tree<TestCollidable>();
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
@@ -91,7 +91,7 @@ namespace SIMDPrototyping.Trees.Tests
 
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.Refit();
+                //tree.Refit();
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Refit Time: {endTime - startTime}");
 
