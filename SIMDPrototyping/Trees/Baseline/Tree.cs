@@ -1,7 +1,6 @@
 ﻿//#define OUTPUT
+#define NODE4
 
-using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,17 +11,25 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
+#if NODE4
+using Node = SIMDPrototyping.Trees.Baseline.Node4;
+#else
+using Node = SIMDPrototyping.Trees.Baseline.Node2;
+#endif
 
 
 namespace SIMDPrototyping.Trees
 {
 
-    public interface IBounded
-    {
-        void GetBoundingBox(out BoundingBox box);
-    }
     public class Tree<T> where T : IBounded
     {
+        public const int ChildrenCapacity =
+#if NODE4
+            4;
+#else
+            2;
+#endif
+
         struct Level
         {
             //Consider using a pointer to avoid pointless range checking.
@@ -108,8 +115,6 @@ namespace SIMDPrototyping.Trees
 
         }
 
-        int vectorSizeMask;
-        Vector<int>[] singleMasks;
 
 
 
@@ -131,46 +136,39 @@ namespace SIMDPrototyping.Trees
                 throw new ArgumentException("Initial tree depth must be positive.");
             if (initialLeafCapacity <= 0)
                 throw new ArgumentException("Initial leaf capacity must be positive.");
-            singleMasks = new Vector<int>[Vector<int>.Count];
-            var buffer = BufferPools<int>.Locking.Take(Vector<int>.Count);
-            unchecked
-            {
-                buffer[0] = (int)0xffffffff;
-                singleMasks[0] = new Vector<int>(buffer);
-                for (int i = 1; i < singleMasks.Length; ++i)
-                {
-                    buffer[i - 1] = 0;
-                    buffer[i] = (int)0xffffffff;
-                    singleMasks[i] = new Vector<int>(buffer);
-                }
-            }
-            Array.Clear(buffer, 0, buffer.Length);
-            BufferPools<int>.Locking.GiveBack(buffer);
 
             Levels = new Level[initialTreeDepth];
             var maximumNodeCount = (int)Math.Ceiling(initialTreeDepth / (double)Vector<float>.Count);
             for (int i = 0; i < Levels.Length; ++i)
             {
-                Levels[i] = new Level { Nodes = new Node[Math.Min(initialLeafCapacity, (long)Math.Pow(4, Math.Min(25, i)))] };
+                Levels[i] = new Level { Nodes = new Node[Math.Min(initialLeafCapacity, (long)Math.Pow(2, Math.Min(25, i)))] };
             }
             InitializeNode(out Levels[0].Nodes[0]);
             Levels[0].Count = 1;
 
             leaves = new Leaf[initialLeafCapacity];
 
-            vectorSizeMask = Vector<float>.Count - 1;
         }
 
-
+        //Node initialNode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void InitializeNode(out Node node)
         {
+#if NODE4
             //could load a premade one instead.
-            BoundingBox empty = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
-            node.BoundingBoxes = new BoundingBoxWide(ref empty);
-            node.Children = new Vector<int>(-1);
+            node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            node.B = node.A;
+            node.C = node.A;
+            node.D = node.A;
+            node.ChildA = -1;
+            node.ChildB = -1;
+            node.ChildC = -1;
+            node.ChildD = -1;
+            node.ChildCount = 0;
             //'no child' is encoded as -1. 
             //Leaf nodes are encoded as -(leafIndex + 2).
+#else
+#endif
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -195,9 +193,8 @@ namespace SIMDPrototyping.Trees
         {
             int levelIndex = 0;
             int nodeIndex = 0;
-            BoundingBox aosBox;
-            leaf.GetBoundingBox(out aosBox);
-            var box = new BoundingBoxWide(ref aosBox);
+            BoundingBox box;
+            leaf.GetBoundingBox(out box);
 #if OUTPUT
             List<int> choices = new List<int>();
 #endif
@@ -205,49 +202,34 @@ namespace SIMDPrototyping.Trees
             {
                 var level = Levels[levelIndex];
                 //Which child should the leaf belong to?
-                Vector<float> originalVolumes;
-                BoundingBoxWide.ComputeVolume(ref level.Nodes[nodeIndex].BoundingBoxes, out originalVolumes);
-                originalVolumes = Vector.Max(originalVolumes, Vector<float>.Zero);
-                BoundingBoxWide merged;
-                BoundingBoxWide.Merge(ref level.Nodes[nodeIndex].BoundingBoxes, ref box, out merged);
-                Vector<float> mergedVolumes;
-                BoundingBoxWide.ComputeVolume(ref merged, out mergedVolumes);
 
                 //Give the leaf to whichever node had the least volume change.
-                var volumeIncreases = mergedVolumes - originalVolumes;
+                var node = level.Nodes[nodeIndex];
+                var boundingBoxes = &node.A;
+                var children = &node.ChildA;
                 int minimumIndex = 0;
-                var minimum = volumeIncreases[0];
-                for (int i = 1; i < Vector<float>.Count; ++i)
+                float minimumChange = float.MaxValue;
+                BoundingBox merged = new BoundingBox();
+                for (int i = 0; i < level.Nodes[nodeIndex].ChildCount; ++i)
                 {
-                    if (volumeIncreases[i] < minimum)
+                    var oldVolume = Math.Max(0, BoundingBox.ComputeVolume(ref boundingBoxes[i]));
+                    BoundingBox mergedCandidate;
+                    BoundingBox.Merge(ref boundingBoxes[i], ref box, out mergedCandidate);
+                    var newVolume = BoundingBox.ComputeVolume(ref mergedCandidate);
+                    var change = newVolume - oldVolume;
+                    if (newVolume < minimumChange)
                     {
+                        minimumChange = newVolume;
                         minimumIndex = i;
-                        minimum = volumeIncreases[i];
+                        merged = mergedCandidate;
                     }
                 }
-
-                //var volumeIncreases = mergedVolumes - originalVolumes;
-                //int minimumIndex = 0;
-                //var minimum = float.MaxValue;
-                //for (int i = 0; i < Vector<float>.Count; ++i)
-                //{
-                //    if (level.Nodes[nodeIndex].Children[i] == -1)
-                //    {
-                //        minimumIndex = i;
-                //        break;
-                //    }
-                //    if (volumeIncreases[i] < minimum)
-                //    {
-                //        minimumIndex = i;
-                //        minimum = volumeIncreases[i];
-                //    }
-                //}
 #if OUTPUT
                 Console.WriteLine($"Minimum index: {minimumIndex}, minimum volume increase: {minimum}");
                 choices.Add(minimumIndex);
 #endif
 
-                var childIndex = level.Nodes[nodeIndex].Children[minimumIndex];
+                var childIndex = children[minimumIndex];
 
                 if (childIndex < -1)
                 {
@@ -258,38 +240,29 @@ namespace SIMDPrototyping.Trees
                     EnsureLevel(nextLevel);
                     Node newNode;
                     InitializeNode(out newNode);
+                    newNode.ChildCount = 2;
                     //The first child of the new node is the old leaf. Insert its bounding box.
-                    //Since we don't have a great way of shuffling yet, just let it be in the same index.
-                    BoundingBoxWide.ConditionalSelect(
-                        ref singleMasks[minimumIndex],
-                        ref level.Nodes[nodeIndex].BoundingBoxes,
-                        ref newNode.BoundingBoxes,
-                        out newNode.BoundingBoxes);
-                    newNode.Children = Vector.ConditionalSelect(singleMasks[minimumIndex], level.Nodes[nodeIndex].Children, newNode.Children);
+                    newNode.A = boundingBoxes[minimumIndex];
+                    newNode.ChildA = children[minimumIndex];
 
                     //Insert the new leaf into the second child slot.
-                    //Just put it in the next slot over from the minimum.
-                    var newLeafChildIndex = (minimumIndex + 1) & vectorSizeMask;
-                    BoundingBoxWide.ConditionalSelect(
-                      ref singleMasks[newLeafChildIndex],
-                      ref box,
-                      ref newNode.BoundingBoxes,
-                      out newNode.BoundingBoxes);
+                    newNode.B = box;
                     var newNodeIndex = Levels[nextLevel].Add(ref newNode);
-                    var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, newLeafChildIndex);
-                    var leafIndexVector = new Vector<int>(Encode(leafIndex));
-                    Levels[nextLevel].Nodes[newNodeIndex].Children = Vector.ConditionalSelect(singleMasks[newLeafChildIndex], leafIndexVector, newNode.Children);
+                    var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, 1);
+                    Levels[nextLevel].Nodes[newNodeIndex].ChildB = Encode(leafIndex);
 
                     //Update the old leaf node with the new index information.
                     var oldLeafIndex = Encode(childIndex);
                     leaves[oldLeafIndex].LevelIndex = nextLevel;
                     leaves[oldLeafIndex].NodeIndex = newNodeIndex;
-                    //Since we inserted it into the same slot of the new node as it was in in the old node, there is no change to the child index.
+                    leaves[oldLeafIndex].ChildIndex = 0;
 
                     //Update the original node's child pointer and bounding box.
-                    var newNodeIndexVector = new Vector<int>(newNodeIndex);
-                    level.Nodes[nodeIndex].Children = Vector.ConditionalSelect(singleMasks[minimumIndex], newNodeIndexVector, level.Nodes[nodeIndex].Children);
-                    BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
+                    children[minimumIndex] = newNodeIndex;
+                    boundingBoxes[minimumIndex] = merged;
+
+                    //BECAUSE THE POINTERS ARE TO A STACK VARIABLE, and not directly the heap data right now, you must copy the node back into the heap.
+                    level.Nodes[nodeIndex] = node;
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} merged with existing leaf.");// New Node Children: {newNode.Children}, Old Node children: {level.Nodes[nodeIndex].Children}");
@@ -302,10 +275,13 @@ namespace SIMDPrototyping.Trees
                 {
                     //There is no child at all.
                     //Put the new leaf here.
+                    ++node.ChildCount;
                     var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, minimumIndex);
-                    var leafIndexVector = new Vector<int>(Encode(leafIndex));
-                    level.Nodes[nodeIndex].Children = Vector.ConditionalSelect(singleMasks[minimumIndex], leafIndexVector, level.Nodes[nodeIndex].Children);
-                    BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
+                    children[minimumIndex] = Encode(leafIndex);
+                    boundingBoxes[minimumIndex] = merged;
+
+                    //BECAUSE THE POINTERS ARE TO A STACK VARIABLE, and not directly the heap data right now, you must copy the node back into the heap.
+                    level.Nodes[nodeIndex] = node;
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} inserted in empty slot.");
@@ -314,9 +290,12 @@ namespace SIMDPrototyping.Trees
                     break;
                 }
                 //It's an internal node. Traverse to the next node.
-                BoundingBoxWide.ConditionalSelect(ref singleMasks[minimumIndex], ref merged, ref level.Nodes[nodeIndex].BoundingBoxes, out level.Nodes[nodeIndex].BoundingBoxes);
-                nodeIndex = level.Nodes[nodeIndex].Children[minimumIndex];
+                boundingBoxes[minimumIndex] = merged;
+                nodeIndex = children[minimumIndex];
                 ++levelIndex;
+
+                //BECAUSE THE POINTERS ARE TO A STACK VARIABLE, and not directly the heap data right now, you must copy the node back into the heap.
+                level.Nodes[nodeIndex] = node;
             }
         }
 
@@ -343,6 +322,8 @@ namespace SIMDPrototyping.Trees
             mergedWide = new BoundingBoxWide(ref merged);
         }
 
+
+
         public unsafe void Refit()
         {
             //Update the bounding boxes of every leaf-owner.
@@ -350,15 +331,9 @@ namespace SIMDPrototyping.Trees
             for (int i = 0; i < leafCount; ++i)
             {
                 BoundingBox box;
-                leaves[i].Bounded.GetBoundingBox(out box);
-                BoundingBoxWide wideBox = new BoundingBoxWide(ref box);
+                leaves[i].Bounded.GetBoundingBox(out (&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].A)[leaves[i].ChildIndex]);
                 //Console.WriteLine($"index reached: {i}, child index: {leaves[i].ChildIndex}, level: {leaves[i].LevelIndex}, node: { leaves[i].NodeIndex}");
 
-                BoundingBoxWide.ConditionalSelect(ref singleMasks[leaves[i].ChildIndex],
-                    ref wideBox,
-                    ref Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].BoundingBoxes,
-                    out Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].BoundingBoxes);
-                //Console.WriteLine($"comp");
 
             }
             //Go through each level, refitting as you go.
@@ -368,17 +343,21 @@ namespace SIMDPrototyping.Trees
                 //consider testing caching Levels[levelIndex]. It may have a minor effect.
                 for (int nodeIndex = 0; nodeIndex < Levels[levelIndex].Count; ++nodeIndex)
                 {
-                    for (int childIndex = 0; childIndex < Vector<int>.Count; ++childIndex)
+                    for (int childIndex = 0; childIndex < Levels[levelIndex].Nodes[nodeIndex].ChildCount; ++childIndex)
                     {
-                        var childNodeIndex = Levels[levelIndex].Nodes[nodeIndex].Children[childIndex];
+
+                        var childNodeIndex = (&Levels[levelIndex].Nodes[nodeIndex].ChildA)[childIndex];
                         if (childNodeIndex >= 0)
                         {
-                            BoundingBoxWide merged;
-                            ComputeBoundingBox(ref Levels[levelIndex + 1].Nodes[childNodeIndex].BoundingBoxes, out merged);
-                            BoundingBoxWide.ConditionalSelect(ref singleMasks[childIndex],
-                                ref merged,
-                                ref Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes,
-                                out Levels[levelIndex].Nodes[nodeIndex].BoundingBoxes);
+                            var childCount = Levels[levelIndex + 1].Nodes[childNodeIndex].ChildCount;
+                            var boundingBoxSlot = (&Levels[levelIndex].Nodes[nodeIndex].A) + childIndex;
+                            *boundingBoxSlot = Levels[levelIndex + 1].Nodes[childNodeIndex].A;
+                            var childBoundingBoxes = &Levels[levelIndex + 1].Nodes[childNodeIndex].A;
+                            for (int i = 1; i < childCount; ++i)
+                            {
+                                BoundingBox.Merge(ref *boundingBoxSlot, ref childBoundingBoxes[i], out *boundingBoxSlot);
+                            }
+
                         }
 
                     }
@@ -387,61 +366,29 @@ namespace SIMDPrototyping.Trees
         }
 
 
-        unsafe struct TraversalStack
-        {
-            public TraversalTarget* Stack;
-            public int Count;
-            public void Initialize(TraversalTarget* stack)
-            {
-                this.Stack = stack;
-                this.Count = 0;
-            }
-
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Push(int levelIndex, int nodeIndex)
-            {
-                Stack[Count] = new TraversalTarget { Level = levelIndex, Node = nodeIndex };
-                Count++;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Pop(out TraversalTarget target)
-            {
-                if (Count > 0)
-                {
-                    --Count;
-                    target = Stack[Count];
-                    return true;
-                }
-                target = new TraversalTarget();
-                return false;
-            }
-        }
+      
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void Test<TResultList>(TraversalTarget* stack, ref int count, int stackCapacity, int level,
-            ref BoundingBoxWide query, ref Node node,
+            ref BoundingBox query, Node* node,
             ref TResultList results) where TResultList : IList<T>
         {
-            Vector<int> intersectionMask;
-            BoundingBoxWide.Intersects(ref node.BoundingBoxes, ref query, out intersectionMask);
-            //Console.WriteLine($"Intersection mask: {intersectionMask}");
-            //Console.WriteLine(node.BoundingBoxes);
-            for (int i = 0; i < Vector<int>.Count; ++i)
+            var boundingBoxes = &node->A;
+            var children = &node->ChildA;
+            for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (intersectionMask[i] < 0)
+                if (BoundingBox.Intersects(ref boundingBoxes[i], ref query))
                 {
-                    if (node.Children[i] >= 0)
+                    if (children[i] >= 0)
                     {
-                        Debug.Assert(count < stackCapacity);
-                        stack[count++] = new TraversalTarget { Level = level + 1, Node = node.Children[i] };
+                        stack[count++] = new TraversalTarget { Level = level + 1, Node = children[i] };
                     }
-                    else if (node.Children[i] < -1)
+                    else
                     {
-                        results.Add(leaves[Encode(node.Children[i])].Bounded);
+                        results.Add(leaves[Encode(children[i])].Bounded);
                     }
                 }
+
             }
         }
 
@@ -449,42 +396,41 @@ namespace SIMDPrototyping.Trees
         public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
             //TODO: could optimize this by keeping the next target out of the stack.
-            var stackCapacity = (Vector<int>.Count - 1) * maximumDepth + 1;
+            var stackCapacity = (ChildrenCapacity - 1) * maximumDepth + 1;
             var stack = stackalloc TraversalTarget[stackCapacity];
             int count = 0;
 
             var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
-            Test(stack, ref count, stackCapacity, 0, ref boundingBoxWide, ref Levels[0].Nodes[0], ref results);
+            Test(stack, ref count, stackCapacity, 0, ref boundingBox, Levels[0].Nodes[0], ref results);
 
             while (count > 0)
             {
                 --count;
                 var target = stack[count];
 
-                Test(stack, ref count, stackCapacity, target.Level, ref boundingBoxWide, ref Levels[target.Level].Nodes[target.Node], ref results);
+                Test(stack, ref count, stackCapacity, target.Level, ref boundingBox, Levels[target.Level].Nodes[target.Node], ref results);
             }
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive<TResultList>(int level, int nodeIndex,
-            ref BoundingBoxWide query,
+            ref BoundingBox query,
             ref TResultList results) where TResultList : IList<T>
         {
-            Vector<int> intersectionMask;
-            BoundingBoxWide.Intersects(ref Levels[level].Nodes[nodeIndex].BoundingBoxes, ref query, out intersectionMask);
-            //Console.WriteLine($"Intersection mask: {intersectionMask}");
-            //Console.WriteLine(node.BoundingBoxes);
-            for (int i = 0; i < Vector<int>.Count; ++i)
+            Node* node = Levels[level].Nodes[nodeIndex];
+            var boundingBoxes = &node->A;
+            var children = &node->ChildA;
+            for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (intersectionMask[i] < 0)
+                if (BoundingBox.Intersects(ref query, ref boundingBoxes[i]))
                 {
-                    if (Levels[level].Nodes[nodeIndex].Children[i] >= 0)
+                    if (children[i] >= 0)
                     {
-                        TestRecursive(level + 1, Levels[level].Nodes[nodeIndex].Children[i], ref query, ref results);
+                        TestRecursive(level + 1, children[i], ref query, ref results);
                     }
-                    else if (Levels[level].Nodes[nodeIndex].Children[i] < -1)
+                    else if (children[i] < -1)
                     {
-                        results.Add(leaves[Encode(Levels[level].Nodes[nodeIndex].Children[i])].Bounded);
+                        results.Add(leaves[Encode(children[i])].Bounded);
                     }
                 }
             }
@@ -493,21 +439,18 @@ namespace SIMDPrototyping.Trees
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
-            var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
-            TestRecursive(0, 0, ref boundingBoxWide, ref results);
+            TestRecursive(0, 0, ref boundingBox, ref results);
         }
 
-        void MeasureNodeOccupancy(int levelIndex, int nodeIndex, ref int nodeCount, ref int childCount)
+        unsafe void MeasureNodeOccupancy(int levelIndex, int nodeIndex, ref int nodeCount, ref int childCount)
         {
             ++nodeCount;
 
-            var children = Levels[levelIndex].Nodes[nodeIndex].Children;
-            for (int i = 0; i < Vector<int>.Count; ++i) 
+            Node* node = Levels[levelIndex].Nodes[nodeIndex];
+            var children = &node->ChildA;
+            childCount += node->ChildCount;
+            for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (children[i] != -1)
-                {
-                    ++childCount;
-                }
                 if (children[i] >= 0)
                 {
                     MeasureNodeOccupancy(levelIndex + 1, children[i], ref nodeCount, ref childCount);

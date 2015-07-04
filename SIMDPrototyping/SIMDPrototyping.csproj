@@ -99,11 +99,14 @@
     <Compile Include="Matrix3x3.cs" />
     <Compile Include="MicroFiddling.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
+    <Compile Include="Trees\Baseline\Node.cs" />
     <Compile Include="Trees\BoundingBox.cs" />
+    <Compile Include="Trees\IBounded.cs" />
     <Compile Include="Trees\TestCollidable.cs" />
-    <Compile Include="Trees\Node.cs" />
+    <Compile Include="Trees\Vectorized\Node.cs" />
     <Compile Include="Trees\Tests\TreeTest.cs" />
-    <Compile Include="Trees\Tree.cs" />
+    <Compile Include="Trees\Baseline\Tree.cs" />
+    <Compile Include="Trees\Vectorized\Tree.cs" />
     <Compile Include="Vector3Wide.cs" />
     <Compile Include="Vector3Width4.cs" />
     <Compile Include="Constraints\HybridPenetrationConstraint.cs" />

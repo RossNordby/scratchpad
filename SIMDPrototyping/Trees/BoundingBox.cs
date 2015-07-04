@@ -1,18 +1,36 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace SIMDPrototyping.Trees
 {
+    
     public struct BoundingBox
     {
         public Vector3 Min;
         public Vector3 Max;
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool Intersects(ref BoundingBox a, ref BoundingBox b)
+        {
+            //May be able to do better than this. Consider unbranching it.
+            return Vector3.Clamp(a.Min, b.Min, b.Max) == a.Min || Vector3.Clamp(a.Max, b.Min, b.Max) == a.Max;
+
+        }
+
+        public static unsafe float ComputeVolume(ref BoundingBox a)
+        {
+            var diagonal = (a.Max - a.Min);
+            return diagonal.X * diagonal.Y * diagonal.Z;
+        }
+
+        public static void Merge(ref BoundingBox a, ref BoundingBox b, out BoundingBox merged)
+        {
+            merged.Min = Vector3.Min(a.Min, b.Min);
+            merged.Max = Vector3.Max(a.Max, b.Max);
+        }
 
         public override string ToString()
         {

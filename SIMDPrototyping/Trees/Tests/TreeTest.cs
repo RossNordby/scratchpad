@@ -1,6 +1,7 @@
 ﻿using BEPUphysics.DataStructures;
 using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
+using SIMDPrototyping.Trees.Vectorized;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -101,10 +102,10 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             int leafCubeSize = 64;
-            float leafSize = 10, leafGap = -.5f;
-            int queryCount = 1000;
+            float leafSize = 10, leafGap = 5f;
+            int queryCount = 1000000;
             float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 5;
-            int queryLocationCount = 2048;
+            int queryLocationCount = 16384;
             int queryMask = queryLocationCount - 1;
             {
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);

@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SIMDPrototyping.Trees
+namespace SIMDPrototyping.Trees.Vectorized
 {
     /// <summary>
     /// 4-wide simd-friendly tree node.
