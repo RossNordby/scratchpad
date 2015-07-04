@@ -18,7 +18,7 @@ using Node = SIMDPrototyping.Trees.Baseline.Node2;
 #endif
 
 
-namespace SIMDPrototyping.Trees
+namespace SIMDPrototyping.Trees.Baseline
 {
 
     public class Tree<T> where T : IBounded
@@ -30,25 +30,40 @@ namespace SIMDPrototyping.Trees
             2;
 #endif
 
-        struct Level
+        unsafe struct Level
         {
             //Consider using a pointer to avoid pointless range checking.
             //Requires fixing. Use debug conditional stuff to ensure safety;
             //may want to use the array itself in debug mode too.
             //Doesn't change the other syntax really.
-            public Node[] Nodes;
+            public Node[] NodesArray;
+            public GCHandle NodesHandle;
+            public Node* Nodes;
             public int Count;
 
             public int Add(ref Node node)
             {
-                if (Count == Nodes.Length)
+                if (Count == NodesArray.Length)
                 {
-                    var newNodes = new Node[Nodes.Length * 2];
-                    Array.Copy(Nodes, newNodes, Nodes.Length);
-                    Nodes = newNodes;
+                    Debug.Assert(NodesHandle.IsAllocated);
+                    NodesHandle.Free();
+                    var newNodes = new Node[NodesArray.Length * 2];
+                    Array.Copy(NodesArray, newNodes, NodesArray.Length);
+                    NodesArray = newNodes;
+                    NodesHandle = GCHandle.Alloc(NodesArray, GCHandleType.Pinned);
+                    Nodes = (Node*)NodesHandle.AddrOfPinnedObject();
                 }
-                Nodes[Count] = node;
+                NodesArray[Count] = node;
                 return Count++;
+            }
+
+            internal void Initialize(long size)
+            {
+                Debug.Assert(!NodesHandle.IsAllocated);
+                NodesArray = new Node[size];
+                NodesHandle = GCHandle.Alloc(NodesArray, GCHandleType.Pinned);
+                Nodes = (Node*)NodesHandle.AddrOfPinnedObject();
+
             }
         }
         Level[] Levels;
@@ -106,7 +121,7 @@ namespace SIMDPrototyping.Trees
                 {
                     //Assume the same size for subsequent levels. While they could grow exponentially,
                     //typically the tree will not be perfectly balanced.
-                    newLevels[i] = new Level { Nodes = new Node[Levels[Levels.Length - 1].Nodes.Length] };
+                    newLevels[i].Initialize(Levels[Levels.Length - 1].NodesArray.Length);
                 }
                 Levels = newLevels;
             }
@@ -130,7 +145,7 @@ namespace SIMDPrototyping.Trees
             }
         }
 
-        public Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 24)
+        public unsafe Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 24)
         {
             if (initialTreeDepth <= 0)
                 throw new ArgumentException("Initial tree depth must be positive.");
@@ -141,7 +156,7 @@ namespace SIMDPrototyping.Trees
             var maximumNodeCount = (int)Math.Ceiling(initialTreeDepth / (double)Vector<float>.Count);
             for (int i = 0; i < Levels.Length; ++i)
             {
-                Levels[i] = new Level { Nodes = new Node[Math.Min(initialLeafCapacity, (long)Math.Pow(2, Math.Min(25, i)))] };
+                Levels[i].Initialize(Math.Min(initialLeafCapacity, (long)Math.Pow(2, Math.Min(25, i))));
             }
             InitializeNode(out Levels[0].Nodes[0]);
             Levels[0].Count = 1;
@@ -204,9 +219,9 @@ namespace SIMDPrototyping.Trees
                 //Which child should the leaf belong to?
 
                 //Give the leaf to whichever node had the least volume change.
-                var node = level.Nodes[nodeIndex];
-                var boundingBoxes = &node.A;
-                var children = &node.ChildA;
+                var node = level.Nodes + nodeIndex;
+                var boundingBoxes = &node->A;
+                var children = &node->ChildA;
                 int minimumIndex = 0;
                 float minimumChange = float.MaxValue;
                 BoundingBox merged = new BoundingBox();
@@ -260,9 +275,7 @@ namespace SIMDPrototyping.Trees
                     //Update the original node's child pointer and bounding box.
                     children[minimumIndex] = newNodeIndex;
                     boundingBoxes[minimumIndex] = merged;
-
-                    //BECAUSE THE POINTERS ARE TO A STACK VARIABLE, and not directly the heap data right now, you must copy the node back into the heap.
-                    level.Nodes[nodeIndex] = node;
+                    
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} merged with existing leaf.");// New Node Children: {newNode.Children}, Old Node children: {level.Nodes[nodeIndex].Children}");
@@ -275,13 +288,11 @@ namespace SIMDPrototyping.Trees
                 {
                     //There is no child at all.
                     //Put the new leaf here.
-                    ++node.ChildCount;
+                    ++node->ChildCount;
                     var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, minimumIndex);
                     children[minimumIndex] = Encode(leafIndex);
                     boundingBoxes[minimumIndex] = merged;
-
-                    //BECAUSE THE POINTERS ARE TO A STACK VARIABLE, and not directly the heap data right now, you must copy the node back into the heap.
-                    level.Nodes[nodeIndex] = node;
+                    
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} inserted in empty slot.");
@@ -293,34 +304,10 @@ namespace SIMDPrototyping.Trees
                 boundingBoxes[minimumIndex] = merged;
                 nodeIndex = children[minimumIndex];
                 ++levelIndex;
-
-                //BECAUSE THE POINTERS ARE TO A STACK VARIABLE, and not directly the heap data right now, you must copy the node back into the heap.
-                level.Nodes[nodeIndex] = node;
+                
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void ComputeBoundingBox(ref BoundingBoxWide boundingBoxes, out BoundingBoxWide mergedWide)
-        {
-            //YIKES transposition
-            BoundingBox merged;
-            merged.Min = new Vector3(float.MaxValue);
-            merged.Max = new Vector3(-float.MaxValue);
-            for (int childIndex = 0; childIndex < Vector<int>.Count; ++childIndex)
-            {
-                var childMin = new Vector3(
-                    boundingBoxes.Min.X[childIndex],
-                    boundingBoxes.Min.Y[childIndex],
-                    boundingBoxes.Min.Z[childIndex]);
-                var childMax = new Vector3(
-                    boundingBoxes.Max.X[childIndex],
-                    boundingBoxes.Max.Y[childIndex],
-                    boundingBoxes.Max.Z[childIndex]);
-                merged.Min = Vector3.Min(merged.Min, childMin);
-                merged.Max = Vector3.Max(merged.Max, childMax);
-            }
-            mergedWide = new BoundingBoxWide(ref merged);
-        }
 
 
 
@@ -330,7 +317,6 @@ namespace SIMDPrototyping.Trees
             //Note the scalar-ness of this. It seems like there should exist some way to vectorize it properly, though it may require changing things around.
             for (int i = 0; i < leafCount; ++i)
             {
-                BoundingBox box;
                 leaves[i].Bounded.GetBoundingBox(out (&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].A)[leaves[i].ChildIndex]);
                 //Console.WriteLine($"index reached: {i}, child index: {leaves[i].ChildIndex}, level: {leaves[i].LevelIndex}, node: { leaves[i].NodeIndex}");
 
@@ -401,14 +387,14 @@ namespace SIMDPrototyping.Trees
             int count = 0;
 
             var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
-            Test(stack, ref count, stackCapacity, 0, ref boundingBox, Levels[0].Nodes[0], ref results);
+            Test(stack, ref count, stackCapacity, 0, ref boundingBox, Levels[0].Nodes, ref results);
 
             while (count > 0)
             {
                 --count;
                 var target = stack[count];
 
-                Test(stack, ref count, stackCapacity, target.Level, ref boundingBox, Levels[target.Level].Nodes[target.Node], ref results);
+                Test(stack, ref count, stackCapacity, target.Level, ref boundingBox, Levels[target.Level].Nodes + target.Node, ref results);
             }
         }
 
@@ -417,7 +403,7 @@ namespace SIMDPrototyping.Trees
             ref BoundingBox query,
             ref TResultList results) where TResultList : IList<T>
         {
-            Node* node = Levels[level].Nodes[nodeIndex];
+            Node* node = Levels[level].Nodes + nodeIndex;
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
             for (int i = 0; i < node->ChildCount; ++i)
@@ -446,7 +432,7 @@ namespace SIMDPrototyping.Trees
         {
             ++nodeCount;
 
-            Node* node = Levels[levelIndex].Nodes[nodeIndex];
+            Node* node = Levels[levelIndex].Nodes + nodeIndex;
             var children = &node->ChildA;
             childCount += node->ChildCount;
             for (int i = 0; i < node->ChildCount; ++i)
@@ -464,6 +450,16 @@ namespace SIMDPrototyping.Trees
             childCount = 0;
             MeasureNodeOccupancy(0, 0, ref nodeCount, ref childCount);
         }
+
+#if DEBUG
+        ~Tree()
+        {
+            for (int i = 0; i < Levels.Length; ++i)
+            {
+                Debug.Assert(!Levels[i].NodesHandle.IsAllocated, "No handle should still be allocated when the tree is finalized; implies a memory leak.");
+            }
+        }
+#endif
 
     }
 

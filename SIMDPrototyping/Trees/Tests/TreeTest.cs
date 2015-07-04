@@ -10,6 +10,9 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
+using Tree = SIMDPrototyping.Trees.Vectorized.Tree<SIMDPrototyping.Trees.TestCollidable>;
+using BaselineTree = SIMDPrototyping.Trees.Baseline.Tree<SIMDPrototyping.Trees.TestCollidable>;
+
 namespace SIMDPrototyping.Trees.Tests
 {
 
@@ -86,7 +89,7 @@ namespace SIMDPrototyping.Trees.Tests
             GC.Collect();
             {
                 var leaves = GetLeaves(2, 2, 2, 10, 10);
-                Tree<TestCollidable> tree = new Tree<TestCollidable>();
+                Tree tree = new Tree();
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     tree.Insert(leaves[i]);
@@ -109,7 +112,7 @@ namespace SIMDPrototyping.Trees.Tests
             int queryMask = queryLocationCount - 1;
             {
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
-                Tree<TestCollidable> tree = new Tree<TestCollidable>(262144, 128);
+                Tree tree = new Tree(262144, 128);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -142,6 +145,64 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Query Time: {endTime - startTime}, overlaps: {list.Count}");
                 list.Dispose();
             }
+
+            GC.Collect();
+
+
+            GC.Collect();
+            {
+                var leaves = GetLeaves(2, 2, 2, 10, 10);
+                BaselineTree tree = new BaselineTree();
+                for (int i = 0; i < leaves.Length; ++i)
+                {
+                    tree.Insert(leaves[i]);
+                }
+                Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
+
+                tree.Refit();
+
+                var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
+                BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
+                tree.Query(ref aabb, ref list);
+                list.Dispose();
+            }
+
+            {
+                var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
+                BaselineTree tree = new BaselineTree(262144, 128);
+                var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < leaves.Length; ++i)
+                {
+                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                    //tree.Insert(leaves[i]);
+                }
+                var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
+
+                int nodeCount, childCount;
+                tree.MeasureNodeOccupancy(out nodeCount, out childCount);
+
+                Console.WriteLine($"Baseline Occupancy: {childCount / (double)nodeCount}");
+
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                tree.Refit();
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"Baseline Refit Time: {endTime - startTime}");
+
+                var queries = GetQueryLocations(queryLocationCount, queryRange, querySize);
+                var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < queryCount; ++i)
+                {
+                    list.Count = 0;
+                    //tree.Query(ref aabb, ref list);
+                    tree.QueryRecursive(ref queries[i & queryMask], ref list);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"Baseline Query Time: {endTime - startTime}, overlaps: {list.Count}");
+                list.Dispose();
+            }
+
 
             GC.Collect();
             {
