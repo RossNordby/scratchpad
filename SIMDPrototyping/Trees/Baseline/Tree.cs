@@ -21,7 +21,7 @@ using Node = SIMDPrototyping.Trees.Baseline.Node2;
 namespace SIMDPrototyping.Trees.Baseline
 {
 
-    public class Tree<T> where T : IBounded
+    public class Tree<T> : IDisposable where T : IBounded
     {
         public const int ChildrenCapacity =
 #if NODE4
@@ -225,7 +225,8 @@ namespace SIMDPrototyping.Trees.Baseline
                 int minimumIndex = 0;
                 float minimumChange = float.MaxValue;
                 BoundingBox merged = new BoundingBox();
-                for (int i = 0; i < level.Nodes[nodeIndex].ChildCount; ++i)
+                var max = Math.Min(ChildrenCapacity, node->ChildCount + 1);
+                for (int i = 0; i < max; ++i)
                 {
                     var oldVolume = Math.Max(0, BoundingBox.ComputeVolume(ref boundingBoxes[i]));
                     BoundingBox mergedCandidate;
@@ -275,7 +276,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     //Update the original node's child pointer and bounding box.
                     children[minimumIndex] = newNodeIndex;
                     boundingBoxes[minimumIndex] = merged;
-                    
+
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} merged with existing leaf.");// New Node Children: {newNode.Children}, Old Node children: {level.Nodes[nodeIndex].Children}");
@@ -292,7 +293,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, minimumIndex);
                     children[minimumIndex] = Encode(leafIndex);
                     boundingBoxes[minimumIndex] = merged;
-                    
+
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} inserted in empty slot.");
@@ -304,7 +305,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 boundingBoxes[minimumIndex] = merged;
                 nodeIndex = children[minimumIndex];
                 ++levelIndex;
-                
+
             }
         }
 
@@ -352,7 +353,7 @@ namespace SIMDPrototyping.Trees.Baseline
         }
 
 
-      
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void Test<TResultList>(TraversalTarget* stack, ref int count, int stackCapacity, int level,
@@ -449,6 +450,15 @@ namespace SIMDPrototyping.Trees.Baseline
             nodeCount = 0;
             childCount = 0;
             MeasureNodeOccupancy(0, 0, ref nodeCount, ref childCount);
+        }
+
+        public void Dispose()
+        {
+            for (int i = 0; i <= maximumDepth; ++i)
+            {
+                if (Levels[i].NodesHandle.IsAllocated)
+                    Levels[i].NodesHandle.Free();
+            }
         }
 
 #if DEBUG
