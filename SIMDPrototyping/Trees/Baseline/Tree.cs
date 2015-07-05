@@ -508,7 +508,7 @@ namespace SIMDPrototyping.Trees.Baseline
             var children = &node->ChildA;
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (BoundingBox.Intersects(ref boundingBoxes[i], ref query))
+                if (BoundingBox.Intersects(ref query, ref boundingBoxes[i]))
                 {
                     if (children[i] >= 0)
                     {
@@ -545,21 +545,23 @@ namespace SIMDPrototyping.Trees.Baseline
             }
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive<TResultList>(int level, int nodeIndex,
             ref BoundingBox query,
             ref TResultList results) where TResultList : IList<T>
         {
-            Node* node = Levels[level].Nodes + nodeIndex;
+            var node = (Levels[level].Nodes + nodeIndex);
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
-            for (int i = 0; i < node->ChildCount; ++i)
+            var childCount = node->ChildCount;
+            var nextLevel = level + 1;
+            for (int i = 0; i < childCount; ++i)
             {
                 if (BoundingBox.Intersects(ref query, ref boundingBoxes[i]))
                 {
                     if (children[i] >= 0)
                     {
-                        TestRecursive(level + 1, children[i], ref query, ref results);
+                        TestRecursive(nextLevel, children[i], ref query, ref results);
                     }
                     else if (children[i] < -1)
                     {

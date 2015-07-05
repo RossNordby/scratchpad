@@ -29,6 +29,11 @@ namespace SIMDPrototyping.Trees
             //    Vector3.Min(Vector3.Max(a.Max, b.Min), b.Max) == a.Max || 
             //    Vector3.Min(Vector3.Max(b.Min, a.Min), a.Max) == b.Min ||
             //    Vector3.Min(Vector3.Max(b.Max, a.Min), a.Max) == b.Max;
+            
+            //This could be changed to result = And(GEQ(a.Max, b.Min), GEQ(b.Max, a.Min))
+            //Then, horizontal And...
+            //Could implement as dot(result, One). If that's -3, then we're good!
+            //geq, geq, and, dot, load 3, compare. Six instructions instead of eleven, and no scalar swap.
 
         }
 
