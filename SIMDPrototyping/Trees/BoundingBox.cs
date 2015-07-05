@@ -23,7 +23,7 @@ namespace SIMDPrototyping.Trees
             //         b.Max.X < a.Min.X | b.Max.Y < a.Min.Y | b.Max.Z < a.Min.Z);
             return a.Max.X >= b.Min.X & a.Max.Y >= b.Min.Y & a.Max.Z >= b.Min.Z &
                      b.Max.X >= a.Min.X & b.Max.Y >= a.Min.Y & b.Max.Z >= a.Min.Z;
-            //return a.Max.X >= b.Min.X && a.Max.Y >= b.Min.Y && a.Max.Z >= b.Min.Z &
+            //return a.Max.X >= b.Min.X && a.Max.Y >= b.Min.Y && a.Max.Z >= b.Min.Z &&
             //         b.Max.X >= a.Min.X && b.Max.Y >= a.Min.Y && b.Max.Z >= a.Min.Z;
             //return Vector3.Min(Vector3.Max(a.Min, b.Min), b.Max) == a.Min ||
             //    Vector3.Min(Vector3.Max(a.Max, b.Min), b.Max) == a.Max || 
