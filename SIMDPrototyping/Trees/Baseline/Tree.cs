@@ -1,8 +1,8 @@
 ﻿//#define OUTPUT
 //#define NODE32
-//#define NODE16
+#define NODE16
 //#define NODE8
-#define NODE4
+//#define NODE4
 
 using System;
 using System.Collections.Generic;

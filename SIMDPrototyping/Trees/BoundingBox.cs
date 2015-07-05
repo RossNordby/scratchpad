@@ -5,10 +5,12 @@ using System.Text;
 
 namespace SIMDPrototyping.Trees
 {
-
+    //[StructLayout(LayoutKind.Explicit, Size = 32)]
     public struct BoundingBox
     {
+        //[FieldOffset(0)]
         public Vector3 Min;
+        //[FieldOffset(16)]
         public Vector3 Max;
 
 
