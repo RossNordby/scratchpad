@@ -67,7 +67,7 @@ namespace SIMDPrototyping.Trees.Tests
             BoundingBox[] boxes = new BoundingBox[count];
             for (int i = 0; i < boxes.Length; ++i)
             {
-                boxes[i].Min = new Vector3();// new Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
+                boxes[i].Min = new Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
                 boxes[i].Max = boxes[i].Min + new Vector3(size);
             }
             return boxes;
@@ -79,7 +79,7 @@ namespace SIMDPrototyping.Trees.Tests
             BEPUutilities.BoundingBox[] boxes = new BEPUutilities.BoundingBox[count];
             for (int i = 0; i < boxes.Length; ++i)
             {
-                boxes[i].Min = new BEPUutilities.Vector3();// new BEPUutilities.Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
+                boxes[i].Min = new BEPUutilities.Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
                 boxes[i].Max = boxes[i].Min + new BEPUutilities.Vector3(size, size, size);
             }
             return boxes;
@@ -104,13 +104,14 @@ namespace SIMDPrototyping.Trees.Tests
                 list.Dispose();
             }
 
-            int leafCubeSize = 2;
+            int leafCubeSize = 64;
             float leafSize = 10, leafGap = 10f;
             int queryCount = 1000000;
             float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 5;
-            int queryLocationCount = 1;
+            int queryLocationCount = 4096;
             int queryMask = queryLocationCount - 1;
             {
+                
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
                 Tree tree = new Tree(262144, 128);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -168,6 +169,7 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             {
+                Console.WriteLine($"Baseline arity: {BaselineTree.ChildrenCapacity}");
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
                 BaselineTree tree = new BaselineTree(262144, 128);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

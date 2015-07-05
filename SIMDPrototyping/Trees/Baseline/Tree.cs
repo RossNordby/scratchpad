@@ -1,5 +1,7 @@
 ﻿//#define OUTPUT
-#define NODE4
+#define NODE16
+//#define NODE8
+//#define NODE4
 
 using System;
 using System.Collections.Generic;
@@ -11,7 +13,11 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-#if NODE4
+#if NODE16
+using Node = SIMDPrototyping.Trees.Baseline.Node16;
+#elif NODE8
+using Node = SIMDPrototyping.Trees.Baseline.Node8;
+#elif NODE4
 using Node = SIMDPrototyping.Trees.Baseline.Node4;
 #else
 using Node = SIMDPrototyping.Trees.Baseline.Node2;
@@ -24,7 +30,11 @@ namespace SIMDPrototyping.Trees.Baseline
     public class Tree<T> : IDisposable where T : IBounded
     {
         public const int ChildrenCapacity =
-#if NODE4
+#if NODE16
+            16;
+#elif NODE8
+            8;
+#elif NODE4
             4;
 #else
             2;
@@ -169,7 +179,59 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void InitializeNode(out Node node)
         {
-#if NODE4
+#if NODE16
+            node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            node.B = node.A;
+            node.C = node.A;
+            node.D = node.A;
+            node.E = node.A;
+            node.F = node.A;
+            node.G = node.A;
+            node.H = node.A;
+            node.I = node.A;
+            node.J = node.A;
+            node.K = node.A;
+            node.L = node.A;
+            node.M = node.A;
+            node.N = node.A;
+            node.O = node.A;
+            node.P = node.A;
+            node.ChildA = -1;
+            node.ChildB = -1;
+            node.ChildC = -1;
+            node.ChildD = -1;
+            node.ChildE = -1;
+            node.ChildF = -1;
+            node.ChildG = -1;
+            node.ChildH = -1;
+            node.ChildI = -1;
+            node.ChildJ = -1;
+            node.ChildK = -1;
+            node.ChildL = -1;
+            node.ChildM = -1;
+            node.ChildN = -1;
+            node.ChildO = -1;
+            node.ChildP = -1;
+            node.ChildCount = 0;
+#elif NODE8
+            node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            node.B = node.A;
+            node.C = node.A;
+            node.D = node.A;
+            node.E = node.A;
+            node.F = node.A;
+            node.G = node.A;
+            node.H = node.A;
+            node.ChildA = -1;
+            node.ChildB = -1;
+            node.ChildC = -1;
+            node.ChildD = -1;
+            node.ChildE = -1;
+            node.ChildF = -1;
+            node.ChildG = -1;
+            node.ChildH = -1;
+            node.ChildCount = 0;
+#elif NODE4
             //could load a premade one instead.
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
             node.B = node.A;
@@ -183,6 +245,11 @@ namespace SIMDPrototyping.Trees.Baseline
             //'no child' is encoded as -1. 
             //Leaf nodes are encoded as -(leafIndex + 2).
 #else
+            node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            node.B = node.A;
+            node.ChildA = -1;
+            node.ChildB = -1;
+            node.ChildCount = 0;
 #endif
         }
 
@@ -228,6 +295,12 @@ namespace SIMDPrototyping.Trees.Baseline
                 var max = Math.Min(ChildrenCapacity, node->ChildCount + 1);
                 for (int i = 0; i < max; ++i)
                 {
+                    //if (children[i] == -1)
+                    //{
+                    //    minimumIndex = i;
+                    //    merged = box;
+                    //    break;
+                    //}
                     var oldVolume = Math.Max(0, BoundingBox.ComputeVolume(ref boundingBoxes[i]));
                     BoundingBox mergedCandidate;
                     BoundingBox.Merge(ref boundingBoxes[i], ref box, out mergedCandidate);

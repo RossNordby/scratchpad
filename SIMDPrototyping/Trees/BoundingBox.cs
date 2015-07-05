@@ -15,8 +15,10 @@ namespace SIMDPrototyping.Trees
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Intersects(ref BoundingBox a, ref BoundingBox b)
         {
-            //May be able to do better than this. Consider unbranching it.
-            return Vector3.Clamp(a.Min, b.Min, b.Max) == a.Min || Vector3.Clamp(a.Max, b.Min, b.Max) == a.Max;
+            ////May be able to do better than this. Consider unbranching it.
+            //return Vector3.Clamp(a.Min, b.Min, b.Max) == a.Min || Vector3.Clamp(a.Max, b.Min, b.Max) == a.Max;
+            return !(a.Max.X < b.Min.X || a.Max.Y < b.Min.Y || a.Max.Z < b.Min.Z ||
+                     b.Max.X < a.Min.X || b.Max.Y < a.Min.Y || b.Max.Z < a.Min.Z);
 
         }
 
