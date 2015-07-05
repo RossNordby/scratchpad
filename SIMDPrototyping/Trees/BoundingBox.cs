@@ -5,7 +5,7 @@ using System.Text;
 
 namespace SIMDPrototyping.Trees
 {
-    
+
     public struct BoundingBox
     {
         public Vector3 Min;
@@ -17,8 +17,18 @@ namespace SIMDPrototyping.Trees
         {
             ////May be able to do better than this. Consider unbranching it.
             //return Vector3.Clamp(a.Min, b.Min, b.Max) == a.Min || Vector3.Clamp(a.Max, b.Min, b.Max) == a.Max;
-            return !(a.Max.X < b.Min.X || a.Max.Y < b.Min.Y || a.Max.Z < b.Min.Z ||
-                     b.Max.X < a.Min.X || b.Max.Y < a.Min.Y || b.Max.Z < a.Min.Z);
+            //return !(a.Max.X < b.Min.X || a.Max.Y < b.Min.Y || a.Max.Z < b.Min.Z ||
+            //         b.Max.X < a.Min.X || b.Max.Y < a.Min.Y || b.Max.Z < a.Min.Z);
+            //return !(a.Max.X < b.Min.X | a.Max.Y < b.Min.Y | a.Max.Z < b.Min.Z |
+            //         b.Max.X < a.Min.X | b.Max.Y < a.Min.Y | b.Max.Z < a.Min.Z);
+            return a.Max.X >= b.Min.X & a.Max.Y >= b.Min.Y & a.Max.Z >= b.Min.Z &
+                     b.Max.X >= a.Min.X & b.Max.Y >= a.Min.Y & b.Max.Z >= a.Min.Z;
+            //return a.Max.X >= b.Min.X && a.Max.Y >= b.Min.Y && a.Max.Z >= b.Min.Z &
+            //         b.Max.X >= a.Min.X && b.Max.Y >= a.Min.Y && b.Max.Z >= a.Min.Z;
+            //return Vector3.Min(Vector3.Max(a.Min, b.Min), b.Max) == a.Min ||
+            //    Vector3.Min(Vector3.Max(a.Max, b.Min), b.Max) == a.Max || 
+            //    Vector3.Min(Vector3.Max(b.Min, a.Min), a.Max) == b.Min ||
+            //    Vector3.Min(Vector3.Max(b.Max, a.Min), a.Max) == b.Max;
 
         }
 

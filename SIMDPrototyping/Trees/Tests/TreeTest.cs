@@ -113,7 +113,7 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
-                Tree tree = new Tree(262144, 128);
+                Tree tree = new Tree(262144, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -139,7 +139,7 @@ namespace SIMDPrototyping.Trees.Tests
                 for (int i = 0; i < queryCount; ++i)
                 {
                     list.Count = 0;
-                    //tree.Query(ref aabb, ref list);
+                    //tree.Query(ref queries[i & queryMask], ref list);
                     tree.QueryRecursive(ref queries[i & queryMask], ref list);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -171,7 +171,7 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 Console.WriteLine($"Baseline arity: {BaselineTree.ChildrenCapacity}");
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
-                BaselineTree tree = new BaselineTree(262144, 128);
+                BaselineTree tree = new BaselineTree(262144, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -197,7 +197,7 @@ namespace SIMDPrototyping.Trees.Tests
                 for (int i = 0; i < queryCount; ++i)
                 {
                     list.Count = 0;
-                    //tree.Query(ref aabb, ref list);
+                    //tree.Query(ref queries[i & queryMask], ref list);
                     tree.QueryRecursive(ref queries[i & queryMask], ref list);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

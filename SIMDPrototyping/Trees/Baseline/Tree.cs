@@ -1,7 +1,8 @@
 ﻿//#define OUTPUT
-#define NODE16
+//#define NODE32
+//#define NODE16
 //#define NODE8
-//#define NODE4
+#define NODE4
 
 using System;
 using System.Collections.Generic;
@@ -13,7 +14,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-#if NODE16
+#if NODE32
+using Node = SIMDPrototyping.Trees.Baseline.Node32;
+#elif NODE16
 using Node = SIMDPrototyping.Trees.Baseline.Node16;
 #elif NODE8
 using Node = SIMDPrototyping.Trees.Baseline.Node8;
@@ -27,10 +30,12 @@ using Node = SIMDPrototyping.Trees.Baseline.Node2;
 namespace SIMDPrototyping.Trees.Baseline
 {
 
-    public class Tree<T> : IDisposable where T : IBounded
+    public unsafe class Tree<T> : IDisposable where T : IBounded
     {
         public const int ChildrenCapacity =
-#if NODE16
+#if NODE32
+            32;
+#elif NODE16
             16;
 #elif NODE8
             8;
@@ -172,14 +177,80 @@ namespace SIMDPrototyping.Trees.Baseline
             Levels[0].Count = 1;
 
             leaves = new Leaf[initialLeafCapacity];
-
+            
         }
 
         //Node initialNode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void InitializeNode(out Node node)
         {
-#if NODE16
+#if NODE32
+            node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            node.B = node.A;
+            node.C = node.A;
+            node.D = node.A;
+            node.E = node.A;
+            node.F = node.A;
+            node.G = node.A;
+            node.H = node.A;
+            node.I = node.A;
+            node.J = node.A;
+            node.K = node.A;
+            node.L = node.A;
+            node.M = node.A;
+            node.N = node.A;
+            node.O = node.A;
+            node.P = node.A;
+            node.A2 = node.A;
+            node.B2 = node.A;
+            node.C2 = node.A;
+            node.D2 = node.A;
+            node.E2 = node.A;
+            node.F2 = node.A;
+            node.G2 = node.A;
+            node.H2 = node.A;
+            node.I2 = node.A;
+            node.J2 = node.A;
+            node.K2 = node.A;
+            node.L2 = node.A;
+            node.M2 = node.A;
+            node.N2 = node.A;
+            node.O2 = node.A;
+            node.P2 = node.A;
+            node.ChildA = -1;
+            node.ChildB = -1;
+            node.ChildC = -1;
+            node.ChildD = -1;
+            node.ChildE = -1;
+            node.ChildF = -1;
+            node.ChildG = -1;
+            node.ChildH = -1;
+            node.ChildI = -1;
+            node.ChildJ = -1;
+            node.ChildK = -1;
+            node.ChildL = -1;
+            node.ChildM = -1;
+            node.ChildN = -1;
+            node.ChildO = -1;
+            node.ChildP = -1;
+            node.ChildA2 = -1;
+            node.ChildB2 = -1;
+            node.ChildC2 = -1;
+            node.ChildD2 = -1;
+            node.ChildE2 = -1;
+            node.ChildF2 = -1;
+            node.ChildG2 = -1;
+            node.ChildH2 = -1;
+            node.ChildI2 = -1;
+            node.ChildJ2 = -1;
+            node.ChildK2 = -1;
+            node.ChildL2 = -1;
+            node.ChildM2 = -1;
+            node.ChildN2 = -1;
+            node.ChildO2 = -1;
+            node.ChildP2 = -1;
+            node.ChildCount = 0;
+#elif NODE16
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
             node.B = node.A;
             node.C = node.A;
@@ -451,6 +522,8 @@ namespace SIMDPrototyping.Trees.Baseline
 
             }
         }
+
+
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
