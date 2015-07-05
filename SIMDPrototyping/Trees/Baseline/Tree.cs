@@ -563,7 +563,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     {
                         TestRecursive(nextLevel, children[i], ref query, ref results);
                     }
-                    else if (children[i] < -1)
+                    else
                     {
                         results.Add(leaves[Encode(children[i])].Bounded);
                     }
@@ -579,6 +579,7 @@ namespace SIMDPrototyping.Trees.Baseline
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var childCount = node->ChildCount;
+       
 
             if (childCount < 1)
                 return;
@@ -588,7 +589,9 @@ namespace SIMDPrototyping.Trees.Baseline
             //b = BoundingBox.Intersects(ref query, ref node->B);
             //c = BoundingBox.Intersects(ref query, ref node->C);
             //d = BoundingBox.Intersects(ref query, ref node->D);
-            
+
+            //node->ChildA ? >= 
+
 
             if (BoundingBox.Intersects(ref query, ref node->A))
             {
@@ -596,7 +599,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     TestRecursive4(nextLevel, node->ChildA, ref query, ref results);
                 }
-                else if (node->ChildA < -1)
+                else
                 {
                     results.Add(leaves[Encode(node->ChildA)].Bounded);
                 }
@@ -609,7 +612,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     TestRecursive4(nextLevel, node->ChildB, ref query, ref results);
                 }
-                else if (node->ChildB < -1)
+                else
                 {
                     results.Add(leaves[Encode(node->ChildB)].Bounded);
                 }
@@ -622,7 +625,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     TestRecursive4(nextLevel, node->ChildC, ref query, ref results);
                 }
-                else if (node->ChildC < -1)
+                else
                 {
                     results.Add(leaves[Encode(node->ChildC)].Bounded);
                 }
@@ -635,7 +638,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     TestRecursive4(nextLevel, node->ChildD, ref query, ref results);
                 }
-                else if (node->ChildD < -1)
+                else
                 {
                     results.Add(leaves[Encode(node->ChildD)].Bounded);
                 }
