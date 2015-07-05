@@ -1,8 +1,8 @@
 ﻿//#define OUTPUT
 //#define NODE32
-#define NODE16
+//#define NODE16
 //#define NODE8
-//#define NODE4
+#define NODE4
 
 using System;
 using System.Collections.Generic;
@@ -177,7 +177,7 @@ namespace SIMDPrototyping.Trees.Baseline
             Levels[0].Count = 1;
 
             leaves = new Leaf[initialLeafCapacity];
-            
+
         }
 
         //Node initialNode;
@@ -570,6 +570,70 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
             }
         }
+
+#if NODE4
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestRecursive4<TResultList>(int level, int nodeIndex,
+            ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<T>
+        {
+            var node = (Levels[level].Nodes + nodeIndex);
+            var childCount = node->ChildCount;
+            if (childCount == 0)
+                return;
+            var nextLevel = level + 1;
+            if (BoundingBox.Intersects(ref query, ref node->A))
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive(nextLevel, node->ChildA, ref query, ref results);
+                }
+                else if (node->ChildA < -1)
+                {
+                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                }
+            }
+            if (childCount < 1)
+                return;
+            if (BoundingBox.Intersects(ref query, ref node->B))
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive(nextLevel, node->ChildB, ref query, ref results);
+                }
+                else if (node->ChildB < -1)
+                {
+                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                }
+            }
+            if (childCount < 2)
+                return;
+            if (BoundingBox.Intersects(ref query, ref node->C))
+            {
+                if (node->ChildC >= 0)
+                {
+                    TestRecursive(nextLevel, node->ChildC, ref query, ref results);
+                }
+                else if (node->ChildC < -1)
+                {
+                    results.Add(leaves[Encode(node->ChildC)].Bounded);
+                }
+            }
+            if (childCount < 3)
+                return;
+            if (BoundingBox.Intersects(ref query, ref node->D))
+            {
+                if (node->ChildD >= 0)
+                {
+                    TestRecursive(nextLevel, node->ChildD, ref query, ref results);
+                }
+                else if (node->ChildD < -1)
+                {
+                    results.Add(leaves[Encode(node->ChildD)].Bounded);
+                }
+            }
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
