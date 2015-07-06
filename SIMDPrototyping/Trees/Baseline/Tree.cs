@@ -587,7 +587,7 @@ namespace SIMDPrototyping.Trees.Baseline
             bool a, b, c, d;
             a = BoundingBox.Intersects(ref query, ref node->A);
             b = BoundingBox.Intersects(ref query, ref node->B);
-
+            c = BoundingBox.Intersects(ref query, ref node->C);
 
 
             if (a)
@@ -603,7 +603,7 @@ namespace SIMDPrototyping.Trees.Baseline
             }
             if (childCount < 2)
                 return;
-            c = BoundingBox.Intersects(ref query, ref node->C);
+            d = BoundingBox.Intersects(ref query, ref node->D);
             if (b)
             {
                 if (node->ChildB >= 0)
@@ -617,7 +617,6 @@ namespace SIMDPrototyping.Trees.Baseline
             }
             if (childCount < 3)
                 return;
-            d = BoundingBox.Intersects(ref query, ref node->D);
             if (c)
             {
                 if (node->ChildC >= 0)
