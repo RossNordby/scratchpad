@@ -2,7 +2,8 @@
 //#define NODE32
 //#define NODE16
 //#define NODE8
-#define NODE4
+//#define NODE4
+#define NODE2
 
 using System;
 using System.Collections.Generic;
@@ -22,7 +23,7 @@ using Node = SIMDPrototyping.Trees.Baseline.Node16;
 using Node = SIMDPrototyping.Trees.Baseline.Node8;
 #elif NODE4
 using Node = SIMDPrototyping.Trees.Baseline.Node4;
-#else
+#elif NODE2
 using Node = SIMDPrototyping.Trees.Baseline.Node2;
 #endif
 
@@ -41,7 +42,7 @@ namespace SIMDPrototyping.Trees.Baseline
             8;
 #elif NODE4
             4;
-#else
+#elif NODE2
             2;
 #endif
 
@@ -315,7 +316,7 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildCount = 0;
             //'no child' is encoded as -1. 
             //Leaf nodes are encoded as -(leafIndex + 2).
-#else
+#elif NODE2
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
             node.B = node.A;
             node.ChildA = -1;
@@ -579,7 +580,7 @@ namespace SIMDPrototyping.Trees.Baseline
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var childCount = node->ChildCount;
-       
+
 
             if (childCount < 1)
                 return;
@@ -806,6 +807,54 @@ namespace SIMDPrototyping.Trees.Baseline
                     break;
             }
 
+
+
+
+        }
+#endif
+
+#if NODE2
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestRecursive2<TResultList>(int level, int nodeIndex,
+            ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<T>
+        {
+            var node = (Levels[level].Nodes + nodeIndex);
+            var childCount = node->ChildCount;
+
+
+            if (childCount < 1)
+                return;
+            var nextLevel = level + 1;
+            bool a, b;
+            a = BoundingBox.Intersects(ref query, ref node->A);
+            b = BoundingBox.Intersects(ref query, ref node->B);
+
+
+            if (a)
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive2(nextLevel, node->ChildA, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                }
+            }
+            if (childCount < 2)
+                return;
+            if (b)
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive2(nextLevel, node->ChildB, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                }
+            }
             
 
 
@@ -815,7 +864,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
-            TestRecursive4(0, 0, ref boundingBox, ref results);
+            TestRecursive2(0, 0, ref boundingBox, ref results);
         }
 
         unsafe void MeasureNodeOccupancy(int levelIndex, int nodeIndex, ref int nodeCount, ref int childCount)
