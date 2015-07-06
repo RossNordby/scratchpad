@@ -588,7 +588,7 @@ namespace SIMDPrototyping.Trees.Baseline
             a = BoundingBox.Intersects(ref query, ref node->A);
             b = BoundingBox.Intersects(ref query, ref node->B);
 
-            
+
 
             if (a)
             {
@@ -642,6 +642,172 @@ namespace SIMDPrototyping.Trees.Baseline
                     results.Add(leaves[Encode(node->ChildD)].Bounded);
                 }
             }
+
+
+        }
+#endif
+
+#if NODE4
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestRecursive4Switch<TResultList>(int level, int nodeIndex,
+            ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<T>
+        {
+            var node = (Levels[level].Nodes + nodeIndex);
+            var childCount = node->ChildCount;
+
+            switch (childCount)
+            {
+                case 1:
+                    {
+                        bool a = BoundingBox.Intersects(ref query, ref node->A);
+
+                        var nextLevel = level + 1;
+                        if (a)
+                        {
+                            if (node->ChildA >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildA, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildA)].Bounded);
+                            }
+                        }
+                    }
+                    break;
+                case 2:
+                    {
+                        bool a, b;
+                        a = BoundingBox.Intersects(ref query, ref node->A);
+                        b = BoundingBox.Intersects(ref query, ref node->B);
+
+                        var nextLevel = level + 1;
+                        if (a)
+                        {
+                            if (node->ChildA >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildA, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildA)].Bounded);
+                            }
+                        }
+                        if (b)
+                        {
+                            if (node->ChildB >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildB, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildB)].Bounded);
+                            }
+                        }
+                    }
+                    break;
+                case 3:
+                    {
+                        bool a, b, c;
+                        a = BoundingBox.Intersects(ref query, ref node->A);
+                        b = BoundingBox.Intersects(ref query, ref node->B);
+                        c = BoundingBox.Intersects(ref query, ref node->C);
+
+                        var nextLevel = level + 1;
+                        if (a)
+                        {
+                            if (node->ChildA >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildA, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildA)].Bounded);
+                            }
+                        }
+                        if (b)
+                        {
+                            if (node->ChildB >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildB, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildB)].Bounded);
+                            }
+                        }
+                        if (c)
+                        {
+                            if (node->ChildC >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildC, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildC)].Bounded);
+                            }
+                        }
+                    }
+                    break;
+                case 4:
+                    {
+                        bool a, b, c, d;
+                        a = BoundingBox.Intersects(ref query, ref node->A);
+                        b = BoundingBox.Intersects(ref query, ref node->B);
+                        c = BoundingBox.Intersects(ref query, ref node->C);
+                        d = BoundingBox.Intersects(ref query, ref node->D);
+
+                        var nextLevel = level + 1;
+                        if (a)
+                        {
+                            if (node->ChildA >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildA, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildA)].Bounded);
+                            }
+                        }
+                        if (b)
+                        {
+                            if (node->ChildB >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildB, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildB)].Bounded);
+                            }
+                        }
+                        if (c)
+                        {
+                            if (node->ChildC >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildC, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildC)].Bounded);
+                            }
+                        }
+                        if (d)
+                        {
+                            if (node->ChildD >= 0)
+                            {
+                                TestRecursive4Switch(nextLevel, node->ChildD, ref query, ref results);
+                            }
+                            else
+                            {
+                                results.Add(leaves[Encode(node->ChildD)].Bounded);
+                            }
+                        }
+                    }
+                    break;
+            }
+
+            
 
 
         }
