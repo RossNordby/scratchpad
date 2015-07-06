@@ -100,6 +100,7 @@
     <Compile Include="MicroFiddling.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
     <Compile Include="Trees\Baseline\Node.cs" />
+    <Compile Include="Trees\Baseline\Tree_MedianSplit.cs" />
     <Compile Include="Trees\BoundingBox.cs" />
     <Compile Include="Trees\IBounded.cs" />
     <Compile Include="Trees\TestCollidable.cs" />

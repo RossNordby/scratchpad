@@ -27,7 +27,7 @@ using Node = SIMDPrototyping.Trees.Baseline.Node2;
 namespace SIMDPrototyping.Trees.Baseline
 {
 
-    public unsafe class Tree<T> : IDisposable where T : IBounded
+    public unsafe partial class Tree<T> : IDisposable where T : IBounded
     {
         public const int ChildrenCapacity =
 #if NODE32
