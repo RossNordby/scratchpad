@@ -1013,6 +1013,12 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     MeasureNodeOccupancy(levelIndex + 1, children[i], ref nodeCount, ref childCount);
                 }
+                if (children[i] == -1)
+                {
+                    //Can't have a non-child within the ChildCount-specified range.
+                    throw new InvalidOperationException("Bug.");
+                }
+
             }
         }
 

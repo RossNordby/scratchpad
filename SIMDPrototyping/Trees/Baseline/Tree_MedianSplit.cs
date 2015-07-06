@@ -83,7 +83,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 Array.Sort(leaves, start, length, zComparer);
         }
 
-        unsafe void MedianSplitAddNode(int level, T[] leaves, int start, int length)
+        unsafe int MedianSplitAddNode(int level, T[] leaves, int start, int length)
         {
             EnsureLevel(level);
             Node node;
@@ -100,44 +100,43 @@ namespace SIMDPrototyping.Trees.Baseline
                     MedianSplitAllocateLeafInNode(leaves[i + start], level, nodeIndex, boundingBoxes, children, i);
 
                 }
-                return;
+                return nodeIndex;
             }
             //It is an internal node.
             //Sort it.
+
+            //Since there are more leaves than node capacity, this is an internal node that is guaranteed to be fully filled.
+            Levels[level].Nodes[nodeIndex].ChildCount = ChildrenCapacity;
+
+            var per = length / ChildrenCapacity;
+            var remainder = length - ChildrenCapacity * per;
+            int* octLengths = stackalloc int[ChildrenCapacity];
+            for (int i = 0; i < ChildrenCapacity; ++i)
+            {
+                octLengths[i] = i < remainder ? per + 1 : per;
+            }
+
+            int* octStarts = stackalloc int[ChildrenCapacity];
+            octStarts[0] = start;
+            for (int i = 1; i < ChildrenCapacity; ++i)
+            {
+                octStarts[i] = octStarts[i - 1] + octLengths[i - 1];
+            }
 
             //Node2
             Sort(leaves, start, length);
 
             //Node4
-            int half = start + length / 2;
-            Sort(leaves, start, half - start);
-            Sort(leaves, half, length - half);
+            Sort(leaves, start, octStarts[4] - start);
+            Sort(leaves, octStarts[4], start + length - octStarts[4]);
 
             //Node8
-            int oneQuarter = start + (half - start) / 2;
-            int threeQuarters = half + (length - half) / 2;
-            Sort(leaves, start, oneQuarter - start);
-            Sort(leaves, oneQuarter, half - oneQuarter);
-            Sort(leaves, half, threeQuarters - half);
-            Sort(leaves, threeQuarters, length - threeQuarters);
+            Sort(leaves, start, octStarts[2] - start);
+            Sort(leaves, octStarts[2], octStarts[4] - octStarts[2]);
+            Sort(leaves, octStarts[4], octStarts[6] - octStarts[4]);
+            Sort(leaves, octStarts[6], start + length - octStarts[6]);
 
-            int* octStarts = stackalloc int[8];
-            octStarts[0] = start;
-            octStarts[1] = start + (oneQuarter - start) / 2;
-            octStarts[2] = oneQuarter;
-            octStarts[3] = octStarts[2] + (half - oneQuarter) / 2;
-            octStarts[4] = half;
-            octStarts[5] = octStarts[4] + (threeQuarters - octStarts[4]) / 2;
-            octStarts[6] = threeQuarters;
-            octStarts[7] = octStarts[6] + (length - octStarts[6]) / 2;
-            //There are eight segments.
-            int* octLengths = stackalloc int[8];
-            
-            for (int i = 0; i < 7; ++i)
-            {
-                octLengths[i] = octStarts[i + 1] - octStarts[i];
-            }
-            octLengths[7] = length - octStarts[7];
+
 
             for (int i = 0; i < 8; ++i)
             {
@@ -148,9 +147,10 @@ namespace SIMDPrototyping.Trees.Baseline
                     continue;
                 }
                 //Multiple children fit this slot. Create another internal node.
-                MedianSplitAddNode(level + 1, leaves, octStarts[i], octLengths[i]);
+                var childNodeIndex = MedianSplitAddNode(level + 1, leaves, octStarts[i], octLengths[i]);
+                children[i] = childNodeIndex;
             }
-
+            return nodeIndex;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -162,6 +162,7 @@ namespace SIMDPrototyping.Trees.Baseline
             leaf.GetBoundingBox(out boundingBoxes[childIndex]);
             var treeLeafIndex = AddLeaf(leaf, level, nodeIndex, childIndex);
             children[childIndex] = Encode(treeLeafIndex);
+            ++Levels[level].Nodes[nodeIndex].ChildCount;
         }
 
         public unsafe void BuildMedianSplit(T[] leaves, int start = 0, int length = -1)
@@ -176,6 +177,10 @@ namespace SIMDPrototyping.Trees.Baseline
                 length = leaves.Length;
             if (Levels[0].Nodes[0].ChildCount != 0)
                 throw new InvalidOperationException("Cannot build a tree that already contains nodes.");
+            //The tree is built with an empty node at the root to make insertion work more easily.
+            //As long as that is the case (and as long as this is not a constructor),
+            //we must clear it out.
+            Levels[0].Count = 0;
             
             MedianSplitAddNode(0, leaves, start, length);
 

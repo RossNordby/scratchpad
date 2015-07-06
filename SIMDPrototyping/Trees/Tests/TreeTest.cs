@@ -105,9 +105,9 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             int leafCubeSize = 64;
-            float leafSize = 10, leafGap = 10f;
-            int queryCount = 10000000;
-            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 0;
+            float leafSize = 10, leafGap = 10;
+            int queryCount = 100000;
+            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 4;
             int queryLocationCount = 4096;
             int queryMask = queryLocationCount - 1;
             {
@@ -154,10 +154,11 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 var leaves = GetLeaves(2, 2, 2, 10, 10);
                 BaselineTree tree = new BaselineTree();
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[i]);
-                }
+                //for (int i = 0; i < leaves.Length; ++i)
+                //{
+                //    tree.Insert(leaves[i]);
+                //}
+                tree.BuildMedianSplit(leaves);
                 Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
@@ -173,11 +174,12 @@ namespace SIMDPrototyping.Trees.Tests
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
                 BaselineTree tree = new BaselineTree(262144, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.Insert(leaves[i]);
-                }
+                //for (int i = 0; i < leaves.Length; ++i)
+                //{
+                //    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                //    //tree.Insert(leaves[i]);
+                //}
+                tree.BuildMedianSplit(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
