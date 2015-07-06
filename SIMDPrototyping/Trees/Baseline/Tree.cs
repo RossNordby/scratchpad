@@ -1,9 +1,5 @@
 ﻿//#define OUTPUT
-//#define NODE32
-//#define NODE16
-//#define NODE8
-//#define NODE4
-#define NODE2
+#define NODE4
 
 using System;
 using System.Collections.Generic;
@@ -378,9 +374,9 @@ namespace SIMDPrototyping.Trees.Baseline
                     BoundingBox.Merge(ref boundingBoxes[i], ref box, out mergedCandidate);
                     var newVolume = BoundingBox.ComputeVolume(ref mergedCandidate);
                     var change = newVolume - oldVolume;
-                    if (newVolume < minimumChange)
+                    if (change < minimumChange)
                     {
-                        minimumChange = newVolume;
+                        minimumChange = change;
                         minimumIndex = i;
                         merged = mergedCandidate;
                     }
@@ -556,10 +552,12 @@ namespace SIMDPrototyping.Trees.Baseline
             var children = &node->ChildA;
             var childCount = node->ChildCount;
             var nextLevel = level + 1;
+            //int INTERSECTEDCOUNT = 0;
             for (int i = 0; i < childCount; ++i)
             {
                 if (BoundingBox.Intersects(ref query, ref boundingBoxes[i]))
                 {
+                    //++INTERSECTEDCOUNT;
                     if (children[i] >= 0)
                     {
                         TestRecursive(nextLevel, children[i], ref query, ref results);
@@ -570,6 +568,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     }
                 }
             }
+            //Console.WriteLine($"Level {level}, intersected count: {INTERSECTEDCOUNT}");
         }
 
 #if NODE4
@@ -864,7 +863,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
-            TestRecursive2(0, 0, ref boundingBox, ref results);
+            TestRecursive4(0, 0, ref boundingBox, ref results);
         }
 
         unsafe void MeasureNodeOccupancy(int levelIndex, int nodeIndex, ref int nodeCount, ref int childCount)

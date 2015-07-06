@@ -106,8 +106,8 @@ namespace SIMDPrototyping.Trees.Tests
 
             int leafCubeSize = 64;
             float leafSize = 10, leafGap = 10f;
-            int queryCount = 1000000;
-            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 5;
+            int queryCount = 10000000;
+            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 0;
             int queryLocationCount = 4096;
             int queryMask = queryLocationCount - 1;
             {

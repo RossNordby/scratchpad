@@ -473,10 +473,12 @@ namespace SIMDPrototyping.Trees.Vectorized
             BoundingBoxWide.Intersects(ref Levels[level].Nodes[nodeIndex].BoundingBoxes, ref query, out intersectionMask);
             //Console.WriteLine($"Intersection mask: {intersectionMask}");
             //Console.WriteLine(node.BoundingBoxes);
+            //int INTERSECTEDCOUNT = 0;
             for (int i = 0; i < Vector<int>.Count; ++i)
             {
                 if (intersectionMask[i] < 0)
                 {
+                    //++INTERSECTEDCOUNT;
                     if (Levels[level].Nodes[nodeIndex].Children[i] >= 0)
                     {
                         TestRecursive(level + 1, Levels[level].Nodes[nodeIndex].Children[i], ref query, ref results);
@@ -487,6 +489,7 @@ namespace SIMDPrototyping.Trees.Vectorized
                     }
                 }
             }
+            //Console.WriteLine($"Level {level}, intersected count: {INTERSECTEDCOUNT}");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
