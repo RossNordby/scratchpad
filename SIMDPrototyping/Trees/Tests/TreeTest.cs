@@ -1,4 +1,6 @@
-﻿using BEPUphysics.DataStructures;
+﻿#define RANDOMLEAVES
+
+using BEPUphysics.DataStructures;
 using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
 using SIMDPrototyping.Trees.Vectorized;
@@ -18,6 +20,40 @@ namespace SIMDPrototyping.Trees.Tests
 
     public static class TreeTest
     {
+        static TestCollidableBEPU[] GetRandomLeavesBEPU(int leafCount, BoundingBox bounds, Vector3 leafSize)
+        {
+            var leaves = new TestCollidableBEPU[leafCount];
+            Random random = new Random(5);
+
+            var range = bounds.Max - bounds.Min;
+            for (int i = 0; i < leafCount; ++i)
+            {
+                var min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
+                var max = min + leafSize;
+
+                leaves[i] = new TestCollidableBEPU();
+                leaves[i].BoundingBox = new BEPUutilities.BoundingBox(new BEPUutilities.Vector3(min.X, min.Y, min.Z), new BEPUutilities.Vector3(max.X, max.Y, max.Z));
+            }
+            return leaves;
+
+        }
+
+        static TestCollidable[] GetRandomLeaves(int leafCount, BoundingBox bounds, Vector3 leafSize)
+        {
+            var leaves = new TestCollidable[leafCount];
+            Random random = new Random(5);
+
+            var range = bounds.Max - bounds.Min;
+            for (int i = 0; i < leafCount; ++i)
+            {
+                leaves[i] = new TestCollidable();
+                leaves[i].BoundingBox.Min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
+                leaves[i].BoundingBox.Max = leaves[i].BoundingBox.Min + leafSize;
+
+            }
+            return leaves;
+
+        }
         static TestCollidableBEPU[] GetLeavesBEPU(int width, int height, int length, float size, float gap)
         {
             var leaves = new TestCollidableBEPU[width * height * length];
@@ -61,26 +97,28 @@ namespace SIMDPrototyping.Trees.Tests
 
         }
 
-        static BoundingBox[] GetQueryLocations(int count, float range, float size)
+        static BoundingBox[] GetQueryLocations(int count, BoundingBox bounds, Vector3 size)
         {
             Random random = new Random(5);
             BoundingBox[] boxes = new BoundingBox[count];
+            var range = bounds.Max - bounds.Min;
             for (int i = 0; i < boxes.Length; ++i)
             {
-                boxes[i].Min = new Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
-                boxes[i].Max = boxes[i].Min + new Vector3(size);
+                boxes[i].Min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
+                boxes[i].Max = boxes[i].Min + size;
             }
             return boxes;
         }
 
-        static BEPUutilities.BoundingBox[] GetBEPUQueryLocations(int count, float range, float size)
+        static BEPUutilities.BoundingBox[] GetBEPUQueryLocations(int count, BoundingBox bounds, Vector3 size)
         {
             Random random = new Random(5);
             BEPUutilities.BoundingBox[] boxes = new BEPUutilities.BoundingBox[count];
+            var range = bounds.Max - bounds.Min;
             for (int i = 0; i < boxes.Length; ++i)
             {
-                boxes[i].Min = new BEPUutilities.Vector3((float)(random.NextDouble() * range), (float)(random.NextDouble() * range), (float)(random.NextDouble() * range));
-                boxes[i].Max = boxes[i].Min + new BEPUutilities.Vector3(size, size, size);
+                boxes[i].Min = new BEPUutilities.Vector3(bounds.Min.X + (float)(random.NextDouble() * range.X), bounds.Min.Y + (float)(random.NextDouble() * range.Y), bounds.Min.Z + (float)(random.NextDouble() * range.Z));
+                boxes[i].Max = boxes[i].Min + new BEPUutilities.Vector3(size.X, size.Y, size.Z);
             }
             return boxes;
         }
@@ -104,15 +142,30 @@ namespace SIMDPrototyping.Trees.Tests
                 list.Dispose();
             }
 
-            int leafCubeSize = 40;
-            float leafSize = 10, leafGap = 10;
+            float leafSize = 10;
             int queryCount = 100000;
-            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 20;
+#if RANDOMLEAVES
+            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
+            BoundingBox queryBounds = randomLeafBounds;
+            int randomLeafCount = 262144;
+#else
+            int leafCountX = 40;
+            int leafCountY = 40;
+            int leafCountZ = 40;
+            float leafGap = 10;
+            BoundingBox queryBounds = new BoundingBox { Min = new Vector3(0), Max = new Vector3(leafCountX, leafCountY, leafCountZ) * (new Vector3(leafSize) + new Vector3(leafGap)) };
+#endif
+
+            Vector3 querySize = new Vector3(30);
             int queryLocationCount = 4096;
             int queryMask = queryLocationCount - 1;
             {
-                
-                var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
+
+#if RANDOMLEAVES
+                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+#else
+                var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
+#endif
                 Tree tree = new Tree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
@@ -133,7 +186,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Refit Time: {endTime - startTime}");
 
-                var queries = GetQueryLocations(queryLocationCount, queryRange, querySize);
+                var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
                 var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < queryCount; ++i)
@@ -171,7 +224,11 @@ namespace SIMDPrototyping.Trees.Tests
 
             {
                 Console.WriteLine($"Baseline arity: {BaselineTree.ChildrenCapacity}");
-                var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
+#if RANDOMLEAVES
+                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+#else
+                var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
+#endif
                 BaselineTree tree = new BaselineTree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 //for (int i = 0; i < leaves.Length; ++i)
@@ -193,7 +250,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Refit Time: {endTime - startTime}");
 
-                var queries = GetQueryLocations(queryLocationCount, queryRange, querySize);
+                var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
                 var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < queryCount; ++i)
@@ -225,7 +282,11 @@ namespace SIMDPrototyping.Trees.Tests
 
             {
 
-                var leaves = GetLeavesBEPU(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
+#if RANDOMLEAVES
+                var leaves = GetRandomLeavesBEPU(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+#else
+                var leaves = GetLeavesBEPU(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
+#endif
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -236,7 +297,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"BEPU Refit Time: {endTime - startTime}");
 
-                var queries = GetBEPUQueryLocations(queryLocationCount, queryRange, querySize);
+                var queries = GetBEPUQueryLocations(queryLocationCount, queryBounds, querySize);
                 RawList<TestCollidableBEPU> results = new RawList<TestCollidableBEPU>();
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < queryCount; ++i)

@@ -1,5 +1,5 @@
 ﻿//#define OUTPUT
-#define NODE4
+#define NODE8
 
 using System;
 using System.Collections.Generic;
