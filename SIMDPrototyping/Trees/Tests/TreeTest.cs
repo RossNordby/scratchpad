@@ -104,7 +104,10 @@ namespace SIMDPrototyping.Trees.Tests
             var range = bounds.Max - bounds.Min;
             for (int i = 0; i < boxes.Length; ++i)
             {
-                boxes[i].Min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
+                var x = (float)random.NextDouble();
+                var y = (float)random.NextDouble();
+                var z = (float)random.NextDouble();
+                boxes[i].Min = bounds.Min + new Vector3(x, y, z) * range;
                 boxes[i].Max = boxes[i].Min + size;
             }
             return boxes;
@@ -117,7 +120,11 @@ namespace SIMDPrototyping.Trees.Tests
             var range = bounds.Max - bounds.Min;
             for (int i = 0; i < boxes.Length; ++i)
             {
-                boxes[i].Min = new BEPUutilities.Vector3(bounds.Min.X + (float)(random.NextDouble() * range.X), bounds.Min.Y + (float)(random.NextDouble() * range.Y), bounds.Min.Z + (float)(random.NextDouble() * range.Z));
+
+                boxes[i].Min = new BEPUutilities.Vector3(
+                    bounds.Min.X + ((float)random.NextDouble()) * range.X,
+                    bounds.Min.Y + ((float)random.NextDouble()) * range.Y,
+                    bounds.Min.Z + ((float)random.NextDouble()) * range.Z);
                 boxes[i].Max = boxes[i].Min + new BEPUutilities.Vector3(size.X, size.Y, size.Z);
             }
             return boxes;
@@ -145,7 +152,7 @@ namespace SIMDPrototyping.Trees.Tests
             float leafSize = 10;
             int queryCount = 100000;
 #if RANDOMLEAVES
-            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
+            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 10000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
             int randomLeafCount = 262144;
 #else
@@ -157,7 +164,7 @@ namespace SIMDPrototyping.Trees.Tests
 #endif
 
             Vector3 querySize = new Vector3(30);
-            int queryLocationCount = 4096;
+            int queryLocationCount = 1;
             int queryMask = queryLocationCount - 1;
             {
 
