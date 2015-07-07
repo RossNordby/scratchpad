@@ -1,9 +1,10 @@
-﻿#define NODE8
+﻿#define NODE4
 
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -83,85 +84,150 @@ namespace SIMDPrototyping.Trees.Baseline
                 Array.Sort(leaves, start, length, zComparer);
         }
 
-        unsafe int MedianSplitAddNode(int level, T[] leaves, int start, int length)
+
+
+
+        unsafe void MedianSplitAddNode(int level, T[] leaves, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
             EnsureLevel(level);
             Node node;
             InitializeNode(out node);
-            var nodeIndex = Levels[level].Add(ref node); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
+            nodeIndex = Levels[level].Add(ref node); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
             var boundingBoxes = &Levels[level].Nodes[nodeIndex].A;
             var children = &Levels[level].Nodes[nodeIndex].ChildA;
 
             if (length <= ChildrenCapacity)
             {
-                //Don't need to do any sorting at all. This internal node contains only leaves.                
+                //Don't need to do any sorting at all. This internal node contains only leaves. 
+                mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
                 for (int i = 0; i < length; ++i)
                 {
-                    MedianSplitAllocateLeafInNode(leaves[i + start], level, nodeIndex, boundingBoxes, children, i);
-
+                    MedianSplitAllocateLeafInNode(leaves[i + start], level, nodeIndex, out boundingBoxes[i], out children[i], i);
+                    BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
                 }
-                return nodeIndex;
+                return;
             }
             //It is an internal node.
             //Sort it.
 
-            //Since there are more leaves than node capacity, this is an internal node that is guaranteed to be fully filled.
-            Levels[level].Nodes[nodeIndex].ChildCount = ChildrenCapacity;
 
             var per = length / ChildrenCapacity;
             var remainder = length - ChildrenCapacity * per;
-            int* octLengths = stackalloc int[ChildrenCapacity];
+            int* lengths = stackalloc int[ChildrenCapacity];
             for (int i = 0; i < ChildrenCapacity; ++i)
             {
-                octLengths[i] = i < remainder ? per + 1 : per;
+                int extra;
+                if (per < ChildrenCapacity)
+                {
+                    //Put in as many leaves of the remainder as possible into single nodes to minimize the number of internal nodes.
+                    //This increases occupancy.
+                    if (per + remainder > ChildrenCapacity)
+                        extra = ChildrenCapacity - per;
+                    else
+                        extra = remainder;
+                    remainder -= extra;
+                }
+                else
+                {
+                    if (remainder > 0)
+                    {
+                        extra = 1;
+                        --remainder;
+                    }
+                    else
+                    {
+                        extra = 0;
+                    }
+                }
+                lengths[i] = per + extra;
             }
 
-            int* octStarts = stackalloc int[ChildrenCapacity];
-            octStarts[0] = start;
+            int* starts = stackalloc int[ChildrenCapacity];
+            starts[0] = start;
             for (int i = 1; i < ChildrenCapacity; ++i)
             {
-                octStarts[i] = octStarts[i - 1] + octLengths[i - 1];
+                starts[i] = starts[i - 1] + lengths[i - 1];
             }
 
+            //int temp = ChildrenCapacity;
+            //int sortingRecursionDepth = 0;
+            //while (temp > 1)
+            //{
+            //    temp <<= 1;
+            //    ++sortingRecursionDepth;
+            //}
             //Node2
+#if NODE2 || NODE4 || NODE8 || NODE16
             Sort(leaves, start, length);
+#endif
 
             //Node4
-            Sort(leaves, start, octStarts[4] - start);
-            Sort(leaves, octStarts[4], start + length - octStarts[4]);
+#if NODE4 || NODE8 || NODE16
+            const int halfCapacity = ChildrenCapacity / 2;
+            Sort(leaves, start, starts[halfCapacity] - start);
+            Sort(leaves, starts[halfCapacity], start + length - starts[halfCapacity]);
+#endif
 
             //Node8
-            Sort(leaves, start, octStarts[2] - start);
-            Sort(leaves, octStarts[2], octStarts[4] - octStarts[2]);
-            Sort(leaves, octStarts[4], octStarts[6] - octStarts[4]);
-            Sort(leaves, octStarts[6], start + length - octStarts[6]);
+#if NODE8 || NODE16
+            const int quarterCapacity = ChildrenCapacity / 4;
+            Sort(leaves, start, starts[quarterCapacity] - start);
+            Sort(leaves, starts[quarterCapacity], starts[quarterCapacity * 2] - starts[quarterCapacity]);
+            Sort(leaves, starts[quarterCapacity * 2], starts[quarterCapacity * 3] - starts[quarterCapacity * 2]);
+            Sort(leaves, starts[quarterCapacity * 3], start + length - starts[quarterCapacity * 3]);
+#endif
+
+            //Node16
+#if NODE16
+            const int eighthCapacity = ChildrenCapacity / 8;
+            Sort(leaves, starts[eighthCapacity * 0], starts[eighthCapacity * 1] - starts[eighthCapacity * 0]);
+            Sort(leaves, starts[eighthCapacity * 1], starts[eighthCapacity * 2] - starts[eighthCapacity * 1]);
+            Sort(leaves, starts[eighthCapacity * 2], starts[eighthCapacity * 3] - starts[eighthCapacity * 2]);
+            Sort(leaves, starts[eighthCapacity * 3], starts[eighthCapacity * 4] - starts[eighthCapacity * 3]);
+            Sort(leaves, starts[eighthCapacity * 4], starts[eighthCapacity * 5] - starts[eighthCapacity * 4]);
+            Sort(leaves, starts[eighthCapacity * 5], starts[eighthCapacity * 6] - starts[eighthCapacity * 5]);
+            Sort(leaves, starts[eighthCapacity * 6], starts[eighthCapacity * 7] - starts[eighthCapacity * 6]);
+            Sort(leaves, starts[eighthCapacity * 7], start + length - starts[eighthCapacity * 7]);
+#endif
+
+            //for (int i = 0; i < sortingRecursionDepth; ++i)
+            //{
+            //    int sortCount = 1 << sortingRecursionDepth;
+            //    for (int j = 0; j < sortCount; ++i)
+            //    {
+            //        Sort(leaves, starts[], starts);
+            //    }
+            //}
 
 
 
-            for (int i = 0; i < 8; ++i)
+            mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            for (int i = 0; i < ChildrenCapacity; ++i)
             {
-                if (octLengths[i] == 1)
+                if (lengths[i] == 1)
                 {
                     //Stick the leaf in this slot and continue to the next child.
-                    MedianSplitAllocateLeafInNode(leaves[octStarts[i]], level, nodeIndex, boundingBoxes, children, i);
-                    continue;
+                    MedianSplitAllocateLeafInNode(leaves[starts[i]], level, nodeIndex, out boundingBoxes[i], out children[i], i);
                 }
-                //Multiple children fit this slot. Create another internal node.
-                var childNodeIndex = MedianSplitAddNode(level + 1, leaves, octStarts[i], octLengths[i]);
-                children[i] = childNodeIndex;
+                else
+                {
+                    //Multiple children fit this slot. Create another internal node.
+                    MedianSplitAddNode(level + 1, leaves, starts[i], lengths[i], out boundingBoxes[i], out children[i]);
+                    ++Levels[level].Nodes[nodeIndex].ChildCount;
+                }
+                BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
             }
-            return nodeIndex;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void MedianSplitAllocateLeafInNode(
             T leaf,
             int level, int nodeIndex,
-            BoundingBox* boundingBoxes, int* children, int childIndex)
+            out BoundingBox boundingBox, out int nodeChild, int childIndex)
         {
-            leaf.GetBoundingBox(out boundingBoxes[childIndex]);
+            leaf.GetBoundingBox(out boundingBox);
             var treeLeafIndex = AddLeaf(leaf, level, nodeIndex, childIndex);
-            children[childIndex] = Encode(treeLeafIndex);
+            nodeChild = Encode(treeLeafIndex);
             ++Levels[level].Nodes[nodeIndex].ChildCount;
         }
 
@@ -181,8 +247,10 @@ namespace SIMDPrototyping.Trees.Baseline
             //As long as that is the case (and as long as this is not a constructor),
             //we must clear it out.
             Levels[0].Count = 0;
-            
-            MedianSplitAddNode(0, leaves, start, length);
+
+            int nodeIndex;
+            BoundingBox boundingBox;
+            MedianSplitAddNode(0, leaves, start, length, out boundingBox, out nodeIndex);
 
 
 

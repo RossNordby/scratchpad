@@ -104,16 +104,16 @@ namespace SIMDPrototyping.Trees.Tests
                 list.Dispose();
             }
 
-            int leafCubeSize = 64;
+            int leafCubeSize = 40;
             float leafSize = 10, leafGap = 10;
             int queryCount = 100000;
-            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 4;
+            float queryRange = leafCubeSize * (leafSize + leafGap), querySize = 20;
             int queryLocationCount = 4096;
             int queryMask = queryLocationCount - 1;
             {
                 
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
-                Tree tree = new Tree(262144, 32);
+                Tree tree = new Tree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -172,7 +172,7 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 Console.WriteLine($"Baseline arity: {BaselineTree.ChildrenCapacity}");
                 var leaves = GetLeaves(leafCubeSize, leafCubeSize, leafCubeSize, leafSize, leafGap);
-                BaselineTree tree = new BaselineTree(262144, 32);
+                BaselineTree tree = new BaselineTree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 //for (int i = 0; i < leaves.Length; ++i)
                 //{

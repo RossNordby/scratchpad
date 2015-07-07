@@ -1,5 +1,5 @@
 ﻿//#define OUTPUT
-#define NODE8
+#define NODE4
 
 using System;
 using System.Collections.Generic;
@@ -157,7 +157,7 @@ namespace SIMDPrototyping.Trees.Baseline
             }
         }
 
-        public unsafe Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 24)
+        public unsafe Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 8)
         {
             if (initialTreeDepth <= 0)
                 throw new ArgumentException("Initial tree depth must be positive.");
@@ -165,10 +165,11 @@ namespace SIMDPrototyping.Trees.Baseline
                 throw new ArgumentException("Initial leaf capacity must be positive.");
 
             Levels = new Level[initialTreeDepth];
-            var maximumNodeCount = (int)Math.Ceiling(initialTreeDepth / (double)Vector<float>.Count);
+            var maxExponent = Math.Log(1e10, ChildrenCapacity);
             for (int i = 0; i < Levels.Length; ++i)
             {
-                Levels[i].Initialize(Math.Min(initialLeafCapacity, (long)Math.Pow(2, Math.Min(25, i))));
+                //The worst case scenario is one leaf node per node.
+                Levels[i].Initialize(Math.Min(initialLeafCapacity, (long)Math.Pow(ChildrenCapacity, Math.Min(maxExponent, i))));
             }
             InitializeNode(out Levels[0].Nodes[0]);
             Levels[0].Count = 1;
@@ -468,20 +469,37 @@ namespace SIMDPrototyping.Trees.Baseline
             //Note that the deepest level is skipped. It does not need to be tested; it's all leaves that were already updated.
             for (int levelIndex = maximumDepth - 1; levelIndex >= 0; --levelIndex)
             {
+                var level = Levels[levelIndex];
+                var nextLevel = Levels[levelIndex + 1];
                 //consider testing caching Levels[levelIndex]. It may have a minor effect.
-                for (int nodeIndex = 0; nodeIndex < Levels[levelIndex].Count; ++nodeIndex)
+                for (int nodeIndex = 0; nodeIndex < level.Count; ++nodeIndex)
                 {
-                    for (int childIndex = 0; childIndex < Levels[levelIndex].Nodes[nodeIndex].ChildCount; ++childIndex)
+                    var node = level.Nodes + nodeIndex;
+                    var boundingBoxPointer = &level.Nodes[nodeIndex].A;
+                    var children = &node->ChildA;
+                    var childCount = node->ChildCount;
+                    for (int childIndex = 0; childIndex < childCount; ++childIndex)
                     {
-
-                        var childNodeIndex = (&Levels[levelIndex].Nodes[nodeIndex].ChildA)[childIndex];
+                        var childNodeIndex = children[childIndex];
+                        //if (childNodeIndex < -1)
+                        //{
+                        //    var leafIndex = Encode(childNodeIndex);
+                        //    if (leafIndex > LeafCount)
+                        //    {
+                        //        throw new Exception($"Bad leaf index {leafIndex} > {LeafCount}");
+                        //    }
+                        //}
                         if (childNodeIndex >= 0)
                         {
-                            var childCount = Levels[levelIndex + 1].Nodes[childNodeIndex].ChildCount;
-                            var boundingBoxSlot = (&Levels[levelIndex].Nodes[nodeIndex].A) + childIndex;
-                            *boundingBoxSlot = Levels[levelIndex + 1].Nodes[childNodeIndex].A;
-                            var childBoundingBoxes = &Levels[levelIndex + 1].Nodes[childNodeIndex].A;
-                            for (int i = 1; i < childCount; ++i)
+                            //if (childNodeIndex >= nextLevel.Count)
+                            //{
+                            //    throw new Exception($"Node ({levelIndex}, {nodeIndex}) has bad child node index: {childNodeIndex} > {nextLevel.Count}");
+                            //}
+                            var nextChildCount = nextLevel.Nodes[childNodeIndex].ChildCount;
+                            var boundingBoxSlot = boundingBoxPointer + childIndex;
+                            var childBoundingBoxes = &nextLevel.Nodes[childNodeIndex].A;
+                            *boundingBoxSlot = childBoundingBoxes[0];
+                            for (int i = 1; i < nextChildCount; ++i)
                             {
                                 BoundingBox.Merge(ref *boundingBoxSlot, ref childBoundingBoxes[i], out *boundingBoxSlot);
                             }
@@ -571,6 +589,250 @@ namespace SIMDPrototyping.Trees.Baseline
             //Console.WriteLine($"Level {level}, intersected count: {INTERSECTEDCOUNT}");
         }
 
+
+#if NODE16
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestRecursive16<TResultList>(int level, int nodeIndex,
+            ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<T>
+        {
+            var node = (Levels[level].Nodes + nodeIndex);
+            var childCount = node->ChildCount;
+
+
+            if (childCount < 1)
+                return;
+            var nextLevel = level + 1;
+            bool a, b, c, d, e, f, g, h,
+                 i, j, k, l, m, n, o, p;
+            a = BoundingBox.Intersects(ref query, ref node->A);
+            b = BoundingBox.Intersects(ref query, ref node->B);
+            c = BoundingBox.Intersects(ref query, ref node->C);
+
+
+
+            if (a)
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildA, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                }
+            }
+            if (childCount < 2)
+                return;
+            if (b)
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildB, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                }
+            }
+            if (childCount < 3)
+                return;
+            d = BoundingBox.Intersects(ref query, ref node->D);
+            if (c)
+            {
+                if (node->ChildC >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildC, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildC)].Bounded);
+                }
+            }
+            if (childCount < 4)
+                return;
+            e = BoundingBox.Intersects(ref query, ref node->E);
+            if (d)
+            {
+                if (node->ChildD >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildD, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildD)].Bounded);
+                }
+            }
+            if (childCount < 5)
+                return;
+            f = BoundingBox.Intersects(ref query, ref node->F);
+            if (e)
+            {
+                if (node->ChildE >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildE, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildE)].Bounded);
+                }
+            }
+            if (childCount < 6)
+                return;
+            g = BoundingBox.Intersects(ref query, ref node->G);
+            if (f)
+            {
+                if (node->ChildF >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildF, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildF)].Bounded);
+                }
+            }
+            if (childCount < 7)
+                return;
+            h = BoundingBox.Intersects(ref query, ref node->H);
+            if (g)
+            {
+                if (node->ChildG >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildG, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildG)].Bounded);
+                }
+            }
+            if (childCount < 8)
+                return;
+            i = BoundingBox.Intersects(ref query, ref node->I);
+            if (h)
+            {
+                if (node->ChildH >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildH, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildH)].Bounded);
+                }
+            }
+            if (childCount < 9)
+                return;
+            j = BoundingBox.Intersects(ref query, ref node->J);
+            if (i)
+            {
+                if (node->ChildI >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildI, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildI)].Bounded);
+                }
+            }
+            if (childCount < 10)
+                return;
+            k = BoundingBox.Intersects(ref query, ref node->K);
+            if (j)
+            {
+                if (node->ChildJ >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildJ, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildJ)].Bounded);
+                }
+            }
+            if (childCount < 11)
+                return;
+            l = BoundingBox.Intersects(ref query, ref node->L);
+            if (k)
+            {
+                if (node->ChildK >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildK, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildK)].Bounded);
+                }
+            }
+            if (childCount < 12)
+                return;
+            m = BoundingBox.Intersects(ref query, ref node->M);
+            if (l)
+            {
+                if (node->ChildL >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildL, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildL)].Bounded);
+                }
+            }
+            if (childCount < 13)
+                return;
+            n = BoundingBox.Intersects(ref query, ref node->N);
+            if (m)
+            {
+                if (node->ChildM >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildM, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildM)].Bounded);
+                }
+            }
+            if (childCount < 14)
+                return;
+            o = BoundingBox.Intersects(ref query, ref node->O);
+            if (n)
+            {
+                if (node->ChildN >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildN, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildN)].Bounded);
+                }
+            }
+            if (childCount < 15)
+                return;
+            p = BoundingBox.Intersects(ref query, ref node->P);
+            if (o)
+            {
+                if (node->ChildO >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildO, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildO)].Bounded);
+                }
+            }
+            if (childCount < 16)
+                return;
+            if (p)
+            {
+                if (node->ChildP >= 0)
+                {
+                    TestRecursive16(nextLevel, node->ChildP, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(leaves[Encode(node->ChildP)].Bounded);
+                }
+            }
+
+        }
+#endif
 
 #if NODE8
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -997,7 +1259,17 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
         {
+#if NODE16
+            TestRecursive16(0, 0, ref boundingBox, ref results);
+#elif NODE8
             TestRecursive8(0, 0, ref boundingBox, ref results);
+#elif NODE4
+            TestRecursive4(0, 0, ref boundingBox, ref results);
+#elif NODE2
+            TestRecursive2(0, 0, ref boundingBox, ref results);
+#else
+            TestRecursive(0, 0, ref boundingBox, ref results);
+#endif
         }
 
         unsafe void MeasureNodeOccupancy(int levelIndex, int nodeIndex, ref int nodeCount, ref int childCount)
@@ -1009,14 +1281,23 @@ namespace SIMDPrototyping.Trees.Baseline
             childCount += node->ChildCount;
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (children[i] >= 0)
+                if (children[i] < -1 && Encode(children[i]) >= leafCount)
                 {
-                    MeasureNodeOccupancy(levelIndex + 1, children[i], ref nodeCount, ref childCount);
+                    throw new InvalidOperationException("Bad leaf index.");
                 }
                 if (children[i] == -1)
                 {
                     //Can't have a non-child within the ChildCount-specified range.
                     throw new InvalidOperationException("Bug.");
+                }
+
+                if (children[i] >= 0)
+                {
+                    if (children[i] >= Levels[levelIndex + 1].Count)
+                    {
+                        throw new InvalidOperationException("Bad node index.");
+                    }
+                    MeasureNodeOccupancy(levelIndex + 1, children[i], ref nodeCount, ref childCount);
                 }
 
             }
@@ -1027,6 +1308,26 @@ namespace SIMDPrototyping.Trees.Baseline
             nodeCount = 0;
             childCount = 0;
             MeasureNodeOccupancy(0, 0, ref nodeCount, ref childCount);
+
+            for (int levelIndex = 0; levelIndex <= maximumDepth; ++levelIndex)
+            {
+                var level = Levels[levelIndex];
+                var nextLevel = Levels[levelIndex + 1];
+                for (int nodeIndex = 0; nodeIndex < level.Count; ++nodeIndex)
+                {
+                    if (level.Nodes[nodeIndex].ChildCount < 0 || level.Nodes[nodeIndex].ChildCount > ChildrenCapacity)
+                        throw new Exception("too many cooks");
+                    for (int childNodeIndex = 0; childNodeIndex < level.Nodes[nodeIndex].ChildCount; ++childNodeIndex)
+                    {
+                        
+                        var nextChildNodeIndex = (&level.Nodes[nodeIndex].ChildA)[childNodeIndex];
+                        if (nextChildNodeIndex > nextLevel.Count)
+                        {
+                            throw new Exception($"({levelIndex}, {nodeIndex}) has bad nodeIndex: {nextChildNodeIndex} > {nextLevel.Count}");
+                        }
+                    }
+                }
+            }
         }
 
         public void Dispose()
