@@ -39,12 +39,14 @@ namespace SIMDPrototyping.Trees
 
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe float ComputeVolume(ref BoundingBox a)
         {
             var diagonal = (a.Max - a.Min);
             return diagonal.X * diagonal.Y * diagonal.Z;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Merge(ref BoundingBox a, ref BoundingBox b, out BoundingBox merged)
         {
             merged.Min = Vector3.Min(a.Min, b.Min);

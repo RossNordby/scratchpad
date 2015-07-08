@@ -25,8 +25,7 @@ using Node = SIMDPrototyping.Trees.Baseline.Node2;
 namespace SIMDPrototyping.Trees.Baseline
 {
     partial class Tree<T>
-    {
-        //This sort could be a LOT faster if the data was provided in dedicated "leaf" form (AABB, index)
+    {   //This sort could be a LOT faster if the data was provided in dedicated "leaf" form (AABB, index)
         //And may need to provide your own SIMD sort implementation...
         class AxisComparerX : IComparer<T>
         {
@@ -35,7 +34,9 @@ namespace SIMDPrototyping.Trees.Baseline
                 BoundingBox a, b;
                 x.GetBoundingBox(out a);
                 y.GetBoundingBox(out b);
-                return a.Min.X.CompareTo(b.Min.X);
+                var centroidA = a.Min + a.Max;
+                var centroidB = b.Min + b.Max;
+                return centroidA.X.CompareTo(centroidB.X);
             }
         }
         class AxisComparerY : IComparer<T>
@@ -45,7 +46,9 @@ namespace SIMDPrototyping.Trees.Baseline
                 BoundingBox a, b;
                 x.GetBoundingBox(out a);
                 y.GetBoundingBox(out b);
-                return a.Min.Y.CompareTo(b.Min.Y);
+                var centroidA = a.Min + a.Max;
+                var centroidB = b.Min + b.Max;
+                return centroidA.Y.CompareTo(centroidB.Y);
             }
         }
         class AxisComparerZ : IComparer<T>
@@ -55,14 +58,16 @@ namespace SIMDPrototyping.Trees.Baseline
                 BoundingBox a, b;
                 x.GetBoundingBox(out a);
                 y.GetBoundingBox(out b);
-                return a.Min.Z.CompareTo(b.Min.Z);
+                var centroidA = a.Min + a.Max;
+                var centroidB = b.Min + b.Max;
+                return centroidA.Z.CompareTo(centroidB.Z);
             }
         }
         static AxisComparerX xComparer = new AxisComparerX();
         static AxisComparerY yComparer = new AxisComparerY();
         static AxisComparerZ zComparer = new AxisComparerZ();
 
-        void Sort(T[] leaves, int start, int length)
+        void CentroidSort(T[] leaves, int start, int length)
         {
             if (length == 0)
                 return;
@@ -148,56 +153,42 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 starts[i] = starts[i - 1] + lengths[i - 1];
             }
-
-            //int temp = ChildrenCapacity;
-            //int sortingRecursionDepth = 0;
-            //while (temp > 1)
-            //{
-            //    temp <<= 1;
-            //    ++sortingRecursionDepth;
-            //}
+            
             //Node2
 #if NODE2 || NODE4 || NODE8 || NODE16
-            Sort(leaves, start, length);
+            CentroidSort(leaves, start, length);
 #endif
 
             //Node4
 #if NODE4 || NODE8 || NODE16
             const int halfCapacity = ChildrenCapacity / 2;
-            Sort(leaves, start, starts[halfCapacity] - start);
-            Sort(leaves, starts[halfCapacity], start + length - starts[halfCapacity]);
+            CentroidSort(leaves, start, starts[halfCapacity] - start);
+            CentroidSort(leaves, starts[halfCapacity], start + length - starts[halfCapacity]);
 #endif
 
             //Node8
 #if NODE8 || NODE16
             const int quarterCapacity = ChildrenCapacity / 4;
-            Sort(leaves, start, starts[quarterCapacity] - start);
-            Sort(leaves, starts[quarterCapacity], starts[quarterCapacity * 2] - starts[quarterCapacity]);
-            Sort(leaves, starts[quarterCapacity * 2], starts[quarterCapacity * 3] - starts[quarterCapacity * 2]);
-            Sort(leaves, starts[quarterCapacity * 3], start + length - starts[quarterCapacity * 3]);
+            CentroidSort(leaves, start, starts[quarterCapacity] - start);
+            CentroidSort(leaves, starts[quarterCapacity], starts[quarterCapacity * 2] - starts[quarterCapacity]);
+            CentroidSort(leaves, starts[quarterCapacity * 2], starts[quarterCapacity * 3] - starts[quarterCapacity * 2]);
+            CentroidSort(leaves, starts[quarterCapacity * 3], start + length - starts[quarterCapacity * 3]);
 #endif
 
             //Node16
 #if NODE16
             const int eighthCapacity = ChildrenCapacity / 8;
-            Sort(leaves, starts[eighthCapacity * 0], starts[eighthCapacity * 1] - starts[eighthCapacity * 0]);
-            Sort(leaves, starts[eighthCapacity * 1], starts[eighthCapacity * 2] - starts[eighthCapacity * 1]);
-            Sort(leaves, starts[eighthCapacity * 2], starts[eighthCapacity * 3] - starts[eighthCapacity * 2]);
-            Sort(leaves, starts[eighthCapacity * 3], starts[eighthCapacity * 4] - starts[eighthCapacity * 3]);
-            Sort(leaves, starts[eighthCapacity * 4], starts[eighthCapacity * 5] - starts[eighthCapacity * 4]);
-            Sort(leaves, starts[eighthCapacity * 5], starts[eighthCapacity * 6] - starts[eighthCapacity * 5]);
-            Sort(leaves, starts[eighthCapacity * 6], starts[eighthCapacity * 7] - starts[eighthCapacity * 6]);
-            Sort(leaves, starts[eighthCapacity * 7], start + length - starts[eighthCapacity * 7]);
+            CentroidSort(leaves, starts[eighthCapacity * 0], starts[eighthCapacity * 1] - starts[eighthCapacity * 0]);
+            CentroidSort(leaves, starts[eighthCapacity * 1], starts[eighthCapacity * 2] - starts[eighthCapacity * 1]);
+            CentroidSort(leaves, starts[eighthCapacity * 2], starts[eighthCapacity * 3] - starts[eighthCapacity * 2]);
+            CentroidSort(leaves, starts[eighthCapacity * 3], starts[eighthCapacity * 4] - starts[eighthCapacity * 3]);
+            CentroidSort(leaves, starts[eighthCapacity * 4], starts[eighthCapacity * 5] - starts[eighthCapacity * 4]);
+            CentroidSort(leaves, starts[eighthCapacity * 5], starts[eighthCapacity * 6] - starts[eighthCapacity * 5]);
+            CentroidSort(leaves, starts[eighthCapacity * 6], starts[eighthCapacity * 7] - starts[eighthCapacity * 6]);
+            CentroidSort(leaves, starts[eighthCapacity * 7], start + length - starts[eighthCapacity * 7]);
 #endif
 
-            //for (int i = 0; i < sortingRecursionDepth; ++i)
-            //{
-            //    int sortCount = 1 << sortingRecursionDepth;
-            //    for (int j = 0; j < sortCount; ++i)
-            //    {
-            //        Sort(leaves, starts[], starts);
-            //    }
-            //}
+
 
 
 

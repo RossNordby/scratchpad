@@ -150,11 +150,11 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             float leafSize = 10;
-            int queryCount = 100000;
+            int queryCount = 10000;
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 10000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 262144;
+            int randomLeafCount = 1000;
 #else
             int leafCountX = 40;
             int leafCountY = 40;
@@ -243,7 +243,8 @@ namespace SIMDPrototyping.Trees.Tests
                 //    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
                 //    //tree.Insert(leaves[i]);
                 //}
-                tree.BuildMedianSplit(leaves);
+                //tree.BuildMedianSplit(leaves);
+                tree.BuildVolumeHeuristic(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
