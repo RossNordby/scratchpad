@@ -1,4 +1,4 @@
-﻿#define NODE8
+﻿#define NODE4
 
 
 using System;
@@ -25,42 +25,44 @@ using Node = SIMDPrototyping.Trees.Baseline.Node2;
 namespace SIMDPrototyping.Trees.Baseline
 {
     partial class Tree<T>
-    {   //This sort could be a LOT faster if the data was provided in dedicated "leaf" form (AABB, index)
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ComputeCentroid(T leaf, out Vector3 centroid)
+        {
+            BoundingBox aabb;
+            leaf.GetBoundingBox(out aabb);
+            centroid = aabb.Min + aabb.Max;
+        }
+        //This sort could be a LOT faster if the data was provided in dedicated "leaf" form (AABB, index)
         //And may need to provide your own SIMD sort implementation...
         class AxisComparerX : IComparer<T>
         {
             public int Compare(T x, T y)
             {
-                BoundingBox a, b;
-                x.GetBoundingBox(out a);
-                y.GetBoundingBox(out b);
-                var centroidA = a.Min + a.Max;
-                var centroidB = b.Min + b.Max;
-                return centroidA.X.CompareTo(centroidB.X);
+                Vector3 a, b;
+                ComputeCentroid(x, out a);
+                ComputeCentroid(y, out b);
+                return a.X.CompareTo(b.X);
             }
         }
         class AxisComparerY : IComparer<T>
         {
             public int Compare(T x, T y)
             {
-                BoundingBox a, b;
-                x.GetBoundingBox(out a);
-                y.GetBoundingBox(out b);
-                var centroidA = a.Min + a.Max;
-                var centroidB = b.Min + b.Max;
-                return centroidA.Y.CompareTo(centroidB.Y);
+                Vector3 a, b;
+                ComputeCentroid(x, out a);
+                ComputeCentroid(y, out b);
+                return a.Y.CompareTo(b.Y);
             }
         }
         class AxisComparerZ : IComparer<T>
         {
             public int Compare(T x, T y)
             {
-                BoundingBox a, b;
-                x.GetBoundingBox(out a);
-                y.GetBoundingBox(out b);
-                var centroidA = a.Min + a.Max;
-                var centroidB = b.Min + b.Max;
-                return centroidA.Z.CompareTo(centroidB.Z);
+                Vector3 a, b;
+                ComputeCentroid(x, out a);
+                ComputeCentroid(y, out b);
+                return a.Z.CompareTo(b.Z);
             }
         }
         static AxisComparerX xComparer = new AxisComparerX();
@@ -153,7 +155,7 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 starts[i] = starts[i - 1] + lengths[i - 1];
             }
-            
+
             //Node2
 #if NODE2 || NODE4 || NODE8 || NODE16
             CentroidSort(leaves, start, length);
