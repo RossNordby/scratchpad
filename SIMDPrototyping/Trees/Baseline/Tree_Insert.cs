@@ -27,14 +27,24 @@ namespace SIMDPrototyping.Trees.Baseline
 {
     partial class Tree<T>
     {
-        
+
 
         public unsafe void Insert(T leaf)
         {
-            int levelIndex = 0;
-            int nodeIndex = 0;
             BoundingBox box;
             leaf.GetBoundingBox(out box);
+
+            var node = Levels[0].Nodes;
+            BoundingBox rootBounds = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            var boundingBoxes = &node->A;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                BoundingBox.Merge(ref rootBounds, ref boundingBoxes[i], out rootBounds);
+            }
+            BoundingBox.Merge(ref box, ref rootBounds, out rootBounds);
+            var parentCost = ComputeBoundsHeuristic(ref rootBounds);
+            int levelIndex = 0;
+            int nodeIndex = 0;
 #if OUTPUT
             List<int> choices = new List<int>();
 #endif
@@ -44,8 +54,8 @@ namespace SIMDPrototyping.Trees.Baseline
                 //Which child should the leaf belong to?
 
                 //Give the leaf to whichever node had the least volume change.
-                var node = level.Nodes + nodeIndex;
-                var boundingBoxes = &node->A;
+                node = level.Nodes + nodeIndex;
+                boundingBoxes = &node->A;
                 var children = &node->ChildA;
                 var leafCounts = &node->LeafCountA;
                 int minimumIndex = 0;
@@ -66,7 +76,30 @@ namespace SIMDPrototyping.Trees.Baseline
                     BoundingBox.Merge(ref boundingBoxes[i], ref box, out mergedCandidate);
                     var newCost = ComputeBoundsHeuristic(ref mergedCandidate);
                     //var costChange = newCost * (leafCounts[i] + 1) - oldCost * (leafCounts[i]);
-                    var costChange = newCost - oldCost;
+                    //var costChange = (newCost - oldCost) / ((leafCounts[i] + 1) / Math.Max(1, leafCounts[i]));
+                    //var costChange = (newCost - oldCost) * ((leafCounts[i] + 1) / Math.Max(1, leafCounts[i]));
+                    //var costChange = (newCost) * ((leafCounts[i] + 1) / Math.Max(1, leafCounts[i])) - oldCost;
+                    //var costChange = newCost * (leafCounts[i] + 1) - oldCost * Math.Max(0, leafCounts[i]);
+                    float costChange;
+                    const float costOfNodeTraversal = 1;
+                    const float costPerLeaf = 1;
+                    if (children[i] == -1)
+                    {
+                        //Going this route would simply use the cost of the new addition.
+                        //TODO: Should this include a 'cost of leaf traversal'?
+                        costChange = newCost * costPerLeaf / parentCost;
+                    }
+                    else if (children[i] < -1)
+                    {
+                        //Merging two leaves. Adds a node, and adds a leaf.
+                        costChange = (newCost * (leafCounts[i] + 1) - oldCost * leafCounts[i]) * costPerLeaf / parentCost + costOfNodeTraversal;
+                    }
+                    else
+                    {
+                        //Just searching into the next internal node. Adds a leaf to the heuristic cost.
+                        costChange = (newCost * (leafCounts[i] + 1) - oldCost * leafCounts[i]) * costPerLeaf / parentCost;
+                    }
+                    //var costChange = newCost - oldCost;
                     if (costChange < minimumChange)
                     {
                         minimumChange = costChange;
@@ -141,6 +174,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 //It's an internal node. Traverse to the next node.
                 boundingBoxes[minimumIndex] = merged;
+                parentCost = ComputeBoundsHeuristic(ref merged);
                 nodeIndex = children[minimumIndex];
                 ++leafCounts[minimumIndex];
                 ++levelIndex;

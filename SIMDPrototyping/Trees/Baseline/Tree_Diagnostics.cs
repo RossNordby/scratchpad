@@ -44,6 +44,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
         public unsafe float MeasureCostHeuristic()
         {
+            //Could flatten this a lot. Unnecessary recursion.
             var node = Levels[0].Nodes;
             var bounds = &node->A;
             var children = &node->ChildA;

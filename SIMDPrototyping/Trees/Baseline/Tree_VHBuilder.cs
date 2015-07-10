@@ -29,9 +29,9 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         float ComputeBoundsHeuristic(ref BoundingBox boundingBox)
         {
-            //return BoundingBox.ComputeVolume(ref boundingBox);
-            var offset = boundingBox.Max - boundingBox.Min;
-            return (offset.X * offset.Y + offset.Y * offset.Z + offset.Z * offset.X);
+            return BoundingBox.ComputeVolume(ref boundingBox);
+            //var offset = boundingBox.Max - boundingBox.Min;
+            //return (offset.X * offset.Y + offset.Y * offset.Z + offset.Z * offset.X);
         }
 
         int GetVolumeSplitIndex(T[] leaves, int start, int length)
