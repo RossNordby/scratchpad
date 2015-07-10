@@ -249,6 +249,8 @@ namespace SIMDPrototyping.Trees.Tests
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
+                Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+
                 int nodeCount, childCount;
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
 

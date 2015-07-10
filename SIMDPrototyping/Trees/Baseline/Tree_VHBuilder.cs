@@ -27,11 +27,11 @@ namespace SIMDPrototyping.Trees.Baseline
     partial class Tree<T>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        float ComputeVolumeHeuristic(int leafCount, ref BoundingBox boundingBox)
+        float ComputeBoundsHeuristic(ref BoundingBox boundingBox)
         {
-            return leafCount * BoundingBox.ComputeVolume(ref boundingBox);
+            return BoundingBox.ComputeVolume(ref boundingBox);
             //var offset = boundingBox.Max - boundingBox.Min;
-            //return leafCount * (offset.X * offset.Y + offset.Y * offset.Z + offset.Z * offset.X);
+            //return (offset.X * offset.Y + offset.Y * offset.Z + offset.Z * offset.X);
         }
 
         int GetVolumeSplitIndex(T[] leaves, int start, int length)
@@ -65,7 +65,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 BoundingBox leafBoundingBox;
                 leaves[start + i].GetBoundingBox(out leafBoundingBox);
                 BoundingBox.Merge(ref merged, ref leafBoundingBox, out merged);
-                var candidateCost = ComputeVolumeHeuristic(i, ref merged) + ComputeVolumeHeuristic(length - i, ref bMerged[i]);
+                var candidateCost = i * ComputeBoundsHeuristic(ref merged) + (length - i) * ComputeBoundsHeuristic(ref bMerged[i]);
                 if (candidateCost < lowestCost)
                 {
                     lowestCost = candidateCost;
