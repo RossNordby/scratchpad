@@ -150,11 +150,11 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             float leafSize = 10;
-            int queryCount = 1000000;
+            int queryCount = 100000;
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 262144;
+            int randomLeafCount = 65536;// 262144;
 #else
             int leafCountX = 64;
             int leafCountY = 64;
@@ -214,11 +214,12 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 var leaves = GetLeaves(2, 2, 2, 10, 10);
                 BaselineTree tree = new BaselineTree();
-                //for (int i = 0; i < leaves.Length; ++i)
-                //{
-                //    tree.Insert(leaves[i]);
-                //}
-                tree.BuildMedianSplit(leaves);
+                for (int i = 0; i < leaves.Length; ++i)
+                {
+                    tree.Insert(leaves[i]);
+                }
+                //tree.BuildMedianSplit(leaves);
+                //tree.BuildVolumeHeuristic(leaves);
                 Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
@@ -238,13 +239,13 @@ namespace SIMDPrototyping.Trees.Tests
 #endif
                 BaselineTree tree = new BaselineTree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //for (int i = 0; i < leaves.Length; ++i)
-                //{
-                //    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                //    //tree.Insert(leaves[i]);
-                //}
+                for (int i = 0; i < leaves.Length; ++i)
+                {
+                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                    //tree.Insert(leaves[i]);
+                }
                 //tree.BuildMedianSplit(leaves);
-                tree.BuildVolumeHeuristic(leaves);
+                //tree.BuildVolumeHeuristic(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 

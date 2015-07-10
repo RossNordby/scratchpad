@@ -1,4 +1,4 @@
-﻿#define NODE4
+﻿//#define NODE8
 
 
 using System;
@@ -121,10 +121,6 @@ namespace SIMDPrototyping.Trees.Baseline
 
         unsafe void VolumeHeuristicAddNode(int level, T[] leaves, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
-            if (level > 150)
-            {
-                Console.WriteLine("Something is wrong.:)");
-            }
             EnsureLevel(level);
             Node node;
             InitializeNode(out node);
