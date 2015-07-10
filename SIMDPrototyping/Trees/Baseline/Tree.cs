@@ -281,6 +281,22 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildN = -1;
             node.ChildO = -1;
             node.ChildP = -1;
+            node.LeafCountA = 0;
+            node.LeafCountB = 0;
+            node.LeafCountC = 0;
+            node.LeafCountD = 0;
+            node.LeafCountE = 0;
+            node.LeafCountF = 0;
+            node.LeafCountG = 0;
+            node.LeafCountH = 0;
+            node.LeafCountI = 0;
+            node.LeafCountJ = 0;
+            node.LeafCountK = 0;
+            node.LeafCountL = 0;
+            node.LeafCountM = 0;
+            node.LeafCountN = 0;
+            node.LeafCountO = 0;
+            node.LeafCountP = 0;
             node.ChildCount = 0;
 #elif NODE8
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
@@ -330,6 +346,8 @@ namespace SIMDPrototyping.Trees.Baseline
             node.B = node.A;
             node.ChildA = -1;
             node.ChildB = -1;
+            node.LeafCountA = 0;
+            node.LeafCountB = 0;
             node.ChildCount = 0;
 #endif
         }
@@ -408,7 +426,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void Test<TResultList>(TraversalTarget* stack, ref int count, int stackCapacity, int level,
             ref BoundingBox query, Node* node,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
@@ -422,7 +440,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     }
                     else
                     {
-                        results.Add(leaves[Encode(children[i])].Bounded);
+                        results.Add(Encode(children[i]));
                     }
                 }
 
@@ -432,7 +450,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
+        public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
             //TODO: could optimize this by keeping the next target out of the stack.
             var stackCapacity = (ChildrenCapacity - 1) * maximumDepth + 1;
@@ -485,7 +503,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive16<TResultList>(int level, int nodeIndex,
             ref BoundingBox query,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var childCount = node->ChildCount;
@@ -510,7 +528,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                    results.Add(Encode(node->ChildA));
                 }
             }
             if (childCount < 2)
@@ -523,7 +541,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                    results.Add(Encode(node->ChildB));
                 }
             }
             if (childCount < 3)
@@ -537,7 +555,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildC)].Bounded);
+                    results.Add(Encode(node->ChildC));
                 }
             }
             if (childCount < 4)
@@ -551,7 +569,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildD)].Bounded);
+                    results.Add(Encode(node->ChildD));
                 }
             }
             if (childCount < 5)
@@ -565,7 +583,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildE)].Bounded);
+                    results.Add(Encode(node->ChildE));
                 }
             }
             if (childCount < 6)
@@ -579,7 +597,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildF)].Bounded);
+                    results.Add(Encode(node->ChildF));
                 }
             }
             if (childCount < 7)
@@ -593,7 +611,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildG)].Bounded);
+                    results.Add(Encode(node->ChildG));
                 }
             }
             if (childCount < 8)
@@ -607,7 +625,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildH)].Bounded);
+                    results.Add(Encode(node->ChildH));
                 }
             }
             if (childCount < 9)
@@ -621,7 +639,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildI)].Bounded);
+                    results.Add(Encode(node->ChildI));
                 }
             }
             if (childCount < 10)
@@ -635,7 +653,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildJ)].Bounded);
+                    results.Add(Encode(node->ChildJ));
                 }
             }
             if (childCount < 11)
@@ -649,7 +667,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildK)].Bounded);
+                    results.Add(Encode(node->ChildK));
                 }
             }
             if (childCount < 12)
@@ -663,7 +681,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildL)].Bounded);
+                    results.Add(Encode(node->ChildL));
                 }
             }
             if (childCount < 13)
@@ -677,7 +695,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildM)].Bounded);
+                    results.Add(Encode(node->ChildM));
                 }
             }
             if (childCount < 14)
@@ -691,7 +709,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildN)].Bounded);
+                    results.Add(Encode(node->ChildN));
                 }
             }
             if (childCount < 15)
@@ -705,7 +723,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildO)].Bounded);
+                    results.Add(Encode(node->ChildO));
                 }
             }
             if (childCount < 16)
@@ -718,7 +736,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildP)].Bounded);
+                    results.Add(Encode(node->ChildP));
                 }
             }
 
@@ -729,7 +747,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive8<TResultList>(int level, int nodeIndex,
             ref BoundingBox query,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var childCount = node->ChildCount;
@@ -753,7 +771,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                    results.Add(Encode(node->ChildA));
                 }
             }
             if (childCount < 2)
@@ -766,7 +784,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                    results.Add(Encode(node->ChildB));
                 }
             }
             if (childCount < 3)
@@ -780,7 +798,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildC)].Bounded);
+                    results.Add(Encode(node->ChildC));
                 }
             }
             if (childCount < 4)
@@ -794,7 +812,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildD)].Bounded);
+                    results.Add(Encode(node->ChildD));
                 }
             }
             if (childCount < 5)
@@ -808,7 +826,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildE)].Bounded);
+                    results.Add(Encode(node->ChildE));
                 }
             }
             if (childCount < 6)
@@ -822,7 +840,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildF)].Bounded);
+                    results.Add(Encode(node->ChildF));
                 }
             }
             if (childCount < 7)
@@ -836,7 +854,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildG)].Bounded);
+                    results.Add(Encode(node->ChildG));
                 }
             }
             if (childCount < 8)
@@ -849,7 +867,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildH)].Bounded);
+                    results.Add(Encode(node->ChildH));
                 }
             }
 
@@ -862,7 +880,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive4<TResultList>(int level, int nodeIndex,
             ref BoundingBox query,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var childCount = node->ChildCount;
@@ -885,7 +903,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                    results.Add(Encode(node->ChildA));
                 }
             }
             if (childCount < 2)
@@ -899,7 +917,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                    results.Add(Encode(node->ChildB));
                 }
             }
             if (childCount < 3)
@@ -912,7 +930,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildC)].Bounded);
+                    results.Add(Encode(node->ChildC));
                 }
             }
             if (childCount < 4)
@@ -925,7 +943,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildD)].Bounded);
+                    results.Add(Encode(node->ChildD));
                 }
             }
 
@@ -1103,7 +1121,7 @@ namespace SIMDPrototyping.Trees.Baseline
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive2<TResultList>(int level, int nodeIndex,
             ref BoundingBox query,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var childCount = node->ChildCount;
@@ -1125,7 +1143,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildA)].Bounded);
+                    results.Add(Encode(node->ChildA));
                 }
             }
             if (childCount < 2)
@@ -1138,7 +1156,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 else
                 {
-                    results.Add(leaves[Encode(node->ChildB)].Bounded);
+                    results.Add(Encode(node->ChildB));
                 }
             }
             
@@ -1148,7 +1166,7 @@ namespace SIMDPrototyping.Trees.Baseline
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
+        public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
 #if NODE16
             TestRecursive16(0, 0, ref boundingBox, ref results);
@@ -1210,7 +1228,7 @@ namespace SIMDPrototyping.Trees.Baseline
                         throw new Exception("too many cooks");
                     for (int childNodeIndex = 0; childNodeIndex < level.Nodes[nodeIndex].ChildCount; ++childNodeIndex)
                     {
-                        
+
                         var nextChildNodeIndex = (&level.Nodes[nodeIndex].ChildA)[childNodeIndex];
                         if (nextLevel < maximumDepth && nextChildNodeIndex > Levels[nextLevel].Count)
                         {

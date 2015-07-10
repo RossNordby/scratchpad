@@ -119,6 +119,22 @@ namespace SIMDPrototyping.Trees.Baseline
         public int ChildN;
         public int ChildO;
         public int ChildP;
+        public int LeafCountA;
+        public int LeafCountB;
+        public int LeafCountC;
+        public int LeafCountD;
+        public int LeafCountE;
+        public int LeafCountF;
+        public int LeafCountG;
+        public int LeafCountH;
+        public int LeafCountI;
+        public int LeafCountJ;
+        public int LeafCountK;
+        public int LeafCountL;
+        public int LeafCountM;
+        public int LeafCountN;
+        public int LeafCountO;
+        public int LeafCountP;
         public int ChildCount;
     }
 
@@ -186,6 +202,8 @@ namespace SIMDPrototyping.Trees.Baseline
         public BoundingBox B;
         public int ChildA;
         public int ChildB;
+        public int LeafCountA;
+        public int LeafCountB;
         public int ChildCount;
     }
 }
