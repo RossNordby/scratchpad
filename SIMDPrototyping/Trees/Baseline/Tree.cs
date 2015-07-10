@@ -1203,7 +1203,7 @@ namespace SIMDPrototyping.Trees.Baseline
             for (int levelIndex = 0; levelIndex <= maximumDepth; ++levelIndex)
             {
                 var level = Levels[levelIndex];
-                var nextLevel = Levels[levelIndex + 1];
+                var nextLevel = levelIndex + 1;
                 for (int nodeIndex = 0; nodeIndex < level.Count; ++nodeIndex)
                 {
                     if (level.Nodes[nodeIndex].ChildCount < 0 || level.Nodes[nodeIndex].ChildCount > ChildrenCapacity)
@@ -1212,9 +1212,9 @@ namespace SIMDPrototyping.Trees.Baseline
                     {
                         
                         var nextChildNodeIndex = (&level.Nodes[nodeIndex].ChildA)[childNodeIndex];
-                        if (nextChildNodeIndex > nextLevel.Count)
+                        if (nextLevel < maximumDepth && nextChildNodeIndex > Levels[nextLevel].Count)
                         {
-                            throw new Exception($"({levelIndex}, {nodeIndex}) has bad nodeIndex: {nextChildNodeIndex} > {nextLevel.Count}");
+                            throw new Exception($"({levelIndex}, {nodeIndex}) has bad nodeIndex: {nextChildNodeIndex} > {Levels[nextLevel].Count}");
                         }
                     }
                 }

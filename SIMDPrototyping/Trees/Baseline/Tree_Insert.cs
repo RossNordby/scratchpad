@@ -41,6 +41,7 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 BoundingBox.Merge(ref rootBounds, ref boundingBoxes[i], out rootBounds);
             }
+            var oldParentCost = ComputeBoundsHeuristic(ref rootBounds);
             BoundingBox.Merge(ref box, ref rootBounds, out rootBounds);
             var parentCost = ComputeBoundsHeuristic(ref rootBounds);
             int levelIndex = 0;
@@ -80,26 +81,34 @@ namespace SIMDPrototyping.Trees.Baseline
                     //var costChange = (newCost - oldCost) * ((leafCounts[i] + 1) / Math.Max(1, leafCounts[i]));
                     //var costChange = (newCost) * ((leafCounts[i] + 1) / Math.Max(1, leafCounts[i])) - oldCost;
                     //var costChange = newCost * (leafCounts[i] + 1) - oldCost * Math.Max(0, leafCounts[i]);
-                    float costChange;
-                    const float costOfNodeTraversal = 1;
-                    const float costPerLeaf = 1;
-                    if (children[i] == -1)
-                    {
-                        //Going this route would simply use the cost of the new addition.
-                        //TODO: Should this include a 'cost of leaf traversal'?
-                        costChange = newCost * costPerLeaf / parentCost;
-                    }
-                    else if (children[i] < -1)
-                    {
-                        //Merging two leaves. Adds a node, and adds a leaf.
-                        costChange = (newCost * (leafCounts[i] + 1) - oldCost * leafCounts[i]) * costPerLeaf / parentCost + costOfNodeTraversal;
-                    }
-                    else
-                    {
-                        //Just searching into the next internal node. Adds a leaf to the heuristic cost.
-                        costChange = (newCost * (leafCounts[i] + 1) - oldCost * leafCounts[i]) * costPerLeaf / parentCost;
-                    }
-                    //var costChange = newCost - oldCost;
+                    //float costChange;
+                    //const float costPerNode = 0;
+                    //const float costPerLeaf = 1;
+                    //if (children[i] == -1)
+                    //{
+                    //    //Going this route would simply use the cost of the new addition.
+                    //    //TODO: Should this include a 'cost of leaf traversal'?
+                    //    costChange = newCost / parentCost;
+                    //}
+                    //else if (children[i] < -1)
+                    //{
+                    //    //Merging two leaves. Adds a node, and adds a leaf.
+                    //    //costChange = (newCost * (leafCounts[i] + 1) - oldCost * leafCounts[i]) * costPerLeaf / parentCost + costPerNode;
+                    //    //costChange = (newCost * 2 * costPerLeaf / parentCost + costPerNode) - oldCost * costPerLeaf / parentCost;
+                    //    //costChange = (newCost - oldCost) / parentCost + costPerNode;
+                    //    //costChange = newCost / parentCost - oldCost / oldParentCost + costPerNode;
+                    //    costChange = newCost * (leafCounts[i] + 1) * costPerLeaf / parentCost - oldCost * leafCounts[i] * costPerLeaf / oldParentCost + costPerNode;
+                    //}
+                    //else
+                    //{
+                    //    //Just searching into the next internal node. Adds a leaf to the heuristic cost.
+                    //    //costChange = (newCost * (leafCounts[i] + 1) - oldCost * leafCounts[i]) * costPerLeaf / parentCost;
+                    //    //costChange = (newCost * (leafCounts[i] + 1) * costPerLeaf / parentCost) - oldCost * leafCounts[i] * costPerLeaf / parentCost;
+                    //    //costChange = (newCost - oldCost) / parentCost;
+                    //    //costChange = newCost / parentCost - oldCost / oldParentCost;
+                    //    costChange = newCost * (leafCounts[i] + 1) * costPerLeaf / parentCost - oldCost * leafCounts[i] * costPerLeaf / oldParentCost;
+                    //}
+                    var costChange = newCost - oldCost;
                     if (costChange < minimumChange)
                     {
                         minimumChange = costChange;
@@ -173,6 +182,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     break;
                 }
                 //It's an internal node. Traverse to the next node.
+                oldParentCost = ComputeBoundsHeuristic(ref boundingBoxes[minimumIndex]);
                 boundingBoxes[minimumIndex] = merged;
                 parentCost = ComputeBoundsHeuristic(ref merged);
                 nodeIndex = children[minimumIndex];

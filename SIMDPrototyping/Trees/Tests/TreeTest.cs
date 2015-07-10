@@ -239,13 +239,13 @@ namespace SIMDPrototyping.Trees.Tests
 #endif
                 BaselineTree tree = new BaselineTree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.Insert(leaves[i]);
-                }
+                //for (int i = 0; i < leaves.Length; ++i)
+                //{
+                //    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                //    //tree.Insert(leaves[i]);
+                //}
                 //tree.BuildMedianSplit(leaves);
-                //tree.BuildVolumeHeuristic(leaves);
+                tree.BuildVolumeHeuristic(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
