@@ -134,7 +134,7 @@ namespace SIMDPrototyping.Trees.Tests
         {
             GC.Collect();
             {
-                var leaves = GetLeaves(2, 2, 2, 10, 10);
+                var leaves = GetLeaves(10, 10, 10, 10, 10);
                 Tree tree = new Tree();
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -148,15 +148,21 @@ namespace SIMDPrototyping.Trees.Tests
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
                 tree.Query(ref aabb, ref list);
                 list.Dispose();
+
+                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlaps(ref overlaps);
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlapsViaQueries(ref overlaps);
             }
 
             float leafSize = 10;
             int queryCount = 100000;
             int selfTestCount = 1;
 #if RANDOMLEAVES
-            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
+            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(10000, 10000, 10000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 10000;
+            int randomLeafCount = 262144;
 #else
             int leafCountX = 64;
             int leafCountY = 64;
@@ -235,7 +241,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             GC.Collect();
             {
-                var leaves = GetLeaves(2, 2, 2, 10, 10);
+                var leaves = GetLeaves(10, 10, 10, 10, 10);
                 BaselineTree tree = new BaselineTree();
                 for (int i = 0; i < leaves.Length; ++i)
                 {
