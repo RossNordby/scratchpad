@@ -89,6 +89,7 @@
   <ItemGroup>
     <Compile Include="Constraints\SingleVectorizedPenetrationConstraint.cs" />
     <Compile Include="Constraints\VectorizedManifoldConstraint.cs" />
+    <Compile Include="Helpers.cs" />
     <Compile Include="Matrix3x3Width4.cs" />
     <Compile Include="Constraints\Tests\HybridConstraintTest.cs" />
     <Compile Include="Constraints\Tests\SingleVectorizedConstraintTest.cs" />
@@ -113,6 +114,7 @@
     <Compile Include="Trees\Tests\TreeTest.cs" />
     <Compile Include="Trees\Baseline\Tree.cs" />
     <Compile Include="Trees\Vectorized\Tree.cs" />
+    <Compile Include="Trees\Vectorized\Tree_TreeQueries.cs" />
     <Compile Include="Vector3Wide.cs" />
     <Compile Include="Vector3Width4.cs" />
     <Compile Include="Constraints\HybridPenetrationConstraint.cs" />

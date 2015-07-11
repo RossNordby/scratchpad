@@ -17,7 +17,7 @@ using System.Threading.Tasks;
 namespace SIMDPrototyping.Trees.Vectorized
 {
 
-    public class Tree<T> where T : IBounded
+    public partial class Tree<T> where T : IBounded
     {
         struct Level
         {
@@ -103,10 +103,9 @@ namespace SIMDPrototyping.Trees.Vectorized
                 maximumDepth = nextLevel;
 
         }
-
-        int vectorSizeMask;
+        
         Vector<int>[] singleMasks;
-
+        
 
 
         int maximumDepth;
@@ -127,22 +126,9 @@ namespace SIMDPrototyping.Trees.Vectorized
             if (initialTreeDepth <= 0)
                 throw new ArgumentException("Initial tree depth must be positive.");
             if (initialLeafCapacity <= 0)
-                throw new ArgumentException("Ini tial leaf capacity must be positive.");
-            singleMasks = new Vector<int>[Vector<int>.Count];
-            var buffer = BufferPools<int>.Locking.Take(Vector<int>.Count);
-            unchecked
-            {
-                buffer[0] = (int)0xffffffff;
-                singleMasks[0] = new Vector<int>(buffer);
-                for (int i = 1; i < singleMasks.Length; ++i)
-                {
-                    buffer[i - 1] = 0;
-                    buffer[i] = (int)0xffffffff;
-                    singleMasks[i] = new Vector<int>(buffer);
-                }
-            }
-            Array.Clear(buffer, 0, buffer.Length);
-            BufferPools<int>.Locking.GiveBack(buffer);
+                throw new ArgumentException("Initial leaf capacity must be positive.");
+
+            singleMasks = Helpers.CreateMasks();
 
             Levels = new Level[initialTreeDepth];
             var maximumNodeCount = (int)Math.Ceiling(initialTreeDepth / (double)Vector<float>.Count);
@@ -154,8 +140,7 @@ namespace SIMDPrototyping.Trees.Vectorized
             Levels[0].Count = 1;
 
             leaves = new Leaf[initialLeafCapacity];
-
-            vectorSizeMask = Vector<float>.Count - 1;
+            
 
 
         }
@@ -268,7 +253,7 @@ namespace SIMDPrototyping.Trees.Vectorized
 
                     //Insert the new leaf into the second child slot.
                     //Just put it in the next slot over from the minimum.
-                    var newLeafChildIndex = (minimumIndex + 1) & vectorSizeMask;
+                    var newLeafChildIndex = (minimumIndex + 1) & (Vector<float>.Count - 1);
                     BoundingBoxWide.ConditionalSelect(
                       ref singleMasks[newLeafChildIndex],
                       ref box,
@@ -421,7 +406,7 @@ namespace SIMDPrototyping.Trees.Vectorized
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void Test<TResultList>(TraversalTarget* stack, ref int count, int stackCapacity, int level,
             ref BoundingBoxWide query, ref Node node,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             Vector<int> intersectionMask;
             BoundingBoxWide.Intersects(ref node.BoundingBoxes, ref query, out intersectionMask);
@@ -438,14 +423,14 @@ namespace SIMDPrototyping.Trees.Vectorized
                     }
                     else if (node.Children[i] < -1)
                     {
-                        results.Add(leaves[Encode(node.Children[i])].Bounded);
+                        results.Add(Encode(node.Children[i]));
                     }
                 }
             }
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
+        public unsafe void Query<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
             //TODO: could optimize this by keeping the next target out of the stack.
             var stackCapacity = (Vector<int>.Count - 1) * maximumDepth + 1;
@@ -467,7 +452,7 @@ namespace SIMDPrototyping.Trees.Vectorized
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive<TResultList>(int level, int nodeIndex,
             ref BoundingBoxWide query,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             Vector<int> intersectionMask;
             BoundingBoxWide.Intersects(ref Levels[level].Nodes[nodeIndex].BoundingBoxes, ref query, out intersectionMask);
@@ -485,7 +470,7 @@ namespace SIMDPrototyping.Trees.Vectorized
                     }
                     else if (Levels[level].Nodes[nodeIndex].Children[i] < -1)
                     {
-                        results.Add(leaves[Encode(Levels[level].Nodes[nodeIndex].Children[i])].Bounded);
+                        results.Add(Encode(Levels[level].Nodes[nodeIndex].Children[i]));
                     }
                 }
             }
@@ -493,7 +478,7 @@ namespace SIMDPrototyping.Trees.Vectorized
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<T>
+        public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
             var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
             TestRecursive(0, 0, ref boundingBoxWide, ref results);

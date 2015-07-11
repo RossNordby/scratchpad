@@ -143,7 +143,7 @@ namespace SIMDPrototyping.Trees.Baseline
         }
 
 
-
+        Vector<int>[] masks;
 
         int maximumDepth;
         /// <summary>
@@ -175,7 +175,7 @@ namespace SIMDPrototyping.Trees.Baseline
             Levels[0].Count = 1;
 
             leaves = new Leaf[initialLeafCapacity];
-
+            masks = Helpers.CreateMasks();
         }
 
         //Node initialNode;

@@ -144,7 +144,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.Refit();
 
-                var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
+                var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
                 tree.Query(ref aabb, ref list);
                 list.Dispose();
@@ -156,7 +156,7 @@ namespace SIMDPrototyping.Trees.Tests
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 262144;
+            int randomLeafCount = 10000;
 #else
             int leafCountX = 64;
             int leafCountY = 64;
@@ -196,7 +196,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Refit Time: {endTime - startTime}");
 
                 var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
-                var list = new QuickList<TestCollidable>(new BufferPool<TestCollidable>());
+                var list = new QuickList<int>(new BufferPool<int>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < queryCount; ++i)
                 {
@@ -207,6 +207,27 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Query Time: {endTime - startTime}, overlaps: {list.Count}");
                 list.Dispose();
+
+
+                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlaps(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlapsViaQueries(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
             }
 
             GC.Collect();
@@ -250,13 +271,13 @@ namespace SIMDPrototyping.Trees.Tests
 #endif
                 BaselineTree tree = new BaselineTree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //for (int i = 0; i < leaves.Length; ++i)
-                //{
-                //    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                //    //tree.Insert(leaves[i]);
-                //}
+                for (int i = 0; i < leaves.Length; ++i)
+                {
+                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                    //tree.Insert(leaves[i]);
+                }
                 //tree.BuildMedianSplit(leaves);
-                tree.BuildVolumeHeuristic(leaves);
+                //tree.BuildVolumeHeuristic(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 

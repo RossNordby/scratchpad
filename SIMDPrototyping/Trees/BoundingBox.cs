@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -58,7 +59,7 @@ namespace SIMDPrototyping.Trees
             return $"({Min.ToString()}, {Max.ToString()})";
         }
     }
-    
+
     [StructLayout(LayoutKind.Sequential)]
     public struct BoundingBoxWide
     {
@@ -70,6 +71,17 @@ namespace SIMDPrototyping.Trees
         {
             Min = new Vector3Wide(ref boundingBox.Min);
             Max = new Vector3Wide(ref boundingBox.Max);
+        }
+
+        public unsafe BoundingBoxWide(BoundingBox* boundingBoxes, Vector<int>[] masks)
+        {
+            Min = new Vector3Wide(ref boundingBoxes[0].Min);
+            Max = new Vector3Wide(ref boundingBoxes[0].Max);
+            for (int i = 1; i < Vector<float>.Count; ++i)
+            {
+                BoundingBoxWide wide = new BoundingBoxWide(ref boundingBoxes[i]);
+                ConditionalSelect(ref masks[i], ref wide, ref this, out this);
+            }
         }
 
 
@@ -149,6 +161,31 @@ namespace SIMDPrototyping.Trees
             return stringBuilder.ToString();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetBoundingBox(ref BoundingBoxWide boundingBoxes, int i, out BoundingBoxWide wide)
+        {
+            wide.Min.X = new Vector<float>(boundingBoxes.Min.X[i]);
+            wide.Min.Y = new Vector<float>(boundingBoxes.Min.Y[i]);
+            wide.Min.Z = new Vector<float>(boundingBoxes.Min.Z[i]);
+            wide.Max.X = new Vector<float>(boundingBoxes.Max.X[i]);
+            wide.Max.Y = new Vector<float>(boundingBoxes.Max.Y[i]);
+            wide.Max.Z = new Vector<float>(boundingBoxes.Max.Z[i]);
+            //var boundingBox = new BoundingBox
+            //{
+            //    Min = new Vector3(boundingBoxes.Min.X[i], boundingBoxes.Min.Y[i], boundingBoxes.Min.Z[i]),
+            //    Max = new Vector3(boundingBoxes.Max.X[i], boundingBoxes.Max.X[i], boundingBoxes.Max.X[i])
+            //};
+            //wide = new BoundingBoxWide(ref boundingBox);
+        }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetBoundingBox(ref BoundingBoxWide boundingBoxes, int i, out BoundingBox box)
+        {
+            box = new BoundingBox
+            {
+                Min = new Vector3(boundingBoxes.Min.X[i], boundingBoxes.Min.Y[i], boundingBoxes.Min.Z[i]),
+                Max = new Vector3(boundingBoxes.Max.X[i], boundingBoxes.Max.Y[i], boundingBoxes.Max.Z[i])
+            };
+        }
     }
 }
