@@ -56,16 +56,16 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     if (BoundingBox.Intersects(ref aBounds[i], ref bBounds[j]))
                     {
-                        if (aChildren[i] >= 0 && bChildren[j] >= 0)
+                        if (aChildren[i] >= 0 & bChildren[j] >= 0)
                         {
                             GetOverlapsBetweenDifferentNodes(nextLevel, aChildren[i], bChildren[j], ref results);
                         }
-                        else if (aChildren[i] < 0 && bChildren[j] >= 0)
+                        else if (aChildren[i] < 0 & bChildren[j] >= 0)
                         {
                             //leaf A versus node B.
                             TestLeafAgainstNode(leaves[Encode(aChildren[i])].Bounded, ref aBounds[i], nextLevel, bChildren[j], ref results);
                         }
-                        else if (aChildren[i] >= 0 && bChildren[j] < 0)
+                        else if (aChildren[i] >= 0 & bChildren[j] < 0)
                         {
                             //leaf B versus node A.
                             TestLeafAgainstNode(leaves[Encode(bChildren[j])].Bounded, ref bBounds[j], nextLevel, aChildren[i], ref results);
@@ -100,16 +100,16 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     if (BoundingBox.Intersects(ref bounds[i], ref bounds[j]))
                     {
-                        if (children[i] >= 0 && children[j] >= 0)
+                        if (children[i] >= 0 & children[j] >= 0)
                         {
                             GetOverlapsBetweenDifferentNodes(nextLevel, children[i], children[j], ref results);
                         }
-                        else if (children[i] < 0 && children[j] >= 0)
+                        else if (children[i] < 0 & children[j] >= 0)
                         {
                             //leaf A versus node B.
                             TestLeafAgainstNode(leaves[Encode(children[i])].Bounded, ref bounds[i], nextLevel, children[j], ref results);
                         }
-                        else if (children[i] >= 0 && children[j] < 0)
+                        else if (children[i] >= 0 & children[j] < 0)
                         {
                             //leaf B versus node A.
                             TestLeafAgainstNode(leaves[Encode(children[j])].Bounded, ref bounds[j], nextLevel, children[i], ref results);
