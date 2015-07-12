@@ -114,6 +114,7 @@
     <Compile Include="Trees\Tests\TreeTest.cs" />
     <Compile Include="Trees\Baseline\Tree.cs" />
     <Compile Include="Trees\Vectorized\Tree.cs" />
+    <Compile Include="Trees\Vectorized\Tree_StreamingQueries.cs" />
     <Compile Include="Trees\Vectorized\Tree_TreeQueries.cs" />
     <Compile Include="Vector3Wide.cs" />
     <Compile Include="Vector3Width4.cs" />

@@ -134,7 +134,7 @@ namespace SIMDPrototyping.Trees.Tests
         {
             GC.Collect();
             {
-                var leaves = GetLeaves(10, 10, 10, 10, 10);
+                var leaves = GetLeaves(64, 64, 64, 10, 10);
                 Tree tree = new Tree();
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -151,16 +151,22 @@ namespace SIMDPrototyping.Trees.Tests
 
                 var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 tree.GetSelfOverlaps(ref overlaps);
+                Console.WriteLine($"Warm overlaps: {overlaps.Count}");
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 tree.GetSelfOverlapsViaQueries(ref overlaps);
+                Console.WriteLine($"Warm overlaps: {overlaps.Count}");
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlapsViaStreamingQueries(ref overlaps);
+                Console.WriteLine($"Warm overlaps: {overlaps.Count}");
             }
 
             float leafSize = 10;
             int queryCount = 100000;
             int selfTestCount = 10;
 #if RANDOMLEAVES
-            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(10000, 10000, 10000) };
+            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
             int randomLeafCount = 262144;
 #else
@@ -234,6 +240,16 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlapsViaStreamingQueries(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"StreamingSelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
             }
 
             GC.Collect();
