@@ -2,8 +2,10 @@
 
 
 using BEPUutilities.DataStructures;
+using BEPUutilities.ResourceManagement;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -40,7 +42,7 @@ namespace SIMDPrototyping.Trees.Baseline
             //That way, the candidate contains the path used to reach this node, but not the final node.
             var oldBest = best;
             best = candidate;
-            candidate = best;
+            candidate = oldBest;
             candidate.ChildrenIndices.EnsureCapacity(best.ChildrenIndices.Count);
             candidate.ChildrenIndices.Count = best.ChildrenIndices.Count;
             Array.Copy(best.ChildrenIndices.Elements, candidate.ChildrenIndices.Elements, best.ChildrenIndices.Count);
@@ -55,6 +57,17 @@ namespace SIMDPrototyping.Trees.Baseline
             var bounds = &node->A;
             var children = &node->ChildA;
             int nextLevel = levelIndex + 1;
+            if (node->ChildCount < ChildrenCapacity)
+            {
+                //May be able to insert in empty slot.
+                //Note that this does not increase the cost at all! This does not create a new internal node!
+                //Leaf costs are constant.
+
+                if (candidate.CostIncrease < best.CostIncrease)
+                {
+                    SwapPaths(ref candidate, ref best, candidate.CostIncrease, node->ChildCount);
+                }
+            }
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (children[i] >= 0)
@@ -83,11 +96,11 @@ namespace SIMDPrototyping.Trees.Baseline
                     //What is being measured is the increase in the INTERNAL NODE cost.
                     //Given a constant set of leaves, the leaves' contribution to the total tree cost is constant, so they're ignored.
                     //The merging process creates a whole new internal node, so it is included fully.
-                    
+
                     BoundingBox merged;
                     BoundingBox.Merge(ref bounds[i], ref newLeafBounds, out merged);
                     var newCost = ComputeBoundsHeuristic(ref merged);
-                    
+
                     var newPathCostIncrease = candidate.CostIncrease + newCost;
                     if (newPathCostIncrease < best.CostIncrease)
                     {
@@ -97,16 +110,6 @@ namespace SIMDPrototyping.Trees.Baseline
 
                 }
 
-            }
-            if (node->ChildCount < ChildrenCapacity)
-            {
-                //May be able to insert in empty slot.
-                //Note that this does not increase the cost at all! This does not create a new internal node!
-                //Leaf costs are constant.
-                if (candidate.CostIncrease < best.CostIncrease)
-                {
-                    SwapPaths(ref candidate, ref best, candidate.CostIncrease, node->ChildCount);
-                }
             }
 
             //Note: Since these nodes have a variable number of children, it's possible that the node cost varies.
@@ -121,10 +124,50 @@ namespace SIMDPrototyping.Trees.Baseline
         /// Tests every possible insertion path to find the one which minimizes the tree's heuristic cost.
         /// </summary>
         /// <param name="leaf">Leaf to insert.</param>
-        public void InsertGlobal(T leaf)
+        public unsafe void InsertGlobal(T leaf)
         {
             BoundingBox leafBox;
             leaf.GetBoundingBox(out leafBox);
+
+            var poolIndex = BufferPool<int>.GetPoolIndex(maximumDepth);
+            var candidate = new Path { ChildrenIndices = new QuickList<int>(BufferPools<int>.Thread, poolIndex) };
+            var best = new Path { ChildrenIndices = new QuickList<int>(BufferPools<int>.Thread, poolIndex), CostIncrease = float.MaxValue };
+            ComputeBestCostChange(0, 0, ref leafBox, ref candidate, ref best);
+
+            int nodeIndex = 0;
+            for (int i = 0; i < best.ChildrenIndices.Count; ++i)
+            {
+                var parentNode = Levels[i].Nodes + nodeIndex;
+                var bounds = &parentNode->A;
+                var children = &parentNode->ChildA;
+                //Merge the chosen child with the leaf.
+                var bestChildIndex = best.ChildrenIndices.Elements[i];
+                BoundingBox merged;
+                BoundingBox.Merge(ref leafBox, ref bounds[bestChildIndex], out merged);
+                if (children[bestChildIndex] == -1)
+                {
+                    Debug.Assert(i == best.ChildrenIndices.Count - 1);
+                    //Inserting the new leaf into an empty slot.
+                    InsertLeafIntoEmptySlot(leaf, ref leafBox, i, nodeIndex, bestChildIndex, parentNode);
+                }
+                else if (children[bestChildIndex] < -1)
+                {
+                    Debug.Assert(i == best.ChildrenIndices.Count - 1);
+                    //Merging the new leaf into an existing leaf node.
+                    MergeLeafNodes(leaf, ref leafBox, i, ref children[bestChildIndex], ref bounds[bestChildIndex], ref (&parentNode->LeafCountA)[bestChildIndex], ref merged);
+                }
+                else
+                {
+                    //Internal node.
+                    bounds[bestChildIndex] = merged;
+                    nodeIndex = children[bestChildIndex];
+                }
+
+
+            }
+
+            candidate.ChildrenIndices.Dispose();
+            best.ChildrenIndices.Dispose();
         }
     }
 }

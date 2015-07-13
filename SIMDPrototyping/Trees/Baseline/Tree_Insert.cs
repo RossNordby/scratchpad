@@ -27,7 +27,51 @@ namespace SIMDPrototyping.Trees.Baseline
 {
     partial class Tree<T>
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void MergeLeafNodes(T newLeaf, ref BoundingBox newLeafBounds, int parentLevelIndex,
+            ref int oldLeafChildSlot, ref BoundingBox oldLeafBoundsSlot, ref int oldLeafLeafCountsSlot, ref BoundingBox merged)
+        {
+            //It's a leaf node.
+            //Create a new internal node with the new leaf and the old leaf as children.
+            var nextLevel = parentLevelIndex + 1;
+            //this is the only place where a new level could potentially be created.
+            EnsureLevel(nextLevel);
+            Node newNode;
+            InitializeNode(out newNode);
+            newNode.ChildCount = 2;
+            //The first child of the new node is the old leaf. Insert its bounding box.
+            newNode.A = oldLeafBoundsSlot;
+            newNode.ChildA = oldLeafChildSlot;
+            newNode.LeafCountA = 1;
 
+            //Insert the new leaf into the second child slot.
+            newNode.B = newLeafBounds;
+            newNode.LeafCountB = 1;
+            var newNodeIndex = Levels[nextLevel].Add(ref newNode);
+            var leafIndex = AddLeaf(newLeaf, nextLevel, newNodeIndex, 1);
+            Levels[nextLevel].Nodes[newNodeIndex].ChildB = Encode(leafIndex);
+
+            //Update the old leaf node with the new index information.
+            var oldLeafIndex = Encode(oldLeafChildSlot);
+            leaves[oldLeafIndex].LevelIndex = nextLevel;
+            leaves[oldLeafIndex].NodeIndex = newNodeIndex;
+            leaves[oldLeafIndex].ChildIndex = 0;
+
+            //Update the original node's child pointer and bounding box.
+            oldLeafChildSlot = newNodeIndex;
+            oldLeafBoundsSlot = merged;
+            ++oldLeafLeafCountsSlot;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void InsertLeafIntoEmptySlot(T leaf, ref BoundingBox leafBox, int levelIndex, int nodeIndex, int childIndex, Node* node)
+        {
+            ++node->ChildCount;
+            var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, childIndex);
+            (&node->ChildA)[childIndex] = Encode(leafIndex);
+            (&node->A)[childIndex] = leafBox;
+            (&node->LeafCountA)[childIndex] = 1;
+        }
 
         public unsafe void Insert(T leaf)
         {
@@ -87,36 +131,37 @@ namespace SIMDPrototyping.Trees.Baseline
 
                 if (childIndex < -1)
                 {
-                    //It's a leaf node.
-                    //Create a new internal node with the new leaf and the old leaf as children.
-                    var nextLevel = levelIndex + 1;
-                    //this is the only place where a new level could potentially be created.
-                    EnsureLevel(nextLevel);
-                    Node newNode;
-                    InitializeNode(out newNode);
-                    newNode.ChildCount = 2;
-                    //The first child of the new node is the old leaf. Insert its bounding box.
-                    newNode.A = boundingBoxes[minimumIndex];
-                    newNode.ChildA = children[minimumIndex];
-                    newNode.LeafCountA = 1;
+                    MergeLeafNodes(leaf, ref box, levelIndex, ref children[minimumIndex], ref boundingBoxes[minimumIndex], ref leafCounts[minimumIndex], ref merged);
+                    ////It's a leaf node.
+                    ////Create a new internal node with the new leaf and the old leaf as children.
+                    //var nextLevel = levelIndex + 1;
+                    ////this is the only place where a new level could potentially be created.
+                    //EnsureLevel(nextLevel);
+                    //Node newNode;
+                    //InitializeNode(out newNode);
+                    //newNode.ChildCount = 2;
+                    ////The first child of the new node is the old leaf. Insert its bounding box.
+                    //newNode.A = boundingBoxes[minimumIndex];
+                    //newNode.ChildA = children[minimumIndex];
+                    //newNode.LeafCountA = 1;
 
-                    //Insert the new leaf into the second child slot.
-                    newNode.B = box;
-                    newNode.LeafCountB = 1;
-                    var newNodeIndex = Levels[nextLevel].Add(ref newNode);
-                    var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, 1);
-                    Levels[nextLevel].Nodes[newNodeIndex].ChildB = Encode(leafIndex);
+                    ////Insert the new leaf into the second child slot.
+                    //newNode.B = box;
+                    //newNode.LeafCountB = 1;
+                    //var newNodeIndex = Levels[nextLevel].Add(ref newNode);
+                    //var leafIndex = AddLeaf(leaf, nextLevel, newNodeIndex, 1);
+                    //Levels[nextLevel].Nodes[newNodeIndex].ChildB = Encode(leafIndex);
 
-                    //Update the old leaf node with the new index information.
-                    var oldLeafIndex = Encode(childIndex);
-                    leaves[oldLeafIndex].LevelIndex = nextLevel;
-                    leaves[oldLeafIndex].NodeIndex = newNodeIndex;
-                    leaves[oldLeafIndex].ChildIndex = 0;
+                    ////Update the old leaf node with the new index information.
+                    //var oldLeafIndex = Encode(childIndex);
+                    //leaves[oldLeafIndex].LevelIndex = nextLevel;
+                    //leaves[oldLeafIndex].NodeIndex = newNodeIndex;
+                    //leaves[oldLeafIndex].ChildIndex = 0;
 
-                    //Update the original node's child pointer and bounding box.
-                    children[minimumIndex] = newNodeIndex;
-                    boundingBoxes[minimumIndex] = merged;
-                    ++leafCounts[minimumIndex];
+                    ////Update the original node's child pointer and bounding box.
+                    //children[minimumIndex] = newNodeIndex;
+                    //boundingBoxes[minimumIndex] = merged;
+                    //++leafCounts[minimumIndex];
 
 
 #if OUTPUT
@@ -130,11 +175,12 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     //There is no child at all.
                     //Put the new leaf here.
-                    ++node->ChildCount;
-                    var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, minimumIndex);
-                    children[minimumIndex] = Encode(leafIndex);
-                    boundingBoxes[minimumIndex] = merged;
-                    leafCounts[minimumIndex] = 1;
+                    InsertLeafIntoEmptySlot(leaf, ref box, levelIndex, nodeIndex, minimumIndex, node);
+                    //++node->ChildCount;
+                    //var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, minimumIndex);
+                    //children[minimumIndex] = Encode(leafIndex);
+                    //boundingBoxes[minimumIndex] = merged;
+                    //leafCounts[minimumIndex] = 1;
 
 
 #if OUTPUT
