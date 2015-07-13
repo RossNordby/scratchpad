@@ -304,7 +304,6 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-                Console.WriteLine($"Cost heuristic 2: {tree.MeasureCostHeuristic2()}");
 
                 int nodeCount, childCount;
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
