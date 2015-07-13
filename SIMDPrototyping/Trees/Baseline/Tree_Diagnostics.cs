@@ -18,6 +18,8 @@ namespace SIMDPrototyping.Trees.Baseline
             return builder.ToString();
         }
 
+        const float leafCost = 1;
+        const float internalNodeCost = 1;
         unsafe float MeasureCostHeuristic(int levelIndex, int nodeIndex, float parentBoundsHeuristic)
         {
             var node = Levels[levelIndex].Nodes + nodeIndex;
@@ -30,7 +32,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 if (children[i] < -1)
                 {
                     //It's a leaf node. They cost one by convention.
-                    cost += 1;
+                    cost += leafCost;
                 }
                 else
                 {
@@ -39,7 +41,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     cost += MeasureCostHeuristic(nextLevel, children[i], childBoundsHeuristic) * childBoundsHeuristic;
                 }
             }
-            return cost / parentBoundsHeuristic + 1;
+            return cost / parentBoundsHeuristic + internalNodeCost;
         }
 
         public unsafe float MeasureCostHeuristic()
@@ -61,7 +63,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 if (children[i] < -1)
                 {
                     //It's a leaf node. They cost one by convention.
-                    cost += 1;
+                    cost += leafCost;
                 }
                 else
                 {
@@ -71,7 +73,48 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
             }
 
-            return cost / rootHeuristic + 1;
+            return cost / rootHeuristic;
+        }
+
+        public unsafe float MeasureCostHeuristic2()
+        {
+            var rootNode = Levels[0].Nodes;
+            var rootBounds = &rootNode->A;
+
+            BoundingBox merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+            for (int i = 0; i < rootNode->ChildCount; ++i)
+            {
+                BoundingBox.Merge(ref rootBounds[i], ref merged, out merged);
+            }
+            float rootHeuristic = ComputeBoundsHeuristic(ref merged);
+
+            float totalCost = 0;
+            for (int levelIndex = 0; levelIndex <= maximumDepth; ++levelIndex)
+            {
+                var level = Levels[levelIndex];
+                for (int nodeIndex = 0; nodeIndex < level.Count; ++nodeIndex)
+                {
+                    var node = level.Nodes + nodeIndex;
+                    var children = &node->ChildA;
+                    var bounds = &node->A;
+                    for (int childIndex = 0; childIndex < level.Nodes[nodeIndex].ChildCount; ++childIndex)
+                    {
+                        if (children[childIndex] >= 0)
+                        {
+                            //Internal node.
+                            totalCost += internalNodeCost * ComputeBoundsHeuristic(ref bounds[childIndex]);
+                        }
+                        else
+                        {
+                            //Leaf node.
+                            totalCost += leafCost * ComputeBoundsHeuristic(ref bounds[childIndex]);
+                        }
+
+                    }
+                }
+            }
+            return totalCost / rootHeuristic;
+
         }
 
     }

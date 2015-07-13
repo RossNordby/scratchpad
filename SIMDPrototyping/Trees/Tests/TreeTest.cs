@@ -164,7 +164,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             float leafSize = 10;
             int queryCount = 100000;
-            int selfTestCount = 10;
+            int selfTestCount = 1;
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
@@ -259,12 +259,12 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 var leaves = GetLeaves(10, 10, 10, 10, 10);
                 BaselineTree tree = new BaselineTree();
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[i]);
-                }
+                //for (int i = 0; i < leaves.Length; ++i)
+                //{
+                //    tree.Insert(leaves[i]);
+                //}
                 //tree.BuildMedianSplit(leaves);
-                //tree.BuildVolumeHeuristic(leaves);
+                tree.BuildVolumeHeuristic(leaves);
                 Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
@@ -304,6 +304,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                Console.WriteLine($"Cost heuristic 2: {tree.MeasureCostHeuristic2()}");
 
                 int nodeCount, childCount;
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);

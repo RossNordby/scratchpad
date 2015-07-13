@@ -79,7 +79,7 @@ namespace SIMDPrototyping.Trees.Vectorized
 
         }
 
-
+        
 
         public unsafe void GetSelfOverlapsViaStreamingQueries<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
         {
