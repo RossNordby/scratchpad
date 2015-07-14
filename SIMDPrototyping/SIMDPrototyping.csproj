@@ -105,6 +105,7 @@
     <Compile Include="Trees\Baseline\Tree_Insert.cs" />
     <Compile Include="Trees\Baseline\Tree_ReinsertRefinement.cs" />
     <Compile Include="Trees\Baseline\Tree_Refinement.cs" />
+    <Compile Include="Trees\Baseline\Tree_Remove.cs" />
     <Compile Include="Trees\Baseline\Tree_TreeQueries.cs" />
     <Compile Include="Trees\Baseline\Tree_VHBuilder.cs" />
     <Compile Include="Trees\Baseline\Tree_MedianSplitBuilder.cs" />
