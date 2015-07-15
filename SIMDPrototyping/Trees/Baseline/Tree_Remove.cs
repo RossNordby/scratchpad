@@ -36,15 +36,57 @@ namespace SIMDPrototyping.Trees.Baseline
         }
 
         /// <summary>
-        /// Moves the bounds, children indices, leaf counts, and child count from the source node to the destination node.
+        /// Moves the bounds, leaf counts, and child count from the source node to the destination node.
         /// The destination parent pointers are left unmodified.
         /// All children are pulled up as necessary to retain the level-by-level access pattern.
+        /// Child pointers to internal nodes are updated to match the new locations of the internal nodes.
         /// The source node is removed.
         /// </summary>
         unsafe void Replace(
             int sourceLevelIndex, int sourceNodeIndex,
             int destinationLevelIndex, int destinationNodeIndex)
         {
+            var sourceNode = Levels[sourceLevelIndex].Nodes + sourceNodeIndex;
+            var sourceBounds = &sourceNode->A;
+            var sourceChildren = &sourceNode->ChildA;
+            var sourceLeafCounts = &sourceNode->LeafCountA;
+
+            var destinationNode = Levels[destinationLevelIndex].Nodes + destinationNodeIndex;
+            var destinationBounds = &destinationNode->A;
+            var destinationChildren = &destinationNode->ChildA;
+            var destinationLeafCounts = &destinationNode->LeafCountA;
+
+            //Overwrite the destination node.
+            var parent = destinationNode->Parent;
+            var indexInParent = destinationNode->IndexInParent;
+            *destinationNode = *sourceNode;
+            destinationNode->Parent = parent;
+            destinationNode->IndexInParent = indexInParent;
+
+            //The source node is now dead. Did the moved node have any internal node children?
+            int firstInternalChildIndex = destinationNode->ChildCount;
+            for (int i = 0; i < destinationNode->ChildCount; ++i)
+            {
+                if (destinationChildren[i] >= 0)
+                {
+                    //This child is internal. It should be pulled up into the source node itself.
+                    //This reuses the node and avoids a pointless remove-add sequence.
+                    Replace(sourceLevelIndex + 1, destinationChildren[i], sourceLevelIndex, sourceNodeIndex);
+
+                    //Update the child pointer to point at its new home.
+
+                    firstInternalChildIndex = i;
+                    break;
+                }
+            }
+            //Walk through the remaining children to find any other internal nodes.
+            for (int i = firstInternalChildIndex; i < destinationNode->ChildCount; ++i)
+            {
+                if (destinationChildren[i] >= 0)
+                {
+                    //This child 
+                }
+            }
 
         }
 
