@@ -30,9 +30,29 @@ namespace SIMDPrototyping.Trees.Baseline
     }
     partial class Tree<T>
     {
-        unsafe void Move(ref Node node, int oldLevel, int newLevel)
+        unsafe void MoveNodeUpOneLevel(int sourceLevelIndex, int sourceNodeIndex, int newParentIndex, int indexInParent)
         {
+            var sourceNode = Levels[sourceLevelIndex].Nodes + sourceNodeIndex;
+            var sourceBounds = &sourceNode->A;
+            var sourceChildren = &sourceNode->ChildA;
+            var sourceLeafCounts = &sourceNode->LeafCountA;
 
+            var newNode = *sourceNode;
+            //The index in the parent should not change, since we're not changing parents. Just following the parent upwards.
+            newNode.Parent = newParentIndex;
+
+            Debug.Assert(indexInParent == newNode.IndexInParent);
+
+            //The parent is on level sourceLevelIndex - 2; it's moved up. We're following.
+            (&Levels[sourceLevelIndex - 2].Nodes[newParentIndex].ChildA)[indexInParent] = 
+            //The parent's pointer to us, however, will change.
+
+
+            int destinationLevelIndex = sourceLevelIndex - 1;
+            var destinationNode = Levels[destinationLevelIndex].Nodes + destinationNodeIndex;
+            var destinationBounds = &destinationNode->A;
+            var destinationChildren = &destinationNode->ChildA;
+            var destinationLeafCounts = &destinationNode->LeafCountA;
         }
 
         /// <summary>
@@ -42,21 +62,21 @@ namespace SIMDPrototyping.Trees.Baseline
         /// Child pointers to internal nodes are updated to match the new locations of the internal nodes.
         /// The source node is removed.
         /// </summary>
-        unsafe void Replace(
-            int sourceLevelIndex, int sourceNodeIndex,
-            int destinationLevelIndex, int destinationNodeIndex)
+        unsafe void MoveNodeUpOneLevel(
+            int sourceLevelIndex, int sourceNodeIndex, int destinationNodeIndex)
         {
             var sourceNode = Levels[sourceLevelIndex].Nodes + sourceNodeIndex;
             var sourceBounds = &sourceNode->A;
             var sourceChildren = &sourceNode->ChildA;
             var sourceLeafCounts = &sourceNode->LeafCountA;
 
+            int destinationLevelIndex = sourceLevelIndex - 1;
             var destinationNode = Levels[destinationLevelIndex].Nodes + destinationNodeIndex;
             var destinationBounds = &destinationNode->A;
             var destinationChildren = &destinationNode->ChildA;
             var destinationLeafCounts = &destinationNode->LeafCountA;
 
-            //Overwrite the destination node.
+            //Overwrite the destination node, except for the parent pointers.
             var parent = destinationNode->Parent;
             var indexInParent = destinationNode->IndexInParent;
             *destinationNode = *sourceNode;
@@ -64,6 +84,7 @@ namespace SIMDPrototyping.Trees.Baseline
             destinationNode->IndexInParent = indexInParent;
 
             //The source node is now dead. Did the moved node have any internal node children?
+            var levelBelowSource = sourceLevelIndex + 1;
             int firstInternalChildIndex = destinationNode->ChildCount;
             for (int i = 0; i < destinationNode->ChildCount; ++i)
             {
@@ -71,9 +92,10 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     //This child is internal. It should be pulled up into the source node itself.
                     //This reuses the node and avoids a pointless remove-add sequence.
-                    Replace(sourceLevelIndex + 1, destinationChildren[i], sourceLevelIndex, sourceNodeIndex);
+                    MoveNodeUpOneLevel(levelBelowSource, destinationChildren[i], sourceNodeIndex);
 
                     //Update the child pointer to point at its new home.
+                    destinationChildren[i] = sourceNodeIndex;
 
                     firstInternalChildIndex = i;
                     break;
@@ -84,7 +106,20 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 if (destinationChildren[i] >= 0)
                 {
-                    //This child 
+                    //There is no spare node available for this internal node to replace.
+                    //A new one needs to be created. Copy its information from the old internal node position.
+                    Node newNode = Levels[levelBelowSource].Nodes[destinationChildren[i]];
+                    //Update its parent pointers to point at the destination.
+                    //The index in parent is unchanged.
+                    newNode.Parent = destinationNodeIndex;
+                    var newNodeIndex = Levels[sourceLevelIndex].Add(ref newNode);
+                    
+
+                    //Remove the old node.
+                    Levels[levelBelowSource].RemoveAt(destinationChildren[i]);
+
+                    //Update the child pointer to its new index.
+                    destinationChildren[i] = newNodeIndex;
                 }
             }
 
@@ -140,7 +175,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 if (otherChildIndex >= 0)
                 {
                     //The remaining child is an internal node. That's complicated: its children should be pulled upward.
-                    Replace(leaf.LevelIndex + 1, otherChildIndex, leaf.LevelIndex, leaf.NodeIndex);
+                    MoveNodeUpOneLevel(leaf.LevelIndex + 1, otherChildIndex, leaf.NodeIndex);
 
                     //Work up the chain of parent pointers, refitting bounding boxes and decrementing leaf counts.
                     RefitForRemoval(node, leaf.LevelIndex);
