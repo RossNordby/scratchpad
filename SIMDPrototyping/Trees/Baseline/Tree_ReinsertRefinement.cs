@@ -135,26 +135,26 @@ namespace SIMDPrototyping.Trees.Baseline
             ComputeBestCostChange(0, 0, ref leafBox, ref candidate, ref best);
 
             int nodeIndex = 0;
-            for (int i = 0; i < best.ChildrenIndices.Count; ++i)
+            for (int levelIndex = 0; levelIndex < best.ChildrenIndices.Count; ++levelIndex)
             {
-                var parentNode = Levels[i].Nodes + nodeIndex;
+                var parentNode = Levels[levelIndex].Nodes + nodeIndex;
                 var bounds = &parentNode->A;
                 var children = &parentNode->ChildA;
                 //Merge the chosen child with the leaf.
-                var bestChildIndex = best.ChildrenIndices.Elements[i];
+                var bestChildIndex = best.ChildrenIndices.Elements[levelIndex];
                 BoundingBox merged;
                 BoundingBox.Merge(ref leafBox, ref bounds[bestChildIndex], out merged);
                 if (children[bestChildIndex] == -1)
                 {
-                    Debug.Assert(i == best.ChildrenIndices.Count - 1);
+                    Debug.Assert(levelIndex == best.ChildrenIndices.Count - 1);
                     //Inserting the new leaf into an empty slot.
-                    InsertLeafIntoEmptySlot(leaf, ref leafBox, i, nodeIndex, bestChildIndex, parentNode);
+                    InsertLeafIntoEmptySlot(leaf, ref leafBox, levelIndex, nodeIndex, bestChildIndex, parentNode);
                 }
                 else if (children[bestChildIndex] < -1)
                 {
-                    Debug.Assert(i == best.ChildrenIndices.Count - 1);
+                    Debug.Assert(levelIndex == best.ChildrenIndices.Count - 1);
                     //Merging the new leaf into an existing leaf node.
-                    MergeLeafNodes(leaf, ref leafBox, i, ref children[bestChildIndex], ref bounds[bestChildIndex], ref (&parentNode->LeafCountA)[bestChildIndex], ref merged);
+                    MergeLeafNodes(leaf, ref leafBox, levelIndex, nodeIndex, bestChildIndex, ref children[bestChildIndex], ref bounds[bestChildIndex], ref (&parentNode->LeafCountA)[bestChildIndex], ref merged);
                 }
                 else
                 {

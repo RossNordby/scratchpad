@@ -94,14 +94,17 @@ namespace SIMDPrototyping.Trees.Baseline
 
 
 
-        unsafe void MedianSplitAddNode(int level, T[] leaves, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
+        unsafe void MedianSplitAddNode(int level, int parentIndex, int indexInParent, T[] leaves, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
             EnsureLevel(level);
-            Node node;
-            InitializeNode(out node);
-            nodeIndex = Levels[level].Add(ref node); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
-            var boundingBoxes = &Levels[level].Nodes[nodeIndex].A;
-            var children = &Levels[level].Nodes[nodeIndex].ChildA;
+            Node emptyNode;
+            InitializeNode(out emptyNode);
+            nodeIndex = Levels[level].Add(ref emptyNode); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
+            var node = Levels[level].Nodes + nodeIndex;
+            node->Parent = parentIndex;
+            node->IndexInParent = indexInParent;
+            var boundingBoxes = &node->A;
+            var children = &node->ChildA;
 
             if (length <= ChildrenCapacity)
             {
@@ -205,7 +208,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 else
                 {
                     //Multiple children fit this slot. Create another internal node.
-                    MedianSplitAddNode(level + 1, leaves, starts[i], lengths[i], out boundingBoxes[i], out children[i]);
+                    MedianSplitAddNode(level + 1, nodeIndex, i, leaves, starts[i], lengths[i], out boundingBoxes[i], out children[i]);
                     ++Levels[level].Nodes[nodeIndex].ChildCount;
                 }
                 BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
@@ -243,7 +246,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
             int nodeIndex;
             BoundingBox boundingBox;
-            MedianSplitAddNode(0, leaves, start, length, out boundingBox, out nodeIndex);
+            MedianSplitAddNode(0, -1, -1, leaves, start, length, out boundingBox, out nodeIndex);
 
 
 

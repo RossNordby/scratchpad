@@ -28,7 +28,7 @@ namespace SIMDPrototyping.Trees.Baseline
     partial class Tree<T>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void MergeLeafNodes(T newLeaf, ref BoundingBox newLeafBounds, int parentLevelIndex,
+        unsafe void MergeLeafNodes(T newLeaf, ref BoundingBox newLeafBounds, int parentLevelIndex, int parentIndex, int indexInParent,
             ref int oldLeafChildSlot, ref BoundingBox oldLeafBoundsSlot, ref int oldLeafLeafCountsSlot, ref BoundingBox merged)
         {
             //It's a leaf node.
@@ -39,6 +39,8 @@ namespace SIMDPrototyping.Trees.Baseline
             Node newNode;
             InitializeNode(out newNode);
             newNode.ChildCount = 2;
+            newNode.Parent = parentIndex;
+            newNode.IndexInParent = indexInParent;
             //The first child of the new node is the old leaf. Insert its bounding box.
             newNode.A = oldLeafBoundsSlot;
             newNode.ChildA = oldLeafChildSlot;
@@ -141,7 +143,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
                 if (childIndex < -1)
                 {
-                    MergeLeafNodes(leaf, ref box, levelIndex, ref children[minimumIndex], ref boundingBoxes[minimumIndex], ref leafCounts[minimumIndex], ref merged);
+                    MergeLeafNodes(leaf, ref box, levelIndex, nodeIndex, minimumIndex, ref children[minimumIndex], ref boundingBoxes[minimumIndex], ref leafCounts[minimumIndex], ref merged);
 
 #if OUTPUT
                     Console.WriteLine($"Leaf {leafIndex} merged with existing leaf.");// New Node Children: {newNode.Children}, Old Node children: {level.Nodes[nodeIndex].Children}");

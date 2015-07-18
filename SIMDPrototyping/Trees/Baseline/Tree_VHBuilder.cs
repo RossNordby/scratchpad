@@ -119,14 +119,19 @@ namespace SIMDPrototyping.Trees.Baseline
         }
 
 
-        unsafe void VolumeHeuristicAddNode(int level, T[] leaves, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
+        unsafe void VolumeHeuristicAddNode(int level, int parentNodeIndex, int indexInParent, T[] leaves, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
             EnsureLevel(level);
-            Node node;
-            InitializeNode(out node);
-            nodeIndex = Levels[level].Add(ref node); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
-            var boundingBoxes = &Levels[level].Nodes[nodeIndex].A;
-            var children = &Levels[level].Nodes[nodeIndex].ChildA;
+            Node emptyNode;
+            InitializeNode(out emptyNode);
+            nodeIndex = Levels[level].Add(ref emptyNode); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
+
+            var node = Levels[level].Nodes + nodeIndex;
+            node->Parent = parentNodeIndex;
+            node->IndexInParent = indexInParent;
+
+            var boundingBoxes = &node->A;
+            var children = &node->ChildA;
 
             if (length <= ChildrenCapacity)
             {
@@ -187,8 +192,8 @@ namespace SIMDPrototyping.Trees.Baseline
                 else
                 {
                     //Multiple children fit this slot. Create another internal node.
-                    VolumeHeuristicAddNode(level + 1, leaves, childNode.Start, childNode.Length, out boundingBoxes[childIndex], out children[childIndex]);
-                    ++Levels[level].Nodes[nodeIndex].ChildCount;
+                    VolumeHeuristicAddNode(level + 1, nodeIndex, childIndex, leaves, childNode.Start, childNode.Length, out boundingBoxes[childIndex], out children[childIndex]);
+                    ++node->ChildCount;
                 }
                 BoundingBox.Merge(ref boundingBoxes[childIndex], ref mergedBoundingBox, out mergedBoundingBox);
                 ++childIndex;
@@ -215,7 +220,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
             int nodeIndex;
             BoundingBox boundingBox;
-            VolumeHeuristicAddNode(0, leaves, start, length, out boundingBox, out nodeIndex);
+            VolumeHeuristicAddNode(0, -1, -1, leaves, start, length, out boundingBox, out nodeIndex);
 
 
 
