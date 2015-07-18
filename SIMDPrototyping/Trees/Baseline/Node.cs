@@ -190,6 +190,8 @@ namespace SIMDPrototyping.Trees.Baseline
         public int LeafCountC;
         public int LeafCountD;
         public int ChildCount;
+        public int Parent;
+        public int IndexInParent;
     }
 
     /// <summary>

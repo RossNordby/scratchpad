@@ -57,7 +57,7 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 //The old node wasn't replaced, meaning there were no internal node children.
                 //Just get rid of that old node then.
-                Levels[sourceLevelIndex].RemoveAt(sourceNodeIndex);
+                RemoveNodeAt(sourceLevelIndex, sourceNodeIndex);
             }
             else
             {
@@ -195,7 +195,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     leaves[otherLeafIndex].ChildIndex = node->IndexInParent;
 
                     //Remove the now dead node.
-                    Levels[leaf.LevelIndex].RemoveAt(leaf.NodeIndex);
+                    RemoveNodeAt(leaf.LevelIndex, leaf.NodeIndex);
 
 
                     //Work up the chain of parent pointers, refitting bounding boxes and decrementing leaf counts.

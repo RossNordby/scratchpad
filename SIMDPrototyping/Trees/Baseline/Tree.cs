@@ -77,8 +77,44 @@ namespace SIMDPrototyping.Trees.Baseline
                 Nodes = (Node*)NodesHandle.AddrOfPinnedObject();
 
             }
+
+
         }
         Level[] Levels;
+
+        internal void RemoveNodeAt(int levelIndex, int nodeIndex)
+        {
+            Debug.Assert(nodeIndex < Levels[levelIndex].Count && nodeIndex >= 0);
+            //We make no guarantees here about maintaining the tree's coherency after a remove.
+            //That's the responsibility of whoever called RemoveAt.
+            if (nodeIndex == Levels[levelIndex].Count - 1)
+            {
+                //Last node; just remove directly.
+                --Levels[levelIndex].Count;
+            }
+            else
+            {
+                //Swap last node for removed node.
+                --Levels[levelIndex].Count;
+                var node = Levels[levelIndex].Nodes + nodeIndex;
+                *node = Levels[levelIndex].Nodes[Levels[levelIndex].Count];
+
+                //Update the moved node's pointers:
+                //its parent's child pointer should change, and
+                (&Levels[levelIndex - 1].Nodes[node->Parent].ChildA)[node->IndexInParent] = nodeIndex;
+                //its children's parent pointers should change.
+                var nodeChildren = &node->ChildA;
+                var nextLevel = levelIndex + 1;
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    if (nodeChildren[i] >= 0)
+                    {
+                        Levels[nextLevel].Nodes[nodeChildren[i]].Parent = nodeIndex;
+                    }
+                }
+
+            }
+        }
 
 
         struct Leaf
@@ -339,6 +375,8 @@ namespace SIMDPrototyping.Trees.Baseline
             node.LeafCountC = 0;
             node.LeafCountD = 0;
             node.ChildCount = 0;
+            node.Parent = 0;
+            node.IndexInParent = 0;
             //'no child' is encoded as -1. 
             //Leaf nodes are encoded as -(leafIndex + 2).
 #elif NODE2
