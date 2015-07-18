@@ -140,6 +140,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 var parentNode = Levels[levelIndex].Nodes + nodeIndex;
                 var bounds = &parentNode->A;
                 var children = &parentNode->ChildA;
+                var leafCounts = &parentNode->LeafCountA;
                 //Merge the chosen child with the leaf.
                 var bestChildIndex = best.ChildrenIndices.Elements[levelIndex];
                 BoundingBox merged;
@@ -154,13 +155,14 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     Debug.Assert(levelIndex == best.ChildrenIndices.Count - 1);
                     //Merging the new leaf into an existing leaf node.
-                    MergeLeafNodes(leaf, ref leafBox, levelIndex, nodeIndex, bestChildIndex, ref children[bestChildIndex], ref bounds[bestChildIndex], ref (&parentNode->LeafCountA)[bestChildIndex], ref merged);
+                    MergeLeafNodes(leaf, ref leafBox, levelIndex, nodeIndex, bestChildIndex, ref children[bestChildIndex], ref bounds[bestChildIndex], ref leafCounts[bestChildIndex], ref merged);
                 }
                 else
                 {
                     //Internal node.
                     bounds[bestChildIndex] = merged;
                     nodeIndex = children[bestChildIndex];
+                    ++leafCounts[bestChildIndex];
                 }
 
 

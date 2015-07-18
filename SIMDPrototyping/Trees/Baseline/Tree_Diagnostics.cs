@@ -65,7 +65,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
         }
 
-        public unsafe void Validate(int levelIndex, int nodeIndex, int expectedParentIndex, int expectedIndexInParent, ref BoundingBox expectedBoundingBox, out int foundLeafCount)
+        unsafe void Validate(int levelIndex, int nodeIndex, int expectedParentIndex, int expectedIndexInParent, ref BoundingBox expectedBoundingBox, out int foundLeafCount)
         {
             var node = Levels[levelIndex].Nodes + nodeIndex;
             if (node->Parent != expectedParentIndex)
@@ -74,19 +74,21 @@ namespace SIMDPrototyping.Trees.Baseline
                 throw new Exception($"Bad index in parent on node ({levelIndex}, {nodeIndex}).");
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
+            var bounds = &node->A;
             var nextLevel = levelIndex + 1;
             foundLeafCount = 0;
             if (node->ChildCount < 2 || node->ChildCount > ChildrenCapacity)
             {
                 throw new Exception($"Internal node with {node->ChildCount} children.");
             }
-            BoundingBox merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };asdf
+            BoundingBox merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             for (int i = 0; i < node->ChildCount; ++i)
             {
+                BoundingBox.Merge(ref merged, ref bounds[i], out merged);
                 if (children[i] >= 0)
                 {
                     int childFoundLeafCount;
-                    Validate(nextLevel, children[i], nodeIndex, i, out childFoundLeafCount);
+                    Validate(nextLevel, children[i], nodeIndex, i, ref bounds[i], out childFoundLeafCount);
                     if (childFoundLeafCount != leafCounts[i])
                         throw new Exception($"Bad leaf count for child {i} of node ({levelIndex}, {nodeIndex}).");
                     foundLeafCount += childFoundLeafCount;
@@ -100,6 +102,11 @@ namespace SIMDPrototyping.Trees.Baseline
                     throw new Exception($"Empty child at index {i} within count on node ({levelIndex}, {nodeIndex}).");
                 }
             }
+
+            if (expectedParentIndex >= 0 && (merged.Min != expectedBoundingBox.Min || merged.Max != expectedBoundingBox.Max))
+            {
+                throw new Exception($"Bounds {merged.ToString()}, expected {expectedBoundingBox.ToString()}.");
+            }
         }
 
 
@@ -107,7 +114,8 @@ namespace SIMDPrototyping.Trees.Baseline
         public void Validate()
         {
             int foundLeafCount;
-            Validate(0, 0, -1, -1, out foundLeafCount);
+            var standInBounds = new BoundingBox();
+            Validate(0, 0, -1, -1, ref standInBounds, out foundLeafCount);
             if (foundLeafCount != LeafCount)
                 throw new Exception($"{foundLeafCount} leaves found in tree, expected {leafCount}.");
         }

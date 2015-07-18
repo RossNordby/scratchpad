@@ -132,6 +132,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
+            var leafCounts = &node->LeafCountA;
 
             if (length <= ChildrenCapacity)
             {
@@ -194,6 +195,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     //Multiple children fit this slot. Create another internal node.
                     VolumeHeuristicAddNode(level + 1, nodeIndex, childIndex, leaves, childNode.Start, childNode.Length, out boundingBoxes[childIndex], out children[childIndex]);
                     ++node->ChildCount;
+                    leafCounts[childIndex] = childNode.Length;
                 }
                 BoundingBox.Merge(ref boundingBoxes[childIndex], ref mergedBoundingBox, out mergedBoundingBox);
                 ++childIndex;

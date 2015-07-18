@@ -209,6 +209,8 @@ namespace SIMDPrototyping.Trees.Baseline
             }
             InitializeNode(out Levels[0].Nodes[0]);
             Levels[0].Count = 1;
+            Levels[0].Nodes[0].Parent = -1;
+            Levels[0].Nodes[0].IndexInParent = -1;
 
             leaves = new Leaf[initialLeafCapacity];
             masks = Helpers.CreateMasks();

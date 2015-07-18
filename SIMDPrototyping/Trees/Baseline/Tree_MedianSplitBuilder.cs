@@ -105,6 +105,7 @@ namespace SIMDPrototyping.Trees.Baseline
             node->IndexInParent = indexInParent;
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
+            var leafCounts = &node->LeafCountA;
 
             if (length <= ChildrenCapacity)
             {
@@ -204,12 +205,14 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     //Stick the leaf in this slot and continue to the next child.
                     MedianSplitAllocateLeafInNode(leaves[starts[i]], level, nodeIndex, out boundingBoxes[i], out children[i], i);
+                    leafCounts[i] = 1;
                 }
                 else
                 {
                     //Multiple children fit this slot. Create another internal node.
                     MedianSplitAddNode(level + 1, nodeIndex, i, leaves, starts[i], lengths[i], out boundingBoxes[i], out children[i]);
                     ++Levels[level].Nodes[nodeIndex].ChildCount;
+                    leafCounts[i] = lengths[i];
                 }
                 BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
             }
