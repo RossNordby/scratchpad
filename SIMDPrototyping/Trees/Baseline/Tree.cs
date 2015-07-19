@@ -111,6 +111,11 @@ namespace SIMDPrototyping.Trees.Baseline
                     {
                         Levels[nextLevel].Nodes[nodeChildren[i]].Parent = nodeIndex;
                     }
+                    else
+                    {
+                        //It's a leaf node. It needs to have its pointers updated.
+                        leaves[Encode(nodeChildren[i])].NodeIndex = nodeIndex;
+                    }
                 }
 
             }

@@ -88,6 +88,8 @@ namespace SIMDPrototyping.Trees.Baseline
                 if (children[i] >= 0)
                 {
                     int childFoundLeafCount;
+                    if (children[i] < 0 || children[i] >= Levels[nextLevel].Count)
+                        throw new Exception($"Implied existence of node ({nextLevel}, {children[i]}) is outside of count {Levels[nextLevel].Count}.");
                     Validate(nextLevel, children[i], nodeIndex, i, ref bounds[i], out childFoundLeafCount);
                     if (childFoundLeafCount != leafCounts[i])
                         throw new Exception($"Bad leaf count for child {i} of node ({levelIndex}, {nodeIndex}).");
@@ -131,6 +133,10 @@ namespace SIMDPrototyping.Trees.Baseline
                 if (Encode((&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
                 {
                     throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
+                }
+                if (Levels[leaves[i].LevelIndex].Count <= leaves[i].NodeIndex)
+                {
+                    throw new Exception($"Leaf {i} points to a node outside the level's node set, {leaves[i].NodeIndex} >= {Levels[leaves[i].LevelIndex].Count}.");
                 }
             }
 
