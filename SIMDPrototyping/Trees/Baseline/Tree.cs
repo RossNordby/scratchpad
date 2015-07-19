@@ -126,6 +126,13 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 Debug.Assert(levelIndex == maximumDepth, "Any level reduced to no nodes by removal should only be the final level in the tree, or else there's a gap.");
                 --maximumDepth;
+                for (int i = 0; i < LeafCount; ++i)
+                {
+                    if (leaves[i].LevelIndex > maximumDepth)
+                    {
+                        Console.WriteLine("Invalid leaf level!");
+                    }
+                }
             }
         }
 

@@ -72,23 +72,42 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
             }
         }
+        
         unsafe void MoveNodeUpOneLevel(int sourceLevelIndex, int sourceNodeIndex, int newParentIndex, int indexInParent)
         {
             var sourceNode = Levels[sourceLevelIndex].Nodes + sourceNodeIndex;
-
-            var newNode = *sourceNode;
+            //Just copy the source node into the higher level directly.
+            var previousLevelIndex = sourceLevelIndex - 1;
+            var newNodeIndex = Levels[previousLevelIndex].Add(ref *sourceNode);
+            var newNode = Levels[previousLevelIndex].Nodes + newNodeIndex;
             //The index in the parent should not change, since we're not changing parents. Just following the parent upwards.
-            newNode.Parent = newParentIndex;
-            Debug.Assert(indexInParent == newNode.IndexInParent);
-            var newNodeIndex = Levels[sourceLevelIndex - 1].Add(ref newNode);
+            Debug.Assert(indexInParent == newNode->IndexInParent);
+            //The parent does change.
+            newNode->Parent = newParentIndex;
 
-            //The parent's pointer to us, however, will change.
+            //The parent's pointer to us also will change.
             //The parent is on level sourceLevelIndex - 2; it's moved up. We're following.
             (&Levels[sourceLevelIndex - 2].Nodes[newParentIndex].ChildA)[indexInParent] = newNodeIndex;
 
-            PullUpChildren(sourceLevelIndex, sourceNodeIndex, &Levels[sourceLevelIndex - 1].Nodes[newNodeIndex].ChildA, newNode.ChildCount, newNodeIndex); 
+            //Update any leaves that were direct children of this node.
+            var children = &newNode->ChildA;
+            for (int i = 0; i < newNode->ChildCount; ++i)
+            {
+                if (children[i] < 0)
+                {
+                    var leafIndex = Encode(children[i]);
+                    leaves[leafIndex].LevelIndex = previousLevelIndex;
+                    leaves[leafIndex].NodeIndex = newNodeIndex;
 
-            
+                    if (leaves[leafIndex].LevelIndex >= maximumDepth)
+                        Console.WriteLine("say whatnow");
+
+                }
+            }
+
+            PullUpChildren(sourceLevelIndex, sourceNodeIndex, children, newNode->ChildCount, newNodeIndex);
+
+
         }
 
         /// <summary>
@@ -118,6 +137,20 @@ namespace SIMDPrototyping.Trees.Baseline
             *destinationNode = *sourceNode;
             destinationNode->Parent = parent;
             destinationNode->IndexInParent = indexInParent;
+
+            //Update any leaves that were direct children of this node.
+            for (int i = 0; i < destinationNode->ChildCount; ++i)
+            {
+                if (destinationChildren[i] < 0)
+                {
+                    var leafIndex = Encode(destinationChildren[i]);
+                    leaves[leafIndex].LevelIndex = destinationLevelIndex;
+                    leaves[leafIndex].NodeIndex = destinationNodeIndex;
+
+                    if (leaves[leafIndex].LevelIndex >= maximumDepth)
+                        Console.WriteLine("say whatnow");
+                }
+            }
 
             PullUpChildren(sourceLevelIndex, sourceNodeIndex, &destinationNode->ChildA, destinationNode->ChildCount, destinationNodeIndex);
 
