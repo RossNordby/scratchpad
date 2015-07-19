@@ -194,9 +194,17 @@ namespace SIMDPrototyping.Trees.Baseline
                     leaves[otherLeafIndex].NodeIndex = node->Parent;
                     leaves[otherLeafIndex].ChildIndex = node->IndexInParent;
 
+                    if (leaves[otherLeafIndex].LevelIndex > maximumDepth)
+                    {
+                        Console.WriteLine("sup");
+                    }
+
                     //Remove the now dead node.
                     RemoveNodeAt(leaf.LevelIndex, leaf.NodeIndex);
-
+                    if (leaves[otherLeafIndex].LevelIndex > maximumDepth)
+                    {
+                        Console.WriteLine("sup");
+                    }
 
                     //Work up the chain of parent pointers, refitting bounding boxes and decrementing leaf counts.
                     //Note that this starts at the parent; we've already done the refit for the current level via collapse.

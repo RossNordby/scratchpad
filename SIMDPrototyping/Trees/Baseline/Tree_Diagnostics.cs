@@ -128,17 +128,6 @@ namespace SIMDPrototyping.Trees.Baseline
         {
             int foundLeafCount;
             var standInBounds = new BoundingBox();
-            for (int i = 0; i < leafCount; ++i)
-            {
-                if (Encode((&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
-                {
-                    throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
-                }
-                if (Levels[leaves[i].LevelIndex].Count <= leaves[i].NodeIndex)
-                {
-                    throw new Exception($"Leaf {i} points to a node outside the level's node set, {leaves[i].NodeIndex} >= {Levels[leaves[i].LevelIndex].Count}.");
-                }
-            }
 
             for (int i = 0; i <= maximumDepth; ++i)
             {
@@ -147,6 +136,23 @@ namespace SIMDPrototyping.Trees.Baseline
                     throw new Exception($"Invalid count of {Levels[i].Count} for level {i} within maximum depth {maximumDepth}.");
                 }
             }
+
+            for (int i = 0; i < leafCount; ++i)
+            {
+                if (Encode((&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
+                {
+                    throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
+                }
+                if (leaves[i].LevelIndex > maximumDepth)
+                {
+                    throw new Exception($"Leaf {i} has invalid level index {leaves[i].LevelIndex} > {maximumDepth}.");
+                }
+                if (Levels[leaves[i].LevelIndex].Count <= leaves[i].NodeIndex)
+                {
+                    throw new Exception($"Leaf {i} points to a node outside the level's node set, {leaves[i].NodeIndex} >= {Levels[leaves[i].LevelIndex].Count}.");
+                }
+            }
+
 
             Validate(0, 0, -1, -1, ref standInBounds, out foundLeafCount);
             if (foundLeafCount != LeafCount)

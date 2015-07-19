@@ -115,6 +115,8 @@ namespace SIMDPrototyping.Trees.Baseline
                     {
                         //It's a leaf node. It needs to have its pointers updated.
                         leaves[Encode(nodeChildren[i])].NodeIndex = nodeIndex;
+                        if (leaves[Encode(nodeChildren[i])].LevelIndex > maximumDepth)
+                            Console.WriteLine("sup");
                     }
                 }
 
