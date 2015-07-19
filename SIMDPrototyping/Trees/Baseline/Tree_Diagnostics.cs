@@ -77,7 +77,7 @@ namespace SIMDPrototyping.Trees.Baseline
             var bounds = &node->A;
             var nextLevel = levelIndex + 1;
             foundLeafCount = 0;
-            if (node->ChildCount < 2 || node->ChildCount > ChildrenCapacity)
+            if (expectedParentIndex >= 0 && (node->ChildCount < 2 || node->ChildCount > ChildrenCapacity))
             {
                 throw new Exception($"Internal node with {node->ChildCount} children.");
             }
@@ -96,10 +96,21 @@ namespace SIMDPrototyping.Trees.Baseline
                 else if (children[i] < -1)
                 {
                     ++foundLeafCount;
+                    if (leafCounts[i] != 1)
+                    {
+                        throw new Exception($"Bad leaf count on ({levelIndex}, {nodeIndex}) child {i}, it's a leaf but leafCount is {leafCounts[i]}.");
+                    }
                 }
                 else if (children[i] == -1)
                 {
                     throw new Exception($"Empty child at index {i} within count on node ({levelIndex}, {nodeIndex}).");
+                }
+            }
+            for (int i = node->ChildCount; i < ChildrenCapacity; ++i)
+            {
+                if (children[i] != -1)
+                {
+                    throw new Exception($"Node ({levelIndex}, {nodeIndex}) contains child data beyond child count.");
                 }
             }
 
@@ -111,13 +122,31 @@ namespace SIMDPrototyping.Trees.Baseline
 
 
 
-        public void Validate()
+        public unsafe void Validate()
         {
             int foundLeafCount;
             var standInBounds = new BoundingBox();
+            for (int i = 0; i < leafCount; ++i)
+            {
+                if (Encode((&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
+                {
+                    throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
+                }
+            }
+
+            for (int i = 0; i <= maximumDepth; ++i)
+            {
+                if (Levels[i].Count <= 0)
+                {
+                    throw new Exception($"Invalid count of {Levels[i].Count} for level {i} within maximum depth {maximumDepth}.");
+                }
+            }
+
             Validate(0, 0, -1, -1, ref standInBounds, out foundLeafCount);
             if (foundLeafCount != LeafCount)
                 throw new Exception($"{foundLeafCount} leaves found in tree, expected {leafCount}.");
+
+
         }
 
     }

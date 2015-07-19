@@ -251,6 +251,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 leaves[leafIndex] = leaves[lastIndex];
             }
             leaves[lastIndex] = new Leaf();
+            leafCount = lastIndex;
             return new LeafMove { OriginalIndex = lastIndex, NewIndex = leafIndex };
         }
     }

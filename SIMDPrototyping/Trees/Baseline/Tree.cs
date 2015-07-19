@@ -82,7 +82,7 @@ namespace SIMDPrototyping.Trees.Baseline
         }
         Level[] Levels;
 
-        internal void RemoveNodeAt(int levelIndex, int nodeIndex)
+        void RemoveNodeAt(int levelIndex, int nodeIndex)
         {
             Debug.Assert(nodeIndex < Levels[levelIndex].Count && nodeIndex >= 0);
             //We make no guarantees here about maintaining the tree's coherency after a remove.
@@ -113,6 +113,12 @@ namespace SIMDPrototyping.Trees.Baseline
                     }
                 }
 
+            }
+
+            if (Levels[levelIndex].Count == 0)
+            {
+                Debug.Assert(levelIndex == maximumDepth, "Any level reduced to no nodes by removal should only be the final level in the tree, or else there's a gap.");
+                --maximumDepth;
             }
         }
 

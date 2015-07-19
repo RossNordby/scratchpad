@@ -140,7 +140,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
                 for (int i = 0; i < length; ++i)
                 {
-                    MedianSplitAllocateLeafInNode(leaves[i + start], level, nodeIndex, out boundingBoxes[i], out children[i], i);
+                    MedianSplitAllocateLeafInNode(leaves[i + start], level, nodeIndex, out boundingBoxes[i], out children[i], out leafCounts[i], i);
                     BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
                 }
                 return;
@@ -188,7 +188,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 if (childNode.Length == 1)
                 {
                     //Stick the leaf in this slot and continue to the next child.
-                    MedianSplitAllocateLeafInNode(leaves[childNode.Start], level, nodeIndex, out boundingBoxes[childIndex], out children[childIndex], childIndex);
+                    MedianSplitAllocateLeafInNode(leaves[childNode.Start], level, nodeIndex, out boundingBoxes[childIndex], out children[childIndex], out leafCounts[childIndex], childIndex);
                 }
                 else
                 {

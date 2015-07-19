@@ -168,7 +168,7 @@ namespace SIMDPrototyping.Trees.Tests
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 16384;
+            int randomLeafCount = 7;
 #else
             int leafCountX = 64;
             int leafCountY = 64;
@@ -307,10 +307,19 @@ namespace SIMDPrototyping.Trees.Tests
 
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
 
+                tree.Validate();
+
+                var leafCount = tree.LeafCount;
+                for (int i = 0; i < leafCount; ++i)
+                {
+                    tree.RemoveAt(0);
+                    tree.Validate();
+                }
+
+
                 int nodeCount, childCount;
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
 
-                tree.Validate();
 
                 Console.WriteLine($"Baseline Occupancy: {childCount / (double)nodeCount}");
 
