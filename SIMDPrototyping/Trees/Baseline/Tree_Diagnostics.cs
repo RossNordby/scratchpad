@@ -121,8 +121,27 @@ namespace SIMDPrototyping.Trees.Baseline
                 throw new Exception($"Bounds {merged.ToString()}, expected {expectedBoundingBox.ToString()}.");
             }
         }
+        
 
+        unsafe void ValidateLeaves()
+        {
 
+            for (int i = 0; i < leafCount; ++i)
+            {
+                if (Levels[leaves[i].LevelIndex].Count <= leaves[i].NodeIndex)
+                {
+                    throw new Exception($"Leaf {i} points to a node outside the level's node set, {leaves[i].NodeIndex} >= {Levels[leaves[i].LevelIndex].Count}.");
+                }
+                if (Encode((&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
+                {
+                    throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
+                }
+                if (leaves[i].LevelIndex > maximumDepth)
+                {
+                    throw new Exception($"Leaf {i} has invalid level index {leaves[i].LevelIndex} > {maximumDepth}.");
+                }
+            }
+        }
 
         public unsafe void Validate()
         {
@@ -137,22 +156,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
             }
 
-            for (int i = 0; i < leafCount; ++i)
-            {
-                if (Encode((&Levels[leaves[i].LevelIndex].Nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
-                {
-                    throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
-                }
-                if (leaves[i].LevelIndex > maximumDepth)
-                {
-                    throw new Exception($"Leaf {i} has invalid level index {leaves[i].LevelIndex} > {maximumDepth}.");
-                }
-                if (Levels[leaves[i].LevelIndex].Count <= leaves[i].NodeIndex)
-                {
-                    throw new Exception($"Leaf {i} points to a node outside the level's node set, {leaves[i].NodeIndex} >= {Levels[leaves[i].LevelIndex].Count}.");
-                }
-            }
-
+            ValidateLeaves();
 
             Validate(0, 0, -1, -1, ref standInBounds, out foundLeafCount);
             if (foundLeafCount != LeafCount)

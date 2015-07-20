@@ -82,59 +82,7 @@ namespace SIMDPrototyping.Trees.Baseline
         }
         Level[] Levels;
 
-        void RemoveNodeAt(int levelIndex, int nodeIndex)
-        {
-            Debug.Assert(nodeIndex < Levels[levelIndex].Count && nodeIndex >= 0);
-            //We make no guarantees here about maintaining the tree's coherency after a remove.
-            //That's the responsibility of whoever called RemoveAt.
-            if (nodeIndex == Levels[levelIndex].Count - 1)
-            {
-                //Last node; just remove directly.
-                --Levels[levelIndex].Count;
-            }
-            else
-            {
-                //Swap last node for removed node.
-                --Levels[levelIndex].Count;
-                var node = Levels[levelIndex].Nodes + nodeIndex;
-                *node = Levels[levelIndex].Nodes[Levels[levelIndex].Count];
-
-                //Update the moved node's pointers:
-                //its parent's child pointer should change, and
-                (&Levels[levelIndex - 1].Nodes[node->Parent].ChildA)[node->IndexInParent] = nodeIndex;
-                //its children's parent pointers should change.
-                var nodeChildren = &node->ChildA;
-                var nextLevel = levelIndex + 1;
-                for (int i = 0; i < node->ChildCount; ++i)
-                {
-                    if (nodeChildren[i] >= 0)
-                    {
-                        Levels[nextLevel].Nodes[nodeChildren[i]].Parent = nodeIndex;
-                    }
-                    else
-                    {
-                        //It's a leaf node. It needs to have its pointers updated.
-                        leaves[Encode(nodeChildren[i])].NodeIndex = nodeIndex;
-                        if (leaves[Encode(nodeChildren[i])].LevelIndex > maximumDepth)
-                            Console.WriteLine("sup");
-                    }
-                }
-
-            }
-
-            if (Levels[levelIndex].Count == 0)
-            {
-                Debug.Assert(levelIndex == maximumDepth, "Any level reduced to no nodes by removal should only be the final level in the tree, or else there's a gap.");
-                --maximumDepth;
-                for (int i = 0; i < LeafCount; ++i)
-                {
-                    if (leaves[i].LevelIndex > maximumDepth)
-                    {
-                        Console.WriteLine("Invalid leaf level!");
-                    }
-                }
-            }
-        }
+        
 
 
         struct Leaf

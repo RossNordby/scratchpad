@@ -30,8 +30,73 @@ namespace SIMDPrototyping.Trees.Baseline
     }
     partial class Tree<T>
     {
+        unsafe void RemoveNodeAt(int levelIndex, int nodeIndex)
+        {
+            if (Levels[levelIndex].Count <= nodeIndex)
+                Console.WriteLine("sup:)");
+            ValidateLeaves();
+            Debug.Assert(nodeIndex < Levels[levelIndex].Count && nodeIndex >= 0);
+            //We make no guarantees here about maintaining the tree's coherency after a remove.
+            //That's the responsibility of whoever called RemoveAt.
+            if (nodeIndex == Levels[levelIndex].Count - 1)
+            {
+                //Last node; just remove directly.
+                --Levels[levelIndex].Count;
+                Console.WriteLine("Leaf");
+            }
+            else
+            {
+                ValidateLeaves();
+                //Swap last node for removed node.
+                --Levels[levelIndex].Count;
+                var node = Levels[levelIndex].Nodes + nodeIndex;
+                *node = Levels[levelIndex].Nodes[Levels[levelIndex].Count];
+
+                //Update the moved node's pointers:
+                //its parent's child pointer should change, and
+                (&Levels[levelIndex - 1].Nodes[node->Parent].ChildA)[node->IndexInParent] = nodeIndex;
+                //its children's parent pointers should change.
+                var nodeChildren = &node->ChildA;
+                var nextLevel = levelIndex + 1;
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    if (nodeChildren[i] >= 0)
+                    {
+                        Levels[nextLevel].Nodes[nodeChildren[i]].Parent = nodeIndex;
+                    }
+                    else
+                    {
+                        //It's a leaf node. It needs to have its pointers updated.
+                        leaves[Encode(nodeChildren[i])].NodeIndex = nodeIndex;
+                        if (leaves[Encode(nodeChildren[i])].LevelIndex > maximumDepth)
+                            Console.WriteLine("sup");
+                    }
+                }
+                ValidateLeaves();
+                Console.WriteLine("Internal");
+
+            }
+
+            if (Levels[levelIndex].Count == 0)
+            {
+                Debug.Assert(levelIndex == maximumDepth, "Any level reduced to no nodes by removal should only be the final level in the tree, or else there's a gap.");
+                --maximumDepth;
+                for (int i = 0; i < LeafCount; ++i)
+                {
+                    if (leaves[i].LevelIndex > maximumDepth)
+                    {
+                        Console.WriteLine("Invalid leaf level!");
+                    }
+                }
+            }
+            ValidateLeaves();
+        }
+
         unsafe void PullUpChildren(int sourceLevelIndex, int sourceNodeIndex, int* childrenIndices, int childrenCount, int newParent)
         {
+            if (Levels[sourceLevelIndex].Count <= sourceNodeIndex)
+                Console.WriteLine("sup:)");
+            ValidateLeaves();
             bool oldNodeReplaced = false;
             //The source node is now dead. Did the moved node have any internal node children?
             int childrenLevel = sourceLevelIndex + 1;
@@ -40,10 +105,27 @@ namespace SIMDPrototyping.Trees.Baseline
             {
                 if (childrenIndices[i] >= 0)
                 {
+                    Console.WriteLine("Previous children:");
+                    for (int j = 0; j < childrenCount; ++j)
+                    {
+                        Console.WriteLine(childrenIndices[j]);
+                        if (childrenIndices[j] >= Levels[childrenLevel].Count)
+                        {
+                            Console.WriteLine("OdD");
+                        }
+                    }
                     //This child is internal. It should be pulled up into the source node itself.
                     //This reuses the node and avoids a pointless remove-add sequence.
                     ReplaceNodeUpOneLevel(childrenLevel, childrenIndices[i], sourceNodeIndex);
-
+                    Console.WriteLine("New children:");
+                    for (int j = 0; j < childrenCount; ++j)
+                    {
+                        Console.WriteLine(childrenIndices[j]);
+                        if (childrenIndices[j] >= Levels[childrenLevel].Count)
+                        {
+                            Console.WriteLine("OdD");
+                        }
+                    }
                     //Update the child pointer to point at its new home.
                     childrenIndices[i] = sourceNodeIndex;
 
@@ -52,7 +134,10 @@ namespace SIMDPrototyping.Trees.Baseline
                     break;
                 }
             }
-
+            if (Levels[sourceLevelIndex].Count <= sourceNodeIndex)
+            {
+                Console.WriteLine("baD");
+            }
             if (!oldNodeReplaced)
             {
                 //The old node wasn't replaced, meaning there were no internal node children.
@@ -66,15 +151,28 @@ namespace SIMDPrototyping.Trees.Baseline
                 {
                     if (childrenIndices[i] >= 0)
                     {
+                        if (childrenIndices[i] >= Levels[childrenLevel].Count)
+                            Console.WriteLine("BAD):");
                         //There are no spare nodes available, so we'll just have to create another one as we move it up.
                         MoveNodeUpOneLevel(childrenLevel, childrenIndices[i], newParent, i);
                     }
                 }
+                //this check is only hear because removal causing it is expected.
+                if (Levels[sourceLevelIndex].Count <= sourceNodeIndex)
+                {
+                    Console.WriteLine("baD");
+                }
             }
+            ValidateLeaves();
         }
         
         unsafe void MoveNodeUpOneLevel(int sourceLevelIndex, int sourceNodeIndex, int newParentIndex, int indexInParent)
         {
+            if (Levels[sourceLevelIndex].Count <= sourceNodeIndex)
+            {
+                Console.WriteLine("baD");
+            }
+            ValidateLeaves();
             var sourceNode = Levels[sourceLevelIndex].Nodes + sourceNodeIndex;
             //Just copy the source node into the higher level directly.
             var previousLevelIndex = sourceLevelIndex - 1;
@@ -101,12 +199,18 @@ namespace SIMDPrototyping.Trees.Baseline
 
                     if (leaves[leafIndex].LevelIndex >= maximumDepth)
                         Console.WriteLine("say whatnow");
+                    if (leaves[leafIndex].NodeIndex >= Levels[leaves[leafIndex].LevelIndex].Count)
+                        Console.WriteLine("bad");
 
                 }
             }
-
+            if (Levels[sourceLevelIndex].Count <= sourceNodeIndex)
+            {
+                Console.WriteLine("baD");
+            }
             PullUpChildren(sourceLevelIndex, sourceNodeIndex, children, newNode->ChildCount, newNodeIndex);
 
+            ValidateLeaves();
 
         }
 
@@ -120,6 +224,7 @@ namespace SIMDPrototyping.Trees.Baseline
         unsafe void ReplaceNodeUpOneLevel(
             int sourceLevelIndex, int sourceNodeIndex, int destinationNodeIndex)
         {
+            ValidateLeaves();
             var sourceNode = Levels[sourceLevelIndex].Nodes + sourceNodeIndex;
             var sourceBounds = &sourceNode->A;
             var sourceChildren = &sourceNode->ChildA;
@@ -149,15 +254,49 @@ namespace SIMDPrototyping.Trees.Baseline
 
                     if (leaves[leafIndex].LevelIndex >= maximumDepth)
                         Console.WriteLine("say whatnow");
+                    if (leaves[leafIndex].NodeIndex >= Levels[leaves[leafIndex].LevelIndex].Count)
+                        Console.WriteLine("bad");
                 }
             }
-
-            PullUpChildren(sourceLevelIndex, sourceNodeIndex, &destinationNode->ChildA, destinationNode->ChildCount, destinationNodeIndex);
-
+            if (Levels[sourceLevelIndex].Count <= sourceNodeIndex)
+            {
+                Console.WriteLine("baD");
+            }
+            for (int i = 0; i < sourceNode->ChildCount; ++i)
+            {
+                if (Levels[sourceLevelIndex + 1].Count <= sourceChildren[i])
+                {
+                    Console.WriteLine("bad index");
+                }
+            }
+            for (int i = 0; i < destinationNode->ChildCount; ++i)
+            {
+                if (Levels[sourceLevelIndex + 1].Count <= destinationChildren[i])
+                {
+                    Console.WriteLine("bad index");
+                }
+            }
+            PullUpChildren(sourceLevelIndex, sourceNodeIndex, destinationChildren, destinationNode->ChildCount, destinationNodeIndex);
+            for (int i = 0; i < sourceNode->ChildCount; ++i)
+            {
+                if (Levels[sourceLevelIndex + 1].Count <= sourceChildren[i])
+                {
+                    Console.WriteLine("bad index");
+                }
+            }
+            for (int i = 0; i < destinationNode->ChildCount; ++i)
+            {
+                if (Levels[sourceLevelIndex].Count <= destinationChildren[i])
+                {
+                    Console.WriteLine("bad index");
+                }
+            }
+            ValidateLeaves();
         }
 
         unsafe void RefitForRemoval(Node* node, int levelIndex)
         {
+            ValidateLeaves();
             while (node->Parent >= 0)
             {
                 //Compute the new bounding box for this node.
@@ -176,13 +315,32 @@ namespace SIMDPrototyping.Trees.Baseline
                 node = parent;
                 levelIndex -= 1;
             }
+            ValidateLeaves();
         }
 
         public unsafe LeafMove RemoveAt(int leafIndex)
         {
+            ValidateLeaves();
             if (leafIndex < 0 || leafIndex >= leafCount)
                 throw new ArgumentOutOfRangeException("Leaf index must be a valid index in the tree's leaf array.");
+
+            //Cache the leaf before overwriting.
             var leaf = leaves[leafIndex];
+
+            //Delete the leaf from the leaves array.
+            //This is done up front to make it easier for tests to catch bad behavior.
+            var lastIndex = LeafCount - 1;
+            if (lastIndex != leafIndex)
+            {
+                //The removed leaf was in the middle of the leaves array. Take the last leaf and use it to fill the slot.
+                //The node owner's index must be updated to point to the new location.
+                var lastLeafOwner = Levels[leaves[lastIndex].LevelIndex].Nodes + leaves[lastIndex].NodeIndex;
+                (&lastLeafOwner->ChildA)[leaves[lastIndex].ChildIndex] = Encode(leafIndex);
+                leaves[leafIndex] = leaves[lastIndex];
+            }
+            leaves[lastIndex] = new Leaf();
+            leafCount = lastIndex;
+
             var node = Levels[leaf.LevelIndex].Nodes + leaf.NodeIndex;
             var nodeChildren = &node->ChildA;
             var nodeBounds = &node->A;
@@ -281,18 +439,9 @@ namespace SIMDPrototyping.Trees.Baseline
             }
 
 
-            //Delete the leaf from the leaves array.
-            var lastIndex = LeafCount - 1;
-            if (lastIndex != leafIndex)
-            {
-                //The removed leaf was in the middle of the leaves array. Take the last leaf and use it to fill the slot.
-                //The node owner's index must be updated to point to the new location.
-                var lastLeafOwner = Levels[leaves[lastIndex].LevelIndex].Nodes + leaves[lastIndex].NodeIndex;
-                (&lastLeafOwner->ChildA)[leaves[lastIndex].ChildIndex] = Encode(leafIndex);
-                leaves[leafIndex] = leaves[lastIndex];
-            }
-            leaves[lastIndex] = new Leaf();
-            leafCount = lastIndex;
+
+            ValidateLeaves();
+
             return new LeafMove { OriginalIndex = lastIndex, NewIndex = leafIndex };
         }
     }
