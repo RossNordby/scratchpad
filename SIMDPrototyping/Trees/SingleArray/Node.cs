@@ -79,6 +79,8 @@ namespace SIMDPrototyping.Trees.SingleArray
         public int ChildO2;
         public int ChildP2;
         public int ChildCount;
+        public int Parent;
+        public int IndexInParent;
     }
 
     /// <summary>
@@ -136,6 +138,8 @@ namespace SIMDPrototyping.Trees.SingleArray
         public int LeafCountO;
         public int LeafCountP;
         public int ChildCount;
+        public int Parent;
+        public int IndexInParent;
     }
 
     /// <summary>
@@ -169,6 +173,8 @@ namespace SIMDPrototyping.Trees.SingleArray
         public int LeafCountG;
         public int LeafCountH;
         public int ChildCount;
+        public int Parent;
+        public int IndexInParent;
     }
 
     /// <summary>
@@ -207,5 +213,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         public int LeafCountA;
         public int LeafCountB;
         public int ChildCount;
+        public int Parent;
+        public int IndexInParent;
     }
 }

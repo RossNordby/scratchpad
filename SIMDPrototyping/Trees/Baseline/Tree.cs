@@ -253,7 +253,6 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildN2 = -1;
             node.ChildO2 = -1;
             node.ChildP2 = -1;
-            node.ChildCount = 0;
 #elif NODE16
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
             node.B = node.A;
@@ -303,7 +302,6 @@ namespace SIMDPrototyping.Trees.Baseline
             node.LeafCountN = 0;
             node.LeafCountO = 0;
             node.LeafCountP = 0;
-            node.ChildCount = 0;
 #elif NODE8
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
             node.B = node.A;
@@ -329,7 +327,6 @@ namespace SIMDPrototyping.Trees.Baseline
             node.LeafCountF = 0;
             node.LeafCountG = 0;
             node.LeafCountH = 0;
-            node.ChildCount = 0;
 #elif NODE4
             //could load a premade one instead.
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
@@ -344,9 +341,6 @@ namespace SIMDPrototyping.Trees.Baseline
             node.LeafCountB = 0;
             node.LeafCountC = 0;
             node.LeafCountD = 0;
-            node.ChildCount = 0;
-            node.Parent = 0;
-            node.IndexInParent = 0;
             //'no child' is encoded as -1. 
             //Leaf nodes are encoded as -(leafIndex + 2).
 #elif NODE2
@@ -356,8 +350,10 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildB = -1;
             node.LeafCountA = 0;
             node.LeafCountB = 0;
-            node.ChildCount = 0;
 #endif
+            node.ChildCount = 0;
+            node.Parent = 0;
+            node.IndexInParent = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

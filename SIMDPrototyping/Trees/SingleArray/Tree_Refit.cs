@@ -11,39 +11,191 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
+   
+
         unsafe void Refit(int nodeIndex, out BoundingBox boundingBox)
         {
             var node = Nodes + nodeIndex;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+
+            if (node->ChildA >= 0)
+            {
+                Refit(node->ChildA, out node->A);
+            }
+            if (node->ChildB >= 0)
+            {
+                Refit(node->ChildB, out node->B);
+            }
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            for (int i = 2; i < node->ChildCount; ++i)
+            {
+                if ((&node->ChildA)[i] >= 0)
+                {
+                    Refit((&node->ChildA)[i], out (&node->A)[i]);
+                }
+                BoundingBox.Merge(ref (&node->A)[i], ref boundingBox, out boundingBox);
+            }
+        }
+
+        unsafe void RefitCached(int nodeIndex, out BoundingBox boundingBox)
+        {
+            var node = Nodes + nodeIndex;
             var bounds = &node->A;
-            var children = &node->ChildA;
+            var children = &node->ChildA; //try move down?
             var childCount = node->ChildCount;
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
 
-            if (children[0] >= 0)
+            if (node->ChildA >= 0)
             {
-                Refit(children[0], out boundingBox);
+                RefitCached(node->ChildA, out node->A);
             }
-            else
+            if (node->ChildB >= 0)
             {
-                //This is a leaf node. It requires no refitting.
-                boundingBox = bounds[0];
+                RefitCached(node->ChildB, out node->B);
             }
-            for (int i = 1; i < childCount; ++i)
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            for (int i = 2; i < childCount; ++i)
             {
                 if (children[i] >= 0)
                 {
-                    BoundingBox childBox;
-                    Refit(children[i], out childBox);
-                    BoundingBox.Merge(ref childBox, ref boundingBox, out boundingBox);
+                    RefitCached(children[i], out bounds[i]);
                 }
-                else
-                {
-                    //This is a leaf node. Merge the existing bounding box in.
-                    BoundingBox.Merge(ref bounds[i], ref boundingBox, out boundingBox);
-                }
+                BoundingBox.Merge(ref bounds[i], ref boundingBox, out boundingBox);
             }
         }
+
+#if NODE4
+        unsafe void Refit4(int nodeIndex, out BoundingBox boundingBox)
+        {
+            var node = Nodes + nodeIndex;
+            var childCount = node->ChildCount;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+
+
+            if (node->ChildA >= 0)
+            {
+                Refit4(node->ChildA, out node->A);
+            }
+            if (node->ChildB >= 0)
+            {
+                Refit4(node->ChildB, out node->B);
+            }
+            if (node->ChildCount < 3)
+                goto Merge;
+            if (node->ChildC >= 0)
+            {
+                Refit4(node->ChildC, out node->C);
+            }
+            if (node->ChildCount < 4)
+                goto Merge;
+            if (node->ChildD >= 0)
+            {
+                Refit4(node->ChildD, out node->D);
+            }
+            Merge:
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            if (node->ChildCount < 3)
+                return;
+            BoundingBox.Merge(ref node->C, ref boundingBox, out boundingBox);
+            if (node->ChildCount < 4)
+                return;
+            BoundingBox.Merge(ref node->D, ref boundingBox, out boundingBox);
+
+        }
+
+        unsafe void RefitSwitch4(int nodeIndex, out BoundingBox boundingBox)
+        {
+            var node = Nodes + nodeIndex;
+            var childCount = node->ChildCount;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+
+
+            switch (node->ChildCount)
+            {
+                case 1:
+                    {
+                        //Must be a leaf.
+                        Debug.Assert(node->ChildA < 0);
+                        boundingBox = node->A;
+                    }
+                    break;
+                case 2:
+                    {
+                        if (node->ChildA >= 0)
+                        {
+                            RefitSwitch4(node->ChildA, out node->A);
+                        }
+                        if (node->ChildB >= 0)
+                        {
+                            RefitSwitch4(node->ChildB, out node->B);
+                        }
+                        BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+                    }
+                    break;
+                case 3:
+                    {
+                        if (node->ChildA >= 0)
+                        {
+                            RefitSwitch4(node->ChildA, out node->A);
+                        }
+                        if (node->ChildB >= 0)
+                        {
+                            RefitSwitch4(node->ChildB, out node->B);
+                        }
+                        if (node->ChildCount < 3)
+                            goto Merge;
+                        if (node->ChildC >= 0)
+                        {
+                            RefitSwitch4(node->ChildC, out node->C);
+                        }
+                        Merge:
+                        BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+                        if (node->ChildCount < 3)
+                            return;
+                        BoundingBox.Merge(ref node->C, ref boundingBox, out boundingBox);
+                    }
+                    break;
+                case 4:
+                default:
+
+                    {
+                        if (node->ChildA >= 0)
+                        {
+                            RefitSwitch4(node->ChildA, out node->A);
+                        }
+                        if (node->ChildB >= 0)
+                        {
+                            RefitSwitch4(node->ChildB, out node->B);
+                        }
+                        if (node->ChildCount < 3)
+                            goto Merge;
+                        if (node->ChildC >= 0)
+                        {
+                            RefitSwitch4(node->ChildC, out node->C);
+                        }
+                        if (node->ChildCount < 4)
+                            goto Merge;
+                        if (node->ChildD >= 0)
+                        {
+                            RefitSwitch4(node->ChildD, out node->D);
+                        }
+                        Merge:
+                        BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+                        if (node->ChildCount < 3)
+                            return;
+                        BoundingBox.Merge(ref node->C, ref boundingBox, out boundingBox);
+                        if (node->ChildCount < 4)
+                            return;
+                        BoundingBox.Merge(ref node->D, ref boundingBox, out boundingBox);
+                    }
+                    break;
+            }
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void UpdateLeafBoundingBox(int leafIndex, ref BoundingBox boundingBox)
