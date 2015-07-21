@@ -12,18 +12,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-#if NODE32
-using Node = SIMDPrototyping.Trees.Baseline.Node32;
-#elif NODE16
-using Node = SIMDPrototyping.Trees.Baseline.Node16;
-#elif NODE8
-using Node = SIMDPrototyping.Trees.Baseline.Node8;
-#elif NODE4
-using Node = SIMDPrototyping.Trees.Baseline.Node4;
-#elif NODE2
-using Node = SIMDPrototyping.Trees.Baseline.Node2;
-#endif
-
 namespace SIMDPrototyping.Trees.Baseline
 {
     partial class Tree<T>

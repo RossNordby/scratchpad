@@ -6,13 +6,14 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SIMDPrototyping.Trees.Baseline
+namespace SIMDPrototyping.Trees
 {
+#if NODE32
     /// <summary>
     /// 32-wide tree node.
     /// </summary>
-    [StructLayout(LayoutKind.Sequential, Size = 912 /*1168*/)]
-    public unsafe struct Node32
+    //[StructLayout(LayoutKind.Sequential, Size = 912 /*1168*/)]
+    public unsafe struct Node
     {
         public BoundingBox A;
         public BoundingBox B;
@@ -78,16 +79,48 @@ namespace SIMDPrototyping.Trees.Baseline
         public int ChildN2;
         public int ChildO2;
         public int ChildP2;
+        public int LeafCountA;
+        public int LeafCountB;
+        public int LeafCountC;
+        public int LeafCountD;
+        public int LeafCountE;
+        public int LeafCountF;
+        public int LeafCountG;
+        public int LeafCountH;
+        public int LeafCountI;
+        public int LeafCountJ;
+        public int LeafCountK;
+        public int LeafCountL;
+        public int LeafCountM;
+        public int LeafCountN;
+        public int LeafCountO;
+        public int LeafCountP;
+        public int LeafCountA2;
+        public int LeafCountB2;
+        public int LeafCountC2;
+        public int LeafCountD2;
+        public int LeafCountE2;
+        public int LeafCountF2;
+        public int LeafCountG2;
+        public int LeafCountH2;
+        public int LeafCountI2;
+        public int LeafCountJ2;
+        public int LeafCountK2;
+        public int LeafCountL2;
+        public int LeafCountM2;
+        public int LeafCountN2;
+        public int LeafCountO2;
+        public int LeafCountP2;
         public int ChildCount;
         public int Parent;
         public int IndexInParent;
     }
-
+#elif NODE16
     /// <summary>
     /// 16-wide tree node.
     /// </summary>
-    [StructLayout(LayoutKind.Sequential, Size = 464 /*592*/)]
-    public unsafe struct Node16
+    //[StructLayout(LayoutKind.Sequential, Size = 464 /*592*/)]
+    public unsafe struct Node
     {
         public BoundingBox A;
         public BoundingBox B;
@@ -141,12 +174,12 @@ namespace SIMDPrototyping.Trees.Baseline
         public int Parent;
         public int IndexInParent;
     }
-
+#elif NODE8
     /// <summary>
     /// 8-wide tree node.
     /// </summary>
     //[StructLayout(LayoutKind.Sequential, Size = 240 /*304*/)]
-    public unsafe struct Node8
+    public unsafe struct Node
     {
         public BoundingBox A;
         public BoundingBox B;
@@ -176,12 +209,12 @@ namespace SIMDPrototyping.Trees.Baseline
         public int Parent;
         public int IndexInParent;
     }
-
+#elif NODE4
     /// <summary>
     /// 4-wide tree node.
     /// </summary>
     //[StructLayout(LayoutKind.Sequential, Size = 128 /*160*/)]
-    public unsafe struct Node4
+    public unsafe struct Node
     {
         public BoundingBox A;
         public BoundingBox B;
@@ -199,12 +232,12 @@ namespace SIMDPrototyping.Trees.Baseline
         public int Parent;
         public int IndexInParent;
     }
-
+#elif NODE2
     /// <summary>
     /// 2-wide tree node.
     /// </summary>
-    [StructLayout(LayoutKind.Sequential, Size = 64 /*80*/)]
-    public unsafe struct Node2
+    //[StructLayout(LayoutKind.Sequential, Size = 64 /*80*/)]
+    public unsafe struct Node
     {
         public BoundingBox A;
         public BoundingBox B;
@@ -216,4 +249,5 @@ namespace SIMDPrototyping.Trees.Baseline
         public int Parent;
         public int IndexInParent;
     }
+#endif
 }

@@ -11,18 +11,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-#if NODE32
-using Node = SIMDPrototyping.Trees.SingleArray.Node32;
-#elif NODE16
-using Node = SIMDPrototyping.Trees.SingleArray.Node16;
-#elif NODE8
-using Node = SIMDPrototyping.Trees.SingleArray.Node8;
-#elif NODE4
-using Node = SIMDPrototyping.Trees.SingleArray.Node4;
-#elif NODE2
-using Node = SIMDPrototyping.Trees.SingleArray.Node2;
-#endif
-
 namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree

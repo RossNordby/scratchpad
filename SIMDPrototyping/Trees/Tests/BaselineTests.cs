@@ -23,10 +23,10 @@ namespace SIMDPrototyping.Trees.Tests
                 BaselineTree tree = new BaselineTree();
                 //for (int i = 0; i < leaves.Length; ++i)
                 //{
-                //    tree.Insert(leaves[i]);
+                //    tree.Insert(warmLeaves[i]);
                 //}
-                //tree.BuildMedianSplit(leaves);
-                tree.BuildVolumeHeuristic(warmLeaves);
+                tree.BuildMedianSplit(warmLeaves);
+                //tree.BuildVolumeHeuristic(warmLeaves);
                 Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
 
                 tree.RefitLeaves();
@@ -51,14 +51,14 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Baseline arity: {BaselineTree.ChildrenCapacity}");
                 BaselineTree tree = new BaselineTree(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.InsertGlobal(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.Insert(leaves[i]);
-                    //tree.InsertGlobal(leaves[i]);
-                }
-                //tree.BuildMedianSplit(leaves);
+                //for (int i = 0; i < leaves.Length; ++i)
+                //{
+                //    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
+                //    //tree.InsertGlobal(leaves[(int)((982451653L * i) % leaves.Length)]);
+                //    //tree.Insert(leaves[i]);
+                //    //tree.InsertGlobal(leaves[i]);
+                //}
+                tree.BuildMedianSplit(leaves);
                 //tree.BuildVolumeHeuristic(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");

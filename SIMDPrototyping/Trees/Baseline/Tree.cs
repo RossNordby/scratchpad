@@ -11,17 +11,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-#if NODE32
-using Node = SIMDPrototyping.Trees.Baseline.Node32;
-#elif NODE16
-using Node = SIMDPrototyping.Trees.Baseline.Node16;
-#elif NODE8
-using Node = SIMDPrototyping.Trees.Baseline.Node8;
-#elif NODE4
-using Node = SIMDPrototyping.Trees.Baseline.Node4;
-#elif NODE2
-using Node = SIMDPrototyping.Trees.Baseline.Node2;
-#endif
 
 
 namespace SIMDPrototyping.Trees.Baseline
@@ -253,6 +242,39 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildN2 = -1;
             node.ChildO2 = -1;
             node.ChildP2 = -1;
+            node.LeafCountA = 0;
+            node.LeafCountB = 0;
+            node.LeafCountC = 0;
+            node.LeafCountD = 0;
+            node.LeafCountE = 0;
+            node.LeafCountF = 0;
+            node.LeafCountG = 0;
+            node.LeafCountH = 0;
+            node.LeafCountI = 0;
+            node.LeafCountJ = 0;
+            node.LeafCountK = 0;
+            node.LeafCountL = 0;
+            node.LeafCountM = 0;
+            node.LeafCountN = 0;
+            node.LeafCountO = 0;
+            node.LeafCountP = 0;
+            node.LeafCountA2 = 0;
+            node.LeafCountB2 = 0;
+            node.LeafCountC2 = 0;
+            node.LeafCountD2 = 0;
+            node.LeafCountE2 = 0;
+            node.LeafCountF2 = 0;
+            node.LeafCountG2 = 0;
+            node.LeafCountH2 = 0;
+            node.LeafCountI2 = 0;
+            node.LeafCountJ2 = 0;
+            node.LeafCountK2 = 0;
+            node.LeafCountL2 = 0;
+            node.LeafCountM2 = 0;
+            node.LeafCountN2 = 0;
+            node.LeafCountO2 = 0;
+            node.LeafCountP2 = 0;
+
 #elif NODE16
             node.A = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
             node.B = node.A;
@@ -479,7 +501,7 @@ namespace SIMDPrototyping.Trees.Baseline
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive<TResultList>(int level, int nodeIndex,
             ref BoundingBox query,
-            ref TResultList results) where TResultList : IList<T>
+            ref TResultList results) where TResultList : IList<int>
         {
             var node = (Levels[level].Nodes + nodeIndex);
             var boundingBoxes = &node->A;
@@ -498,7 +520,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     }
                     else
                     {
-                        results.Add(leaves[Encode(children[i])].Bounded);
+                        results.Add(Encode(children[i]));
                     }
                 }
             }

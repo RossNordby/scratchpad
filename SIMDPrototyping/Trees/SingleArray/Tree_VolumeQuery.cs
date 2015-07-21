@@ -6,17 +6,6 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-#if NODE32
-using Node = SIMDPrototyping.Trees.SingleArray.Node32;
-#elif NODE16
-using Node = SIMDPrototyping.Trees.SingleArray.Node16;
-#elif NODE8
-using Node = SIMDPrototyping.Trees.SingleArray.Node8;
-#elif NODE4
-using Node = SIMDPrototyping.Trees.SingleArray.Node4;
-#elif NODE2
-using Node = SIMDPrototyping.Trees.SingleArray.Node2;
-#endif
 
 
 namespace SIMDPrototyping.Trees.SingleArray
@@ -98,7 +87,369 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        
+
+#if NODE16
+        unsafe void TestRecursive16<TResultList>(int nodeIndex, ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<int>
+        {
+            var node = (Nodes + nodeIndex);
+            var childCount = node->ChildCount;
+
+            Debug.Assert(childCount >= 1);
+
+            var a = BoundingBox.Intersects(ref query, ref node->A);
+            var b = BoundingBox.Intersects(ref query, ref node->B);
+            var c = BoundingBox.Intersects(ref query, ref node->C);
+
+
+            if (a)
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive16(node->ChildA, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildA));
+                }
+            }
+            if (childCount < 2)
+                return;
+            var d = BoundingBox.Intersects(ref query, ref node->D);
+            if (b)
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive16(node->ChildB, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildB));
+                }
+            }
+            if (childCount < 3)
+                return;
+            var e = BoundingBox.Intersects(ref query, ref node->E);
+            if (c)
+            {
+                if (node->ChildC >= 0)
+                {
+                    TestRecursive16(node->ChildC, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildC));
+                }
+            }
+            if (childCount < 4)
+                return;
+            var f = BoundingBox.Intersects(ref query, ref node->F);
+            if (d)
+            {
+                if (node->ChildD >= 0)
+                {
+                    TestRecursive16(node->ChildD, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildD));
+                }
+            }
+            if (childCount < 5)
+                return;
+            var g = BoundingBox.Intersects(ref query, ref node->G);
+            if (e)
+            {
+                if (node->ChildE >= 0)
+                {
+                    TestRecursive16(node->ChildE, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildE));
+                }
+            }
+            if (childCount < 6)
+                return;
+            var h = BoundingBox.Intersects(ref query, ref node->H);
+            if (f)
+            {
+                if (node->ChildF >= 0)
+                {
+                    TestRecursive16(node->ChildF, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildF));
+                }
+            }
+            if (childCount < 7)
+                return;
+            var i = BoundingBox.Intersects(ref query, ref node->H);
+            if (g)
+            {
+                if (node->ChildG >= 0)
+                {
+                    TestRecursive16(node->ChildG, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildG));
+                }
+            }
+            if (childCount < 8)
+                return;
+            var j = BoundingBox.Intersects(ref query, ref node->H);
+            if (h)
+            {
+                if (node->ChildH >= 0)
+                {
+                    TestRecursive16(node->ChildH, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildH));
+                }
+            }
+            if (childCount < 9)
+                return;
+            var k = BoundingBox.Intersects(ref query, ref node->H);
+            if (i)
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive16(node->ChildA, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildA));
+                }
+            }
+            if (childCount < 10)
+                return;
+            var l = BoundingBox.Intersects(ref query, ref node->D);
+            if (j)
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive16(node->ChildB, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildB));
+                }
+            }
+            if (childCount < 11)
+                return;
+            var m = BoundingBox.Intersects(ref query, ref node->E);
+            if (k)
+            {
+                if (node->ChildC >= 0)
+                {
+                    TestRecursive16(node->ChildC, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildC));
+                }
+            }
+            if (childCount < 12)
+                return;
+            var n = BoundingBox.Intersects(ref query, ref node->F);
+            if (l)
+            {
+                if (node->ChildD >= 0)
+                {
+                    TestRecursive16(node->ChildD, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildD));
+                }
+            }
+            if (childCount < 13)
+                return;
+            var o = BoundingBox.Intersects(ref query, ref node->G);
+            if (m)
+            {
+                if (node->ChildE >= 0)
+                {
+                    TestRecursive16(node->ChildE, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildE));
+                }
+            }
+            if (childCount < 14)
+                return;
+            var p = BoundingBox.Intersects(ref query, ref node->H);
+            if (n)
+            {
+                if (node->ChildF >= 0)
+                {
+                    TestRecursive16(node->ChildF, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildF));
+                }
+            }
+            if (childCount < 15)
+                return;
+            if (o)
+            {
+                if (node->ChildG >= 0)
+                {
+                    TestRecursive16(node->ChildG, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildG));
+                }
+            }
+            if (childCount < 16)
+                return;
+            if (p)
+            {
+                if (node->ChildH >= 0)
+                {
+                    TestRecursive16(node->ChildH, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildH));
+                }
+            }
+
+        }
+#endif
+
+#if NODE8
+        unsafe void TestRecursive8<TResultList>(int nodeIndex, ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<int>
+        {
+            var node = (Nodes + nodeIndex);
+            var childCount = node->ChildCount;
+
+            Debug.Assert(childCount >= 1);
+            
+            var a = BoundingBox.Intersects(ref query, ref node->A);
+            var b = BoundingBox.Intersects(ref query, ref node->B);
+            var c = BoundingBox.Intersects(ref query, ref node->C);
+
+
+            if (a)
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive8(node->ChildA, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildA));
+                }
+            }
+            if (childCount < 2)
+                return;
+            var d = BoundingBox.Intersects(ref query, ref node->D);
+            if (b)
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive8(node->ChildB, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildB));
+                }
+            }
+            if (childCount < 3)
+                return;
+            var e = BoundingBox.Intersects(ref query, ref node->E);
+            if (c)
+            {
+                if (node->ChildC >= 0)
+                {
+                    TestRecursive8(node->ChildC, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildC));
+                }
+            }
+            if (childCount < 4)
+                return;
+            var f = BoundingBox.Intersects(ref query, ref node->F);
+            if (d)
+            {
+                if (node->ChildD >= 0)
+                {
+                    TestRecursive8(node->ChildD, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildD));
+                }
+            }
+            if (childCount < 5)
+                return;
+            var g = BoundingBox.Intersects(ref query, ref node->G);
+            if (e)
+            {
+                if (node->ChildE >= 0)
+                {
+                    TestRecursive8(node->ChildE, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildE));
+                }
+            }
+            if (childCount < 6)
+                return;
+            var h = BoundingBox.Intersects(ref query, ref node->H);
+            if (f)
+            {
+                if (node->ChildF >= 0)
+                {
+                    TestRecursive8(node->ChildF, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildF));
+                }
+            }
+            if (childCount < 7)
+                return;
+            if (g)
+            {
+                if (node->ChildG >= 0)
+                {
+                    TestRecursive8(node->ChildG, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildG));
+                }
+            }
+            if (childCount < 8)
+                return;
+            if (h)
+            {
+                if (node->ChildH >= 0)
+                {
+                    TestRecursive8(node->ChildH, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildH));
+                }
+            }
+
+
+        }
+#endif
 
 #if NODE4
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -170,9 +521,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
         }
-#endif
 
-#if NODE4
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursive4Switch<TResultList>(int nodeIndex,
             ref BoundingBox query,
@@ -185,7 +534,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 case 1:
                     {
                         bool a = BoundingBox.Intersects(ref query, ref node->A);
-                        
+
                         if (a)
                         {
                             if (node->ChildA >= 0)
@@ -204,7 +553,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         bool a, b;
                         a = BoundingBox.Intersects(ref query, ref node->A);
                         b = BoundingBox.Intersects(ref query, ref node->B);
-                        
+
                         if (a)
                         {
                             if (node->ChildA >= 0)
@@ -220,7 +569,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         {
                             if (node->ChildB >= 0)
                             {
-                                TestRecursive4Switch( node->ChildB, ref query, ref results);
+                                TestRecursive4Switch(node->ChildB, ref query, ref results);
                             }
                             else
                             {
@@ -235,12 +584,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                         a = BoundingBox.Intersects(ref query, ref node->A);
                         b = BoundingBox.Intersects(ref query, ref node->B);
                         c = BoundingBox.Intersects(ref query, ref node->C);
-                        
+
                         if (a)
                         {
                             if (node->ChildA >= 0)
                             {
-                                TestRecursive4Switch( node->ChildA, ref query, ref results);
+                                TestRecursive4Switch(node->ChildA, ref query, ref results);
                             }
                             else
                             {
@@ -251,7 +600,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         {
                             if (node->ChildB >= 0)
                             {
-                                TestRecursive4Switch( node->ChildB, ref query, ref results);
+                                TestRecursive4Switch(node->ChildB, ref query, ref results);
                             }
                             else
                             {
@@ -262,7 +611,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         {
                             if (node->ChildC >= 0)
                             {
-                                TestRecursive4Switch( node->ChildC, ref query, ref results);
+                                TestRecursive4Switch(node->ChildC, ref query, ref results);
                             }
                             else
                             {
@@ -278,7 +627,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         b = BoundingBox.Intersects(ref query, ref node->B);
                         c = BoundingBox.Intersects(ref query, ref node->C);
                         d = BoundingBox.Intersects(ref query, ref node->D);
-                        
+
                         if (a)
                         {
                             if (node->ChildA >= 0)
@@ -332,15 +681,19 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 #endif
-        
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
             //Assumption: root is always zero.
+
 #if NODE4
-            
             TestRecursive4(0, ref boundingBox, ref results);
+#elif NODE8
+            TestRecursive8(0, ref boundingBox, ref results);
+#else
+            TestRecursive(0, ref boundingBox, ref results);
 #endif
         }
     }

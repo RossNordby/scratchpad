@@ -35,7 +35,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;NODE4</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
@@ -100,7 +100,6 @@
     <Compile Include="Matrix3x3.cs" />
     <Compile Include="MicroFiddling.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
-    <Compile Include="Trees\SingleArray\Node.cs" />
     <Compile Include="Trees\SingleArray\Tree.cs" />
     <Compile Include="Trees\SingleArray\Tree_Diagnostics.cs" />
     <Compile Include="Trees\SingleArray\Tree_Insert.cs" />
@@ -112,11 +111,10 @@
     <Compile Include="Trees\SingleArray\Tree_Remove.cs" />
     <Compile Include="Trees\SingleArray\Tree_TreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_VHBuilder.cs" />
-    <Compile Include="Trees\Baseline\Node.cs" />
+    <Compile Include="Trees\Node.cs" />
     <Compile Include="Trees\Baseline\Tree_Diagnostics.cs" />
     <Compile Include="Trees\Baseline\Tree_Insert.cs" />
     <Compile Include="Trees\Baseline\Tree_ReinsertRefinement.cs" />
-    <Compile Include="Trees\Baseline\Tree_Refinement.cs" />
     <Compile Include="Trees\Baseline\Tree_Remove.cs" />
     <Compile Include="Trees\Baseline\Tree_TreeQueries.cs" />
     <Compile Include="Trees\Baseline\Tree_VHBuilder.cs" />
