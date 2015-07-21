@@ -681,7 +681,48 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 #endif
+#if NODE2
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestRecursive2<TResultList>(int nodeIndex, ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<int>
+        {
+            var node = (Nodes + nodeIndex);
+            var childCount = node->ChildCount;
 
+            Debug.Assert(childCount >= 1);
+            
+            var a = BoundingBox.Intersects(ref query, ref node->A);
+            var b = BoundingBox.Intersects(ref query, ref node->B);
+            
+            if (a)
+            {
+                if (node->ChildA >= 0)
+                {
+                    TestRecursive2(node->ChildA, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildA));
+                }
+            }
+            if (childCount < 2)
+                return;
+            if (b)
+            {
+                if (node->ChildB >= 0)
+                {
+                    TestRecursive2(node->ChildB, ref query, ref results);
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildB));
+                }
+            }
+
+
+
+        }
+#endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
