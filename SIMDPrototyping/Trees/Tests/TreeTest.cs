@@ -19,7 +19,7 @@ using SIMDPrototyping.Trees.Baseline;
 namespace SIMDPrototyping.Trees.Tests
 {
 
-    public static class TreeTest
+    public static partial class TreeTest
     {
         static TestCollidableBEPU[] GetRandomLeavesBEPU(int leafCount, BoundingBox bounds, Vector3 leafSize)
         {
@@ -132,43 +132,18 @@ namespace SIMDPrototyping.Trees.Tests
         }
         public static void Test()
         {
-            GC.Collect();
-            {
-                var leaves = GetLeaves(8, 8, 8, 10, 10);
-                Tree tree = new Tree();
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[i]);
-                }
-                Console.WriteLine($"Cachewarm Build: {tree.LeafCount}");
-
-                tree.Refit();
-
-                var list = new QuickList<int>(new BufferPool<int>());
-                BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
-                tree.Query(ref aabb, ref list);
-                list.Dispose();
-
-                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                tree.GetSelfOverlaps(ref overlaps);
-                Console.WriteLine($"Warm overlaps: {overlaps.Count}");
-
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                tree.GetSelfOverlapsViaQueries(ref overlaps);
-                Console.WriteLine($"Warm overlaps: {overlaps.Count}");
-
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                tree.GetSelfOverlapsViaStreamingQueries(ref overlaps);
-                Console.WriteLine($"Warm overlaps: {overlaps.Count}");
-            }
-
             float leafSize = 10;
             int queryCount = 100000;
             int selfTestCount = 1;
+
+            Vector3 querySize = new Vector3(20);
+            int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
+
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 64;
+            int randomLeafCount = 262144;
+
 #else
             int leafCountX = 64;
             int leafCountY = 64;
@@ -177,205 +152,31 @@ namespace SIMDPrototyping.Trees.Tests
             BoundingBox queryBounds = new BoundingBox { Min = new Vector3(0), Max = new Vector3(leafCountX, leafCountY, leafCountZ) * (new Vector3(leafSize) + new Vector3(leafGap)) };
 #endif
 
-            Vector3 querySize = new Vector3(20);
-            int queryLocationCount = 16384;
-            int queryMask = queryLocationCount - 1;
             {
+
+                var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
 
 #if RANDOMLEAVES
                 var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
 #else
                 var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
-                Tree tree = new Tree(leaves.Length, 32);
-                var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.Insert(leaves[i]);
-                }
-                var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
-
-                int nodeCount, childCount;
-                tree.MeasureNodeOccupancy(out nodeCount, out childCount);
-
-                Console.WriteLine($"Occupancy: {childCount / (double)nodeCount}");
-
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.Refit();
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Refit Time: {endTime - startTime}");
-
-                var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
-                var list = new QuickList<int>(new BufferPool<int>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < queryCount; ++i)
-                {
-                    list.Count = 0;
-                    //tree.Query(ref queries[i & queryMask], ref list);
-                    tree.QueryRecursive(ref queries[i & queryMask], ref list);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Query Time: {endTime - startTime}, overlaps: {list.Count}");
-                list.Dispose();
-
-
-                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < selfTestCount; ++i)
-                {
-                    overlaps.Count = 0;
-                    tree.GetSelfOverlaps(ref overlaps);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
-
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < selfTestCount; ++i)
-                {
-                    overlaps.Count = 0;
-                    tree.GetSelfOverlapsViaQueries(ref overlaps);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
-
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < selfTestCount; ++i)
-                {
-                    overlaps.Count = 0;
-                    tree.GetSelfOverlapsViaStreamingQueries(ref overlaps);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"StreamingSelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
-            }
-
-            GC.Collect();
-
-
-            GC.Collect();
-            {
-                var leaves = GetLeaves(10, 10, 10, 10, 10);
-                BaselineTree tree = new BaselineTree();
-                //for (int i = 0; i < leaves.Length; ++i)
-                //{
-                //    tree.Insert(leaves[i]);
-                //}
-                //tree.BuildMedianSplit(leaves);
-                tree.BuildVolumeHeuristic(leaves);
-                Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
-
-                tree.Refit();
-
-                var list = new QuickList<int>(new BufferPool<int>());
-                BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
-                tree.QueryRecursive(ref aabb, ref list);
-                list.Dispose();
-
-                var overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-                tree.GetSelfOverlaps(ref overlaps);
-                Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
-
-                overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-
-                tree.GetSelfOverlapsViaQueries(ref overlaps);
-                Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
-            }
-
-            {
-                Console.WriteLine($"Baseline arity: {BaselineTree.ChildrenCapacity}");
+                GC.Collect();
+                TestVectorized(leaves, queries, queryCount, selfTestCount);
 #if RANDOMLEAVES
-                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
 #else
-                var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
+                leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
-                BaselineTree tree = new BaselineTree(leaves.Length, 32);
-                var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    //tree.Insert(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.InsertGlobal(leaves[(int)((982451653L * i) % leaves.Length)]);
-                    //tree.Insert(leaves[i]);
-                    //tree.InsertGlobal(leaves[i]);
-                }
-                //tree.BuildMedianSplit(leaves);
-                tree.BuildVolumeHeuristic(leaves);
-                var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
-
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-
-                tree.Validate();
-
-                var leafCount = tree.LeafCount;
-                for (int i = 0; i < leafCount; ++i)
-                {
-                    tree.RemoveAt(0);
-                    tree.Validate();
-                }
-
-
-                int nodeCount, childCount;
-                tree.MeasureNodeOccupancy(out nodeCount, out childCount);
-
-
-                Console.WriteLine($"Baseline Occupancy: {childCount / (double)nodeCount}");
-
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.Refit();
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Baseline Refit Time: {endTime - startTime}");
-
-                var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
-                var list = new QuickList<int>(new BufferPool<int>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < queryCount; ++i)
-                {
-                    list.Count = 0;
-                    //tree.Query(ref queries[i & queryMask], ref list);
-                    tree.QueryRecursive(ref queries[i & queryMask], ref list);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Baseline Query Time: {endTime - startTime}, overlaps: {list.Count}");
-                list.Dispose();
-
-                var overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < selfTestCount; ++i)
-                {
-                    overlaps.Count = 0;
-                    tree.GetSelfOverlaps(ref overlaps);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Baseline SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
-
-                overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < selfTestCount; ++i)
-                {
-                    overlaps.Count = 0;
-                    tree.GetSelfOverlapsViaQueries(ref overlaps);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"Baseline SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
-            }
-
-
-            GC.Collect();
-            {
-                var leaves = GetLeavesBEPU(2, 2, 2, 10, 10);
-                BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
-                Console.WriteLine($"BEPU Cachewarm Build, root AABB: {tree.BoundingBox}");
-
-                tree.Refit();
-
-                RawList<TestCollidableBEPU> results = new RawList<TestCollidableBEPU>();
-                BEPUutilities.BoundingBox aabb = new BEPUutilities.BoundingBox { Min = new BEPUutilities.Vector3(0, 0, 0), Max = new BEPUutilities.Vector3(1, 1, 1) };
-
-                results.Count = 0;
-                tree.GetOverlaps(aabb, results);
+                GC.Collect();
+                TestBaseline(leaves, queries, queryCount, selfTestCount);
+#if RANDOMLEAVES
+                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+#else
+                leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
+#endif
+                GC.Collect();
+                TestSingleArray(leaves, queries, queryCount, selfTestCount);
             }
 
             {
@@ -385,27 +186,10 @@ namespace SIMDPrototyping.Trees.Tests
 #else
                 var leaves = GetLeavesBEPU(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
-                var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
-                var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"BEPU Build Time: {endTime - startTime}, root AABB: {tree.BoundingBox}");
-
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.Refit();
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"BEPU Refit Time: {endTime - startTime}");
-
                 var queries = GetBEPUQueryLocations(queryLocationCount, queryBounds, querySize);
-                RawList<TestCollidableBEPU> results = new RawList<TestCollidableBEPU>();
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < queryCount; ++i)
-                {
-                    results.Count = 0;
-                    tree.GetOverlaps(queries[i & queryMask], results);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"BEPU Query Time: {endTime - startTime}, overlaps: {results.Count}");
 
+                GC.Collect();
+                TestBEPU(leaves, queries, queryCount, selfTestCount);
             }
 
         }

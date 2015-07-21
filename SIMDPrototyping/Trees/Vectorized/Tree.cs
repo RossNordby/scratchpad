@@ -327,7 +327,7 @@ namespace SIMDPrototyping.Trees.Vectorized
             mergedWide = new BoundingBoxWide(ref merged);
         }
 
-        public unsafe void Refit()
+        public unsafe void RefitLeaves()
         {
             //Update the bounding boxes of every leaf-owner.
             //Note the scalar-ness of this. It seems like there should exist some way to vectorize it properly, though it may require changing things around.
@@ -345,6 +345,10 @@ namespace SIMDPrototyping.Trees.Vectorized
                 //Console.WriteLine($"comp");
 
             }
+        }
+        public unsafe void Refit()
+        {
+            
             //Go through each level, refitting as you go.
             //Note that the deepest level is skipped. It does not need to be tested; it's all leaves that were already updated.
             for (int levelIndex = maximumDepth - 1; levelIndex >= 0; --levelIndex)

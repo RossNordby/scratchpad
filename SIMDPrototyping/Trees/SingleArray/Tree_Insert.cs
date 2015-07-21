@@ -12,30 +12,28 @@ using System.Text;
 using System.Threading.Tasks;
 
 #if NODE32
-using Node = SIMDPrototyping.Trees.Baseline.Node32;
+using Node = SIMDPrototyping.Trees.SingleArray.Node32;
 #elif NODE16
-using Node = SIMDPrototyping.Trees.Baseline.Node16;
+using Node = SIMDPrototyping.Trees.SingleArray.Node16;
 #elif NODE8
-using Node = SIMDPrototyping.Trees.Baseline.Node8;
+using Node = SIMDPrototyping.Trees.SingleArray.Node8;
 #elif NODE4
-using Node = SIMDPrototyping.Trees.Baseline.Node4;
+using Node = SIMDPrototyping.Trees.SingleArray.Node4;
 #elif NODE2
-using Node = SIMDPrototyping.Trees.Baseline.Node2;
+using Node = SIMDPrototyping.Trees.SingleArray.Node2;
 #endif
 
-namespace SIMDPrototyping.Trees.Baseline
+namespace SIMDPrototyping.Trees.SingleArray
 {
-    partial class Tree<T>
+    partial class Tree
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void MergeLeafNodes(T newLeaf, ref BoundingBox newLeafBounds, int parentLevelIndex, int parentIndex, int indexInParent,
+        unsafe void MergeLeafNodes(int newLeafId, ref BoundingBox newLeafBounds, int parentIndex, int indexInParent,
             ref int oldLeafChildSlot, ref BoundingBox oldLeafBoundsSlot, ref int oldLeafLeafCountsSlot, ref BoundingBox merged)
         {
             //It's a leaf node.
             //Create a new internal node with the new leaf and the old leaf as children.
-            var nextLevel = parentLevelIndex + 1;
             //this is the only place where a new level could potentially be created.
-            EnsureLevel(nextLevel);
             Node newNode;
             InitializeNode(out newNode);
             newNode.ChildCount = 2;
@@ -49,15 +47,14 @@ namespace SIMDPrototyping.Trees.Baseline
             //Insert the new leaf into the second child slot.
             newNode.B = newLeafBounds;
             newNode.LeafCountB = 1;
-            var newNodeIndex = Levels[nextLevel].Add(ref newNode);
-            var leafIndex = AddLeaf(newLeaf, nextLevel, newNodeIndex, 1);
-            Levels[nextLevel].Nodes[newNodeIndex].ChildB = Encode(leafIndex);
+            var newNodeIndex = Add(ref newNode);
+            var leafIndex = AddLeaf(newLeafId, newNodeIndex, 1);
+            Nodes[newNodeIndex].ChildB = Encode(leafIndex);
 
             //Update the old leaf node with the new index information.
             var oldLeafIndex = Encode(oldLeafChildSlot);
-            leaves[oldLeafIndex].LevelIndex = nextLevel;
-            leaves[oldLeafIndex].NodeIndex = newNodeIndex;
-            leaves[oldLeafIndex].ChildIndex = 0;
+            Leaves[oldLeafIndex].NodeIndex = newNodeIndex;
+            Leaves[oldLeafIndex].ChildIndex = 0;
 
             //Update the original node's child pointer and bounding box.
             oldLeafChildSlot = newNodeIndex;
@@ -66,39 +63,40 @@ namespace SIMDPrototyping.Trees.Baseline
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void InsertLeafIntoEmptySlot(T leaf, ref BoundingBox leafBox, int levelIndex, int nodeIndex, int childIndex, Node* node)
+        unsafe void InsertLeafIntoEmptySlot(int leafId, ref BoundingBox leafBox, int nodeIndex, int childIndex, Node* node)
         {
             ++node->ChildCount;
-            var leafIndex = AddLeaf(leaf, levelIndex, nodeIndex, childIndex);
+            var leafIndex = AddLeaf(leafId, nodeIndex, childIndex);
             (&node->ChildA)[childIndex] = Encode(leafIndex);
             (&node->A)[childIndex] = leafBox;
             (&node->LeafCountA)[childIndex] = 1;
         }
-
-        public unsafe void Insert(T leaf)
+        enum BestInsertionChoice
         {
-            BoundingBox box;
-            leaf.GetBoundingBox(out box);
-
-
-            int levelIndex = 0;
+            EmptySlot,
+            MergeLeaf,
+            Internal
+        }
+        public unsafe void Insert(int leafId, ref BoundingBox box)
+        {
+            //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             int nodeIndex = 0;
 #if OUTPUT
             List<int> choices = new List<int>();
 #endif
             while (true)
             {
-                var level = Levels[levelIndex];
                 //Which child should the leaf belong to?
 
-                //Give the leaf to whichever node had the least volume change.          
-                var node = level.Nodes + nodeIndex;
+                //Give the leaf to whichever node had the least volume change. 
+                var node = Nodes + nodeIndex;
                 var boundingBoxes = &node->A;
                 var children = &node->ChildA;
                 var leafCounts = &node->LeafCountA;
                 int minimumIndex = 0;
                 float minimumChange = float.MaxValue;
                 BoundingBox merged = new BoundingBox();
+                var bestChoice = BestInsertionChoice.EmptySlot;
                 if (node->ChildCount < ChildrenCapacity)
                 {
                     //The best slot will, at best, be tied with inserting it in a leaf node because the change in heuristic cost
@@ -106,6 +104,7 @@ namespace SIMDPrototyping.Trees.Baseline
                     minimumIndex = node->ChildCount;
                     merged = box;
                     minimumChange = 0;
+                    bestChoice = BestInsertionChoice.EmptySlot;
                 }
                 else
                 {
@@ -118,7 +117,18 @@ namespace SIMDPrototyping.Trees.Baseline
                         //and continuing down another internal node.
                         //Going into another internal node only increases the relevant cost (that of internal nodes) by the change in merged volume.
                         //Merging into a leaf node generates a whole new internal node, so it tends to be more expensive.
-                        float costChange = children[i] >= 0 ? newCost - ComputeBoundsHeuristic(ref boundingBoxes[i]) : newCost;
+                        BestInsertionChoice choice;
+                        float costChange;
+                        if (children[i] >= 0)
+                        {
+                            choice = BestInsertionChoice.Internal;
+                            costChange = newCost - ComputeBoundsHeuristic(ref boundingBoxes[i]);
+                        }
+                        else
+                        {
+                            choice = BestInsertionChoice.MergeLeaf;
+                            costChange = newCost;
+                        }
 
 
                         if (costChange < minimumChange)
@@ -126,6 +136,7 @@ namespace SIMDPrototyping.Trees.Baseline
                             minimumChange = costChange;
                             minimumIndex = i;
                             merged = mergedCandidate;
+                            bestChoice = choice;
                         }
 
                     }
@@ -136,38 +147,24 @@ namespace SIMDPrototyping.Trees.Baseline
                 Console.WriteLine($"Minimum index: {minimumIndex}, minimum volume increase: {minimum}");
                 choices.Add(minimumIndex);
 #endif
-
-                var childIndex = children[minimumIndex];
-
-                if (childIndex < -1)
+                switch (bestChoice)
                 {
-                    MergeLeafNodes(leaf, ref box, levelIndex, nodeIndex, minimumIndex, ref children[minimumIndex], ref boundingBoxes[minimumIndex], ref leafCounts[minimumIndex], ref merged);
+                    case BestInsertionChoice.EmptySlot:
+                        //There is no child at all.
+                        //Put the new leaf here.
+                        InsertLeafIntoEmptySlot(leafId, ref box, nodeIndex, minimumIndex, node);
+                        return;
+                    case BestInsertionChoice.MergeLeaf:
+                        MergeLeafNodes(leafId, ref box, nodeIndex, minimumIndex, ref children[minimumIndex], ref boundingBoxes[minimumIndex], ref leafCounts[minimumIndex], ref merged);
+                        return;
+                    case BestInsertionChoice.Internal:
+                        //It's an internal node. Traverse to the next node.
+                        boundingBoxes[minimumIndex] = merged;
+                        nodeIndex = children[minimumIndex];
+                        ++leafCounts[minimumIndex];
+                        break;
 
-#if OUTPUT
-                    Console.WriteLine($"Leaf {leafIndex} merged with existing leaf.");// New Node Children: {newNode.Children}, Old Node children: {level.Nodes[nodeIndex].Children}");
-                    Console.WriteLine($"Choices: {GetChoiceList(choices)}");
-#endif
-
-                    break;
                 }
-                if (childIndex == -1)
-                {
-                    //There is no child at all.
-                    //Put the new leaf here.
-                    InsertLeafIntoEmptySlot(leaf, ref box, levelIndex, nodeIndex, minimumIndex, node);
-
-
-#if OUTPUT
-                    Console.WriteLine($"Leaf {leafIndex} inserted in empty slot.");
-                    Console.WriteLine($"Choices: {GetChoiceList(choices)}");
-#endif
-                    break;
-                }
-                //It's an internal node. Traverse to the next node.
-                boundingBoxes[minimumIndex] = merged;
-                nodeIndex = children[minimumIndex];
-                ++leafCounts[minimumIndex];
-                ++levelIndex;
 
             }
         }
