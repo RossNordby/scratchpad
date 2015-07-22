@@ -64,8 +64,8 @@ namespace SIMDPrototyping.Trees.Tests
                     var leafIndex = (int)((982451653L * i) % leaves.Length);
                     BoundingBox box;
                     leaves[i].GetBoundingBox(out box);
-                    //tree.Insert(leafIndex, ref box);
-                    tree.InsertGlobal(leafIndex, ref box);
+                    tree.Insert(leafIndex, ref box);
+                    //tree.InsertGlobal(leafIndex, ref box);
                 }
                 //int[] leafIds = new int[leaves.Length];
                 //BoundingBox[] leafBounds = new BoundingBox[leaves.Length];
@@ -84,11 +84,14 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.Validate();
 
                 var leafCount = tree.LeafCount;
-                for (int i = 0; i < leafCount / 2; ++i)
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < leafCount; ++i)
                 {
                     tree.RemoveAt(0);
-                    tree.Validate();
+                    //tree.Validate();
                 }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray Removal Time: {endTime - startTime}");
 
 
                 int nodeCount, childCount;

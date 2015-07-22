@@ -20,9 +20,6 @@ namespace SIMDPrototyping.Trees.SingleArray
     {
         unsafe void RemoveNodeAt(int nodeIndex)
         {
-            if (NodeCount <= nodeIndex)
-                Console.WriteLine("sup:)");
-            ValidateLeaves();
             Debug.Assert(nodeIndex < NodeCount && nodeIndex >= 0);
             //We make no guarantees here about maintaining the tree's coherency after a remove.
             //That's the responsibility of whoever called RemoveAt.
@@ -30,11 +27,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 //Last node; just remove directly.
                 --NodeCount;
-                Console.WriteLine("Leaf");
             }
             else
             {
-                ValidateLeaves();
                 //Swap last node for removed node.
                 --NodeCount;
                 var node = Nodes + nodeIndex;
@@ -57,20 +52,16 @@ namespace SIMDPrototyping.Trees.SingleArray
                         Leaves[Encode(nodeChildren[i])].NodeIndex = nodeIndex;
                     }
                 }
-                ValidateLeaves();
-                Console.WriteLine("Internal");
 
             }
 
-
-            ValidateLeaves();
+            
         }
 
 
        
         unsafe void RefitForRemoval(Node* node)
         {
-            ValidateLeaves();
             while (node->Parent >= 0)
             {
                 //Compute the new bounding box for this node.
@@ -88,12 +79,10 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                 node = parent;
             }
-            ValidateLeaves();
         }
 
         public unsafe LeafMove RemoveAt(int leafIndex)
         {
-            ValidateLeaves();
             if (leafIndex < 0 || leafIndex >= leafCount)
                 throw new ArgumentOutOfRangeException("Leaf index must be a valid index in the tree's leaf array.");
 
@@ -194,7 +183,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-            ValidateLeaves();
+
 
             return new LeafMove { OriginalIndex = lastIndex, NewIndex = leafIndex };
         }
