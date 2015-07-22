@@ -44,14 +44,14 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.QueryRecursive(ref aabb, ref list);
                 list.Dispose();
 
-                //var overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-                //tree.GetSelfOverlaps(ref overlaps);
-                //Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
+                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlaps(ref overlaps);
+                Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
 
-                //overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
 
-                //tree.GetSelfOverlapsViaQueries(ref overlaps);
-                //Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
+                tree.GetSelfOverlapsViaQueries(ref overlaps);
+                Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
             }
 
             {
@@ -125,25 +125,25 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray Query Time: {endTime - startTime}, overlaps: {list.Count}");
                 list.Dispose();
 
-                //var overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //for (int i = 0; i < selfTestCount; ++i)
-                //{
-                //    overlaps.Count = 0;
-                //    tree.GetSelfOverlaps(ref overlaps);
-                //}
-                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //Console.WriteLine($"SingleArray SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlaps(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
 
-                //overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
-                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //for (int i = 0; i < selfTestCount; ++i)
-                //{
-                //    overlaps.Count = 0;
-                //    tree.GetSelfOverlapsViaQueries(ref overlaps);
-                //}
-                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //Console.WriteLine($"SingleArray SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlapsViaQueries(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
             }
         }
     }
