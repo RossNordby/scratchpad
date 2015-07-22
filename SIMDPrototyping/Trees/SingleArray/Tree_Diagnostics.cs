@@ -22,7 +22,11 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-
+        //TODO: Note that this heuristic does not fully capture the cost of a node.
+        //It assumes that traversing a node with 2 children is about the same as traversing a node with 8 children.
+        //While this may be closer to true that it appears at first glance due to the very high cost of cache misses versus trivial ALU work,
+        //it's probably not *identical*.
+        //The builders also use this approximation.
         public unsafe float MeasureCostHeuristic()
         {
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.

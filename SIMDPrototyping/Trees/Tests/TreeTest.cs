@@ -133,7 +133,7 @@ namespace SIMDPrototyping.Trees.Tests
         public static void Test()
         {
             float leafSize = 10;
-            int queryCount = 100000;
+            int queryCount = 1000000;
             int selfTestCount = 1;
             int refitCount = 1;
 
@@ -163,7 +163,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestVectorized(leaves, queries, queryCount, selfTestCount, refitCount);
+                //TestVectorized(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
                 leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
 #else

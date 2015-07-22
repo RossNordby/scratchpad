@@ -85,22 +85,22 @@ namespace SIMDPrototyping.Trees.Tests
 
                 //var leafCount = tree.LeafCount;
                 //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //int passes = 20;
+                //int passes = 5;
                 //for (int passIndex = 0; passIndex < passes; ++passIndex)
                 //{
                 //    for (int i = leafCount - 1; i >= 0; --i)
                 //    {
                 //        BoundingBox boundingBox;
-                //        var id = tree.Leaves[i].Id;
+                //        var id = tree.LeavesArray[i].Id;
                 //        tree.GetLeafBoundingBox(i, out boundingBox);
-                //        tree.Refit();
+                //        //tree.Refit();
                 //        tree.RemoveAt(i);
-                //        tree.Validate();
+                //        //tree.Validate();
                 //        //tree.Refit();
                 //        tree.AddGlobal(id, ref boundingBox);
                 //        //tree.Refit();
-                //        Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-                //        tree.Validate();
+                //        //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                //        //tree.Validate();
                 //    }
                 //}
                 //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -139,6 +139,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Query Time: {endTime - startTime}, overlaps: {list.Count}");
+
                 list.Dispose();
 
                 var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
