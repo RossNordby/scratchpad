@@ -87,46 +87,44 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestRecursivePrecache<TResultList>(int nodeIndex,
+            ref BoundingBox query,
+            ref TResultList results) where TResultList : IList<int>
+        {
+            var node = nodes + nodeIndex;
+            //var boundingBoxes = &node->A;
+            var children = &node->ChildA;
+            //var childCount = node->ChildCount;
+            var internalNodeIndices = stackalloc int[ChildrenCapacity];
+            int internalNodeCount = 0;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (BoundingBox.Intersects(ref query, ref (&node->A)[i]))
+                {
+                    if (children[i] >= 0)
+                    {
+                        internalNodeIndices[internalNodeCount] = children[i];
+                        ++internalNodeCount;
+                    }
+                    else
+                    {
+                        results.Add(Encode(children[i]));
+                    }
+                }
+            }
+            for (int i = 0; i < internalNodeCount; ++i)
+            {
+                TestRecursivePrecache(internalNodeIndices[i], ref query, ref results);
+            }
+        }
 #if NODE4
+
         struct Precache
         {
             public int a, b, c, d;
         }
-
-        ////[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //unsafe void TestRecursivePrecache<TResultList>(int nodeIndex,
-        //    ref BoundingBox query,
-        //    ref TResultList results) where TResultList : IList<int>
-        //{
-        //    var node = nodes + nodeIndex;
-        //    //var boundingBoxes = &node->A;
-        //    var children = &node->ChildA;
-        //    //var childCount = node->ChildCount;
-        //    //var internalNodeIndices = stackalloc int[4];
-        //    Precache precacheData;
-        //    var internalNodeIndices = &precacheData.a;
-        //    int internalNodeCount = 0;
-        //    for (int i = 0; i < node->ChildCount; ++i)
-        //    {
-        //        if (BoundingBox.Intersects(ref query, ref (&node->A)[i]))
-        //        {
-        //            if (children[i] >= 0)
-        //            {
-        //                internalNodeIndices[internalNodeCount] = children[i];
-        //                ++internalNodeCount;
-        //            }
-        //            else
-        //            {
-        //                results.Add(Encode(children[i]));
-        //            }
-        //        }
-        //    }
-        //    for (int i = 0; i < internalNodeCount; ++i)
-        //    {
-        //        TestRecursivePrecache(internalNodeIndices[i], ref query, ref results);
-        //    }
-        //}
-
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void TestRecursivePrecache4<TResultList>(int nodeIndex,
             ref BoundingBox query,
@@ -210,7 +208,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void TestRecursive16<TResultList>(int nodeIndex, ref BoundingBox query,
             ref TResultList results) where TResultList : IList<int>
         {
-            var node = (Nodes + nodeIndex);
+            var node = (nodes + nodeIndex);
             var childCount = node->ChildCount;
 
             Debug.Assert(childCount >= 1);
@@ -804,14 +802,14 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void TestRecursive2<TResultList>(int nodeIndex, ref BoundingBox query,
             ref TResultList results) where TResultList : IList<int>
         {
-            var node = (Nodes + nodeIndex);
+            var node = (nodes + nodeIndex);
             var childCount = node->ChildCount;
 
             Debug.Assert(childCount >= 1);
-            
+
             var a = BoundingBox.Intersects(ref query, ref node->A);
             var b = BoundingBox.Intersects(ref query, ref node->B);
-            
+
             if (a)
             {
                 if (node->ChildA >= 0)
@@ -847,14 +845,32 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             //Assumption: root is always zero.
 
-#if NODE4
-            TestRecursive4(0, ref boundingBox, ref results);
-#elif NODE8
-            TestRecursive8(0, ref boundingBox, ref results);
-#else
+            //#if NODE2
+            //            TestRecursive2(0, ref boundingBox, ref results);
+            //#elif NODE4
+            //            TestRecursive4(0, ref boundingBox, ref results);
+            //#elif NODE8
+            //            TestRecursive8(0, ref boundingBox, ref results);
+            //#elif NODE16
+            //            TestRecursive16(0, ref boundingBox, ref results);
+            //#else
+            //            TestRecursive(0, ref boundingBox, ref results);
+            //#endif
             TestRecursive(0, ref boundingBox, ref results);
-#endif
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void QueryRecursive2<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
+        {
+            //Assumption: root is always zero.
+
+            //#if NODE4
+            //            TestRecursive4(0, ref boundingBox, ref results);
+            //#elif NODE8
+            //            TestRecursive8(0, ref boundingBox, ref results);
+            //#else
+            TestRecursivePrecache(0, ref boundingBox, ref results);
+            //#endif
+        }
     }
 }

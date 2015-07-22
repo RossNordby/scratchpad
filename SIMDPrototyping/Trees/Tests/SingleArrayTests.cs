@@ -129,17 +129,29 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray Refit Time: {endTime - startTime}");
 
                 var list = new QuickList<int>(new BufferPool<int>());
-                var queryMask = queries.Length - 1;
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < queryCount; ++i)
+                for (int passIndex = 0; passIndex < 10; ++passIndex)
                 {
-                    list.Count = 0;
-                    //tree.Query(ref queries[i & queryMask], ref list);
-                    tree.QueryRecursive(ref queries[i & queryMask], ref list);
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SingleArray Query Time: {endTime - startTime}, overlaps: {list.Count}");
+                    var queryMask = queries.Length - 1;
+                    startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    for (int i = 0; i < queryCount; ++i)
+                    {
+                        list.Count = 0;
+                        //tree.Query(ref queries[i & queryMask], ref list);
+                        tree.QueryRecursive(ref queries[i & queryMask], ref list);
+                    }
+                    endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    Console.WriteLine($"SingleArray Query Time: {endTime - startTime}, overlaps: {list.Count}");
 
+                    startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    for (int i = 0; i < queryCount; ++i)
+                    {
+                        list.Count = 0;
+                        //tree.Query(ref queries[i & queryMask], ref list);
+                        tree.QueryRecursive2(ref queries[i & queryMask], ref list);
+                    }
+                    endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    Console.WriteLine($"SingleArray Query2 Time: {endTime - startTime}, overlaps: {list.Count}");
+                }
                 list.Dispose();
 
                 var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
