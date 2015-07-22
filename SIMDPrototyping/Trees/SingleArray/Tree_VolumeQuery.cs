@@ -51,14 +51,14 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
-            Test(stack, ref count, ref boundingBox, Nodes, ref results);
+            Test(stack, ref count, ref boundingBox, nodes, ref results);
 
             while (count > 0)
             {
                 --count;
                 var nodeIndex = stack[count];
 
-                Test(stack, ref count, ref boundingBox, Nodes + nodeIndex, ref results);
+                Test(stack, ref count, ref boundingBox, nodes + nodeIndex, ref results);
             }
         }
 
@@ -67,7 +67,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             ref BoundingBox query,
             ref TResultList results) where TResultList : IList<int>
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
             var childCount = node->ChildCount;
@@ -456,7 +456,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void TestRecursive4<TResultList>(int nodeIndex, ref BoundingBox query,
             ref TResultList results) where TResultList : IList<int>
         {
-            var node = (Nodes + nodeIndex);
+            var node = (nodes + nodeIndex);
             var childCount = node->ChildCount;
 
             Debug.Assert(childCount >= 1);
@@ -527,7 +527,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             ref BoundingBox query,
             ref TResultList results) where TResultList : IList<int>
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
 
             switch (node->ChildCount)
             {

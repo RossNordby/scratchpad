@@ -42,7 +42,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void ComputeBestCostChange(int nodeIndex, ref BoundingBox newLeafBounds, ref Path candidate, ref Path best)
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var bounds = &node->A;
             var children = &node->ChildA;
             if (node->ChildCount < ChildrenCapacity)
@@ -122,7 +122,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int nodeIndex = 0;
             for (int levelIndex = 0; levelIndex < best.ChildrenIndices.Count; ++levelIndex)
             {
-                var parentNode = Nodes + nodeIndex;
+                var parentNode = nodes + nodeIndex;
                 var bounds = &parentNode->A;
                 var children = &parentNode->ChildA;
                 var leafCounts = &parentNode->LeafCountA;

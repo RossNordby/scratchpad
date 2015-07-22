@@ -108,7 +108,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             InitializeNode(out emptyNode);
             nodeIndex = Add(ref emptyNode); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
 
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             node->Parent = parentNodeIndex;
             node->IndexInParent = indexInParent;
 
@@ -199,12 +199,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 throw new ArgumentException("Length must be positive.");
             if (length < 0)
                 length = leafIds.Length;
-            if (Nodes[0].ChildCount != 0)
+            if (nodes[0].ChildCount != 0)
                 throw new InvalidOperationException("Cannot build a tree that already contains nodes.");
             //The tree is built with an empty node at the root to make insertion work more easily.
             //As long as that is the case (and as long as this is not a constructor),
             //we must clear it out.
-            NodeCount = 0;
+            nodeCount = 0;
 
             int nodeIndex;
             BoundingBox boundingBox;

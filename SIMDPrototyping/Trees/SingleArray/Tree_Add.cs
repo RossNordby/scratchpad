@@ -37,12 +37,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             newNode.LeafCountB = 1;
             var newNodeIndex = Add(ref newNode);
             var leafIndex = AddLeaf(newLeafId, newNodeIndex, 1);
-            Nodes[newNodeIndex].ChildB = Encode(leafIndex);
+            nodes[newNodeIndex].ChildB = Encode(leafIndex);
 
             //Update the old leaf node with the new index information.
             var oldLeafIndex = Encode(oldLeafChildSlot);
-            Leaves[oldLeafIndex].NodeIndex = newNodeIndex;
-            Leaves[oldLeafIndex].ChildIndex = 0;
+            leaves[oldLeafIndex].NodeIndex = newNodeIndex;
+            leaves[oldLeafIndex].ChildIndex = 0;
 
             //Update the original node's child pointer and bounding box.
             oldLeafChildSlot = newNodeIndex;
@@ -77,7 +77,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Which child should the leaf belong to?
 
                 //Give the leaf to whichever node had the least volume change. 
-                var node = Nodes + nodeIndex;
+                var node = nodes + nodeIndex;
                 var boundingBoxes = &node->A;
                 var children = &node->ChildA;
                 var leafCounts = &node->LeafCountA;

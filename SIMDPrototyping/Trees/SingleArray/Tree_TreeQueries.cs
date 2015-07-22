@@ -17,7 +17,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     {
         unsafe void TestLeafAgainstNode<TResultList>(int leafIndex, ref BoundingBox leafBounds, int levelIndex, int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var bounds = &node->A;
             var children = &node->ChildA;
             int nextLevel = levelIndex + 1;
@@ -40,8 +40,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void GetOverlapsBetweenDifferentNodes<TResultList>(int levelIndex, int aIndex, int bIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
-            var a = Nodes + aIndex;
-            var b = Nodes + bIndex;
+            var a = nodes + aIndex;
+            var b = nodes + bIndex;
             var aBounds = &a->A;
             var aChildren = &a->ChildA;
             var bBounds = &b->A;
@@ -81,7 +81,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void GetOverlapsInNode<TResultList>(int levelIndex, int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var bounds = &node->A;
             var children = &node->ChildA;
             int nextLevel = levelIndex + 1;
@@ -135,8 +135,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             for (int i = 0; i < leafCount; ++i)
             {
-                var leaf = Leaves[i];
-                var leafBoundingBox = (&Nodes[leaf.NodeIndex].A)[leaf.ChildIndex];
+                var leaf = leaves[i];
+                var leafBoundingBox = (&nodes[leaf.NodeIndex].A)[leaf.ChildIndex];
                 QueryRecursive(ref leafBoundingBox, ref leafQueryResults);
                 for (int j = 0; j < leafQueryResults.Count; ++j)
                 {

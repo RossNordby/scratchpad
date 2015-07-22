@@ -26,7 +26,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         public unsafe float MeasureCostHeuristic()
         {
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
-            var rootNode = Nodes;
+            var rootNode = nodes;
             var rootBounds = &rootNode->A;
 
             BoundingBox merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
@@ -40,9 +40,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             const float internalNodeCost = 1;
 
             float totalCost = 0;
-            for (int i = 0; i < NodeCount; ++i)
+            for (int i = 0; i < nodeCount; ++i)
             {
-                var node = Nodes + i;
+                var node = nodes + i;
                 var children = &node->ChildA;
                 var bounds = &node->A;
                 for (int childIndex = 0; childIndex < node->ChildCount; ++childIndex)
@@ -66,7 +66,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void Validate(int nodeIndex, int expectedParentIndex, int expectedIndexInParent, ref BoundingBox expectedBoundingBox, out int foundLeafCount)
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             if (node->Parent != expectedParentIndex)
                 throw new Exception($"Bad parent index on node {nodeIndex}");
             if (node->IndexInParent != expectedIndexInParent)
@@ -90,8 +90,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (children[i] >= 0)
                 {
                     int childFoundLeafCount;
-                    if (children[i] < 0 || children[i] >= NodeCount)
-                        throw new Exception($"Implied existence of node {children[i]} is outside of count {NodeCount}.");
+                    if (children[i] < 0 || children[i] >= nodeCount)
+                        throw new Exception($"Implied existence of node {children[i]} is outside of count {nodeCount}.");
                     Validate(children[i], nodeIndex, i, ref bounds[i], out childFoundLeafCount);
                     if (childFoundLeafCount != leafCounts[i])
                         throw new Exception($"Bad leaf count for child {i} of node {nodeIndex}.");
@@ -119,15 +119,15 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             for (int i = 0; i < leafCount; ++i)
             {
-                if (Leaves[i].NodeIndex < 0)
+                if (leaves[i].NodeIndex < 0)
                 {
-                    throw new Exception($"Leaf {i} has negative node index: {Leaves[i].NodeIndex}.");
+                    throw new Exception($"Leaf {i} has negative node index: {leaves[i].NodeIndex}.");
                 }
-                if (Leaves[i].NodeIndex >= NodeCount)
+                if (leaves[i].NodeIndex >= nodeCount)
                 {
-                    throw new Exception($"Leaf {i} points to a node outside the node set, {Leaves[i].NodeIndex} >= {NodeCount}.");
+                    throw new Exception($"Leaf {i} points to a node outside the node set, {leaves[i].NodeIndex} >= {nodeCount}.");
                 }
-                if (Encode((&Nodes[Leaves[i].NodeIndex].ChildA)[Leaves[i].ChildIndex]) != i)
+                if (Encode((&nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
                 {
                     throw new Exception($"Leaf {i} data does not agree with node about parenthood.");
                 }
@@ -136,13 +136,13 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void Validate()
         {
-            if (NodeCount < 0)
+            if (nodeCount < 0)
             {
-                throw new Exception($"Invalid negative node count of {NodeCount}");
+                throw new Exception($"Invalid negative node count of {nodeCount}");
             }
-            else if (NodeCount > NodesArray.Length)
+            else if (nodeCount > nodesArray.Length)
             {
-                throw new Exception($"Invalid node count of {NodeCount}, larger than nodes array length {NodesArray.Length}.");
+                throw new Exception($"Invalid node count of {nodeCount}, larger than nodes array length {nodesArray.Length}.");
             }
 
 
@@ -152,7 +152,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var standInBounds = new BoundingBox();
 
             Validate(0, -1, -1, ref standInBounds, out foundLeafCount);
-            if (foundLeafCount != LeafCount)
+            if (foundLeafCount != leafCount)
                 throw new Exception($"{foundLeafCount} leaves found in tree, expected {leafCount}.");
 
 
@@ -169,7 +169,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (children[i] >= 0)
                 {
                     int childNodeCount, childChildCount;
-                    MeasureNodeOccupancy(Nodes + children[i], out childNodeCount, out childChildCount);
+                    MeasureNodeOccupancy(nodes + children[i], out childNodeCount, out childChildCount);
                     nodeCount += childNodeCount;
                     childCount += childChildCount;
                 }
@@ -178,7 +178,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void MeasureNodeOccupancy(out int nodeCount, out int childCount)
         {
-            MeasureNodeOccupancy(Nodes, out nodeCount, out childCount);
+            MeasureNodeOccupancy(nodes, out nodeCount, out childCount);
 
 
         }
@@ -192,7 +192,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (children[i] >= 0)
                 {
-                    var candidate = ComputeMaximumDepth(Nodes + children[i], nextDepth);
+                    var candidate = ComputeMaximumDepth(nodes + children[i], nextDepth);
                     if (candidate > maximum)
                         maximum = candidate;
                 }
@@ -202,7 +202,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe int ComputeMaximumDepth()
         {
-            return ComputeMaximumDepth(Nodes, 0);
+            return ComputeMaximumDepth(nodes, 0);
         }
 
     }

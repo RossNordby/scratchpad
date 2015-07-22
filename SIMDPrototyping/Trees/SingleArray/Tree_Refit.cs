@@ -15,7 +15,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void Refit(int nodeIndex, out BoundingBox boundingBox)
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
 
@@ -40,7 +40,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void RefitCached(int nodeIndex, out BoundingBox boundingBox)
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var bounds = &node->A;
             var children = &node->ChildA; //try move down?
             var childCount = node->ChildCount;
@@ -69,7 +69,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 #if NODE4
         unsafe void Refit4(int nodeIndex, out BoundingBox boundingBox)
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var childCount = node->ChildCount;
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
@@ -108,7 +108,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void RefitSwitch4(int nodeIndex, out BoundingBox boundingBox)
         {
-            var node = Nodes + nodeIndex;
+            var node = nodes + nodeIndex;
             var childCount = node->ChildCount;
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
@@ -200,15 +200,15 @@ namespace SIMDPrototyping.Trees.SingleArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void UpdateLeafBoundingBox(int leafIndex, ref BoundingBox boundingBox)
         {
-            (&Nodes[Leaves[leafIndex].NodeIndex].A)[Leaves[leafIndex].ChildIndex] = boundingBox;
+            (&nodes[leaves[leafIndex].NodeIndex].A)[leaves[leafIndex].ChildIndex] = boundingBox;
         }
 
         public unsafe void Refit()
         {
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
-            var rootChildren = &Nodes->ChildA;
-            var rootBounds = &Nodes->A;
-            for (int i = 0; i < Nodes->ChildCount; ++i)
+            var rootChildren = &nodes->ChildA;
+            var rootBounds = &nodes->A;
+            for (int i = 0; i < nodes->ChildCount; ++i)
             {
                 if (rootChildren[i] >= 0)
                 {

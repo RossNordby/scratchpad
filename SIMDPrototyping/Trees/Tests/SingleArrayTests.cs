@@ -83,29 +83,29 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.Validate();
 
-                var leafCount = tree.LeafCount;
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                int passes = 20;
-                for (int passIndex = 0; passIndex < passes; ++passIndex)
-                {
-                    for (int i = leafCount - 1; i >= 0; --i)
-                    {
-                        BoundingBox boundingBox;
-                        var id = tree.Leaves[i].Id;
-                        tree.GetLeafBoundingBox(i, out boundingBox);
-                        tree.Refit();
-                        tree.RemoveAt(i);
-                        tree.Validate();
-                        //tree.Refit();
-                        tree.AddGlobal(id, ref boundingBox);
-                        //tree.Refit();
-                        Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-                        tree.Validate();
-                    }
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                //var leafCount = tree.LeafCount;
+                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //int passes = 20;
+                //for (int passIndex = 0; passIndex < passes; ++passIndex)
+                //{
+                //    for (int i = leafCount - 1; i >= 0; --i)
+                //    {
+                //        BoundingBox boundingBox;
+                //        var id = tree.Leaves[i].Id;
+                //        tree.GetLeafBoundingBox(i, out boundingBox);
+                //        tree.Refit();
+                //        tree.RemoveAt(i);
+                //        tree.Validate();
+                //        //tree.Refit();
+                //        tree.AddGlobal(id, ref boundingBox);
+                //        //tree.Refit();
+                //        Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                //        tree.Validate();
+                //    }
+                //}
+                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
+                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
 
 
                 int nodeCount, childCount;
