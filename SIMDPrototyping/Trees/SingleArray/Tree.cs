@@ -51,7 +51,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         Node* nodes;
         int nodeCount;
 
-        int Add(ref Node node)
+        int AllocateNode()
         {
             if (nodeCount == nodesArray.Length)
             {
@@ -63,7 +63,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodesHandle = GCHandle.Alloc(nodesArray, GCHandleType.Pinned);
                 nodes = (Node*)nodesHandle.AddrOfPinnedObject();
             }
-            nodesArray[nodeCount] = node;
             return nodeCount++;
         }
 

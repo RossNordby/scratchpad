@@ -104,9 +104,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void VolumeHeuristicAddNode(int parentNodeIndex, int indexInParent, int[] leafIds, BoundingBox[] leafBounds, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
-            Node emptyNode;
-            InitializeNode(out emptyNode);
-            nodeIndex = Add(ref emptyNode); //This is a kinda stupid design! Inserting an empty node so we can go back and fill it later!
+            nodeIndex = AllocateNode();
 
             var node = nodes + nodeIndex;
             node->Parent = parentNodeIndex;

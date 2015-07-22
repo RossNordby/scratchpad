@@ -22,20 +22,19 @@ namespace SIMDPrototyping.Trees.SingleArray
             //It's a leaf node.
             //Create a new internal node with the new leaf and the old leaf as children.
             //this is the only place where a new level could potentially be created.
-            Node newNode;
-            InitializeNode(out newNode);
-            newNode.ChildCount = 2;
-            newNode.Parent = parentIndex;
-            newNode.IndexInParent = indexInParent;
+            var newNodeIndex = AllocateNode();
+            var newNode = nodes + newNodeIndex;
+            newNode->ChildCount = 2;
+            newNode->Parent = parentIndex;
+            newNode->IndexInParent = indexInParent;
             //The first child of the new node is the old leaf. Insert its bounding box.
-            newNode.A = oldLeafBoundsSlot;
-            newNode.ChildA = oldLeafChildSlot;
-            newNode.LeafCountA = 1;
+            newNode->A = oldLeafBoundsSlot;
+            newNode->ChildA = oldLeafChildSlot;
+            newNode->LeafCountA = 1;
 
             //Insert the new leaf into the second child slot.
-            newNode.B = newLeafBounds;
-            newNode.LeafCountB = 1;
-            var newNodeIndex = Add(ref newNode);
+            newNode->B = newLeafBounds;
+            newNode->LeafCountB = 1;
             var leafIndex = AddLeaf(newLeafId, newNodeIndex, 1);
             nodes[newNodeIndex].ChildB = Encode(leafIndex);
 
