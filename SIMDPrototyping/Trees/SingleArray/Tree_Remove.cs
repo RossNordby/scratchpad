@@ -54,8 +54,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
             }
-
             
+
         }
 
 
@@ -127,7 +127,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var parentNode = Nodes + node->Parent;
                 (&parentNode->A)[node->IndexInParent] = nodeBounds[otherIndex];
                 (&parentNode->ChildA)[node->IndexInParent] = otherChildIndex;
-                (&parentNode->LeafCountA)[node->IndexInParent] = 1;
+                (&parentNode->LeafCountA)[node->IndexInParent] = nodeLeafCounts[otherIndex];
 
                 if (otherChildIndex < 0)
                 {
@@ -135,6 +135,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                     var otherLeafIndex = Encode(otherChildIndex);
                     Leaves[otherLeafIndex].NodeIndex = node->Parent;
                     Leaves[otherLeafIndex].ChildIndex = node->IndexInParent;
+                }
+                else
+                {
+                    //It's an internal node. Update its parent node.
+                    Nodes[otherChildIndex].Parent = node->Parent;
+                    Nodes[otherChildIndex].IndexInParent = node->IndexInParent;
+      
                 }
 
 

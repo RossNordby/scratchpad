@@ -102,7 +102,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-
         unsafe void VolumeHeuristicAddNode(int parentNodeIndex, int indexInParent, int[] leafIds, BoundingBox[] leafBounds, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
             Node emptyNode;

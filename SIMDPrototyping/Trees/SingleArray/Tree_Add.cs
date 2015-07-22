@@ -65,7 +65,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             MergeLeaf,
             Internal
         }
-        public unsafe void Insert(int leafId, ref BoundingBox box)
+        public unsafe void Add(int leafId, ref BoundingBox box)
         {
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             int nodeIndex = 0;

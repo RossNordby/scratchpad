@@ -112,7 +112,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// Tests every possible insertion path to find the one which minimizes the tree's heuristic cost.
         /// </summary>
         /// <param name="leaf">Leaf to insert.</param>
-        public unsafe void InsertGlobal(int leafId, ref BoundingBox leafBounds)
+        public unsafe void AddGlobal(int leafId, ref BoundingBox leafBounds)
         {
 
             var candidate = new Path { ChildrenIndices = new QuickList<int>(BufferPools<int>.Thread) };

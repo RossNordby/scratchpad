@@ -69,6 +69,11 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
+        public unsafe void GetLeafBoundingBox(int i, out BoundingBox boundingBox)
+        {
+            boundingBox = (&Nodes[Leaves[i].NodeIndex].A)[Leaves[i].ChildIndex];
+        }
+
 
         public Leaf[] Leaves;
         int leafCount;

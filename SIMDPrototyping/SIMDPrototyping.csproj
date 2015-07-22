@@ -102,11 +102,11 @@
     <Compile Include="Tests\VectorAccelerationTest.cs" />
     <Compile Include="Trees\SingleArray\Tree.cs" />
     <Compile Include="Trees\SingleArray\Tree_Diagnostics.cs" />
-    <Compile Include="Trees\SingleArray\Tree_Insert.cs" />
+    <Compile Include="Trees\SingleArray\Tree_Add.cs" />
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_VolumeQuery.cs" />
     <Compile Include="Trees\SingleArray\Tree_Refit.cs" />
-    <Compile Include="Trees\SingleArray\Tree_InsertGlobal.cs" />
+    <Compile Include="Trees\SingleArray\Tree_AddGlobal.cs" />
     <Compile Include="Trees\SingleArray\Tree_Remove.cs" />
     <Compile Include="Trees\SingleArray\Tree_TreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_VHBuilder.cs" />
