@@ -11,7 +11,7 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static void TestBEPU(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, int queryCount, int selfTestCount)
+        public static void TestBEPU(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, int queryCount, int selfTestCount, int refitCount)
         {
 
             GC.Collect();
@@ -30,17 +30,20 @@ namespace SIMDPrototyping.Trees.Tests
             }
 
             {
-                
+
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 BoundingBoxTree<TestCollidableBEPU> tree = new BoundingBoxTree<TestCollidableBEPU>(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"BEPU Build Time: {endTime - startTime}, root AABB: {tree.BoundingBox}");
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.Refit();
+                for (int i = 0; i < refitCount; ++i)
+                {
+                    tree.Refit();
+                }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"BEPU Refit Time: {endTime - startTime}");
-                
+
                 RawList<TestCollidableBEPU> results = new RawList<TestCollidableBEPU>();
                 var queryMask = queries.Length - 1;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

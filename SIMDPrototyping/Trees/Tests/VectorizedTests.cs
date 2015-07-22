@@ -13,7 +13,7 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static void TestVectorized(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount)
+        public static void TestVectorized(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount, int refitCount)
         {
             {
                 var warmLeaves = GetLeaves(8, 8, 8, 10, 10);
@@ -46,7 +46,7 @@ namespace SIMDPrototyping.Trees.Tests
 
 
             {
-                
+
                 Tree<TestCollidable> tree = new Tree<TestCollidable>(leaves.Length, 32);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
@@ -63,11 +63,14 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Occupancy: {childCount / (double)nodeCount}");
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //tree.RefitLeaves();
-                tree.Refit();
+                for (int i = 0; i < refitCount; ++i)
+                {
+                    //tree.RefitLeaves();
+                    tree.Refit();
+                }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Refit Time: {endTime - startTime}");
-                
+
                 var list = new QuickList<int>(new BufferPool<int>());
                 var queryMask = queries.Length - 1;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

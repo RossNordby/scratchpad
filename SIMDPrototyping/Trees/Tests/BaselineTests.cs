@@ -16,7 +16,7 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static void TestBaseline(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount)
+        public static void TestBaseline(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount, int refitCount)
         {
             {
                 var warmLeaves = GetLeaves(10, 10, 10, 10, 10);
@@ -25,8 +25,8 @@ namespace SIMDPrototyping.Trees.Tests
                 //{
                 //    tree.Insert(warmLeaves[i]);
                 //}
-                tree.BuildMedianSplit(warmLeaves);
-                //tree.BuildVolumeHeuristic(warmLeaves);
+                //tree.BuildMedianSplit(warmLeaves);
+                tree.BuildVolumeHeuristic(warmLeaves);
                 Console.WriteLine($"Baseline Cachewarm Build: {tree.LeafCount}");
 
                 tree.RefitLeaves();
@@ -58,8 +58,8 @@ namespace SIMDPrototyping.Trees.Tests
                 //    //tree.Insert(leaves[i]);
                 //    //tree.InsertGlobal(leaves[i]);
                 //}
-                tree.BuildMedianSplit(leaves);
-                //tree.BuildVolumeHeuristic(leaves);
+                //tree.BuildMedianSplit(leaves);
+                tree.BuildVolumeHeuristic(leaves);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Build Time: {endTime - startTime}, depth: {tree.MaximumDepth}");
 
@@ -82,11 +82,14 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Baseline Occupancy: {childCount / (double)nodeCount}");
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //tree.RefitLeaves();
-                tree.Refit();
+                for (int i = 0; i < refitCount; ++i)
+                {
+                    //tree.RefitLeaves();
+                    tree.Refit();
+                }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Refit Time: {endTime - startTime}");
-                
+
                 var list = new QuickList<int>(new BufferPool<int>());
                 var queryMask = queries.Length - 1;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

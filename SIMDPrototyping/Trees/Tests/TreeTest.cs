@@ -135,6 +135,7 @@ namespace SIMDPrototyping.Trees.Tests
             float leafSize = 10;
             int queryCount = 100000;
             int selfTestCount = 1;
+            int refitCount = 100;
 
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
@@ -142,7 +143,7 @@ namespace SIMDPrototyping.Trees.Tests
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 1048576;
+            int randomLeafCount = 65536;
 
 #else
             int leafCountX = 64;
@@ -162,21 +163,21 @@ namespace SIMDPrototyping.Trees.Tests
                 var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestVectorized(leaves, queries, queryCount, selfTestCount);
+                TestVectorized(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
                 leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
 #else
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestBaseline(leaves, queries, queryCount, selfTestCount);
+                TestBaseline(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
                 leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
 #else
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestSingleArray(leaves, queries, queryCount, selfTestCount);
+                TestSingleArray(leaves, queries, queryCount, selfTestCount, refitCount);
             }
 
             {
@@ -189,7 +190,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var queries = GetBEPUQueryLocations(queryLocationCount, queryBounds, querySize);
 
                 GC.Collect();
-                TestBEPU(leaves, queries, queryCount, selfTestCount);
+                TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
             }
 
         }

@@ -15,7 +15,7 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static void TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount)
+        public static void TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount, int refitCount)
         {
             {
                 var warmLeaves = GetLeaves(10, 10, 10, 10, 10);
@@ -33,8 +33,8 @@ namespace SIMDPrototyping.Trees.Tests
                     leafIds[i] = i;
                     warmLeaves[i].GetBoundingBox(out leafBounds[i]);
                 }
-                tree.BuildMedianSplit(leafIds, leafBounds);
-                //tree.BuildVolumeHeuristic(warmLeaves);
+                //tree.BuildMedianSplit(leafIds, leafBounds);
+                tree.BuildVolumeHeuristic(leafIds, leafBounds);
                 Console.WriteLine($"SingleArray Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
@@ -75,8 +75,8 @@ namespace SIMDPrototyping.Trees.Tests
                     leafIds[i] = i;
                     leaves[i].GetBoundingBox(out leafBounds[i]);
                 }
-                tree.BuildMedianSplit(leafIds, leafBounds);
-                //tree.BuildVolumeHeuristic(leaves);
+                //tree.BuildMedianSplit(leafIds, leafBounds);
+                tree.BuildVolumeHeuristic(leafIds, leafBounds);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Build Time: {endTime - startTime}, depth: {tree.ComputeMaximumDepth()}");
 
@@ -99,13 +99,16 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //for (int i = 0; i < tree.LeafCount; ++i)
-                //{
-                //    BoundingBox box;
-                //    leaves[tree.Leaves[i].Id].GetBoundingBox(out box);
-                //    tree.UpdateLeafBoundingBox(i, ref box);
-                //}
-                tree.Refit();
+                for (int i = 0; i < refitCount; ++i)
+                {
+                    //for (int i = 0; i < tree.LeafCount; ++i)
+                    //{
+                    //    BoundingBox box;
+                    //    leaves[tree.Leaves[i].Id].GetBoundingBox(out box);
+                    //    tree.UpdateLeafBoundingBox(i, ref box);
+                    //}
+                    tree.Refit();
+                }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refit Time: {endTime - startTime}");
 
