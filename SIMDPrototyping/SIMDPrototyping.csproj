@@ -105,9 +105,8 @@
     <Compile Include="Trees\SingleArray\Tree_Insert.cs" />
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_VolumeQuery.cs" />
-    <Compile Include="Trees\SingleArray\Tree_Refinement.cs" />
     <Compile Include="Trees\SingleArray\Tree_Refit.cs" />
-    <Compile Include="Trees\SingleArray\Tree_ReinsertRefinement.cs" />
+    <Compile Include="Trees\SingleArray\Tree_InsertGlobal.cs" />
     <Compile Include="Trees\SingleArray\Tree_Remove.cs" />
     <Compile Include="Trees\SingleArray\Tree_TreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_VHBuilder.cs" />
