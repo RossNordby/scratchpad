@@ -83,12 +83,12 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.Validate();
 
-                //var leafCount = tree.LeafCount;
-                //for (int i = 0; i < leafCount; ++i)
-                //{
-                //    tree.RemoveAt(0);
-                //    tree.Validate();
-                //}
+                var leafCount = tree.LeafCount;
+                for (int i = 0; i < leafCount / 2; ++i)
+                {
+                    tree.RemoveAt(0);
+                    tree.Validate();
+                }
 
 
                 int nodeCount, childCount;
