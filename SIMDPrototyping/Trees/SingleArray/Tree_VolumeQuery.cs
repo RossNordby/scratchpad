@@ -845,32 +845,19 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             //Assumption: root is always zero.
 
-            //#if NODE2
-            //            TestRecursive2(0, ref boundingBox, ref results);
-            //#elif NODE4
-            //            TestRecursive4(0, ref boundingBox, ref results);
-            //#elif NODE8
-            //            TestRecursive8(0, ref boundingBox, ref results);
-            //#elif NODE16
-            //            TestRecursive16(0, ref boundingBox, ref results);
-            //#else
-            //            TestRecursive(0, ref boundingBox, ref results);
-            //#endif
-            TestRecursive(0, ref boundingBox, ref results);
+#if NODE2
+            TestRecursive2(0, ref boundingBox, ref results);
+#elif NODE4
+                        TestRecursive4(0, ref boundingBox, ref results);
+#elif NODE8
+                        TestRecursive8(0, ref boundingBox, ref results);
+#elif NODE16
+                        TestRecursive16(0, ref boundingBox, ref results);
+#else
+                        TestRecursive(0, ref boundingBox, ref results);
+#endif
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void QueryRecursive2<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
-        {
-            //Assumption: root is always zero.
 
-            //#if NODE4
-            //            TestRecursive4(0, ref boundingBox, ref results);
-            //#elif NODE8
-            //            TestRecursive8(0, ref boundingBox, ref results);
-            //#else
-            TestRecursivePrecache(0, ref boundingBox, ref results);
-            //#endif
-        }
     }
 }
