@@ -100,6 +100,24 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+
+        unsafe struct TempNode
+        {
+            public int A;
+            public int B;
+            public BoundingBox BoundingBox;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Add(TempNode* node, ref int count)
+            {
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void FastRemoveAt(TempNode* node, ref int count)
+            {
+            }
+        }
+        
+
         /// <summary>
         /// Collects a limited set of subtrees hanging from the specified node and performs a local treelet rebuild using a bottom-up agglomerative approach.
         /// </summary>
@@ -111,8 +129,46 @@ namespace SIMDPrototyping.Trees.SingleArray
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             var internalNodes = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes);
-            
-             
+
+            //We're going to create a little binary tree via agglomeration, and then we'll collapse it into an n-ary tree.
+            TempNode* tempNodes = stackalloc TempNode[subtrees.Count - 1];
+            int tempNodeCount;
+
+            //Determine which pair of subtrees has the smallest cost.
+            //(Smallest absolute cost is used instead of *increase* in cost because absolute tends to move bigger objects up the tree, which is desirable.)
+            float bestCost = 0;
+            BoundingBox bestMerged = new BoundingBox();
+            int bestPairA = 0;
+            int bestPairB = 0;
+            for (int i = 0; i < subtrees.Count; ++i)
+            {
+                for (int j = i + 1; j < subtrees.Count; ++j)
+                {
+                    BoundingBox merged;
+                    BoundingBox.Merge(ref subtrees.Elements[i].BoundingBox, ref subtrees.Elements[j].BoundingBox, out merged);
+                    var cost = ComputeBoundsHeuristic(ref merged);
+                    if (cost < bestCost)
+                    {
+                        bestCost = cost;
+                        bestMerged = merged;
+                        bestPairA = i;
+                        bestPairB = j;
+                    }
+                }
+            }
+            if (bestPairA > bestPairB)
+            {
+                subtrees.FastRemoveAt(bestPairA);
+                subtrees.FastRemoveAt(bestPairB);
+            }
+            else
+            {
+                subtrees.FastRemoveAt(bestPairB);
+                subtrees.FastRemoveAt(bestPairA);
+            }
+            //Add the new combined node.
+
+            subtrees.Add(Encode(
         }
 
         /// <summary>
