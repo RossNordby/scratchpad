@@ -23,9 +23,10 @@ namespace SIMDPrototyping
 
             TreeTest.Test();
 
+
+
         }
 
-        
 
     }
 }
