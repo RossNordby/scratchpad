@@ -148,7 +148,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 throw new Exception($"Invalid node count of {nodeCount}, larger than nodes array length {nodesArray.Length}.");
             }
-
+            if (LeafCount > 0 && (nodes[0].IndexInParent != -1 || nodes[0].IndexInParent != -1))
+            {
+                throw new Exception($"Invalid parent pointers on root.");
+            }
 
             ValidateLeaves();
 

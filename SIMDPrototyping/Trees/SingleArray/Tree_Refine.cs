@@ -198,6 +198,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //Remerging here may or may not be faster than repeatedly caching 'best' candidates from above. It is a really, really cheap operation, after all, apart from cache issues.
                     BoundingBox.Merge(ref tempNodes[newTempNode.A].BoundingBox, ref tempNodes[newTempNode.B].BoundingBox, out newTempNode.BoundingBox);
                     newTempNode.LeafCount = tempNodes[newTempNode.A].LeafCount + tempNodes[newTempNode.B].LeafCount;
+                    if (newTempNode.LeafCount < 2)
+                        Console.WriteLine("Asdf");
 
                     //Remove the best options from the list.
                     //BestA is always lower than bestB, so remove bestB first to avoid corrupting bestA index.
@@ -345,8 +347,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                         nodeChildren[b] = tempNode->B;
                     else
                         nodeChildren[b] = tempNodes[tempNode->B].A; //It's a leaf. Leaf index is always stored in A...
+                    
                     leafCounts[a] = tempNodes[tempNode->A].LeafCount;
                     leafCounts[b] = tempNodes[tempNode->B].LeafCount;
+                    if (leafCounts[a] == 0 || leafCounts[b] == 0)
+                    {
+                        Console.WriteLine("a,sdf?");
+                    }
 
                     if (nodeChildren[a] >= 0 && tempNodes[nodeChildren[a]].A < 0)
                         Console.WriteLine("not suppose to happ");
@@ -362,7 +369,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var index = childCount++;
                 nodeBounds[index] = tempNode->BoundingBox;
                 nodeChildren[index] = tempNode->A;
-                leafCounts[index] = 1;
+                leafCounts[index] = tempNode->LeafCount;
             }
         }
 
