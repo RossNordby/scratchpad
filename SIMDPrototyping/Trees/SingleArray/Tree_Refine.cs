@@ -56,23 +56,19 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Find the largest subtree.
                 float highestCost = float.MinValue;
                 int highestIndex = -1;
-                for (int subtreeIndex = subtrees.Count - 1; subtreeIndex >= 0; ++subtreeIndex)
+                for (int subtreeIndex = subtrees.Count - 1; subtreeIndex >= 0; --subtreeIndex)
                 {
                     var subtreeNodeIndex = subtrees.Elements[subtreeIndex];
-                    var subtreeNode = nodes + subtreeNodeIndex;
-                    var subtreeChildren = &subtreeNode->ChildA;
-                    var subtreeBounds = &subtreeNode->A;
-
-                    for (int childIndex = 0; childIndex < subtreeNode->ChildCount; ++childIndex)
+                    if (subtreeNodeIndex >= 0) //Only consider internal nodes.
                     {
-                        //Only consider internal nodes as potential expansions.
-                        if (subtreeChildren[childIndex] >= 0 &&
-                            (subtrees.Count - 1 + nodes[subtreeChildren[childIndex]].ChildCount) <= maximumSubtrees) //Make sure that the new node would fit (after we remove the expanded node).
+                        var subtreeNode = nodes + subtreeNodeIndex;
+                        if ((subtrees.Count - 1 + subtreeNode->ChildCount) <= maximumSubtrees) //Make sure that the new node would fit (after we remove the expanded node).
                         {
-                            var candidateCost = ComputeBoundsHeuristic(ref subtreeBounds[childIndex]);
+                            var candidateCost = ComputeBoundsHeuristic(ref (&nodes[subtreeNode->Parent].A)[subtreeNode->IndexInParent]);
                             if (candidateCost > highestCost)
                             {
                                 highestIndex = subtreeIndex;
+                                highestCost = candidateCost;
                             }
                         }
                     }
@@ -85,7 +81,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     subtrees.FastRemoveAt(highestIndex);
                     //Add all the children to the set of subtrees.
                     //This is safe because we pre-validated the number of children in the node.
-                    var expandedNode = nodes + highestIndex;
+                    var expandedNode = nodes + expandedNodeIndex;
                     var expandedNodeChildren = &expandedNode->ChildA;
                     for (int i = 0; i < expandedNode->ChildCount; ++i)
                     {
@@ -175,7 +171,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 //Determine which pair of subtrees has the smallest cost.
                 //(Smallest absolute cost is used instead of *increase* in cost because absolute tends to move bigger objects up the tree, which is desirable.)
-                float bestCost = 0;
+                float bestCost = float.MaxValue;
                 int bestA = 0, bestB = 0;
                 for (int i = 0; i < remainingNodesCount; ++i)
                 {
@@ -204,16 +200,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                     newTempNode.LeafCount = tempNodes[newTempNode.A].LeafCount + tempNodes[newTempNode.B].LeafCount;
 
                     //Remove the best options from the list.
-                    if (bestA > bestB)
-                    {
-                        TempNode.FastRemoveAt(bestA, remainingNodes, ref remainingNodesCount);
-                        TempNode.FastRemoveAt(bestB, remainingNodes, ref remainingNodesCount);
-                    }
-                    else
-                    {
-                        TempNode.FastRemoveAt(bestB, remainingNodes, ref remainingNodesCount);
-                        TempNode.FastRemoveAt(bestA, remainingNodes, ref remainingNodesCount);
-                    }
+                    //BestA is always lower than bestB, so remove bestB first to avoid corrupting bestA index.
+                    TempNode.FastRemoveAt(bestB, remainingNodes, ref remainingNodesCount);
+                    TempNode.FastRemoveAt(bestA, remainingNodes, ref remainingNodesCount);
+
                     //Add the reference to the new node.
                     var newIndex = TempNode.Add(ref newTempNode, tempNodes, ref tempNodeCount);
                     remainingNodes[remainingNodesCount++] = newIndex;
@@ -231,7 +221,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             int indexInParent = nodes[nodeIndex].IndexInParent;
 
             var reifiedIndex = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, collapseCount, ref subtrees, ref internalNodes);
-            Debug.Assert((&nodes[parent].ChildA)[indexInParent] == reifiedIndex);
+
+            Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
 
             if (internalNodes.Count > 0)
             {
@@ -245,7 +236,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             internalNodes.Dispose();
             subtrees.Dispose();
-            
+
 
         }
 
@@ -273,6 +264,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             internalNode->Parent = parent;
             internalNode->IndexInParent = indexInParent;
             int* internalNodeChildren = &internalNode->ChildA;
+            if (tempNodes[tempNodeIndex].A < 0)
+            {
+                Console.WriteLine("A leaf..");
+            }
             CollapseTree(collapseCount, tempNodes, tempNodeIndex, internalNodeChildren, ref internalNode->ChildCount, &internalNode->A, &internalNode->LeafCountA);
 
 
@@ -280,14 +275,32 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Reify each one in sequence.
             for (int i = 0; i < internalNode->ChildCount; ++i)
             {
+                if (internalNodeChildren[i] < 0)
+                {
+                    Console.WriteLine("ASDf");
+                }
+
                 if (internalNodeChildren[i] >= 0)
                 {
+                    //It's still an internal node.
                     internalNodeChildren[i] = BuildChild(internalNodeIndex, i, tempNodes, internalNodeChildren[i], collapseCount, ref subtrees, ref internalNodes);
                 }
                 else
                 {
-                    //It's a subtree. Reifying subtrees is really easy! Just take pull the pointers until you're pointing back at the real node.
-                    internalNodeChildren[i] = subtrees.Elements[Encode(internalNodeChildren[i])];
+                    //It's a subtree. Just take pull the pointers until you're pointing back at the real node.
+                    var potentialSubtreeIndex = tempNodes[internalNodeChildren[i]].A;
+                    var childNodeIndex = subtrees.Elements[Encode(potentialSubtreeIndex)];
+                    internalNodeChildren[i] = childNodeIndex;
+                    if (childNodeIndex < 0)
+                    {
+                        //It's a leaf node.
+                        //We need to update the leaf's pointers.
+                        var leafIndex = Encode(childNodeIndex);
+                        var leaf = leaves + leafIndex;
+                        leaf->NodeIndex = internalNodeIndex;
+                        leaf->ChildIndex = i;
+                    }
+
                 }
             }
             return internalNodeIndex;

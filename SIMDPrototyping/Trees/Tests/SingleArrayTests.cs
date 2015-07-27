@@ -129,6 +129,12 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refit Time: {endTime - startTime}");
 
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                tree.AgglomerativeRefine(0);
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
+                tree.Validate();
+
                 var list = new QuickList<int>(new BufferPool<int>());
                 var queryMask = queries.Length - 1;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
