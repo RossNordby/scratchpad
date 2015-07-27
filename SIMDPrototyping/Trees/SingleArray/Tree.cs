@@ -51,10 +51,65 @@ namespace SIMDPrototyping.Trees.SingleArray
         Node* nodes;
         int nodeCount;
 
-        int AllocateNode()
+        int AllocateNode(out bool pointersInvalidated)
         {
-            if (nodeCount == nodesArray.Length)
+            if (nodeCount == NodeCapacity)
             {
+                NodeCapacity *= 2;
+                pointersInvalidated = true;
+            }
+            else
+            {
+                pointersInvalidated = false;
+            }
+            return nodeCount++;
+        }
+
+
+        /// <summary>
+        /// Gets or sets the space available for leaves in the tree.
+        /// Setting this property invalidates any pointers to leaves.
+        /// </summary>
+        public int LeafCapacity
+        {
+            get
+            {
+                return LeavesArray.Length;
+            }
+            set
+            {
+                if (value < LeafCount)
+                {
+                    throw new ArgumentException("Cannot set the capacity to a value smaller than the current leaf count.");
+                }
+                Debug.Assert(leavesHandle.IsAllocated);
+                leavesHandle.Free();
+                var newLeaves = new Leaf[value];
+                Array.Copy(LeavesArray, newLeaves, LeavesArray.Length);
+                LeavesArray = newLeaves;
+                leavesHandle = GCHandle.Alloc(LeavesArray, GCHandleType.Pinned);
+                leaves = (Leaf*)nodesHandle.AddrOfPinnedObject();
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the space available for nodes in the tree.
+        /// Setting this property invalidates any pointers to nodes.
+        /// </summary>
+        private int NodeCapacity
+        {
+            get
+
+            {
+                return nodesArray.Length;
+
+            }
+            set
+            {
+                if (value < nodeCount)
+                {
+                    throw new ArgumentException("Cannot set the capacity to a value smaller than the current leaf count.");
+                }
                 Debug.Assert(nodesHandle.IsAllocated);
                 nodesHandle.Free();
                 var newNodes = new Node[nodesArray.Length * 2];
@@ -63,10 +118,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodesHandle = GCHandle.Alloc(nodesArray, GCHandleType.Pinned);
                 nodes = (Node*)nodesHandle.AddrOfPinnedObject();
             }
-            return nodeCount++;
         }
-
-
 
 
 
@@ -85,18 +137,16 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        int AddLeaf(int id, int nodeIndex, int childIndex)
+        int AddLeaf(int id, int nodeIndex, int childIndex, out bool leavesInvalidated)
         {
             if (leafCount == LeavesArray.Length)
             {
-                Debug.Assert(leavesHandle.IsAllocated);
-                leavesHandle.Free();
-                var newLeaves = new Leaf[LeavesArray.Length * 2];
-                Array.Copy(LeavesArray, newLeaves, LeavesArray.Length);
-                LeavesArray = newLeaves;
-                leavesHandle = GCHandle.Alloc(LeavesArray, GCHandleType.Pinned);
-                leaves = (Leaf*)nodesHandle.AddrOfPinnedObject();
-
+                LeafCapacity *= 2;
+                leavesInvalidated = true;
+            }
+            else
+            {
+                leavesInvalidated = false;
             }
             var leaf = leaves + leafCount;
             leaf->Id = id;

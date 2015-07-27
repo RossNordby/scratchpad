@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -104,7 +105,9 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void VolumeHeuristicAddNode(int parentNodeIndex, int indexInParent, int[] leafIds, BoundingBox[] leafBounds, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
         {
-            nodeIndex = AllocateNode();
+            bool nodesInvalidated;
+            nodeIndex = AllocateNode(out nodesInvalidated);
+            Debug.Assert(!nodesInvalidated, "Node capacity should have been ensured prior to the build.");
 
             var node = nodes + nodeIndex;
             node->Parent = parentNodeIndex;
@@ -121,7 +124,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 for (int i = 0; i < length; ++i)
                 {
                     boundingBoxes[i] = leafBounds[i + start];
-                    MedianSplitAllocateLeafInNode(leafIds[i + start], ref boundingBoxes[i], nodeIndex, out children[i], out leafCounts[i], i);
+                    bool leavesInvalidated;
+                    MedianSplitAllocateLeafInNode(leafIds[i + start], ref boundingBoxes[i], nodeIndex, out children[i], out leafCounts[i], i, out leavesInvalidated);
                     BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
                 }
                 return;
@@ -170,7 +174,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     //Stick the leaf in this slot and continue to the next child.
                     boundingBoxes[childIndex] = leafBounds[childNode.Start];
-                    MedianSplitAllocateLeafInNode(leafIds[childNode.Start], ref boundingBoxes[childIndex], nodeIndex, out children[childIndex], out leafCounts[childIndex], childIndex);
+                    bool leavesInvalidated;
+                    MedianSplitAllocateLeafInNode(leafIds[childNode.Start], ref boundingBoxes[childIndex], nodeIndex, out children[childIndex], out leafCounts[childIndex], childIndex, out leavesInvalidated);
                 }
                 else
                 {
@@ -184,6 +189,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
         }
+
 
         public unsafe void BuildVolumeHeuristic(int[] leafIds, BoundingBox[] leafBounds, int start = 0, int length = -1)
         {
@@ -203,6 +209,17 @@ namespace SIMDPrototyping.Trees.SingleArray
             //As long as that is the case (and as long as this is not a constructor),
             //we must clear it out.
             nodeCount = 0;
+
+            //Guarantee that no resizes will occur during the build.
+            if (LeafCapacity < leafBounds.Length)
+            {
+                LeafCapacity = leafBounds.Length;
+            }
+            var preallocatedNodeCount = leafBounds.Length * 2 - 1;
+            if (NodeCapacity < preallocatedNodeCount)
+            {
+                NodeCapacity = preallocatedNodeCount;
+            }
 
             int nodeIndex;
             BoundingBox boundingBox;

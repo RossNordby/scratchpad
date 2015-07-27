@@ -16,44 +16,45 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void MergeLeafNodes(int newLeafId, ref BoundingBox newLeafBounds, int parentIndex, int indexInParent,
-            ref int oldLeafChildSlot, ref BoundingBox oldLeafBoundsSlot, ref int oldLeafLeafCountsSlot, ref BoundingBox merged)
+        unsafe void MergeLeafNodes(int newLeafId, ref BoundingBox newLeafBounds, int parentIndex, int indexInParent, ref BoundingBox merged, out bool nodesInvalidated, out bool leavesInvalidated)
         {
             //It's a leaf node.
             //Create a new internal node with the new leaf and the old leaf as children.
             //this is the only place where a new level could potentially be created.
-            var newNodeIndex = AllocateNode();
+
+            var newNodeIndex = AllocateNode(out nodesInvalidated);
             var newNode = nodes + newNodeIndex;
             newNode->ChildCount = 2;
             newNode->Parent = parentIndex;
             newNode->IndexInParent = indexInParent;
             //The first child of the new node is the old leaf. Insert its bounding box.
-            newNode->A = oldLeafBoundsSlot;
-            newNode->ChildA = oldLeafChildSlot;
+            var parentNode = nodes + parentIndex;
+            newNode->A = (&parentNode->A)[indexInParent];
+            newNode->ChildA = (&parentNode->ChildA)[indexInParent];
             newNode->LeafCountA = 1;
 
             //Insert the new leaf into the second child slot.
             newNode->B = newLeafBounds;
             newNode->LeafCountB = 1;
-            var leafIndex = AddLeaf(newLeafId, newNodeIndex, 1);
+            var leafIndex = AddLeaf(newLeafId, newNodeIndex, 1, out leavesInvalidated);
             nodes[newNodeIndex].ChildB = Encode(leafIndex);
 
             //Update the old leaf node with the new index information.
-            var oldLeafIndex = Encode(oldLeafChildSlot);
+            var oldLeafIndex = Encode(newNode->ChildA);
             leaves[oldLeafIndex].NodeIndex = newNodeIndex;
             leaves[oldLeafIndex].ChildIndex = 0;
 
             //Update the original node's child pointer and bounding box.
-            oldLeafChildSlot = newNodeIndex;
-            oldLeafBoundsSlot = merged;
-            ++oldLeafLeafCountsSlot;
+            (&parentNode->ChildA)[indexInParent] = newNodeIndex;
+            (&parentNode->A)[indexInParent] = merged;
+            ++(&parentNode->LeafCountA)[indexInParent];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void InsertLeafIntoEmptySlot(int leafId, ref BoundingBox leafBox, int nodeIndex, int childIndex, Node* node)
+        unsafe void InsertLeafIntoEmptySlot(int leafId, ref BoundingBox leafBox, int nodeIndex, int childIndex, Node* node, out bool leavesInvalidated)
         {
             ++node->ChildCount;
-            var leafIndex = AddLeaf(leafId, nodeIndex, childIndex);
+            var leafIndex = AddLeaf(leafId, nodeIndex, childIndex, out leavesInvalidated);
             (&node->ChildA)[childIndex] = Encode(leafIndex);
             (&node->A)[childIndex] = leafBox;
             (&node->LeafCountA)[childIndex] = 1;
@@ -137,19 +138,28 @@ namespace SIMDPrototyping.Trees.SingleArray
                 switch (bestChoice)
                 {
                     case BestInsertionChoice.EmptySlot:
-                        //There is no child at all.
-                        //Put the new leaf here.
-                        InsertLeafIntoEmptySlot(leafId, ref box, nodeIndex, minimumIndex, node);
-                        return;
+                        {
+                            //There is no child at all.
+                            //Put the new leaf here.
+                            bool leavesInvalidated;
+                            InsertLeafIntoEmptySlot(leafId, ref box, nodeIndex, minimumIndex, node, out leavesInvalidated);
+                            return;
+                        }
                     case BestInsertionChoice.MergeLeaf:
-                        MergeLeafNodes(leafId, ref box, nodeIndex, minimumIndex, ref children[minimumIndex], ref boundingBoxes[minimumIndex], ref leafCounts[minimumIndex], ref merged);
-                        return;
+                        {
+                            bool nodesInvalidated, leavesInvalidated;
+                            MergeLeafNodes(leafId, ref box, nodeIndex, minimumIndex, ref merged, out nodesInvalidated, out leavesInvalidated);
+                            //No pointers need to be updated. All the old ones are done with.
+                            return;
+                        }
                     case BestInsertionChoice.Internal:
-                        //It's an internal node. Traverse to the next node.
-                        boundingBoxes[minimumIndex] = merged;
-                        nodeIndex = children[minimumIndex];
-                        ++leafCounts[minimumIndex];
-                        break;
+                        {
+                            //It's an internal node. Traverse to the next node.
+                            boundingBoxes[minimumIndex] = merged;
+                            nodeIndex = children[minimumIndex];
+                            ++leafCounts[minimumIndex];
+                            break;
+                        }
 
                 }
 

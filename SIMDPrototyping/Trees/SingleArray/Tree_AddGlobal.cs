@@ -135,7 +135,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                     Debug.Assert(bestChildIndex <= ChildrenCapacity);
                     Debug.Assert(levelIndex == best.ChildrenIndices.Count - 1);
                     //Inserting the new leaf into an empty slot.
-                    InsertLeafIntoEmptySlot(leafId, ref leafBounds, nodeIndex, bestChildIndex, parentNode);
+                    bool leavesInvalidated;
+                    InsertLeafIntoEmptySlot(leafId, ref leafBounds, nodeIndex, bestChildIndex, parentNode, out leavesInvalidated);
                 }
                 else
                 {
@@ -145,7 +146,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         Debug.Assert(levelIndex == best.ChildrenIndices.Count - 1);
                         //Merging the new leaf into an existing leaf node.
-                        MergeLeafNodes(leafId, ref leafBounds, nodeIndex, bestChildIndex, ref children[bestChildIndex], ref bounds[bestChildIndex], ref leafCounts[bestChildIndex], ref merged);
+                        bool nodesInvalidated, leavesInvalidated;
+                        MergeLeafNodes(leafId, ref leafBounds, nodeIndex, bestChildIndex, ref merged, out nodesInvalidated, out leavesInvalidated);
+                        //No pointers require management.
                     }
                     else
                     {

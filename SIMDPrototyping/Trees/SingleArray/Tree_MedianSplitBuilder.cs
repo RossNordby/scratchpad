@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -69,13 +70,20 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        unsafe void MedianSplitAddNode(int parentIndex, int indexInParent, int[] leafIds, BoundingBox[] leafBounds, int start, int length, out BoundingBox mergedBoundingBox, out int nodeIndex)
+        unsafe void MedianSplitAddNode(int parentIndex, int indexInParent, int[] leafIds, BoundingBox[] leafBounds, int start, int length, out bool nodesInvalidated)
         {
-            
-            nodeIndex = AllocateNode();
+            //AllocateNode can invalidate node pointers, so this function can invalidate node pointers.
+
+            var nodeIndex = AllocateNode(out nodesInvalidated);
+            Debug.Assert(!nodesInvalidated, "Node capacity should have been ensured before build.");
             var node = nodes + nodeIndex;
             node->Parent = parentIndex;
             node->IndexInParent = indexInParent;
+            //Update the parent's reference to this node.
+            if (parentIndex >= 0)
+            {
+                (&nodes[parentIndex].ChildA)[indexInParent] = nodeIndex;
+            }
             var boundingBoxes = &node->A;
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
@@ -83,13 +91,20 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (length <= ChildrenCapacity)
             {
                 //Don't need to do any sorting at all. This internal node contains only leaves. 
-                mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+                var mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
                 for (int i = 0; i < length; ++i)
                 {
                     boundingBoxes[i] = leafBounds[i + start];
-                    MedianSplitAllocateLeafInNode(leafIds[i + start], ref boundingBoxes[i], nodeIndex, out children[i], out leafCounts[i], i);
+                    bool leavesInvalidated;
+                    MedianSplitAllocateLeafInNode(leafIds[i + start], ref boundingBoxes[i], nodeIndex, out children[i], out leafCounts[i], i, out leavesInvalidated);
                     BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
                 }
+                if (parentIndex >= 0)
+                {
+                    //TODO: would be nice not to create the bounding box at all for the root.
+                    (&nodes[parentIndex].A)[indexInParent] = mergedBoundingBox;
+                }
+
                 return;
             }
             //It is an internal node.
@@ -171,25 +186,47 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-
-            mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
-            for (int i = 0; i < ChildrenCapacity; ++i)
             {
-                if (lengths[i] == 1)
+
+                var mergedBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(-float.MaxValue) };
+                for (int i = 0; i < ChildrenCapacity; ++i)
                 {
-                    //Stick the leaf in this slot and continue to the next child.
-                    boundingBoxes[starts[i]] = leafBounds[i];
-                    MedianSplitAllocateLeafInNode(leafIds[starts[i]], ref boundingBoxes[starts[i]], nodeIndex, out children[i], out leafCounts[i], i);
-                    leafCounts[i] = 1;
+                    if (lengths[i] == 1)
+                    {
+                        //Stick the leaf in this slot and continue to the next child.
+                        boundingBoxes[starts[i]] = leafBounds[i];
+                        bool leavesInvalidated;
+                        MedianSplitAllocateLeafInNode(leafIds[starts[i]], ref boundingBoxes[starts[i]], nodeIndex, out children[i], out leafCounts[i], i, out leavesInvalidated);
+                        leafCounts[i] = 1;
+                    }
+                    else
+                    {
+                        //Multiple children fit this slot. Create another internal node.
+                        //MedianSplitAddNode can invalidate node pointers due to the allocation of a node, so we can't directly output to boundingBoxes and children.
+                        bool childNodesInvalidated;
+                        MedianSplitAddNode(nodeIndex, i, leafIds, leafBounds, starts[i], lengths[i], out childNodesInvalidated);
+                        if (childNodesInvalidated)
+                        {
+                            //Node pointers were invalidated.
+                            node = nodes + nodeIndex;
+                            boundingBoxes = &node->A;
+                            children = &node->ChildA;
+                            leafCounts = &node->LeafCountA;
+                            nodesInvalidated = true;
+                        }
+                        ++node->ChildCount;
+                        leafCounts[i] = lengths[i];
+                    }
+
+                    BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
+
                 }
-                else
+
+                //TODO: would be nice not to create the bounding box at all for the root.
+                if (parentIndex >= 0)
                 {
-                    //Multiple children fit this slot. Create another internal node.
-                    MedianSplitAddNode(nodeIndex, i, leafIds, leafBounds, starts[i], lengths[i], out boundingBoxes[i], out children[i]);
-                    ++nodes[nodeIndex].ChildCount;
-                    leafCounts[i] = lengths[i];
+                    (&nodes[parentIndex].A)[indexInParent] = mergedBoundingBox;
                 }
-                BoundingBox.Merge(ref boundingBoxes[i], ref mergedBoundingBox, out mergedBoundingBox);
             }
         }
 
@@ -197,9 +234,9 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void MedianSplitAllocateLeafInNode(
             int leafId, ref BoundingBox leafBounds,
             int nodeIndex,
-            out int nodeChild, out int leafCount, int childIndex)
+            out int nodeChild, out int leafCount, int childIndex, out bool leavesInvalidated)
         {
-            var treeLeafIndex = AddLeaf(leafId, nodeIndex, childIndex);
+            var treeLeafIndex = AddLeaf(leafId, nodeIndex, childIndex, out leavesInvalidated);
             nodeChild = Encode(treeLeafIndex);
             ++nodes[nodeIndex].ChildCount;
             leafCount = 1;
@@ -224,9 +261,20 @@ namespace SIMDPrototyping.Trees.SingleArray
             //we must clear it out.
             nodeCount = 0;
 
-            int nodeIndex;
-            BoundingBox boundingBox;
-            MedianSplitAddNode(-1, -1, leafIds, leafBounds, start, length, out boundingBox, out nodeIndex);
+
+            //Guarantee that no resizes will occur during the build.
+            if (LeafCapacity < leafBounds.Length)
+            {
+                LeafCapacity = leafBounds.Length;
+            }
+            var preallocatedNodeCount = leafBounds.Length * 2 - 1;
+            if (NodeCapacity < preallocatedNodeCount)
+            {
+                NodeCapacity = preallocatedNodeCount;
+            }
+
+            bool nodesInvalidated;
+            MedianSplitAddNode(-1, -1, leafIds, leafBounds, start, length, out nodesInvalidated);
 
 
 
