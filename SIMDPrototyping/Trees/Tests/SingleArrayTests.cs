@@ -40,6 +40,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
+                tree.Refine();
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
@@ -51,6 +52,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+
 
                 tree.GetSelfOverlapsViaQueries(ref overlaps);
                 Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
@@ -80,6 +82,9 @@ namespace SIMDPrototyping.Trees.Tests
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Build Time: {endTime - startTime}, depth: {tree.ComputeMaximumDepth()}");
 
+                int nodeCount, childCount;
+                tree.MeasureNodeOccupancy(out nodeCount, out childCount);
+                Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
 
                 tree.Validate();
@@ -108,11 +113,20 @@ namespace SIMDPrototyping.Trees.Tests
                 //Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
                 //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
 
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //tree.AgglomerativeRefine(4);
+                for (int i = 0; i < 5; ++i)
+                {
+                    tree.Refine();
+                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                    tree.Validate();
+                }
 
-                int nodeCount, childCount;
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
+
+                
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
-
-
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -129,12 +143,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refit Time: {endTime - startTime}");
 
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.AgglomerativeRefine(0);
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
-                tree.Validate();
-
+     
                 var list = new QuickList<int>(new BufferPool<int>());
                 var queryMask = queries.Length - 1;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

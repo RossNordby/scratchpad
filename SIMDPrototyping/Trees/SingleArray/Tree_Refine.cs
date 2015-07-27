@@ -221,24 +221,51 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(remainingNodesCount == 1);
             int parent = nodes[nodeIndex].Parent;
             int indexInParent = nodes[nodeIndex].IndexInParent;
+            ValidateLeaves();
 
             var reifiedIndex = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, collapseCount, ref subtrees, ref internalNodes);
 
             Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
 
+            ValidateLeaves();
             if (internalNodes.Count > 0)
             {
                 //There were some spare internal nodes left. Apparently, the tree was compressed a little bit.
                 //Remove them from the real tree.
                 //TODO: Multithreading issue.
-                for (int i = 0; i < internalNodes.Count; ++i)
+                //Remove highest to lowest to avoid any situation where removing could invalidate an index.
+                Array.Sort(internalNodes.Elements, 0, internalNodes.Count);
+                for (int i = internalNodes.Count - 1; i >= 0; --i)
                 {
+                    Validate();
+                    for (int leafIndex = 0; leafIndex < leafCount; ++leafIndex)
+                    {
+                        if (leaves[i].NodeIndex == internalNodes.Elements[i])
+                        {
+                            Console.WriteLine("Leaf pointing to dead internalnode.");
+                        }
+                    }
+                    var internalNodeToRemove = nodes + internalNodes[i];
+                    if ((&nodes[internalNodeToRemove->Parent].ChildA)[internalNodeToRemove->IndexInParent] == internalNodes[i] && !internalNodes.Contains(internalNodeToRemove->Parent))
+                    {
+                        Console.WriteLine("Node to remove still referenced by parent");
+                    }
+                    for (int internalNodeToRemoveChild = 0; internalNodeToRemoveChild < internalNodeToRemove->ChildCount; ++internalNodeToRemoveChild)
+                    {
+                        var childNodeIndex = (&internalNodeToRemove->ChildA)[internalNodeToRemoveChild];
+                        if (childNodeIndex >= 0 && !internalNodes.Contains(childNodeIndex) && nodes[childNodeIndex].Parent == internalNodes[i])
+                        {
+                            Console.WriteLine("Node to remove still referenced by child");
+                        }
+                    }
                     RemoveNodeAt(internalNodes.Elements[i]);
+                    Validate();
                 }
             }
             internalNodes.Dispose();
             subtrees.Dispose();
 
+            ValidateLeaves();
 
         }
 
@@ -347,7 +374,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         nodeChildren[b] = tempNode->B;
                     else
                         nodeChildren[b] = tempNodes[tempNode->B].A; //It's a leaf. Leaf index is always stored in A...
-                    
+
                     leafCounts[a] = tempNodes[tempNode->A].LeafCount;
                     leafCounts[b] = tempNodes[tempNode->B].LeafCount;
                     if (leafCounts[a] == 0 || leafCounts[b] == 0)
@@ -373,12 +400,36 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+        unsafe void TryToRefine(int* refinementFlags, int nodeIndex)
+        {
+            if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
+            {
+                AgglomerativeRefine(nodeIndex);
+                var parent = nodes[nodeIndex].Parent;
+                if (parent != -1)
+                {
+                    TryToRefine(refinementFlags, parent);
+                }
+            }
+        }
+
         /// <summary>
         /// Executes one pass of bottom-up refinement.
         /// </summary>
         public unsafe void Refine()
         {
-
+            //If this works out, should probably choose a more efficient flagging approach.
+            var refinementFlags = stackalloc int[nodeCount];
+            for (int i = 0; i < nodeCount; ++i)
+            {
+                refinementFlags[i] = 0;
+            }
+            for (int i = 0; i < leafCount; ++i)
+            {
+                TryToRefine(refinementFlags, leaves[i].NodeIndex);
+            }
         }
+
+
     }
 }
