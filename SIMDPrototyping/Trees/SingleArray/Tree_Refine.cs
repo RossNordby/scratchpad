@@ -275,21 +275,23 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Reify each one in sequence.
             for (int i = 0; i < internalNode->ChildCount; ++i)
             {
-                if (internalNodeChildren[i] < 0)
-                {
-                    Console.WriteLine("ASDf");
-                }
+                //The internalNodeChildren[i] can be negative, as a result of a subtree being encountered in CollapseTree.
+                //tempNodes[internalNodeChildren[i]].A is never negative for any internal node (internalNodeChildren[i] >= 0),
+                //because we pre-collapsed that reference in CollapseTree for convenience.
 
                 if (internalNodeChildren[i] >= 0)
                 {
                     //It's still an internal node.
+                    if (tempNodes[internalNodeChildren[i]].A < 0)
+                    {
+                        Console.WriteLine("that shouldn't happen");
+                    }
                     internalNodeChildren[i] = BuildChild(internalNodeIndex, i, tempNodes, internalNodeChildren[i], collapseCount, ref subtrees, ref internalNodes);
                 }
                 else
                 {
                     //It's a subtree. Just take pull the pointers until you're pointing back at the real node.
-                    var potentialSubtreeIndex = tempNodes[internalNodeChildren[i]].A;
-                    var childNodeIndex = subtrees.Elements[Encode(potentialSubtreeIndex)];
+                    var childNodeIndex = subtrees.Elements[Encode(internalNodeChildren[i])];
                     internalNodeChildren[i] = childNodeIndex;
                     if (childNodeIndex < 0)
                     {
@@ -306,29 +308,43 @@ namespace SIMDPrototyping.Trees.SingleArray
             return internalNodeIndex;
         }
 
-        unsafe void CollapseTree(int depthRemaining, TempNode* nodes, int nodeIndex, int* nodeChildren, ref int childCount, BoundingBox* nodeBounds, int* leafCounts)
+        unsafe void CollapseTree(int depthRemaining, TempNode* tempNodes, int nodeIndex, int* nodeChildren, ref int childCount, BoundingBox* nodeBounds, int* leafCounts)
         {
-            var node = nodes + nodeIndex;
-            if (node->A >= 0)
+            var tempNode = tempNodes + nodeIndex;
+            if (tempNode->A >= 0)
             {
                 //Internal node.
                 if (depthRemaining > 0)
                 {
                     depthRemaining -= 1;
-                    CollapseTree(depthRemaining, nodes, node->A, nodeChildren, ref childCount, nodeBounds, leafCounts);
-                    CollapseTree(depthRemaining, nodes, node->B, nodeChildren, ref childCount, nodeBounds, leafCounts);
+                    CollapseTree(depthRemaining, tempNodes, tempNode->A, nodeChildren, ref childCount, nodeBounds, leafCounts);
+                    CollapseTree(depthRemaining, tempNodes, tempNode->B, nodeChildren, ref childCount, nodeBounds, leafCounts);
                 }
                 else
                 {
                     //Reached the bottom of the recursion. Add the collected children.
                     int a = childCount++;
                     int b = childCount++;
-                    nodeBounds[a] = nodes[node->A].BoundingBox;
-                    nodeBounds[b] = nodes[node->B].BoundingBox;
-                    nodeChildren[a] = node->A;
-                    nodeChildren[b] = node->B;
-                    leafCounts[a] = nodes[node->A].LeafCount;
-                    leafCounts[b] = nodes[node->B].LeafCount;
+                    nodeBounds[a] = tempNodes[tempNode->A].BoundingBox;
+                    nodeBounds[b] = tempNodes[tempNode->B].BoundingBox;
+                    //If the child is a leaf, collapse it. Slightly less annoying to handle it here than later.
+                    //This is a byproduct of the awkward data layout for tempnodes...
+                    if (tempNodes[tempNode->A].A >= 0)
+                        nodeChildren[a] = tempNode->A;
+                    else
+                        nodeChildren[a] = tempNodes[tempNode->A].A; //It's a leaf.
+                    if (tempNodes[tempNode->B].A >= 0)
+                        nodeChildren[b] = tempNode->B;
+                    else
+                        nodeChildren[b] = tempNodes[tempNode->B].A; //It's a leaf. Leaf index is always stored in A...
+                    leafCounts[a] = tempNodes[tempNode->A].LeafCount;
+                    leafCounts[b] = tempNodes[tempNode->B].LeafCount;
+
+                    if (nodeChildren[a] >= 0 && tempNodes[nodeChildren[a]].A < 0)
+                        Console.WriteLine("not suppose to happ");
+                    if (nodeChildren[b] >= 0 && tempNodes[nodeChildren[b]].A < 0)
+                        Console.WriteLine("not suppose to happ");
+
                 }
 
             }
@@ -336,8 +352,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 //Leaf node.
                 var index = childCount++;
-                nodeBounds[index] = node->BoundingBox;
-                nodeChildren[index] = node->A;
+                nodeBounds[index] = tempNode->BoundingBox;
+                nodeChildren[index] = tempNode->A;
                 leafCounts[index] = 1;
             }
         }
