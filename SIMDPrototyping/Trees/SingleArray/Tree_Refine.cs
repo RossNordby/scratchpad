@@ -293,7 +293,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //It's a subtree. Just take pull the pointers until you're pointing back at the real node.
                     var childNodeIndex = subtrees.Elements[Encode(internalNodeChildren[i])];
                     internalNodeChildren[i] = childNodeIndex;
-                    if (childNodeIndex < 0)
+                    if (childNodeIndex >= 0)
+                    {
+                        //It's an internal node. 
+                        //Update the internal node's parent pointers.
+                        var node = nodes + childNodeIndex;
+                        node->Parent = internalNodeIndex;
+                        node->IndexInParent = i;
+                    }
+                    else
                     {
                         //It's a leaf node.
                         //We need to update the leaf's pointers.
