@@ -158,7 +158,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Query Time: {endTime - startTime}, overlaps: {list.Count}");
-
+                Array.Clear(list.Elements, 0, list.Elements.Length);
                 list.Dispose();
 
                 var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());

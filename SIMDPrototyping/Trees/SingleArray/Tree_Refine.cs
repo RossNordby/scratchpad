@@ -437,7 +437,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe void TryToRefine(int* refinementFlags, int nodeIndex)
+        unsafe void TryToRefine(int[] refinementFlags, int nodeIndex)
         {
             if (nodeIndex >= nodeCount || nodeIndex < 0)
                 Console.WriteLine("bad");
@@ -460,7 +460,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         public unsafe void Refine()
         {
             //If this works out, should probably choose a more efficient flagging approach.
-            var refinementFlags = stackalloc int[nodeCount];
+            var refinementFlags = new int[leafCount * 2 - 1];
             for (int i = 0; i < nodeCount; ++i)
             {
                 refinementFlags[i] = 0;
