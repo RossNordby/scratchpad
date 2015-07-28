@@ -45,6 +45,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.GetSelfOverlapsViaQueries(ref overlaps);
                 Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
+                tree.Dispose();
             }
 
             {
@@ -101,6 +102,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline Query Time: {endTime - startTime}, overlaps: {list.Count}");
+                Array.Clear(list.Elements, 0, list.Elements.Length);
                 list.Dispose();
 
                 var overlaps = new QuickList<Overlap<TestCollidable>>(new BufferPool<Overlap<TestCollidable>>());
@@ -122,6 +124,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"Baseline SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+                tree.Dispose();
             }
         }
     }

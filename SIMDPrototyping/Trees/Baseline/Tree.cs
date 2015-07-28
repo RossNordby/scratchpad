@@ -1270,7 +1270,7 @@ namespace SIMDPrototyping.Trees.Baseline
 
         public void Dispose()
         {
-            for (int i = 0; i <= maximumDepth; ++i)
+            for (int i = 0; i < Levels.Length; ++i)
             {
                 if (Levels[i].NodesHandle.IsAllocated)
                     Levels[i].NodesHandle.Free();

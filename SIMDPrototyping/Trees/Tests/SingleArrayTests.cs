@@ -56,6 +56,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.GetSelfOverlapsViaQueries(ref overlaps);
                 Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
+                tree.Dispose();
             }
 
             {
@@ -115,14 +116,14 @@ namespace SIMDPrototyping.Trees.Tests
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 //tree.AgglomerativeRefine(4);
-                //for (int i = 0; i < 100; ++i)
-                //{
-                //    //bool test;
-                //    //tree.AgglomerativeRefine(0, out test);
-                //    tree.Refine();
-                //    tree.Validate();
-                //    Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-                //}
+                for (int i = 0; i < 100; ++i)
+                {
+                    //bool test;
+                    //tree.AgglomerativeRefine(0, out test);
+                    tree.Refine();
+                    tree.Validate();
+                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
@@ -179,6 +180,8 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+
+                tree.Dispose();
             }
         }
     }
