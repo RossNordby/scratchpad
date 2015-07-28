@@ -80,6 +80,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     Console.WriteLine("Bad");
             }
             Console.WriteLine($"Adding {nodeIndex}");
+            //Cache the index of the treelet root. Later, the root will be moved to the end of the list to guarantee that it's the first node that's used.
+            //This provides the guarantee that the treelet root index will not change.
+            var rootIndex = internalNodes.Count;
             internalNodes.Add(nodeIndex);
 
             for (int i = 0; i < subtrees.Count; ++i)
@@ -151,6 +154,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
             }
+            //Swap the treelet root into the last position so that the first internal node consumed is guaranteed to be the root.
+            var lastIndex = internalNodes.Count - 1;
+            var temp = internalNodes.Elements[lastIndex];
+            internalNodes.Elements[lastIndex] = internalNodes.Elements[rootIndex];
+            internalNodes.Elements[rootIndex] = temp;
         }
 
 
@@ -313,11 +321,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (internalNodes.Count > 0)
             {
                 //There is an old internal node that we can use.
-                //Note that we remove from the beginning to guarantee that the root stays at index 0 in the real tree.
-                //The internal nodes were gathered such that the first internal node is the root, and the first attempt to pull an internal
-                //node will be the root of the treelet.
-                internalNodeIndex = internalNodes.Elements[0];
-                internalNodes.FastRemoveAt(0);
+                //Note that we remove from the end to guarantee that the treelet root does not change location.
+                //The CollectSubtrees function guarantees that the treelet root is placed at the very end of the spare internalNodes list.
+                int lastIndex = internalNodes.Count - 1;
+                internalNodeIndex = internalNodes.Elements[lastIndex];
+                internalNodes.FastRemoveAt(lastIndex);
                 if (parent == internalNodeIndex)
                 {
                     Console.WriteLine("ya did a bad");
