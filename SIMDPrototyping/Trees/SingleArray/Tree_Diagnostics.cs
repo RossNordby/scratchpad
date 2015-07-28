@@ -117,10 +117,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-
-        unsafe void ValidateLeaves()
+        unsafe void ValidateLeafNodeIndices()
         {
-
             for (int i = 0; i < leafCount; ++i)
             {
                 if (leaves[i].NodeIndex < 0)
@@ -131,6 +129,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     throw new Exception($"Leaf {i} points to a node outside the node set, {leaves[i].NodeIndex} >= {nodeCount}.");
                 }
+            }
+        }
+
+        unsafe void ValidateLeaves()
+        {
+            ValidateLeafNodeIndices();
+
+            for (int i = 0; i < leafCount; ++i)
+            {
                 if (Encode((&nodes[leaves[i].NodeIndex].ChildA)[leaves[i].ChildIndex]) != i)
                 {
                     throw new Exception($"Leaf {i} data does not agree with node about parenthood.");

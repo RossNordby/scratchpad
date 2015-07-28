@@ -40,7 +40,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
-                tree.Refine();
+                tree.BottomUpRefine();
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
@@ -120,7 +120,8 @@ namespace SIMDPrototyping.Trees.Tests
                 {
                     //bool test;
                     //tree.AgglomerativeRefine(0, out test);
-                    tree.Refine();
+                    tree.TopDownRefine();
+                    //tree.BottomUpRefine();
                     tree.Validate();
                     Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
                 }
