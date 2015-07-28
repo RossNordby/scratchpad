@@ -50,13 +50,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes)
         {
-            if (subtrees.Count > 0)
-                Console.WriteLine("baD");
-            SearchForSpareNodes(0, ref internalNodes);
-            if (internalNodes.Contains(nodeIndex))
-            {
-                Console.WriteLine("bad");
-            }
+
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
             //This collects every child of a given node at once- the set of subtrees must not include only SOME of the children of a node.
 
@@ -74,22 +68,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 subtrees.Add(children[i]);
             }
-            for (int i = 0; i < subtrees.Count; ++i)
-            {
-                if (internalNodes.Contains(subtrees.Elements[i]))
-                    Console.WriteLine("Bad");
-            }
-            Console.WriteLine($"Adding {nodeIndex}");
+
             //Cache the index of the treelet root. Later, the root will be moved to the end of the list to guarantee that it's the first node that's used.
             //This provides the guarantee that the treelet root index will not change.
             var rootIndex = internalNodes.Count;
             internalNodes.Add(nodeIndex);
 
-            for (int i = 0; i < subtrees.Count; ++i)
-            {
-                if (internalNodes.Contains(subtrees.Elements[i]))
-                    Console.WriteLine("Bad");
-            }
 
             while (subtrees.Count < maximumSubtrees)
             {
@@ -117,19 +101,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 if (highestIndex >= 0)
                 {
-                    for (int i = 0; i < subtrees.Count; ++i)
-                    {
-                        if (internalNodes.Contains(subtrees.Elements[i]))
-                            Console.WriteLine("Bad");
-                    }
                     //Found a subtree to expand.
                     var expandedNodeIndex = subtrees.Elements[highestIndex];
-                    if (internalNodes.Contains(expandedNodeIndex))
-                        Console.WriteLine("bad");
-                    else
-                    {
-                        Console.WriteLine($"Adding {expandedNodeIndex}");
-                    }
+                    
                     internalNodes.Add(expandedNodeIndex);
 
                     subtrees.FastRemoveAt(highestIndex);
@@ -140,11 +114,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     for (int i = 0; i < expandedNode->ChildCount; ++i)
                     {
                         subtrees.Add(expandedNodeChildren[i]);
-                    }
-                    for (int i = 0; i < subtrees.Count; ++i)
-                    {
-                        if (internalNodes.Contains(subtrees.Elements[i]))
-                            Console.WriteLine("Bad");
                     }
                 }
                 else
@@ -194,8 +163,6 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// <param name="nodesInvalidated">True if the refinement process invalidated node pointers, false otherwise.</param>
         public unsafe void AgglomerativeRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
-            SearchForSpareNodes(0, ref internalNodes);
-            Console.WriteLine($"starting a refine, internal node count: { internalNodes.Count}");
             var maximumSubtrees = ChildrenCapacity * ChildrenCapacity;
             var poolIndex = BufferPool<int>.GetPoolIndex(maximumSubtrees);
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
@@ -208,11 +175,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Then, we add up subtrees.Count - 1 internal nodes without removing earlier slots.
             int tempNodesCapacity = subtrees.Count * 2 - 1;
 
-            TempNode* tempNodes = stackalloc TempNode[tempNodesCapacity];
+            var tempNodes = stackalloc TempNode[tempNodesCapacity];
             int tempNodeCount = subtrees.Count;
             int remainingNodesCapacity = subtrees.Count;
 
-            int* remainingNodes = stackalloc int[remainingNodesCapacity];
+            var remainingNodes = stackalloc int[remainingNodesCapacity];
             int remainingNodesCount = subtrees.Count;
 
             for (int i = 0; i < subtrees.Count; ++i)
@@ -295,10 +262,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(remainingNodesCount == 1);
             int parent = nodes[nodeIndex].Parent;
             int indexInParent = nodes[nodeIndex].IndexInParent;
-
-
-            if (internalNodes.Contains(parent))
-                Console.WriteLine("how");
+            
 
             (&nodes[parent].ChildA)[indexInParent] = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out nodesInvalidated);
 
@@ -306,15 +270,12 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             subtrees.Dispose();
-
-            SearchForSpareNodes(0, ref internalNodes);
+            
 
         }
 
         unsafe int BuildChild(int parent, int indexInParent, TempNode* tempNodes, int tempNodeIndex, int tempNodeCount, int collapseCount, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
-            if (internalNodes.Contains(parent))
-                Console.WriteLine("how");
             //Get ready to build a real node out of this.
             int internalNodeIndex;
             nodesInvalidated = false;
@@ -326,10 +287,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 int lastIndex = internalNodes.Count - 1;
                 internalNodeIndex = internalNodes.Elements[lastIndex];
                 internalNodes.FastRemoveAt(lastIndex);
-                if (parent == internalNodeIndex)
-                {
-                    Console.WriteLine("ya did a bad");
-                }
+   
             }
             else
             {
@@ -338,10 +296,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Watch out, calls to AllocateNode potentially invalidate all extant node pointers.
                 //Fortunately, there are no pointers to invalidate... here. Propagate it up.
                 internalNodeIndex = AllocateNode(out nodesInvalidated);
-                if (parent == internalNodeIndex)
-                {
-                    Console.WriteLine("ya did a bad");
-                }
+
             }
 
 
@@ -352,9 +307,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int* internalNodeChildren = &internalNode->ChildA;
 
             CollapseTree(collapseCount, tempNodes, tempNodeIndex, tempNodeCount, internalNodeChildren, ref internalNode->ChildCount, &internalNode->A, &internalNode->LeafCountA);
-
-            if (internalNodes.Contains(parent))
-                Console.WriteLine("how");
+            
 
             int originalChildCount = internalNode->ChildCount;
             //ValidateLeafNodeIndices();
@@ -372,11 +325,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //It's still an internal node.
                     bool childNodesInvalidated;
                     var childIndex = BuildChild(internalNodeIndex, i, tempNodes, internalNodeChildren[i], tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out childNodesInvalidated);
-
-                    if (internalNodes.Contains(childIndex))
-                    {
-                        Console.WriteLine("bad");
-                    }
 
                     if (childNodesInvalidated)
                     {
