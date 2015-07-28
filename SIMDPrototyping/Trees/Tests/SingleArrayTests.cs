@@ -122,8 +122,8 @@ namespace SIMDPrototyping.Trees.Tests
                     //tree.AgglomerativeRefine(0, out test);
                     tree.TopDownRefine();
                     //tree.BottomUpRefine();
-                    tree.Validate();
-                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                    //tree.Validate();
+                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
                 }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

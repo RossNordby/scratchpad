@@ -264,9 +264,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             int indexInParent = nodes[nodeIndex].IndexInParent;
             
 
-            (&nodes[parent].ChildA)[indexInParent] = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out nodesInvalidated);
+            var reifiedIndex = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out nodesInvalidated);
 
-            //Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
+            Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
 
 
             subtrees.Dispose();
@@ -414,8 +414,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Leaf node.
                 var index = childCount++;
                 nodeBounds[index] = tempNode->BoundingBox;
-                if (tempNode->A < -70)
-                    Console.WriteLine("how?");
                 nodeChildren[index] = tempNode->A;
                 leafCounts[index] = tempNode->LeafCount;
             }
@@ -442,8 +440,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
             {
                 bool nodesInvalidated;
-                if (spareInternalNodes.Contains(nodeIndex))
-                    Console.WriteLine("baD");
                 AgglomerativeRefine(nodeIndex, ref spareInternalNodes, out nodesInvalidated);
 
                 var parent = nodes[nodeIndex].Parent;
@@ -485,8 +481,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         private unsafe void TopDownRefine(int nodeIndex, ref QuickList<int> spareNodes)
         {
-            if (spareNodes.Contains(nodeIndex))
-                Console.WriteLine("baD");
             bool nodesInvalidated;
             AgglomerativeRefine(nodeIndex, ref spareNodes, out nodesInvalidated);
             //The root of the tree is guaranteed to stay in position, so nodeIndex is still valid.
