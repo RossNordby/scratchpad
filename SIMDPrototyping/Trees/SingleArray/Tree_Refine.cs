@@ -51,11 +51,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtrees.Add(children[i]);
             }
             internalNodes.Add(nodeIndex);
-            for (int i = 0; i < internalNodes.Count; ++i)
-            {
-                if (internalNodes.Elements[i] >= nodeCount)
-                    Console.WriteLine("why");
-            }
+
 
 
             while (subtrees.Count < maximumSubtrees)
@@ -87,11 +83,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //Found a subtree to expand.
                     var expandedNodeIndex = subtrees.Elements[highestIndex];
                     internalNodes.Add(expandedNodeIndex);
-                    for (int i = 0; i < internalNodes.Count; ++i)
-                    {
-                        if (internalNodes.Elements[i] >= nodeCount)
-                            Console.WriteLine("why");
-                    }
 
                     subtrees.FastRemoveAt(highestIndex);
                     //Add all the children to the set of subtrees.
@@ -143,19 +134,13 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// </summary>
         /// <param name="nodeIndex">Root of the refinement treelet.</param>
         /// <param name="nodesInvalidated">True if the refinement process invalidated node pointers, false otherwise.</param>
-        public unsafe void AgglomerativeRefine(int nodeIndex, out bool nodesInvalidated)
+        public unsafe void AgglomerativeRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
             var maximumSubtrees = ChildrenCapacity * ChildrenCapacity;
             var poolIndex = BufferPool<int>.GetPoolIndex(maximumSubtrees);
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
-            var internalNodes = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes);
 
-            for (int i = 0; i < internalNodes.Count; ++i)
-            {
-                if (internalNodes.Elements[i] >= nodeCount)
-                    Console.WriteLine("why");
-            }
 
 
             //We're going to create a little binary tree via agglomeration, and then we'll collapse it into an n-ary tree.
@@ -251,25 +236,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             int parent = nodes[nodeIndex].Parent;
             int indexInParent = nodes[nodeIndex].IndexInParent;
 
-            
+
 
             var reifiedIndex = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out nodesInvalidated);
 
             Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
 
-            if (internalNodes.Count > 0)
-            {
-                //There were some spare internal nodes left. Apparently, the tree was compressed a little bit.
-                //Remove them from the real tree.
-                //TODO: Multithreading issue.
-                //Remove highest to lowest to avoid any situation where removing could invalidate an index.
-                Array.Sort(internalNodes.Elements, 0, internalNodes.Count);
-                for (int i = internalNodes.Count - 1; i >= 0; --i)
-                {
-                    RemoveNodeAt(internalNodes.Elements[i]);
-                }
-            }
-            internalNodes.Dispose();
+
             subtrees.Dispose();
 
 
@@ -289,10 +262,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 internalNodeIndex = internalNodes.Elements[0];
                 internalNodes.FastRemoveAt(0);
 
-                if (internalNodeIndex >= nodeCount)
-                {
-                    Console.WriteLine("how did that happen");
-                }
             }
             else
             {
@@ -301,10 +270,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Watch out, calls to AllocateNode potentially invalidate all extant node pointers.
                 //Fortunately, there are no pointers to invalidate... here. Propagate it up.
                 internalNodeIndex = AllocateNode(out nodesInvalidated);
-                if (internalNodeIndex >= nodeCount)
-                {
-                    Console.WriteLine("how did that happen");
-                }
+
             }
 
             var internalNode = nodes + internalNodeIndex;
@@ -315,6 +281,13 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             CollapseTree(collapseCount, tempNodes, tempNodeIndex, tempNodeCount, internalNodeChildren, ref internalNode->ChildCount, &internalNode->A, &internalNode->LeafCountA);
 
+            for (int i = 0; i < internalNode->ChildCount; ++i)
+            {
+                if (internalNodeChildren[i] < -70)
+                {
+                    Console.WriteLine("whow");
+                }
+            }
             //ValidateLeafNodeIndices();
 
             //The node now contains valid bounding boxes, but the children indices are not yet valid. They're pointing into the tempnodes.
@@ -338,9 +311,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                         internalNodeChildren = &internalNode->ChildA;
                     }
                     internalNodeChildren[i] = childIndex;
+
                 }
                 else
                 {
+
+                    if (internalNodeChildren[i] < -70)
+                    {
+                        Console.WriteLine("whow");
+                    }
                     //It's a subtree. Just take pull the pointers until you're pointing back at the real node.
                     var childNodeIndex = subtrees.Elements[Encode(internalNodeChildren[i])];
                     internalNodeChildren[i] = childNodeIndex;
@@ -358,11 +337,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                         //It's a leaf node.
                         //We need to update the leaf's pointers.
                         var leafIndex = Encode(childNodeIndex);
-
-                        if (internalNodeIndex >= nodeCount)
-                        {
-                            Console.WriteLine("how did that happen");
-                        }
 
                         var leaf = leaves + leafIndex;
                         leaf->NodeIndex = internalNodeIndex;
@@ -421,26 +395,44 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Leaf node.
                 var index = childCount++;
                 nodeBounds[index] = tempNode->BoundingBox;
+                if (tempNode->A < -70)
+                    Console.WriteLine("how?");
                 nodeChildren[index] = tempNode->A;
                 leafCounts[index] = tempNode->LeafCount;
             }
         }
 
-        unsafe void TryToBottomUpRefine(int[] refinementFlags, int nodeIndex)
+        unsafe void TryToBottomUpRefine(int[] refinementFlags, int nodeIndex, ref QuickList<int> spareInternalNodes)
         {
             if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
             {
                 bool nodesInvalidated;
-                AgglomerativeRefine(nodeIndex, out nodesInvalidated);
+                AgglomerativeRefine(nodeIndex, ref spareInternalNodes, out nodesInvalidated);
 
                 var parent = nodes[nodeIndex].Parent;
                 if (parent != -1)
                 {
-                    TryToBottomUpRefine(refinementFlags, parent);
+                    TryToBottomUpRefine(refinementFlags, parent, ref spareInternalNodes);
                 }
             }
         }
 
+
+        void RemoveUnusedInternalNodes(ref QuickList<int> spareNodes)
+        {
+            if (spareNodes.Count > 0)
+            {
+                //There were some spare internal nodes left. Apparently, the tree was compressed a little bit.
+                //Remove them from the real tree.
+                //TODO: Multithreading issue.
+                //Remove highest to lowest to avoid any situation where removing could invalidate an index.
+                Array.Sort(spareNodes.Elements, 0, spareNodes.Count);
+                for (int i = spareNodes.Count - 1; i >= 0; --i)
+                {
+                    RemoveNodeAt(spareNodes.Elements[i]);
+                }
+            }
+        }
         /// <summary>
         /// Executes one pass of bottom-up refinement.
         /// </summary>
@@ -450,6 +442,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Note the size: it needs to contain all possible internal nodes.
             //TODO: This is actually bugged, because the refinement flags do not update if the nodes move.
             //And the nodes CAN move.
+            var spareNodes = new QuickList<int>(BufferPools<int>.Thread, 8);
             var refinementFlags = new int[leafCount * 2 - 1];
             for (int i = 0; i < nodeCount; ++i)
             {
@@ -457,27 +450,31 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             for (int i = 0; i < leafCount; ++i)
             {
-                TryToBottomUpRefine(refinementFlags, leaves[i].NodeIndex);
+                TryToBottomUpRefine(refinementFlags, leaves[i].NodeIndex, ref spareNodes);
                 //Validate();
             }
             //Console.WriteLine($"root children: {nodes->ChildCount}");
+            RemoveUnusedInternalNodes(ref spareNodes);
+            spareNodes.Dispose();
         }
 
 
-        private unsafe void TopDownRefine(int nodeIndex)
+
+
+        private unsafe void TopDownRefine(int nodeIndex, ref QuickList<int> spareNodes)
         {
             bool nodesInvalidated;
-            AgglomerativeRefine(nodeIndex, out nodesInvalidated);
+            AgglomerativeRefine(nodeIndex, ref spareNodes, out nodesInvalidated);
             //The root of the tree is guaranteed to stay in position, so nodeIndex is still valid.
-   
+
             //Node pointers can be invalidated, so don't hold a reference between executions.
             for (int i = 0; i < nodes[nodeIndex].ChildCount; ++i)
             {
                 var child = (&nodes[nodeIndex].ChildA)[i];
                 if (child >= 0)
                 {
-                    TopDownRefine(child);
-                    
+                    TopDownRefine(child, ref spareNodes);
+
                 }
             }
 
@@ -485,7 +482,10 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
         public unsafe void TopDownRefine()
         {
-            TopDownRefine(0);
+            var spareNodes = new QuickList<int>(BufferPools<int>.Thread, 8);
+            TopDownRefine(0, ref spareNodes);
+            RemoveUnusedInternalNodes(ref spareNodes);
+            spareNodes.Dispose();
         }
 
 
