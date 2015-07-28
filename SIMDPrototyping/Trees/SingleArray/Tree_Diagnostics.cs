@@ -79,7 +79,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var leafCounts = &node->LeafCountA;
             var bounds = &node->A;
             foundLeafCount = 0;
-            if (expectedParentIndex >= 0 && (node->ChildCount < 2 || node->ChildCount > ChildrenCapacity))
+            if ((expectedParentIndex >= 0 && node->ChildCount < 2) || node->ChildCount < 0 || node->ChildCount > ChildrenCapacity)
             {
                 throw new Exception($"Internal node with {node->ChildCount} children.");
             }

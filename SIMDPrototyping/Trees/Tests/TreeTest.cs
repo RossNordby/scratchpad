@@ -134,8 +134,8 @@ namespace SIMDPrototyping.Trees.Tests
         {
             float leafSize = 10;
             int queryCount = 1000000;
-            int selfTestCount = 1;
-            int refitCount = 1;
+            int selfTestCount = 10;
+            int refitCount = 100;
 
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
@@ -143,7 +143,7 @@ namespace SIMDPrototyping.Trees.Tests
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1000, 1000, 1000) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 4096;
+            int randomLeafCount = 262144;
 
 #else
             int leafCountX = 64;

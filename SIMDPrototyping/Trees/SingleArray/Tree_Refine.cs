@@ -409,10 +409,13 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void TryToRefine(int* refinementFlags, int nodeIndex)
         {
+            if (nodeIndex >= nodeCount)
+                Console.WriteLine("bad");
             if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
             {
                 bool nodesInvalidated;
                 AgglomerativeRefine(nodeIndex, out nodesInvalidated);
+                Validate();
                 var parent = nodes[nodeIndex].Parent;
                 if (parent != -1)
                 {
@@ -436,7 +439,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 TryToRefine(refinementFlags, leaves[i].NodeIndex);
                 //Validate();
+                if (nodes->ChildCount > ChildrenCapacity)
+                    throw new Exception("what");
             }
+            //Console.WriteLine($"root children: {nodes->ChildCount}");
         }
 
 
