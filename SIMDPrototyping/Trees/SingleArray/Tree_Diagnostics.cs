@@ -27,7 +27,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         //While this may be closer to true that it appears at first glance due to the very high cost of cache misses versus trivial ALU work,
         //it's probably not *identical*.
         //The builders also use this approximation.
-        public unsafe float MeasureCostHeuristic()
+        public unsafe float MeasureCostMetric()
         {
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             var rootNode = nodes;
@@ -38,7 +38,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 BoundingBox.Merge(ref rootBounds[i], ref merged, out merged);
             }
-            float rootHeuristic = ComputeBoundsHeuristic(ref merged);
+            float rootHeuristic = ComputeBoundsMetric(ref merged);
 
             const float leafCost = 1;
             const float internalNodeCost = 1;
@@ -54,12 +54,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                     if (children[childIndex] >= 0)
                     {
                         //Internal node.
-                        totalCost += internalNodeCost * ComputeBoundsHeuristic(ref bounds[childIndex]);
+                        totalCost += internalNodeCost * ComputeBoundsMetric(ref bounds[childIndex]);
                     }
                     else
                     {
                         //Leaf node.
-                        totalCost += leafCost * ComputeBoundsHeuristic(ref bounds[childIndex]);
+                        totalCost += leafCost * ComputeBoundsMetric(ref bounds[childIndex]);
                     }
 
                 }

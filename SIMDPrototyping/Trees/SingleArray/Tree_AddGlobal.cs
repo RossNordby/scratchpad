@@ -63,10 +63,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //About to recurse into an internal node. Update the candidate.
                     candidate.ChildrenIndices.Add(i);
                     var previousCostIncrease = candidate.CostIncrease;
-                    var oldCost = ComputeBoundsHeuristic(ref bounds[i]);
+                    var oldCost = ComputeBoundsMetric(ref bounds[i]);
                     BoundingBox merged;
                     BoundingBox.Merge(ref bounds[i], ref newLeafBounds, out merged);
-                    var newCost = ComputeBoundsHeuristic(ref merged);
+                    var newCost = ComputeBoundsMetric(ref merged);
                     candidate.CostIncrease += newCost - oldCost;
 
                     ComputeBestCostChange(children[i], ref newLeafBounds, ref candidate, ref best);
@@ -87,7 +87,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                     BoundingBox merged;
                     BoundingBox.Merge(ref bounds[i], ref newLeafBounds, out merged);
-                    var newCost = ComputeBoundsHeuristic(ref merged);
+                    var newCost = ComputeBoundsMetric(ref merged);
 
                     var newPathCostIncrease = candidate.CostIncrease + newCost;
                     if (newPathCostIncrease < best.CostIncrease)

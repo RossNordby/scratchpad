@@ -56,7 +56,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         if ((subtrees.Count - 1 + subtreeNode->ChildCount) <= maximumSubtrees) //Make sure that the new node would fit (after we remove the expanded node).
                         {
 
-                            var candidateCost = ComputeBoundsHeuristic(ref (&nodes[subtreeNode->Parent].A)[subtreeNode->IndexInParent]);
+                            var candidateCost = ComputeBoundsMetric(ref (&nodes[subtreeNode->Parent].A)[subtreeNode->IndexInParent]);
                             if (candidateCost > highestCost)
                             {
                                 highestIndex = subtreeIndex;
@@ -192,7 +192,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         var nodeIndexB = remainingNodes[j];
                         BoundingBox merged;
                         BoundingBox.Merge(ref tempNodes[nodeIndexA].BoundingBox, ref tempNodes[nodeIndexB].BoundingBox, out merged);
-                        var cost = ComputeBoundsHeuristic(ref merged);
+                        var cost = ComputeBoundsMetric(ref merged);
                         if (cost < bestCost)
                         {
                             bestCost = cost;
@@ -291,7 +291,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Reify each one in sequence.
             for (int i = 0; i < internalNode->ChildCount; ++i)
             {
-                treeletCost += ComputeBoundsHeuristic(ref internalNodeBounds[i]);
+                treeletCost += ComputeBoundsMetric(ref internalNodeBounds[i]);
                 //The internalNodeChildren[i] can be negative, as a result of a subtree being encountered in CollapseTree.
                 //tempNodes[internalNodeChildren[i]].A is never negative for any internal node (internalNodeChildren[i] >= 0),
                 //because we pre-collapsed that reference in CollapseTree for convenience.

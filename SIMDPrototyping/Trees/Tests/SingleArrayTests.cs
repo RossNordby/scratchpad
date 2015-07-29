@@ -86,7 +86,7 @@ namespace SIMDPrototyping.Trees.Tests
                 int nodeCount, childCount;
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
                 tree.Validate();
 
@@ -121,15 +121,15 @@ namespace SIMDPrototyping.Trees.Tests
                     //bool test;
                     //tree.AgglomerativeRefine(0, out test);
                     tree.TopDownRefine();
-                    tree.BottomUpRefine();
-                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                    //tree.BottomUpRefine();
+                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
                     //tree.Validate();
                 }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
 
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
+                Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");

@@ -100,7 +100,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         BoundingBox mergedCandidate;
                         BoundingBox.Merge(ref boundingBoxes[i], ref box, out mergedCandidate);
-                        var newCost = ComputeBoundsHeuristic(ref mergedCandidate);
+                        var newCost = ComputeBoundsMetric(ref mergedCandidate);
                         //Since we already checked for an empty slot, the two remaining possibilities are merging with an existing leaf node
                         //and continuing down another internal node.
                         //Going into another internal node only increases the relevant cost (that of internal nodes) by the change in merged volume.
@@ -110,7 +110,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         if (children[i] >= 0)
                         {
                             choice = BestInsertionChoice.Internal;
-                            costChange = newCost - ComputeBoundsHeuristic(ref boundingBoxes[i]);
+                            costChange = newCost - ComputeBoundsMetric(ref boundingBoxes[i]);
                         }
                         else
                         {

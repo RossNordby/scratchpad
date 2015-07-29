@@ -16,7 +16,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        float ComputeBoundsHeuristic(ref BoundingBox boundingBox)
+        float ComputeBoundsMetric(ref BoundingBox boundingBox)
         {
             return BoundingBox.ComputeVolume(ref boundingBox);
             //var offset = boundingBox.Max - boundingBox.Min;
@@ -50,7 +50,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 0; i < length - 1; ++i)
             {
                 BoundingBox.Merge(ref merged, ref leafBounds[start + i], out merged);
-                var candidateCost = i * ComputeBoundsHeuristic(ref merged) + (length - i) * ComputeBoundsHeuristic(ref bMerged[i]);
+                var candidateCost = i * ComputeBoundsMetric(ref merged) + (length - i) * ComputeBoundsMetric(ref bMerged[i]);
                 if (candidateCost < lowestCost)
                 {
                     lowestCost = candidateCost;
