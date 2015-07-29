@@ -126,6 +126,7 @@
     <Compile Include="Trees\SingleArray\Tree_Add.cs" />
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_AgglomerativeRefine.cs" />
+    <Compile Include="Trees\SingleArray\Tree_SweepRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_VolumeQuery.cs" />
     <Compile Include="Trees\SingleArray\Tree_Refit.cs" />
     <Compile Include="Trees\SingleArray\Tree_AddGlobal.cs" />
