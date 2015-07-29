@@ -13,40 +13,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
-        /// <summary>
-        /// Defines a subtree by pointing to a particular node.
-        /// May also be a leaf node; in that case, the node index is encoded.
-        /// </summary>
-        struct Subtree
-        {
-            //We cache the bounding box and node locally so that we can freely manipulate information without worrying about corrupting the tree.
-            //Does the implementation really care?
-            public BoundingBox BoundingBox;
-            public int NodeIndex;
-        }
-
-        struct PotentialSubtree
-        {
-            public int NodeIndex;
-            public float Cost;
-        }
-
-        unsafe void SearchForSpareNodes(int nodeIndex, ref QuickList<int> internalNodes)
-        {
-            if (internalNodes.Contains(nodeIndex))
-            {
-                Console.WriteLine("Found a spare node which is still accessible through the tree. Invalid state.");
-            }
-            var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-            for (int childIndex = 0; childIndex < node->ChildCount; ++childIndex)
-            {
-                if (children[childIndex] >= 0)
-                {
-                    SearchForSpareNodes(children[childIndex], ref internalNodes);
-                }
-            }
-        }
 
         unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
         {
@@ -530,7 +496,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        
+
         private unsafe void TopDownRefine(int nodeIndex, ref QuickList<int> spareNodes)
         {
             bool nodesInvalidated;
