@@ -40,6 +40,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             var rootIndex = internalNodes.Count;
             internalNodes.Add(nodeIndex);
 
+            //Note that the treelet root's cost is excluded from the treeletCost.
+            //That's because the treelet root cannot change.
             treeletCost = 0;
             while (subtrees.Count < maximumSubtrees)
             {
