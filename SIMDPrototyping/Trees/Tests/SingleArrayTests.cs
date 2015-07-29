@@ -116,19 +116,19 @@ namespace SIMDPrototyping.Trees.Tests
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 //tree.AgglomerativeRefine(4);
-                for (int i = 0; i < 100; ++i)
+                for (int i = 0; i < 10; ++i)
                 {
                     //bool test;
                     //tree.AgglomerativeRefine(0, out test);
                     tree.TopDownRefine();
-                    //tree.BottomUpRefine();
+                    tree.BottomUpRefine();
                     //tree.Validate();
-                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
                 }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
 
+                Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
