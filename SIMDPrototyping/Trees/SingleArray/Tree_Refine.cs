@@ -48,7 +48,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes)
+        unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
         {
 
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
@@ -74,7 +74,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var rootIndex = internalNodes.Count;
             internalNodes.Add(nodeIndex);
 
-
+            treeletCost = 0;
             while (subtrees.Count < maximumSubtrees)
             {
                 //Find the largest subtree.
@@ -101,9 +101,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 if (highestIndex >= 0)
                 {
+                    treeletCost += highestCost;
                     //Found a subtree to expand.
                     var expandedNodeIndex = subtrees.Elements[highestIndex];
-                    
+
                     internalNodes.Add(expandedNodeIndex);
 
                     subtrees.FastRemoveAt(highestIndex);
@@ -166,7 +167,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             var maximumSubtrees = ChildrenCapacity * ChildrenCapacity;
             var poolIndex = BufferPool<int>.GetPoolIndex(maximumSubtrees);
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
-            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes);
+            float originalTreeletCost;
+            int treeletInternalNodesStartIndex = internalNodes.Count;
+            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes, out originalTreeletCost);
 
 
 
@@ -262,16 +265,114 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(remainingNodesCount == 1);
             int parent = nodes[nodeIndex].Parent;
             int indexInParent = nodes[nodeIndex].IndexInParent;
-            
 
-            var reifiedIndex = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out nodesInvalidated);
+            var stagingNodeCapacity = maximumSubtrees - 1;
+            var stagingNodes = stackalloc Node[maximumSubtrees - 1];
+            int stagingNodeCount = 0;
+            float newTreeletCost;
+            var stagingRootIndex = BuildStagingChild(parent, indexInParent, tempNodes, tempNodeCount - 1, collapseCount, stagingNodes, ref stagingNodeCount, out newTreeletCost);
+            Debug.Assert(stagingNodeCount < stagingNodeCapacity);
 
-            Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
+            if (newTreeletCost < originalTreeletCost)
+            {
+                //The refinement is an actual improvement.
+                //Apply the staged nodes to real nodes!
+                var reifiedIndex = ReifyStagingNode(parent, indexInParent, stagingNodes, 0, stagingNodeCapacity, ref subtrees, ref internalNodes, out nodesInvalidated);
+                Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
+            }
+            else
+            {
+                //The internal nodes collected by the most recent iteration of CollectSubtrees weren't replaced! Get them out of the pool.
+                //TODO: Would be nice to do this in a slightly less gross way.
+                for (int i = internalNodes.Count - 1; i >= treeletInternalNodesStartIndex; --i)
+                {
+                    internalNodes.FastRemoveAt(i);
+                }
+                nodesInvalidated = false;
+            }
+
+            //var reifiedIndex = BuildChild(parent, indexInParent, tempNodes, tempNodeCount - 1, tempNodeCount, collapseCount, ref subtrees, ref internalNodes, out nodesInvalidated);
+
+            //Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
 
 
             subtrees.Dispose();
-            
 
+
+        }
+
+        unsafe int ReifyStagingNode(int parent, int indexInParent, Node* stagingNodes, int stagingNodeIndex, int stagingNodeCapacity, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out bool nodesInvalidated)
+        {
+            
+            nodesInvalidated = false;
+            int internalNodeIndex;
+            if (internalNodes.Count > 0)
+            {
+                //There is an old internal node that we can use.
+                //Note that we remove from the end to guarantee that the treelet root does not change location.
+                //The CollectSubtrees function guarantees that the treelet root is placed at the very end of the spare internalNodes list.
+                var lastIndex = internalNodes.Count - 1;
+                internalNodeIndex = internalNodes.Elements[lastIndex];
+                internalNodes.FastRemoveAt(lastIndex);
+            }
+            else
+            {
+                //There was no pre-existing internal node that we could use. Apparently, the tree gained some internal nodes.
+                //TODO: Multithreading issue.
+                //Watch out, calls to AllocateNode potentially invalidate all extant node pointers.
+                //Fortunately, there are no pointers to invalidate... here. Propagate it up.
+                bool addCausedInvalidation;
+                internalNodeIndex = AllocateNode(out addCausedInvalidation);
+                if (addCausedInvalidation)
+                    nodesInvalidated = true;
+            }
+
+            //To make the staging node real, it requires an accurate parent pointer, index in parent, and child indices.
+            //Copy the staging node into the real tree.
+            var stagingNode = stagingNodes + stagingNodeIndex;
+            var internalNode = nodes + internalNodeIndex;
+            *internalNode = *stagingNode;
+            internalNode->Parent = parent;
+            internalNode->IndexInParent = indexInParent;
+            var internalNodeChildren = &internalNode->ChildA;
+            for (int i = 0; i < internalNode->ChildCount; ++i)
+            {
+                if (internalNodeChildren[i] >= 0)
+                {
+                    bool childNodesInvalidated;
+                    internalNodeChildren[i] = ReifyStagingNode(internalNodeIndex, i, stagingNodes, internalNodeChildren[i], stagingNodeCapacity, ref subtrees, ref internalNodes, out childNodesInvalidated);
+                    if (childNodesInvalidated)
+                    {
+                        internalNode = nodes + internalNodeIndex;
+                        internalNodeChildren = &internalNode->ChildA;
+                        nodesInvalidated = true;
+                    }
+                }
+                else
+                {
+                    //It's a subtree. Update its pointers.
+                    var subtreeIndex = subtrees.Elements[Encode(internalNodeChildren[i])];
+                    internalNodeChildren[i] = subtreeIndex;
+                    if (subtreeIndex >= 0)
+                    {
+                        Debug.Assert(subtreeIndex >= 0 && subtreeIndex < nodeCount);
+                        //Subtree is an internal node. Update its parent pointers.
+                        nodes[subtreeIndex].IndexInParent = i;
+                        nodes[subtreeIndex].Parent = internalNodeIndex;
+
+                    }
+                    else
+                    {
+                        //Subtree is a leaf node. Update its parent pointers.
+                        var leafIndex = Encode(subtreeIndex);
+                        Debug.Assert(leafIndex >= 0 && leafIndex < LeafCount);
+                        var leaf = leaves + leafIndex;
+                        leaf->ChildIndex = i;
+                        leaf->NodeIndex = internalNodeIndex;
+                    }
+                }
+            }
+            return internalNodeIndex;
         }
 
         unsafe int BuildChild(int parent, int indexInParent, TempNode* tempNodes, int tempNodeIndex, int tempNodeCount, int collapseCount, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out bool nodesInvalidated)
@@ -287,7 +388,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 int lastIndex = internalNodes.Count - 1;
                 internalNodeIndex = internalNodes.Elements[lastIndex];
                 internalNodes.FastRemoveAt(lastIndex);
-   
+
             }
             else
             {
@@ -306,8 +407,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             internalNode->IndexInParent = indexInParent;
             int* internalNodeChildren = &internalNode->ChildA;
 
-            CollapseTree(collapseCount, tempNodes, tempNodeIndex, tempNodeCount, internalNodeChildren, ref internalNode->ChildCount, &internalNode->A, &internalNode->LeafCountA);
-            
+            CollapseTree(collapseCount, tempNodes, tempNodeIndex, internalNodeChildren, ref internalNode->ChildCount, &internalNode->A, &internalNode->LeafCountA);
+
 
             int originalChildCount = internalNode->ChildCount;
             //ValidateLeafNodeIndices();
@@ -358,6 +459,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         var leafIndex = Encode(childNodeIndex);
 
                         var leaf = leaves + leafIndex;
+                        
                         leaf->NodeIndex = internalNodeIndex;
                         leaf->ChildIndex = i;
                         //ValidateLeafNodeIndices();
@@ -368,7 +470,53 @@ namespace SIMDPrototyping.Trees.SingleArray
             return internalNodeIndex;
         }
 
-        unsafe void CollapseTree(int depthRemaining, TempNode* tempNodes, int tempNodeIndex, int tempNodeCount, int* nodeChildren, ref int childCount, BoundingBox* nodeBounds, int* leafCounts)
+        unsafe int BuildStagingChild(int parent, int indexInParent, TempNode* tempNodes, int tempNodeIndex, int collapseCount,
+            Node* stagingNodes, ref int stagingNodeCount, out float treeletCost)
+        {
+            //Get ready to build a staging node out of this.
+
+            var internalNodeIndex = stagingNodeCount++;
+            var internalNode = stagingNodes + internalNodeIndex;
+            internalNode->Parent = parent;
+            internalNode->IndexInParent = indexInParent;
+            internalNode->ChildCount = 0;
+
+
+            var internalNodeChildren = &internalNode->ChildA;
+            var internalNodeBounds = &internalNode->A;
+
+            CollapseTree(collapseCount, tempNodes, tempNodeIndex, internalNodeChildren, ref internalNode->ChildCount, internalNodeBounds, &internalNode->LeafCountA);
+
+            treeletCost = 0;
+            //ValidateLeafNodeIndices();
+
+            //The node now contains valid bounding boxes, but the children indices are not yet valid. They're pointing into the tempnodes.
+            //Reify each one in sequence.
+            for (int i = 0; i < internalNode->ChildCount; ++i)
+            {
+                treeletCost += ComputeBoundsHeuristic(ref internalNodeBounds[i]);
+                //The internalNodeChildren[i] can be negative, as a result of a subtree being encountered in CollapseTree.
+                //tempNodes[internalNodeChildren[i]].A is never negative for any internal node (internalNodeChildren[i] >= 0),
+                //because we pre-collapsed that reference in CollapseTree for convenience.
+
+                if (internalNodeChildren[i] >= 0)
+                {
+                    //It's still an internal node.
+                    float childTreeletCost;
+                    var childIndex = BuildStagingChild(internalNodeIndex, i, tempNodes, internalNodeChildren[i], collapseCount, stagingNodes, ref stagingNodeCount, out childTreeletCost);
+                    treeletCost += childTreeletCost;
+
+                    internalNodeChildren[i] = childIndex;
+
+                }
+                //If it's a subtree, then we don't need to change it at all.
+            }
+            return internalNodeIndex;
+        }
+
+
+
+        unsafe void CollapseTree(int depthRemaining, TempNode* tempNodes, int tempNodeIndex, int* nodeChildren, ref int childCount, BoundingBox* nodeBounds, int* leafCounts)
         {
 
             var tempNode = tempNodes + tempNodeIndex;
@@ -379,8 +527,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (depthRemaining > 0)
                 {
                     depthRemaining -= 1;
-                    CollapseTree(depthRemaining, tempNodes, tempNode->A, tempNodeCount, nodeChildren, ref childCount, nodeBounds, leafCounts);
-                    CollapseTree(depthRemaining, tempNodes, tempNode->B, tempNodeCount, nodeChildren, ref childCount, nodeBounds, leafCounts);
+                    CollapseTree(depthRemaining, tempNodes, tempNode->A, nodeChildren, ref childCount, nodeBounds, leafCounts);
+                    CollapseTree(depthRemaining, tempNodes, tempNode->B, nodeChildren, ref childCount, nodeBounds, leafCounts);
                 }
                 else
                 {
