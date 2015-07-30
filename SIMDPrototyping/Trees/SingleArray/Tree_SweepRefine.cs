@@ -125,7 +125,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     lowestIndex = i;
                     a = merged;
                     b = bMerged[i];
-                    aLeafCount = LeafCount;
+                    aLeafCount = leafCount;
                     bLeafCount = bLeafCounts[i];
                 }
             }
@@ -160,7 +160,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                     var stagingBounds = &stagingNode->A;
                     var stagingChildren = &stagingNode->ChildA;
-                    var stagingLeafCounts = &stagingNodes->LeafCountA;
+                    var stagingLeafCounts = &stagingNode->LeafCountA;
 
                     stagingBounds[childIndexA] = a;
                     stagingBounds[childIndexB] = b;
@@ -174,6 +174,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         stagingChildren[childIndexA] = CreateStagingNode(stagingNodeIndex, childIndexA, ref a, subtrees, subtreeStart, subtreeCountA,
                             stagingNodes, ref stagingNodesCount, out costA);
+                        costA += ComputeBoundsMetric(ref a); //An internal node was created; measure its cost.
                     }
                     else
                     {
@@ -186,6 +187,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         stagingChildren[childIndexB] = CreateStagingNode(stagingNodeIndex, childIndexB, ref b, subtrees, splitIndex, subtreeCountB,
                             stagingNodes, ref stagingNodesCount, out costB);
+                        costB += ComputeBoundsMetric(ref b); //An internal node was created; measure its cost.
                     }
                     else
                     {
@@ -237,7 +239,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 return stagingNodeIndex;
             }
 
-            const int recursionDepth = ChildrenCapacity == 32 ? 5 : ChildrenCapacity == 16 ? 4 : ChildrenCapacity == 8 ? 3 : ChildrenCapacity == 4 ? 2 : 1;
+            const int recursionDepth = ChildrenCapacity == 32 ? 4 : ChildrenCapacity == 16 ? 3 : ChildrenCapacity == 8 ? 2 : ChildrenCapacity == 4 ? 1 : 0;
 
 
             SplitSubtreesIntoChildren(recursionDepth, subtrees, subtreeStart, subtreeCount, ref boundingBox, stagingNodes, stagingNodeIndex, ref stagingNodeCount, out childTreeletsCost);
@@ -247,13 +249,26 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
+
+
         public unsafe void SweepRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
             const int maximumSubtrees = 4096;
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int internalNodeStartIndex = internalNodes.Count;
             float originalTreeletCost;
-            CollectSubtrees(0, maximumSubtrees, ref subtrees, ref internalNodes, out originalTreeletCost);
+            if (internalNodes.Count > 0)
+
+            {
+                Console.WriteLine("asdf");
+            }
+            Console.WriteLine($"previousCount: {internalNodes.Count}");
+            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes, out originalTreeletCost);
+            if (internalNodes.Count > nodeCount)
+
+            {
+                Console.WriteLine("ASD");
+            }
 
             //Gather necessary information from nodes. (TODO: This could be more efficiently gathered up front... collectsubtrees already touched most of this data!)
             var sweepSubtrees = stackalloc SweepSubtree[subtrees.Count];
@@ -306,6 +321,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             float newTreeletCost;
             CreateStagingNode(parent, indexInParent, ref treeletBoundingBox, sweepSubtrees, 0, subtrees.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
+            ValidateStaging(stagingNodes, sweepSubtrees, ref subtrees, parent, indexInParent);
 
             if (newTreeletCost < originalTreeletCost)
             {
@@ -324,13 +340,64 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
             subtrees.Dispose();
+
+        }
+
+        unsafe void ValidateStaging(Node* stagingNodes, SweepSubtree* subtrees, ref QuickList<int> subtreeReferences, int treeletParent, int treeletIndexInParent)
+        {
+            int foundSubtrees, foundLeafCount;
+            ValidateStaging(stagingNodes, 0, subtrees, out foundSubtrees, out foundLeafCount);
+            if (treeletParent < -1 || treeletParent >= nodeCount)
+                throw new Exception("Bad treelet parent.");
+            if (treeletIndexInParent < -1 || (treeletParent >= 0 && treeletIndexInParent >= nodes[treeletParent].ChildCount))
+                throw new Exception("Bad treelet index in parent.");
+            if (treeletParent >= 0 && (&nodes[treeletParent].LeafCountA)[treeletIndexInParent] != foundLeafCount)
+            {
+                throw new Exception("Bad leaf count.");
+            }
+            if (subtreeReferences.Count != foundSubtrees)
+            {
+                throw new Exception("Bad subtree found count.");
+            }
+
+        }
+        unsafe void ValidateStaging(Node* stagingNodes, int stagingNodeIndex, SweepSubtree* subtrees, out int foundSubtrees, out int foundLeafCount)
+        {
+            var stagingNode = stagingNodes + stagingNodeIndex;
+            var children = &stagingNode->ChildA;
+            var leafCounts = &stagingNode->LeafCountA;
+            foundSubtrees = foundLeafCount = 0;
+            for (int i = 0; i < stagingNode->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    int childFoundSubtrees, childFoundLeafCount;
+                    ValidateStaging(stagingNodes, children[i], subtrees, out childFoundSubtrees, out childFoundLeafCount);
+                    if (childFoundLeafCount != leafCounts[i])
+                        throw new Exception("Bad leaf count.");
+                    foundSubtrees += childFoundSubtrees;
+                    foundLeafCount += childFoundLeafCount;
+                }
+                else
+                {
+                    var subtreeIndex = Encode(children[i]);
+                    var subtree = subtrees + subtreeIndex;
+                    if (leafCounts[i] != subtree->LeafCount)
+                        throw new Exception("bad leaf count.");
+                    foundLeafCount += subtree->LeafCount;
+                    ++foundSubtrees;
+                }
+            }
+
         }
 
 
         private unsafe void TopDownSweepRefine(int nodeIndex, ref QuickList<int> spareNodes)
         {
             bool nodesInvalidated;
-            AgglomerativeRefine(nodeIndex, ref spareNodes, out nodesInvalidated);
+            Validate();
+            SweepRefine(nodeIndex, ref spareNodes, out nodesInvalidated);
+            Validate();
             //The root of the tree is guaranteed to stay in position, so nodeIndex is still valid.
 
             //Node pointers can be invalidated, so don't hold a reference between executions.
@@ -340,11 +407,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (child >= 0)
                 {
                     TopDownSweepRefine(child, ref spareNodes);
-
                 }
             }
-
-
         }
         public unsafe void TopDownSweepRefine()
         {
