@@ -22,7 +22,7 @@ namespace SIMDPrototyping
 
             TreeTest.Test();
 
-            
+            //Console.ReadKey();
         }
 
 
