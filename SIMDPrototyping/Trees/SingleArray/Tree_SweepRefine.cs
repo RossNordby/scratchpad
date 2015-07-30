@@ -62,6 +62,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 centroids[i] = (&subtrees[i].BoundingBox.Min.X)[axisIndex] + (&subtrees[i].BoundingBox.Max.X)[axisIndex];
             }
+
+            for (int i = 0; i < subtreeCount; ++i)
+            {
+                if (subtrees[i].LeafCount == 0)
+                    Console.WriteLine("impossible");
+            }
             for (int i = 1; i < subtreeCount; ++i)
             {
                 var index = i;
@@ -75,9 +81,20 @@ namespace SIMDPrototyping.Trees.SingleArray
                     centroids[previousIndex] = tempCentroid;
                     subtrees[previousIndex] = tempSubtree;
 
+                    if (subtrees[index].LeafCount == 0 || subtrees[previousIndex].LeafCount == 0)
+                        Console.WriteLine("asD");
+
+                    if (previousIndex == 0)
+                        break;
                     index = previousIndex;
                     --previousIndex;
                 }
+            }
+
+            for (int i = 0; i < subtreeCount; ++i)
+            {
+                if (subtrees[i].LeafCount == 0)
+                    Console.WriteLine("impossible");
             }
         }
 
@@ -116,7 +133,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int leafCount = 0;
             for (int i = 0; i < subtreeCount - 1; ++i)
             {
-                leafCount += subtrees[i].LeafCount;
+                leafCount += subtrees[subtreeStart + i].LeafCount;
                 BoundingBox.Merge(ref merged, ref subtrees[subtreeStart + i].BoundingBox, out merged);
                 var candidateCost = leafCount * ComputeBoundsMetric(ref merged) + bLeafCounts[i] * ComputeBoundsMetric(ref bMerged[i]);
                 if (candidateCost < lowestCost)
@@ -129,8 +146,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                     bLeafCount = bLeafCounts[i];
                 }
             }
+            
             return subtreeStart + lowestIndex + 1;
         }
+
 
 
         unsafe void SplitSubtreesIntoChildren(int depthRemaining, SweepSubtree* subtrees, int subtreeStart, int subtreeCount, ref BoundingBox boundingBox,
@@ -143,6 +162,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 var splitIndex = GetSplitIndex(subtrees, subtreeStart, subtreeCount, out a, out b, out leafCountA, out leafCountB);
+                if ((leafCountA + leafCountB) == 1)
+                    Console.WriteLine("impossible");
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
@@ -350,9 +371,11 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
+        
+
         unsafe void ValidateStaging(Node* stagingNodes, SweepSubtree* subtrees, ref QuickList<int> subtreeReferences, int treeletParent, int treeletIndexInParent)
         {
-            //return;
+            return;
             int foundSubtrees, foundLeafCount;
             QuickList<int> collectedSubtreeReferences = new QuickList<int>(BufferPools<int>.Thread);
             ValidateStaging(stagingNodes, 0, subtrees, ref collectedSubtreeReferences, out foundSubtrees, out foundLeafCount);
