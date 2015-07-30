@@ -180,7 +180,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         Debug.Assert(subtreeCountA == 1);
                         //Only one subtree. Don't create another node.
-                        stagingChildren[childIndexA] = Encode(subtreeStart);
+                        stagingChildren[childIndexA] = subtrees[subtreeStart].Index;
+                        if (subtrees[subtreeStart].LeafCount != stagingLeafCounts[childIndexA])
+                            Console.WriteLine("ASDF");
                         costA = 0;
                     }
                     if (subtreeCountB > 1)
@@ -193,7 +195,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         Debug.Assert(subtreeCountB == 1);
                         //Only one subtree. Don't create another node.
-                        stagingChildren[childIndexB] = Encode(splitIndex);
+                        stagingChildren[childIndexB] = subtrees[splitIndex].Index;
+                        if (subtrees[splitIndex].LeafCount != stagingLeafCounts[childIndexB])
+                            Console.WriteLine("ASDF");
                         costB = 0;
                     }
                 }
@@ -206,7 +210,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var childIndex = stagingNodes[stagingNodeIndex].ChildCount++;
                 Debug.Assert(stagingNodes[stagingNodeIndex].ChildCount <= ChildrenCapacity);
                 (&stagingNodes[stagingNodeIndex].A)[childIndex] = subtrees[subtreeStart].BoundingBox;
-                (&stagingNodes[stagingNodeIndex].ChildA)[childIndex] = Encode(subtreeStart);
+                (&stagingNodes[stagingNodeIndex].ChildA)[childIndex] = subtrees[subtreeStart].Index;
                 (&stagingNodes[stagingNodeIndex].LeafCountA)[childIndex] = subtrees[subtreeStart].LeafCount;
                 //Subtrees cannot contribute to change in cost.
                 childrenTreeletsCost = 0;
@@ -321,12 +325,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             float newTreeletCost;
             CreateStagingNode(parent, indexInParent, ref treeletBoundingBox, sweepSubtrees, 0, subtrees.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
+
             ValidateStaging(stagingNodes, sweepSubtrees, ref subtrees, parent, indexInParent);
 
             if (newTreeletCost < originalTreeletCost)
             {
                 //Reify the nodes.
+                ValidateLeaves();
                 ReifyStagingNode(parent, indexInParent, stagingNodes, 0, stagingNodeCapacity, ref subtrees, ref internalNodes, out nodesInvalidated);
+                ValidateLeaves();
             }
             else
             {
@@ -345,8 +352,10 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void ValidateStaging(Node* stagingNodes, SweepSubtree* subtrees, ref QuickList<int> subtreeReferences, int treeletParent, int treeletIndexInParent)
         {
+            //return;
             int foundSubtrees, foundLeafCount;
-            ValidateStaging(stagingNodes, 0, subtrees, out foundSubtrees, out foundLeafCount);
+            QuickList<int> collectedSubtreeReferences = new QuickList<int>(BufferPools<int>.Thread);
+            ValidateStaging(stagingNodes, 0, subtrees, ref collectedSubtreeReferences, out foundSubtrees, out foundLeafCount);
             if (treeletParent < -1 || treeletParent >= nodeCount)
                 throw new Exception("Bad treelet parent.");
             if (treeletIndexInParent < -1 || (treeletParent >= 0 && treeletIndexInParent >= nodes[treeletParent].ChildCount))
@@ -359,9 +368,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 throw new Exception("Bad subtree found count.");
             }
-
+            for (int i = 0; i < collectedSubtreeReferences.Count; ++i)
+            {
+                if (!subtreeReferences.Contains(collectedSubtreeReferences[i]) || !collectedSubtreeReferences.Contains(subtreeReferences[i]))
+                    throw new Exception("Bad subtree reference.");
+            }
+            collectedSubtreeReferences.Dispose();
         }
-        unsafe void ValidateStaging(Node* stagingNodes, int stagingNodeIndex, SweepSubtree* subtrees, out int foundSubtrees, out int foundLeafCount)
+        unsafe void ValidateStaging(Node* stagingNodes, int stagingNodeIndex, SweepSubtree* subtrees, ref QuickList<int> collectedSubtreeReferences, out int foundSubtrees, out int foundLeafCount)
         {
             var stagingNode = stagingNodes + stagingNodeIndex;
             var children = &stagingNode->ChildA;
@@ -372,7 +386,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (children[i] >= 0)
                 {
                     int childFoundSubtrees, childFoundLeafCount;
-                    ValidateStaging(stagingNodes, children[i], subtrees, out childFoundSubtrees, out childFoundLeafCount);
+                    ValidateStaging(stagingNodes, children[i], subtrees, ref collectedSubtreeReferences, out childFoundSubtrees, out childFoundLeafCount);
                     if (childFoundLeafCount != leafCounts[i])
                         throw new Exception("Bad leaf count.");
                     foundSubtrees += childFoundSubtrees;
@@ -386,6 +400,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         throw new Exception("bad leaf count.");
                     foundLeafCount += subtree->LeafCount;
                     ++foundSubtrees;
+                    collectedSubtreeReferences.Add(subtree->Index);
                 }
             }
 
