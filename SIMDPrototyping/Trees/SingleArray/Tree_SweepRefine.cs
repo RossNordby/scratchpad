@@ -300,7 +300,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 0; i < subtrees.Count; ++i)
             {
                 var subtree = sweepSubtrees + i;
-                subtree->Index = subtrees.Elements[i];
+                subtree->Index = i;
                 if (subtree->Index >= 0)
                 {
                     //It's an internal node.
