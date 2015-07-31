@@ -27,7 +27,14 @@ namespace SIMDPrototyping.Trees.Tests
 
                 results.Count = 0;
                 tree.GetOverlaps(aabb, results);
+
+                var overlaps = new List<TreeOverlapPair<TestCollidableBEPU, TestCollidableBEPU>>(100);
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    tree.GetOverlaps(tree, overlaps);
+                }
             }
+            GC.Collect();
 
             {
 
@@ -55,6 +62,15 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"BEPU Query Time: {endTime - startTime}, overlaps: {results.Count}");
 
+                //var overlaps = new RawList<TreeOverlapPair<TestCollidableBEPU, TestCollidableBEPU>>(280000);
+                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //for (int i = 0; i < selfTestCount; ++i)
+                //{
+                //    overlaps.Count = 0;
+                //    tree.GetOverlaps(tree, overlaps);
+                //}
+                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //Console.WriteLine($"BEPU SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
             }
 
         }

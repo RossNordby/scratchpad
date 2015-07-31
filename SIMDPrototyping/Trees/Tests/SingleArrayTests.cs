@@ -40,7 +40,10 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();
-                //tree.BottomUpRefine();
+                tree.BottomUpAgglomerativeRefine();
+                tree.TopDownAgglomerativeRefine();
+                tree.BottomUpSweepRefine();
+                tree.TopDownSweepRefine();
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
