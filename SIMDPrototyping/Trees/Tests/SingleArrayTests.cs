@@ -93,13 +93,13 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.Validate();
 
-                //QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
-                //bool nodesInvalidated;
+                QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
+                bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 10; ++i)
+                for (int i = 0; i < 10000; ++i)
                 {
-                    //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
+                    tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
                     //tree.BottomUpSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
                     //tree.TopDownSweepRefine();

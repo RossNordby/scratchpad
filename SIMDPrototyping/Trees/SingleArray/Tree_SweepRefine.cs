@@ -37,31 +37,36 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Compute dominant axis based on the bounding box.
             //Sort along that axis. This uses an in-place insertion sort for simplicity and to take advantage of the partially sorted data.
             var offset = boundingBox.Max - boundingBox.Min;
-            int axisIndex;
+            subtrees += subtreeStart;
+            //A variety of potential microoptimizations exist here.
+            //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
+            var centroids = stackalloc float[subtreeCount];
             if (offset.X >= offset.Y && offset.X >= offset.Z)
             {
                 //X is dominant.
-                axisIndex = 0;
+                for (int i = 0; i < subtreeCount; ++i)
+                {
+                    centroids[i] = subtrees[i].BoundingBox.Min.X + subtrees[i].BoundingBox.Max.X;
+                }
             }
             else if (offset.Y >= offset.Z)
             {
                 //Y is dominant.
-                axisIndex = 1;
+                for (int i = 0; i < subtreeCount; ++i)
+                {
+                    centroids[i] = subtrees[i].BoundingBox.Min.Y + subtrees[i].BoundingBox.Max.Y;
+                }
             }
             else
             {
-                //Z is dominant.
-                axisIndex = 2;
+                //Z is dominant.   
+                for (int i = 0; i < subtreeCount; ++i)
+                {
+                    centroids[i] = subtrees[i].BoundingBox.Min.Z + subtrees[i].BoundingBox.Max.Z;
+                }
             }
-            //A variety of potential optimizations exist here.
-            //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
-            //May also want to try not accessing components via pointer- may be faster to do directly, not much extra work.
-            var centroids = stackalloc float[subtreeCount];
-            subtrees += subtreeStart;
-            for (int i = 0; i < subtreeCount; ++i)
-            {
-                centroids[i] = (&subtrees[i].BoundingBox.Min.X)[axisIndex] + (&subtrees[i].BoundingBox.Max.X)[axisIndex];
-            }
+
+
 
  
             for (int i = 1; i < subtreeCount; ++i)
