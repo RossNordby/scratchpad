@@ -41,12 +41,16 @@ namespace SIMDPrototyping.Trees.SingleArray
             //A variety of potential microoptimizations exist here.
             //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
             var centroids = stackalloc float[subtreeCount];
+            var subtreesCopy = stackalloc SweepSubtree[subtreeCount];
+            var indexMap = stackalloc int[subtreeCount];
             if (offset.X >= offset.Y && offset.X >= offset.Z)
             {
                 //X is dominant.
                 for (int i = 0; i < subtreeCount; ++i)
                 {
                     centroids[i] = subtrees[i].BoundingBox.Min.X + subtrees[i].BoundingBox.Max.X;
+                    indexMap[i] = i;
+                    subtreesCopy[i] = subtrees[i];
                 }
             }
             else if (offset.Y >= offset.Z)
@@ -55,6 +59,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 for (int i = 0; i < subtreeCount; ++i)
                 {
                     centroids[i] = subtrees[i].BoundingBox.Min.Y + subtrees[i].BoundingBox.Max.Y;
+                    indexMap[i] = i;
+                    subtreesCopy[i] = subtrees[i];
                 }
             }
             else
@@ -63,9 +69,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 for (int i = 0; i < subtreeCount; ++i)
                 {
                     centroids[i] = subtrees[i].BoundingBox.Min.Z + subtrees[i].BoundingBox.Max.Z;
+                    indexMap[i] = i;
+                    subtreesCopy[i] = subtrees[i];
                 }
             }
-
 
 
  
@@ -73,14 +80,18 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 var index = i;
                 var previousIndex = index - 1;
-                while (centroids[index] < centroids[previousIndex])
+                while (centroids[indexMap[index]] < centroids[indexMap[previousIndex]])
                 {
-                    var tempCentroid = centroids[index];
-                    var tempSubtree = subtrees[index];
-                    centroids[index] = centroids[previousIndex];
-                    subtrees[index] = subtrees[previousIndex];
-                    centroids[previousIndex] = tempCentroid;
-                    subtrees[previousIndex] = tempSubtree;
+                    //var tempCentroid = centroids[pointers[index]];
+                    //var tempSubtree = subtrees[index];
+                    //centroids[index] = centroids[previousIndex];
+                    //subtrees[index] = subtrees[previousIndex];
+                    //centroids[previousIndex] = tempCentroid;
+                    //subtrees[previousIndex] = tempSubtree;
+
+                    var tempPointer = indexMap[index];
+                    indexMap[index] = indexMap[previousIndex];
+                    indexMap[previousIndex] = tempPointer;
 
 
                     if (previousIndex == 0)
@@ -88,6 +99,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                     index = previousIndex;
                     --previousIndex;
                 }
+            }
+
+            for (int i = 0; i < subtreeCount; ++i)
+            {
+                subtrees[i] = subtreesCopy[indexMap[i]];
             }
 
         
