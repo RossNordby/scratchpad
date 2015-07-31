@@ -375,7 +375,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void ValidateStaging(Node* stagingNodes, SweepSubtree* subtrees, ref QuickList<int> subtreeNodePointers, int treeletParent, int treeletIndexInParent)
         {
-            return;
             int foundSubtrees, foundLeafCount;
             QuickList<int> collectedSubtreeReferences = new QuickList<int>(BufferPools<int>.Thread);
             ValidateStaging(stagingNodes, 0, subtrees, ref subtreeNodePointers, ref collectedSubtreeReferences, out foundSubtrees, out foundLeafCount);
@@ -441,7 +440,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         foundLeafCount += 1;
                     }
                     ++foundSubtrees;
-                    collectedSubtreeReferences.Add(subtreeNodePointerIndex);
+                    collectedSubtreeReferences.Add(subtreeNodePointer);
                 }
             }
 
