@@ -63,11 +63,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 centroids[i] = (&subtrees[i].BoundingBox.Min.X)[axisIndex] + (&subtrees[i].BoundingBox.Max.X)[axisIndex];
             }
 
-            for (int i = 0; i < subtreeCount; ++i)
-            {
-                if (subtrees[i].LeafCount == 0)
-                    Console.WriteLine("impossible");
-            }
+ 
             for (int i = 1; i < subtreeCount; ++i)
             {
                 var index = i;
@@ -81,8 +77,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     centroids[previousIndex] = tempCentroid;
                     subtrees[previousIndex] = tempSubtree;
 
-                    if (subtrees[index].LeafCount == 0 || subtrees[previousIndex].LeafCount == 0)
-                        Console.WriteLine("asD");
 
                     if (previousIndex == 0)
                         break;
@@ -91,11 +85,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
 
-            for (int i = 0; i < subtreeCount; ++i)
-            {
-                if (subtrees[i].LeafCount == 0)
-                    Console.WriteLine("impossible");
-            }
+        
         }
 
         unsafe int GetSplitIndex(SweepSubtree* subtrees, int subtreeStart, int subtreeCount, out BoundingBox a, out BoundingBox b, out int aLeafCount, out int bLeafCount)
@@ -162,8 +152,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 var splitIndex = GetSplitIndex(subtrees, subtreeStart, subtreeCount, out a, out b, out leafCountA, out leafCountB);
-                if ((leafCountA + leafCountB) == 1)
-                    Console.WriteLine("impossible");
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
@@ -202,8 +190,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                         Debug.Assert(subtreeCountA == 1);
                         //Only one subtree. Don't create another node.
                         stagingChildren[childIndexA] = Encode(subtrees[subtreeStart].Index);
-                        if (subtrees[subtreeStart].LeafCount != stagingLeafCounts[childIndexA])
-                            Console.WriteLine("ASDF");
                         costA = 0;
                     }
                     if (subtreeCountB > 1)
@@ -217,8 +203,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                         Debug.Assert(subtreeCountB == 1);
                         //Only one subtree. Don't create another node.
                         stagingChildren[childIndexB] = Encode(subtrees[splitIndex].Index);
-                        if (subtrees[splitIndex].LeafCount != stagingLeafCounts[childIndexB])
-                            Console.WriteLine("ASDF");
                         costB = 0;
                     }
                 }
@@ -282,18 +266,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int internalNodeStartIndex = internalNodes.Count;
             float originalTreeletCost;
-            if (internalNodes.Count > nodeCount)
 
-            {
-                Console.WriteLine("asdf");
-            }
-            //Console.WriteLine($"previousCount: {internalNodes.Count}");
             CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes, out originalTreeletCost);
-            if (internalNodes.Count > nodeCount)
 
-            {
-                Console.WriteLine("ASD");
-            }
 
             //Gather necessary information from nodes. (TODO: This could be more efficiently gathered up front... collectsubtrees already touched most of this data!)
             var sweepSubtrees = stackalloc SweepSubtree[subtrees.Count];
@@ -347,14 +322,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             float newTreeletCost;
             CreateStagingNode(parent, indexInParent, ref treeletBoundingBox, sweepSubtrees, 0, subtrees.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
 
-            ValidateStaging(stagingNodes, sweepSubtrees, ref subtrees, parent, indexInParent);
+            //ValidateStaging(stagingNodes, sweepSubtrees, ref subtrees, parent, indexInParent);
 
             if (newTreeletCost < originalTreeletCost)
             {
                 //Reify the nodes.
-                ValidateLeaves();
+                //ValidateLeaves();
                 ReifyStagingNode(parent, indexInParent, stagingNodes, 0, stagingNodeCapacity, ref subtrees, ref internalNodes, out nodesInvalidated);
-                ValidateLeaves();
+                //ValidateLeaves();
             }
             else
             {
@@ -450,9 +425,9 @@ namespace SIMDPrototyping.Trees.SingleArray
         private unsafe void TopDownSweepRefine(int nodeIndex, ref QuickList<int> spareNodes)
         {
             bool nodesInvalidated;
-            Validate();
+            //Validate();
             SweepRefine(nodeIndex, ref spareNodes, out nodesInvalidated);
-            Validate();
+            //Validate();
             //The root of the tree is guaranteed to stay in position, so nodeIndex is still valid.
 
             //Node pointers can be invalidated, so don't hold a reference between executions.
@@ -472,5 +447,48 @@ namespace SIMDPrototyping.Trees.SingleArray
             RemoveUnusedInternalNodes(ref spareNodes);
             spareNodes.Dispose();
         }
+
+
+        unsafe void TryToBottomUpSweepRefine(int[] refinementFlags, int nodeIndex, ref QuickList<int> spareInternalNodes)
+        {
+            if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
+            {
+                bool nodesInvalidated;
+                SweepRefine(nodeIndex, ref spareInternalNodes, out nodesInvalidated);
+
+                var parent = nodes[nodeIndex].Parent;
+                if (parent != -1)
+                {
+                    TryToBottomUpSweepRefine(refinementFlags, parent, ref spareInternalNodes);
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// Executes one pass of bottom-up refinement.
+        /// </summary>
+        public unsafe void BottomUpSweepRefine()
+        {
+            //If this works out, should probably choose a more efficient flagging approach.
+            //Note the size: it needs to contain all possible internal nodes.
+            //TODO: This is actually bugged, because the refinement flags do not update if the nodes move.
+            //And the nodes CAN move.
+            var spareNodes = new QuickList<int>(BufferPools<int>.Thread, 8);
+            var refinementFlags = new int[leafCount * 2 - 1];
+            for (int i = 0; i < nodeCount; ++i)
+            {
+                refinementFlags[i] = 0;
+            }
+            for (int i = 0; i < leafCount; ++i)
+            {
+                TryToBottomUpSweepRefine(refinementFlags, leaves[i].NodeIndex, ref spareNodes);
+                //Validate();
+            }
+            //Console.WriteLine($"root children: {nodes->ChildCount}");
+            RemoveUnusedInternalNodes(ref spareNodes);
+            spareNodes.Dispose();
+        }
+
     }
 }

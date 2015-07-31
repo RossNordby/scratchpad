@@ -456,7 +456,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe void TryToBottomUpRefine(int[] refinementFlags, int nodeIndex, ref QuickList<int> spareInternalNodes)
+        unsafe void TryToBottomUpAgglomerativeRefine(int[] refinementFlags, int nodeIndex, ref QuickList<int> spareInternalNodes)
         {
             if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
             {
@@ -466,7 +466,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var parent = nodes[nodeIndex].Parent;
                 if (parent != -1)
                 {
-                    TryToBottomUpRefine(refinementFlags, parent, ref spareInternalNodes);
+                    TryToBottomUpAgglomerativeRefine(refinementFlags, parent, ref spareInternalNodes);
                 }
             }
         }
@@ -475,7 +475,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// <summary>
         /// Executes one pass of bottom-up refinement.
         /// </summary>
-        public unsafe void BottomUpRefine()
+        public unsafe void BottomUpAgglomerativeRefine()
         {
             //If this works out, should probably choose a more efficient flagging approach.
             //Note the size: it needs to contain all possible internal nodes.
@@ -489,7 +489,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             for (int i = 0; i < leafCount; ++i)
             {
-                TryToBottomUpRefine(refinementFlags, leaves[i].NodeIndex, ref spareNodes);
+                TryToBottomUpAgglomerativeRefine(refinementFlags, leaves[i].NodeIndex, ref spareNodes);
                 //Validate();
             }
             //Console.WriteLine($"root children: {nodes->ChildCount}");
@@ -499,7 +499,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        private unsafe void TopDownRefine(int nodeIndex, ref QuickList<int> spareNodes)
+        private unsafe void TopDownAgglomerativeRefine(int nodeIndex, ref QuickList<int> spareNodes)
         {
             bool nodesInvalidated;
             AgglomerativeRefine(nodeIndex, ref spareNodes, out nodesInvalidated);
@@ -511,17 +511,17 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var child = (&nodes[nodeIndex].ChildA)[i];
                 if (child >= 0)
                 {
-                    TopDownRefine(child, ref spareNodes);
+                    TopDownAgglomerativeRefine(child, ref spareNodes);
 
                 }
             }
 
 
         }
-        public unsafe void TopDownRefine()
+        public unsafe void TopDownAgglomerativeRefine()
         {
             var spareNodes = new QuickList<int>(BufferPools<int>.Thread, 8);
-            TopDownRefine(0, ref spareNodes);
+            TopDownAgglomerativeRefine(0, ref spareNodes);
             RemoveUnusedInternalNodes(ref spareNodes);
             spareNodes.Dispose();
         }

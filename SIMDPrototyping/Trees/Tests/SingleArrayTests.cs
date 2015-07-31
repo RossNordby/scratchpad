@@ -90,41 +90,16 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.Validate();
 
-                //var leafCount = tree.LeafCount;
-                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //int passes = 5;
-                //for (int passIndex = 0; passIndex < passes; ++passIndex)
-                //{
-                //    for (int i = leafCount - 1; i >= 0; --i)
-                //    {
-                //        BoundingBox boundingBox;
-                //        var id = tree.LeavesArray[i].Id;
-                //        tree.GetLeafBoundingBox(i, out boundingBox);
-                //        //tree.Refit();
-                //        tree.RemoveAt(i);
-                //        //tree.Validate();
-                //        //tree.Refit();
-                //        tree.AddGlobal(id, ref boundingBox);
-                //        //tree.Refit();
-                //        //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-                //        //tree.Validate();
-                //    }
-                //}
-                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
-                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostHeuristic()}");
-
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //tree.AgglomerativeRefine(4);
                 for (int i = 0; i < 10; ++i)
                 {
-                    //bool test;
-                    //tree.AgglomerativeRefine(0, out test);
-                    tree.TopDownSweepRefine();
-                    tree.Refit();
+
+                    tree.BottomUpSweepRefine();
+                    //tree.TopDownSweepRefine();
+                    //tree.Refit();
                     //tree.BottomUpRefine();
-                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                    tree.Validate();
+                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                    //tree.Validate();
                 }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
