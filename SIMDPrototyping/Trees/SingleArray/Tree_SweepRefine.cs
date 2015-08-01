@@ -15,79 +15,25 @@ namespace SIMDPrototyping.Trees.SingleArray
         struct SweepSubtree
         {
             public BoundingBox BoundingBox;
-            public int Index;
             public int LeafCount;
         }
 
-        unsafe void ComputeBoundingBox(SweepSubtree* subtrees, int subtreeStart, int subtreeCount, out BoundingBox boundingBox)
+      
+
+        unsafe void FindPartitionForAxis(SweepSubtree* subtrees, int* indexMap, Vector3* centroids, int subtreeCount, int axisIndex,
+            out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
-            Debug.Assert(subtreeCount > 0);
-            Debug.Assert(subtreeStart >= 0);
-            subtrees += subtreeStart;
+            Debug.Assert(subtreeCount > 1);
+            //TODO: Test performance of accessing centroid components by reinterpreting the centroid pointer as a float and using a stride with offset.
+            //Another option: store as SOA to begin with. Frontloads the cost of transposition and avoids all access difficulty. My guess is this will be a win.
 
-            boundingBox = subtrees->BoundingBox;
-            for (int i = 1; i < subtreeCount; ++i)
-            {
-                BoundingBox.Merge(ref subtrees[i].BoundingBox, ref boundingBox, out boundingBox);
-            }
-        }
-
-        unsafe void CentroidSort(SweepSubtree* subtrees, int subtreeStart, int subtreeCount, ref BoundingBox boundingBox)
-        {
-            //Compute dominant axis based on the bounding box.
-            //Sort along that axis. This uses an in-place insertion sort for simplicity and to take advantage of the partially sorted data.
-            var offset = boundingBox.Max - boundingBox.Min;
-            subtrees += subtreeStart;
-            //A variety of potential microoptimizations exist here.
-            //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
-            var centroids = stackalloc float[subtreeCount];
-            var subtreesCopy = stackalloc SweepSubtree[subtreeCount];
-            var indexMap = stackalloc int[subtreeCount];
-            if (offset.X >= offset.Y && offset.X >= offset.Z)
-            {
-                //X is dominant.
-                for (int i = 0; i < subtreeCount; ++i)
-                {
-                    centroids[i] = subtrees[i].BoundingBox.Min.X + subtrees[i].BoundingBox.Max.X;
-                    indexMap[i] = i;
-                    subtreesCopy[i] = subtrees[i];
-                }
-            }
-            else if (offset.Y >= offset.Z)
-            {
-                //Y is dominant.
-                for (int i = 0; i < subtreeCount; ++i)
-                {
-                    centroids[i] = subtrees[i].BoundingBox.Min.Y + subtrees[i].BoundingBox.Max.Y;
-                    indexMap[i] = i;
-                    subtreesCopy[i] = subtrees[i];
-                }
-            }
-            else
-            {
-                //Z is dominant.   
-                for (int i = 0; i < subtreeCount; ++i)
-                {
-                    centroids[i] = subtrees[i].BoundingBox.Min.Z + subtrees[i].BoundingBox.Max.Z;
-                    indexMap[i] = i;
-                    subtreesCopy[i] = subtrees[i];
-                }
-            }
-
-
- 
+            //Sort the index map according to the centroids.
             for (int i = 1; i < subtreeCount; ++i)
             {
                 var index = i;
                 var previousIndex = index - 1;
-                while (centroids[indexMap[index]] < centroids[indexMap[previousIndex]])
+                while ((&centroids[indexMap[index]].X)[axisIndex] < (&centroids[indexMap[previousIndex]].X)[axisIndex])
                 {
-                    //var tempCentroid = centroids[pointers[index]];
-                    //var tempSubtree = subtrees[index];
-                    //centroids[index] = centroids[previousIndex];
-                    //subtrees[index] = subtrees[previousIndex];
-                    //centroids[previousIndex] = tempCentroid;
-                    //subtrees[previousIndex] = tempSubtree;
 
                     var tempPointer = indexMap[index];
                     indexMap[index] = indexMap[previousIndex];
@@ -101,66 +47,114 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
 
+            //Search for the best split.
+            //Sweep across from low to high, caching the merged size and leaf count at each point.
+            //Index N includes every subtree from 0 to N, inclusive. So index 0 contains subtree 0's information.
+            var lastIndex = subtreeCount - 1;
+            var aLeafCounts = stackalloc int[lastIndex];
+            var aMerged = stackalloc BoundingBox[lastIndex];
+            aLeafCounts[0] = subtrees[0].LeafCount;
+            aMerged[0] = subtrees[0].BoundingBox;
+            for (int i = 1; i < subtreeCount; ++i)
+            {
+                aLeafCounts[i] = subtrees[i].LeafCount + aLeafCounts[i - 1];
+                BoundingBox.Merge(ref aMerged[i - 1], ref subtrees[i].BoundingBox, out aMerged[i]);
+            }
+
+            //Sweep from high to low.
+            BoundingBox bMerged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
+            cost = float.MaxValue;
+            splitIndex = 0;
+            int bLeafCount = 0;
+            a = bMerged;
+            b = bMerged;
+            leafCountA = 0;
+            leafCountB = 0;
+            for (int i = lastIndex - 1; i >= 1; --i)
+            {
+                int aIndex = i - 1;
+                BoundingBox.Merge(ref bMerged, ref subtrees[lastIndex].BoundingBox, out bMerged);
+                bLeafCount += subtrees[lastIndex].LeafCount;
+
+                var aCost = aLeafCounts[aIndex] * ComputeBoundsMetric(ref aMerged[aIndex]);
+                var bCost = bLeafCount * ComputeBoundsMetric(ref bMerged);
+
+                var totalCost = aCost + bCost;
+                if (totalCost < cost)
+                {
+                    cost = totalCost;
+                    splitIndex = i;
+                    a = aMerged[aIndex];
+                    b = bMerged;
+                    leafCountA = aLeafCounts[aIndex];
+                    leafCountB = bLeafCount;
+                }
+
+            }
+
+        }
+        unsafe void FindPartition(SweepSubtree* subtrees, int* indexMap, int subtreeStart, int subtreeCount, ref BoundingBox boundingBox,
+               out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
+        {
+            //Compute dominant axis based on the bounding box.
+            //Sort along that axis. This uses an in-place insertion sort for simplicity and to take advantage of the partially sorted data.
+            var offset = boundingBox.Max - boundingBox.Min;
+
+            //A variety of potential microoptimizations exist here.
+            //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
+            var centroids = stackalloc Vector3[subtreeCount];
+            var indexMapX = stackalloc int[subtreeCount];
+            var indexMapY = stackalloc int[subtreeCount];
+            var indexMapZ = stackalloc int[subtreeCount];
+
+            //Initialize the per-axis candidate maps.
+            subtrees += subtreeStart;
+            indexMap += subtreeStart;
             for (int i = 0; i < subtreeCount; ++i)
             {
-                subtrees[i] = subtreesCopy[indexMap[i]];
+                var originalValue = indexMap[i];
+                indexMapX[i] = originalValue;
+                indexMapY[i] = originalValue;
+                indexMapZ[i] = originalValue;
+                centroids[i] = subtrees[i].BoundingBox.Min + subtrees[i].BoundingBox.Max;
             }
 
+            int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
+            BoundingBox xA, xB, yA, yB, zA, zB;
+            float xCost, yCost, zCost;
+            FindPartitionForAxis(subtrees, indexMapX, centroids, subtreeCount, 0, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
+            FindPartitionForAxis(subtrees, indexMapY, centroids, subtreeCount, 0, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
+            FindPartitionForAxis(subtrees, indexMapZ, centroids, subtreeCount, 0, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
+
+            if (xCost <= yCost && xCost <= zCost)
+            {
+                splitIndex = xSplitIndex;
+                cost = xCost;
+                a = xA;
+                b = xB;
+                leafCountA = xLeafCountA;
+                leafCountB = xLeafCountB;
+            }
+            else if (yCost <= zCost)
+            {
+                splitIndex = ySplitIndex;
+                cost = yCost;
+                a = yA;
+                b = yB;
+                leafCountA = yLeafCountA;
+                leafCountB = yLeafCountB;
+            }
+            else
+            {
+                splitIndex = zSplitIndex;
+                cost = zCost;
+                a = zA;
+                b = zB;
+                leafCountA = zLeafCountA;
+                leafCountB = zLeafCountB;
+            }
+        }
         
-        }
-
-        unsafe int GetSplitIndex(SweepSubtree* subtrees, int subtreeStart, int subtreeCount, out BoundingBox a, out BoundingBox b, out int aLeafCount, out int bLeafCount)
-        {
-            //Precompute the bounding boxes to avoid redundant work.
-            //TODO: Could avoid reallocating this array over and over again.
-            //Build the bMerged lists by iterating backwards through the sorted leaves. Only do length - 1, since 0 < split < length - 1.
-            //We want to just index bMerged directly with the candidate splitIndex to get the associated bounding boxes.
-            //So, bMerged[0] should contain all bounding boxes from leaves[start + 1] to leaves[start + length - 1].
-            //bMerged[bMerged.Length - 1] is just leaves[start + length - 1]'s bounding box.
-            var bMergedLength = subtreeCount - 1;
-            var bMerged = stackalloc BoundingBox[bMergedLength];
-            var bLeafCounts = stackalloc int[bMergedLength];
-            var lastIndex = subtreeStart + subtreeCount - 1;
-
-            bMerged[bMergedLength - 1] = subtrees[lastIndex].BoundingBox;
-            bLeafCounts[bMergedLength - 1] = subtrees[lastIndex].LeafCount;
-            for (int i = bMergedLength - 2; i >= 0; --i)
-            {
-                var subtreeIndex = subtreeStart + 1 + i;
-                bLeafCounts[i] = bLeafCounts[i + 1] + subtrees[subtreeIndex].LeafCount;
-                BoundingBox.Merge(ref subtrees[subtreeIndex].BoundingBox, ref bMerged[i + 1], out bMerged[i]);
-
-            }
-
-            int lowestIndex = -1;
-            float lowestCost = float.MaxValue;
-            BoundingBox merged = new BoundingBox
-            {
-                Min = new Vector3(float.MaxValue),
-                Max = new Vector3(-float.MaxValue)
-            };
-            a = b = merged;
-            aLeafCount = bLeafCount = 0;
-            int leafCount = 0;
-            for (int i = 0; i < subtreeCount - 1; ++i)
-            {
-                leafCount += subtrees[subtreeStart + i].LeafCount;
-                BoundingBox.Merge(ref merged, ref subtrees[subtreeStart + i].BoundingBox, out merged);
-                var candidateCost = leafCount * ComputeBoundsMetric(ref merged) + bLeafCounts[i] * ComputeBoundsMetric(ref bMerged[i]);
-                if (candidateCost < lowestCost)
-                {
-                    lowestCost = candidateCost;
-                    lowestIndex = i;
-                    a = merged;
-                    b = bMerged[i];
-                    aLeafCount = leafCount;
-                    bLeafCount = bLeafCounts[i];
-                }
-            }
-            
-            return subtreeStart + lowestIndex + 1;
-        }
-
 
 
         unsafe void SplitSubtreesIntoChildren(int depthRemaining, SweepSubtree* subtrees, int subtreeStart, int subtreeCount, ref BoundingBox boundingBox,
@@ -367,7 +361,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        
+
 
         unsafe void ValidateStaging(Node* stagingNodes, SweepSubtree* subtrees, ref QuickList<int> subtreeNodePointers, int treeletParent, int treeletIndexInParent)
         {
