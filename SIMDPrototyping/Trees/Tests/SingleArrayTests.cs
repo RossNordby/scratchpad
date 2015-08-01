@@ -97,12 +97,12 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 10; ++i)
+                for (int i = 0; i < 30000; ++i)
                 {
-                    //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
-                    tree.BottomUpSweepRefine();
+                    tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
+                    //tree.BottomUpSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
-                    tree.TopDownSweepRefine();
+                    //tree.TopDownSweepRefine();
                     //tree.Refit();
                     //tree.BottomUpRefine();
                     //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");

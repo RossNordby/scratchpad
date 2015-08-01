@@ -16,7 +16,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        float ComputeBoundsMetric(ref BoundingBox boundingBox)
+        internal static float ComputeBoundsMetric(ref BoundingBox boundingBox)
         {
             return BoundingBox.ComputeVolume(ref boundingBox);
             //var offset = boundingBox.Max - boundingBox.Min;

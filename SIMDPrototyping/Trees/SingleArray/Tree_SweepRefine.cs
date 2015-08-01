@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -96,6 +97,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
         }
+        [MethodImpl(MethodImplOptions.NoInlining)]
         unsafe void FindPartition(SweepSubtree* subtrees, int* indexMap, int start, int count,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
@@ -158,13 +160,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             splitIndex += start;
 
-            int totalLeafCount = 0;
-            for (int i = 0; i < count; ++i)
-            {
-                totalLeafCount += subtrees[indexMap[i]].LeafCount;
-            }
-            if (leafCountA + leafCountB != totalLeafCount)
-                throw new Exception("bad");
+
         }
 
 
@@ -178,19 +174,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 int splitIndex;
-                List<int> indicesPreviously = new List<int>();
-                for (int i = start; i < start + count; ++i)
-                {
-                    indicesPreviously.Add(indexMap[i]);
-                }
                 FindPartition(subtrees, indexMap, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
-                for (int i = start; i < start + count; ++i)
-                {
-                    if (!indicesPreviously.Contains(indexMap[i]))
-                    {
-                        Console.WriteLine("Bad");
-                    }
-                }
+
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
@@ -366,7 +351,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             float newTreeletCost;
             CreateStagingNode(parent, indexInParent, ref treeletBoundingBox, sweepSubtrees, indexMap, 0, subtreeReferences.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
 
-            ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
+            //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
             if (newTreeletCost < originalTreeletCost)
             {
