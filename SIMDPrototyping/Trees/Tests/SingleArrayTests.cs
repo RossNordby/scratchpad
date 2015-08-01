@@ -94,12 +94,37 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.Validate();
 
                 QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
+                QuickList<int> subtrees = new QuickList<int>(new BufferPool<int>(), 8);
+                QuickList<int> internalNodes2 = new QuickList<int>(new BufferPool<int>(), 8);
+                QuickList<int> subtrees2 = new QuickList<int>(new BufferPool<int>(), 8);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                 for (int i = 0; i < 30000; ++i)
                 {
-                    tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
+                    subtrees.Count = 0;
+                    internalNodes.Count = 0;
+                    //subtrees2.Count = 0;
+                    //internalNodes2.Count = 0;
+                    float treeletCost;
+                    //float treeletCost2;
+                    tree.CollectSubtrees(0, 1024, ref subtrees, ref internalNodes, out treeletCost);
+                    //tree.CollectSubtrees2(0, 256, ref subtrees2, ref internalNodes2, out treeletCost2);
+                    //if (internalNodes.Count != internalNodes2.Count || subtrees.Count != subtrees2.Count)
+                    //{
+                    //    Console.WriteLine("bad");
+                    //}
+                    //for (int p = 0; p < internalNodes.Count; ++p)
+                    //{
+                    //    if (!internalNodes2.Contains(internalNodes[p]))
+                    //        Console.WriteLine("bad");
+                    //}
+                    //for (int p = 0; p < subtrees2.Count; ++p)
+                    //{
+                    //    if (!subtrees.Contains(subtrees2[p]))
+                    //        Console.WriteLine("bad");
+                    //}
+                    //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
                     //tree.BottomUpSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
                     //tree.TopDownSweepRefine();

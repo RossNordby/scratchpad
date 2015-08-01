@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,13 +22,34 @@ namespace SIMDPrototyping.Trees.SingleArray
             Count = 0;
         }
 
-        public int Pop()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryPop(Node* nodes, ref int remainingSubtreeSpace, out int index, out float cost)
         {
             Debug.Assert(Count > 0);
-            return Indices[--Count];
+            for (int i = Count - 1; i >= 0; --i)
+            {
+                var childCountChange = nodes[Indices[i]].ChildCount - 1;
+                if (childCountChange <= remainingSubtreeSpace)
+                {
+                    remainingSubtreeSpace = remainingSubtreeSpace - childCountChange;
+                    index = Indices[i];
+                    cost = Costs[i];
+                    //Shift everything down.
+                    for (int j = i; j < Count - 1; ++j)
+                    {
+                        Indices[j] = Indices[j + 1];
+                        Costs[j] = Costs[j + 1];
+                    }
+                    --Count;
+                    return true;
+                }
+            }
+            index = -1;
+            cost = -1;
+            return false;
         }
 
-        public void Insert(Node* node, Node* nodes)
+        public void Insert(Node* node, Node* nodes, ref QuickList<int> subtrees)
         {
             var sortedChildren = stackalloc int[node->ChildCount];
             var childCosts = stackalloc float[node->ChildCount];
@@ -42,6 +64,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                     childCosts[internalChildrenCount] = Tree.ComputeBoundsMetric(ref bounds[i]);
                     ++internalChildrenCount;
                 }
+                else
+                {
+                    //Immediately add leaf nodes.
+                    subtrees.Add(children[i]);
+                }
             }
             //Sort the children to prepare for batched insertion.
             //The priority queue's sort is from lowest to highest.
@@ -53,18 +80,21 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 var index = i;
                 var previousIndex = i - 1;
-                do
+                while (childCosts[previousIndex] < childCosts[index])
                 {
-                    if (childCosts[previousIndex] < childCosts[index])
-                    {
-                        var tempIndex = sortedChildren[index];
-                        var tempCost = childCosts[index];
-                        sortedChildren[index] = sortedChildren[previousIndex];
-                        childCosts[index] = childCosts[previousIndex];
-                        sortedChildren[previousIndex] = tempIndex;
-                        childCosts[previousIndex] = tempCost;
-                    }
-                } while (previousIndex >= 0);
+                    var tempIndex = sortedChildren[index];
+                    var tempCost = childCosts[index];
+                    sortedChildren[index] = sortedChildren[previousIndex];
+                    childCosts[index] = childCosts[previousIndex];
+                    sortedChildren[previousIndex] = tempIndex;
+                    childCosts[previousIndex] = tempCost;
+
+                    index = previousIndex;
+                    --previousIndex;
+
+                    if (previousIndex < 0)
+                        break;
+                }
             }
 
             //Start at the end of the list and work your way back.
@@ -95,7 +125,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     ++nextChildToAllocate;
                 }
             }
-           
+
             Count += internalChildrenCount;
 
 
@@ -104,7 +134,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
-        unsafe void CollectSubtrees2(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
+        public unsafe void CollectSubtrees2(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
         {
 
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
@@ -115,15 +145,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //or perhaps constraining the generation process to leave room for the unaffected nodes.)
 
             var node = nodes + nodeIndex;
-            var bounds = &node->A;
-            var children = &node->ChildA;
             Debug.Assert(maximumSubtrees >= node->ChildCount, "Can't only consider some of a node's children, but specified maximumSubtrees precludes the treelet root's children.");
             //All of treelet root's children are included immediately. (Follows from above requirement.)
 
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                subtrees.Add(children[i]);
-            }
+
+            var indices = stackalloc int[maximumSubtrees];
+            var costs = stackalloc float[maximumSubtrees];
+            SubtreePriorityQueue priorityQueue = new SubtreePriorityQueue(indices, costs);
+
+            priorityQueue.Insert(node, nodes, ref subtrees);
 
             //Cache the index of the treelet root. Later, the root will be moved to the end of the list to guarantee that it's the first node that's used.
             //This provides the guarantee that the treelet root index will not change.
@@ -133,55 +163,25 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Note that the treelet root's cost is excluded from the treeletCost.
             //That's because the treelet root cannot change.
             treeletCost = 0;
-            while (subtrees.Count < maximumSubtrees)
+            int highestIndex;
+            float highestCost;
+            int remainingSubtreeSpace = maximumSubtrees - priorityQueue.Count;
+            while (priorityQueue.TryPop(nodes, ref remainingSubtreeSpace, out highestIndex, out highestCost))
             {
-                //Find the largest subtree.
-                float highestCost = float.MinValue;
-                int highestIndex = -1;
-                for (int subtreeIndex = subtrees.Count - 1; subtreeIndex >= 0; --subtreeIndex)
-                {
-                    var subtreeNodeIndex = subtrees.Elements[subtreeIndex];
-                    if (subtreeNodeIndex >= 0) //Only consider internal nodes.
-                    {
+                treeletCost += highestCost;
+                internalNodes.Add(highestIndex);
 
-                        var subtreeNode = nodes + subtreeNodeIndex;
-                        if ((subtrees.Count - 1 + subtreeNode->ChildCount) <= maximumSubtrees) //Make sure that the new node would fit (after we remove the expanded node).
-                        {
-
-                            var candidateCost = ComputeBoundsMetric(ref (&nodes[subtreeNode->Parent].A)[subtreeNode->IndexInParent]);
-                            if (candidateCost > highestCost)
-                            {
-                                highestIndex = subtreeIndex;
-                                highestCost = candidateCost;
-                            }
-                        }
-                    }
-                }
-                if (highestIndex >= 0)
-                {
-                    treeletCost += highestCost;
-                    //Found a subtree to expand.
-                    var expandedNodeIndex = subtrees.Elements[highestIndex];
-
-                    internalNodes.Add(expandedNodeIndex);
-
-                    subtrees.FastRemoveAt(highestIndex);
-                    //Add all the children to the set of subtrees.
-                    //This is safe because we pre-validated the number of children in the node.
-                    var expandedNode = nodes + expandedNodeIndex;
-                    var expandedNodeChildren = &expandedNode->ChildA;
-                    for (int i = 0; i < expandedNode->ChildCount; ++i)
-                    {
-                        subtrees.Add(expandedNodeChildren[i]);
-                    }
-                }
-                else
-                {
-                    //No further expansions are possible. Either every option was a leaf, or the remaining expansions are too large to fit in the maximumSubtrees.
-                    break;
-                }
-
+                //Add all the children to the set of subtrees.
+                //This is safe because we pre-validated the number of children in the node.
+                var expandedNode = nodes + highestIndex;
+                priorityQueue.Insert(expandedNode, nodes, ref subtrees);
             }
+
+            for (int i = 0; i < priorityQueue.Count; ++i)
+            {
+                subtrees.Add(priorityQueue.Indices[i]);
+            }
+
             //Swap the treelet root into the last position so that the first internal node consumed is guaranteed to be the root.
             var lastIndex = internalNodes.Count - 1;
             var temp = internalNodes.Elements[lastIndex];
@@ -189,7 +189,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             internalNodes.Elements[rootIndex] = temp;
         }
 
-        unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
+        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
         {
 
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
