@@ -77,11 +77,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Ever so slightly offset the min to keep things predictable.
             min += span * 1e-5f;
 
-            var subtreeBinIndices = new int[subtreeCount];
-            var binSubtreeCounts = new int[binCount];
-            var binSubtreeCountsSecondPass = new int[binCount];
-            var binBoundingBoxes = new BoundingBox[binCount];
-            var binLeafCounts = new int[binCount];
+            var subtreeBinIndices = stackalloc int[subtreeCount];
+            var binSubtreeCounts = stackalloc int[binCount];
+            var binSubtreeCountsSecondPass = stackalloc int[binCount];
+            var binBoundingBoxes = stackalloc BoundingBox[binCount];
+            var binLeafCounts = stackalloc int[binCount];
             //Initialize to default values. (Stackalloc actually does this for the numerical types, but we can't assume that.)
             for (int i = 0; i < binCount; ++i)
             {
@@ -106,7 +106,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //Rebuild the index map.
             //Technically, could shave some of this work off until you knew for a fact that this was the winning candidate by cost.
-            var binStartIndices = new int[binCount];
+            var binStartIndices = stackalloc int[binCount];
             binStartIndices[0] = 0;
             for (int i = 1; i < binCount; ++i)
             {
@@ -119,8 +119,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //Determine the split index.
             var lastIndex = binCount - 1;
-            var aLeafCounts = new int[lastIndex];
-            var aMerged = new BoundingBox[lastIndex];
+            var aLeafCounts = stackalloc int[lastIndex];
+            var aMerged = stackalloc BoundingBox[lastIndex];
 
             aLeafCounts[0] = binLeafCounts[0];
             aMerged[0] = binBoundingBoxes[0];
