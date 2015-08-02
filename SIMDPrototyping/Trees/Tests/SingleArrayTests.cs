@@ -104,8 +104,8 @@ namespace SIMDPrototyping.Trees.Tests
 
                     tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
                     //tree.BottomUpSweepRefine();
-                    //tree.BottomUpAgglomerativeRefine();
                     //tree.TopDownSweepRefine();
+                    //tree.BottomUpAgglomerativeRefine();
                     //tree.Refit();
                     //tree.BottomUpRefine();
                     //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
