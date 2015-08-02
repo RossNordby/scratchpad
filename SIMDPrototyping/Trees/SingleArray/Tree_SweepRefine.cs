@@ -53,8 +53,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             var lastIndex = subtreeCount - 1;
             var aLeafCounts = stackalloc int[lastIndex];
             var aMerged = stackalloc BoundingBox[lastIndex];
-            aLeafCounts[0] = subtrees[indexMap[0]].LeafCount;
-            aMerged[0] = subtrees[indexMap[0]].BoundingBox;
+
+            *aLeafCounts = subtrees[*indexMap].LeafCount;
+            *aMerged = subtrees[*indexMap].BoundingBox;
             for (int i = 1; i < lastIndex; ++i)
             {
                 var subtree = subtrees + indexMap[i];
