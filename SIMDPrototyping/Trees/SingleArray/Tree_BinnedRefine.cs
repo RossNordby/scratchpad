@@ -12,12 +12,74 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
+        unsafe void FindPartitionBinned5(ref Subtrees subtrees, int start, int count,
+               out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
+        {
+            //A variety of potential microoptimizations exist here.
+            //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
+            var indexMapX = stackalloc int[count];
+            var indexMapY = stackalloc int[count];
+            var indexMapZ = stackalloc int[count];
+
+            //Initialize the per-axis candidate maps.
+            var localIndexMap = subtrees.IndexMap + start;
+            for (int i = 0; i < count; ++i)
+            {
+                var originalValue = localIndexMap[i];
+            }
+
+            int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
+            BoundingBox xA, xB, yA, yB, zA, zB;
+            float xCost, yCost, zCost;
+            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsX, localIndexMap, indexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
+            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsY, localIndexMap, indexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
+            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsZ, localIndexMap, indexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
+
+            int* bestIndexMap;
+            if (xCost <= yCost && xCost <= zCost)
+            {
+                splitIndex = xSplitIndex;
+                a = xA;
+                b = xB;
+                leafCountA = xLeafCountA;
+                leafCountB = xLeafCountB;
+                bestIndexMap = indexMapX;
+            }
+            else if (yCost <= zCost)
+            {
+                splitIndex = ySplitIndex;
+                a = yA;
+                b = yB;
+                leafCountA = yLeafCountA;
+                leafCountB = yLeafCountB;
+                bestIndexMap = indexMapY;
+            }
+            else
+            {
+                splitIndex = zSplitIndex;
+                a = zA;
+                b = zB;
+                leafCountA = zLeafCountA;
+                leafCountB = zLeafCountB;
+                bestIndexMap = indexMapZ;
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                localIndexMap[i] = bestIndexMap[i];
+            }
+
+            splitIndex += start;
+
+
+        }
+
         unsafe void FindPartitionForAxisBinned(BoundingBox* boundingBoxes, int* leafCounts, float* centroids, int* originalIndexMap, int* indexMap, int subtreeCount,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             Debug.Assert(subtreeCount > 1);
 
             const int binCount = 16;
+
 
             //TODO: Try out AOS centroids again or figure out a clever SOA approach.
             //Compute centroid bounds. We use these instead of the bounding box because
@@ -170,7 +232,6 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             //A variety of potential microoptimizations exist here.
             //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
-            var centroids = stackalloc Vector3[count];
             var indexMapX = stackalloc int[count];
             var indexMapY = stackalloc int[count];
             var indexMapZ = stackalloc int[count];
@@ -226,6 +287,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
         }
+
 
 
 
