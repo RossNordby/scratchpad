@@ -16,13 +16,12 @@ namespace SIMDPrototyping.Trees.SingleArray
         struct SweepSubtree
         {
             public BoundingBox BoundingBox;
-            public Vector3 Centroid;
             public int LeafCount;
         }
 
 
 
-        unsafe void FindPartitionForAxis(SweepSubtree* subtrees, int* indexMap, int subtreeCount, int axisIndex,
+        unsafe void FindPartitionForAxis(SweepSubtree* subtrees, float* centroids, int* indexMap, int subtreeCount,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             Debug.Assert(subtreeCount > 1);
@@ -34,7 +33,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 var index = i;
                 var previousIndex = index - 1;
-                while ((&subtrees[indexMap[index]].Centroid.X)[axisIndex] < (&subtrees[indexMap[previousIndex]].Centroid.X)[axisIndex])
+                while (centroids[indexMap[index]] < centroids[indexMap[previousIndex]])
                 {
 
                     var tempPointer = indexMap[index];
@@ -97,8 +96,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
         }
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        unsafe void FindPartition(SweepSubtree* subtrees, int* indexMap, int start, int count,
+        unsafe void FindPartition(SweepSubtree* subtrees, int* indexMap, float* centroidsX, float* centroidsY, float* centroidsZ, int start, int count,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             //A variety of potential microoptimizations exist here.
@@ -121,9 +119,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
             BoundingBox xA, xB, yA, yB, zA, zB;
             float xCost, yCost, zCost;
-            FindPartitionForAxis(subtrees, indexMapX, count, 0, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
-            FindPartitionForAxis(subtrees, indexMapY, count, 1, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
-            FindPartitionForAxis(subtrees, indexMapZ, count, 2, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
+            FindPartitionForAxis(subtrees, centroidsX, indexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
+            FindPartitionForAxis(subtrees, centroidsY, indexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
+            FindPartitionForAxis(subtrees, centroidsZ, indexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
 
             int* bestIndexMap;
             if (xCost <= yCost && xCost <= zCost)
@@ -165,7 +163,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        unsafe void SplitSubtreesIntoChildren(int depthRemaining, SweepSubtree* subtrees, int* indexMap, int start, int count, ref BoundingBox boundingBox,
+        unsafe void SplitSubtreesIntoChildren(int depthRemaining, SweepSubtree* subtrees, int* indexMap, float* centroidsX, float* centroidsY, float* centroidsZ, 
+            int start, int count, ref BoundingBox boundingBox,
             Node* stagingNodes, int stagingNodeIndex, ref int stagingNodesCount, out float childrenTreeletsCost)
         {
             if (count > 1)
@@ -174,14 +173,14 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 int splitIndex;
-                FindPartition(subtrees, indexMap, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
+                FindPartition(subtrees, indexMap, centroidsX, centroidsY, centroidsZ, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
 
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
                     --depthRemaining;
-                    SplitSubtreesIntoChildren(depthRemaining, subtrees, indexMap, start, splitIndex - start, ref a, stagingNodes, stagingNodeIndex, ref stagingNodesCount, out costA);
-                    SplitSubtreesIntoChildren(depthRemaining, subtrees, indexMap, splitIndex, start + count - splitIndex, ref b, stagingNodes, stagingNodeIndex, ref stagingNodesCount, out costB);
+                    SplitSubtreesIntoChildren(depthRemaining, subtrees, indexMap, centroidsX, centroidsY, centroidsZ, start, splitIndex - start, ref a, stagingNodes, stagingNodeIndex, ref stagingNodesCount, out costA);
+                    SplitSubtreesIntoChildren(depthRemaining, subtrees, indexMap, centroidsX, centroidsY, centroidsZ, splitIndex, start + count - splitIndex, ref b, stagingNodes, stagingNodeIndex, ref stagingNodesCount, out costB);
                 }
                 else
                 {
@@ -205,7 +204,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     int subtreeCountB = start + count - splitIndex;
                     if (subtreeCountA > 1)
                     {
-                        stagingChildren[childIndexA] = CreateStagingNode(stagingNodeIndex, childIndexA, ref a, subtrees, indexMap, start, subtreeCountA,
+                        stagingChildren[childIndexA] = CreateStagingNode(stagingNodeIndex, childIndexA, ref a, subtrees, indexMap, centroidsX, centroidsY, centroidsZ, start, subtreeCountA,
                             stagingNodes, ref stagingNodesCount, out costA);
                         costA += ComputeBoundsMetric(ref a); //An internal node was created; measure its cost.
                     }
@@ -218,7 +217,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                     if (subtreeCountB > 1)
                     {
-                        stagingChildren[childIndexB] = CreateStagingNode(stagingNodeIndex, childIndexB, ref b, subtrees, indexMap, splitIndex, subtreeCountB,
+                        stagingChildren[childIndexB] = CreateStagingNode(stagingNodeIndex, childIndexB, ref b, subtrees, indexMap, centroidsX, centroidsY, centroidsZ, splitIndex, subtreeCountB,
                             stagingNodes, ref stagingNodesCount, out costB);
                         costB += ComputeBoundsMetric(ref b); //An internal node was created; measure its cost.
                     }
@@ -248,7 +247,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
         unsafe int CreateStagingNode(int parentIndex, int indexInParent, ref BoundingBox boundingBox,
-            SweepSubtree* subtrees, int* indexMap, int start, int count,
+            SweepSubtree* subtrees, int* indexMap, float* centroidsX, float* centroidsY, float* centroidsZ, int start, int count,
             Node* stagingNodes, ref int stagingNodeCount, out float childTreeletsCost)
         {
             var stagingNodeIndex = stagingNodeCount++;
@@ -277,7 +276,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             const int recursionDepth = ChildrenCapacity == 32 ? 4 : ChildrenCapacity == 16 ? 3 : ChildrenCapacity == 8 ? 2 : ChildrenCapacity == 4 ? 1 : 0;
 
 
-            SplitSubtreesIntoChildren(recursionDepth, subtrees, indexMap, start, count, ref boundingBox, stagingNodes, stagingNodeIndex, ref stagingNodeCount, out childTreeletsCost);
+            SplitSubtreesIntoChildren(recursionDepth, subtrees, indexMap, centroidsX, centroidsY, centroidsZ, start, count, ref boundingBox, stagingNodes, stagingNodeIndex, ref stagingNodeCount, out childTreeletsCost);
 
 
             return stagingNodeIndex;
@@ -299,6 +298,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Gather necessary information from nodes. (TODO: This could be more efficiently gathered up front... collectsubtrees already touched most of this data!)
             var sweepSubtrees = stackalloc SweepSubtree[subtreeReferences.Count];
             var indexMap = stackalloc int[subtreeReferences.Count];
+            float* centroidsX = stackalloc float[subtreeReferences.Count];
+            float* centroidsY = stackalloc float[subtreeReferences.Count];
+            float* centroidsZ = stackalloc float[subtreeReferences.Count];
             for (int i = 0; i < subtreeReferences.Count; ++i)
             {
                 var subtree = sweepSubtrees + i;
@@ -309,7 +311,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                     var subtreeNode = nodes + subtreeReferences.Elements[i];
                     var parentNode = nodes + subtreeNode->Parent;
                     subtree->BoundingBox = (&parentNode->A)[subtreeNode->IndexInParent];
-                    subtree->Centroid = subtree->BoundingBox.Min + subtree->BoundingBox.Max;
+                    var centroid = subtree->BoundingBox.Min + subtree->BoundingBox.Max;
+                    centroidsX[i] = centroid.X;
+                    centroidsY[i] = centroid.Y;
+                    centroidsZ[i] = centroid.Z;
                     subtree->LeafCount = (&parentNode->LeafCountA)[subtreeNode->IndexInParent];
                 }
                 else
@@ -317,7 +322,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //It's a leaf node.
                     var leaf = leaves + Encode(subtreeReferences.Elements[i]);
                     subtree->BoundingBox = (&nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
-                    subtree->Centroid = subtree->BoundingBox.Min + subtree->BoundingBox.Max;
+                    var centroid = subtree->BoundingBox.Min + subtree->BoundingBox.Max;
+                    centroidsX[i] = centroid.X;
+                    centroidsY[i] = centroid.Y;
+                    centroidsZ[i] = centroid.Z;
                     subtree->LeafCount = 1;
                 }
             }
@@ -349,7 +357,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
             float newTreeletCost;
-            CreateStagingNode(parent, indexInParent, ref treeletBoundingBox, sweepSubtrees, indexMap, 0, subtreeReferences.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
+            CreateStagingNode(parent, indexInParent, ref treeletBoundingBox, sweepSubtrees, indexMap, centroidsX, centroidsY, centroidsZ, 0, subtreeReferences.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
