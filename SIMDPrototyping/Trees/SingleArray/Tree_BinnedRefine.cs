@@ -1,4 +1,5 @@
-﻿using BEPUutilities.DataStructures;
+﻿using Toolbox = BEPUutilities.Toolbox;
+using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
 using System;
 using System.Collections.Generic;
@@ -37,7 +38,41 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
             //Bin along all three axes simultaneously.
+            var nullBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             var span = centroidBoundingBox.Max - centroidBoundingBox.Min;
+            if (span.X < Toolbox.Epsilon && span.Y < Toolbox.Epsilon && span.Z < Toolbox.Epsilon)
+            {
+                //All axes are degenerate.
+                //This is the one situation in which we can end up with all objects in the same bin.
+                //To stop this, just short circuit.
+                splitIndex = count / 2;
+                a = nullBoundingBox;
+                b = nullBoundingBox;
+                leafCountA = 0;
+                leafCountB = 0;
+                for (int i = 0; i < splitIndex; ++i)
+                {
+                    BoundingBox.Merge(ref a, ref subtrees.BoundingBoxes[localIndexMap[i]], out a);
+                    leafCountA += subtrees.LeafCounts[localIndexMap[i]];
+                }
+                for (int i = splitIndex; i < count; ++i)
+                {
+                    BoundingBox.Merge(ref b, ref subtrees.BoundingBoxes[localIndexMap[i]], out b);
+                    leafCountB += subtrees.LeafCounts[localIndexMap[i]];
+                }
+                return;
+            }
+            else
+            {
+                //Modify the span to handle degenerate cases.
+                //This will result in degenerate axes all being dumped into the first bin.
+                if (span.X < 1e-7f)
+                    span.X = float.MaxValue;
+                if (span.Y < 1e-7f)
+                    span.Y = float.MaxValue;
+                if (span.Z < 1e-7f)
+                    span.Z = float.MaxValue;
+            }
             const int binCount = 16;
             var inverseBinSize = new Vector3(binCount) / span;
 
@@ -58,7 +93,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             var binSubtreeCountsY = stackalloc int[binCount];
             var binSubtreeCountsZ = stackalloc int[binCount];
 
-            var nullBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             for (int i = 0; i < binCount; ++i)
             {
                 binBoundingBoxesX[i] = nullBoundingBox;
@@ -234,6 +268,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 localIndexMap[i] = tempIndexMap[i];
             }
+            
+        
 
             //Transform the split index into object indices.
             splitIndex = binStartIndices[splitIndex] + start;
