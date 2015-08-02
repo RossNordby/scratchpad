@@ -18,13 +18,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(subtreeCount > 1);
 
             const int binCount = 16;
-            const float inverseBinCount = 1f / binCount;
 
             //TODO: Try out AOS centroids again or figure out a clever SOA approach.
             //Compute centroid bounds. We use these instead of the bounding box because
             //the whole bounding can end up distributing ALL subtrees into a single bin.
             //(Consider one subtree with an enormous AABB...)
             //While that's a corner case, it still has an effect on average.
+   
             var centroid = centroids[*originalIndexMap];
             float min = centroid;
             float max = centroid;
@@ -41,10 +41,41 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
 
+
             var span = max - min;
-            var multiplier = span * inverseBinCount;
+            if (span < 1e-6f)
+            {
+                //Everything appears to be in the same spot.
+                //No real good options.
+                //Just use the existing layout.
+                for (int i = 0; i < subtreeCount; ++i)
+                {
+                    indexMap[i] = originalIndexMap[i];
+                }
+                //Pick the middle as the split index.
+                splitIndex = subtreeCount / 2;
+                //Build the children properties.
+                a = boundingBoxes[indexMap[0]];
+                leafCountA = leafCounts[indexMap[0]];
+                for (int i = 1; i < splitIndex; ++i)
+                {
+                    BoundingBox.Merge(ref a, ref boundingBoxes[indexMap[i]], out a);
+                    leafCountA += leafCounts[indexMap[i]];
+                }
+                b = boundingBoxes[indexMap[splitIndex]];
+                leafCountB = leafCounts[indexMap[0]];
+                for (int i = splitIndex + 1; i < subtreeCount; ++i)
+                {
+                    BoundingBox.Merge(ref b, ref boundingBoxes[indexMap[i]], out b);
+                    leafCountB += leafCounts[indexMap[i]];
+                }
+                cost = ComputeBoundsMetric(ref a) * leafCountA + ComputeBoundsMetric(ref b) * leafCountB;
+                return;
+
+            }
+            var inverseBinSize = binCount / span;
             //Ever so slightly offset the min to keep things predictable.
-            min -= span * 1e-5f;
+            min += span * 1e-5f;
 
             var subtreeBinIndices = new int[subtreeCount];
             var binSubtreeCounts = new int[binCount];
@@ -66,9 +97,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 0; i < subtreeCount; ++i)
             {
                 var subtreeIndex = originalIndexMap[i];
-                var binIndex = (int)((centroids[subtreeIndex] - min) * multiplier);
+                var binIndex = Math.Min((int)((centroids[subtreeIndex] - min) * inverseBinSize), binCount - 1);
                 BoundingBox.Merge(ref binBoundingBoxes[binIndex], ref boundingBoxes[subtreeIndex], out binBoundingBoxes[binIndex]);
-                binLeafCounts[i] += leafCounts[subtreeIndex];
+                binLeafCounts[binIndex] += leafCounts[subtreeIndex];
+                ++binSubtreeCounts[binIndex];
+                subtreeBinIndices[i] = binIndex;
             }
 
             //Rebuild the index map.
@@ -77,11 +110,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             binStartIndices[0] = 0;
             for (int i = 1; i < binCount; ++i)
             {
-                binStartIndices[i] = binStartIndices[i - 1] + subtreeBinIndices[i - 1];
+                binStartIndices[i] = binStartIndices[i - 1] + binSubtreeCounts[i - 1];
             }
             for (int i = 0; i < subtreeCount; ++i)
             {
-                indexMap[i] = originalIndexMap[binStartIndices[subtreeBinIndices[i]] + binSubtreeCountsSecondPass[i]++];
+                indexMap[i] = originalIndexMap[binStartIndices[subtreeBinIndices[i]] + binSubtreeCountsSecondPass[subtreeBinIndices[i]]++];
             }
 
             //Determine the split index.
@@ -147,9 +180,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 0; i < count; ++i)
             {
                 var originalValue = localIndexMap[i];
-                indexMapX[i] = originalValue;
-                indexMapY[i] = originalValue;
-                indexMapZ[i] = originalValue;
             }
 
             int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
