@@ -133,7 +133,6 @@ namespace SIMDPrototyping.Trees.SingleArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryPop(Node* nodes, ref int remainingSubtreeSpace, ref QuickList<int> subtrees, out int index, out float cost)
         {
-            Debug.Assert(Count > 0);
             while (Count > 0)
             {
                 //Repeatedly pop minimum until you find one that can fit.

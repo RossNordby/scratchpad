@@ -12,45 +12,89 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
-        unsafe void FindPartitionForAxisBinned(BoundingBox* boundingBoxes, int* leafCounts, float* centroids, int* indexMap, int subtreeCount,
+        unsafe void FindPartitionForAxisBinned(BoundingBox* boundingBoxes, int* leafCounts, float* centroids, int* originalIndexMap, int* indexMap, int subtreeCount,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             Debug.Assert(subtreeCount > 1);
 
-            //Sort the index map according to the centroids.
+            const int binCount = 16;
+            const float inverseBinCount = 1f / binCount;
+
+            //TODO: Try out AOS centroids again or figure out a clever SOA approach.
+            //Compute centroid bounds. We use these instead of the bounding box because
+            //the whole bounding can end up distributing ALL subtrees into a single bin.
+            //(Consider one subtree with an enormous AABB...)
+            //While that's a corner case, it still has an effect on average.
+            var centroid = centroids[*originalIndexMap];
+            float min = centroid;
+            float max = centroid;
             for (int i = 1; i < subtreeCount; ++i)
             {
-                var index = i;
-                var previousIndex = index - 1;
-                while (centroids[indexMap[index]] < centroids[indexMap[previousIndex]])
+                centroid = centroids[originalIndexMap[i]];
+                if (centroid < min)
                 {
-
-                    var tempPointer = indexMap[index];
-                    indexMap[index] = indexMap[previousIndex];
-                    indexMap[previousIndex] = tempPointer;
-
-
-                    if (previousIndex == 0)
-                        break;
-                    index = previousIndex;
-                    --previousIndex;
+                    min = centroid;
+                }
+                else if (centroid > max)
+                {
+                    max = centroid;
                 }
             }
 
-            //Search for the best split.
-            //Sweep across from low to high, caching the merged size and leaf count at each point.
-            //Index N includes every subtree from 0 to N, inclusive. So index 0 contains subtree 0's information.
-            var lastIndex = subtreeCount - 1;
-            var aLeafCounts = stackalloc int[lastIndex];
-            var aMerged = stackalloc BoundingBox[lastIndex];
+            var span = max - min;
+            var multiplier = span * inverseBinCount;
+            //Ever so slightly offset the min to keep things predictable.
+            min -= span * 1e-5f;
 
-            *aLeafCounts = leafCounts[*indexMap];
-            *aMerged = boundingBoxes[*indexMap];
+            var subtreeBinIndices = new int[subtreeCount];
+            var binSubtreeCounts = new int[binCount];
+            var binSubtreeCountsSecondPass = new int[binCount];
+            var binBoundingBoxes = new BoundingBox[binCount];
+            var binLeafCounts = new int[binCount];
+            //Initialize to default values. (Stackalloc actually does this for the numerical types, but we can't assume that.)
+            for (int i = 0; i < binCount; ++i)
+            {
+                binBoundingBoxes[i] = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
+                binLeafCounts[i] = 0;
+                binSubtreeCounts[i] = 0;
+                binSubtreeCountsSecondPass[i] = 0;
+            }
+
+            //Determine which bins each subtree belongs to.
+            //TODO: Note that centroid computation and bin index computation can be done in a pretty SIMD fashion (3-wide, at least).
+            //Actual depositing part is scalar, but some speedups still might be possible.
+            for (int i = 0; i < subtreeCount; ++i)
+            {
+                var subtreeIndex = originalIndexMap[i];
+                var binIndex = (int)((centroids[subtreeIndex] - min) * multiplier);
+                BoundingBox.Merge(ref binBoundingBoxes[binIndex], ref boundingBoxes[subtreeIndex], out binBoundingBoxes[binIndex]);
+                binLeafCounts[i] += leafCounts[subtreeIndex];
+            }
+
+            //Rebuild the index map.
+            //Technically, could shave some of this work off until you knew for a fact that this was the winning candidate by cost.
+            var binStartIndices = new int[binCount];
+            binStartIndices[0] = 0;
+            for (int i = 1; i < binCount; ++i)
+            {
+                binStartIndices[i] = binStartIndices[i - 1] + subtreeBinIndices[i - 1];
+            }
+            for (int i = 0; i < subtreeCount; ++i)
+            {
+                indexMap[i] = originalIndexMap[binStartIndices[subtreeBinIndices[i]] + binSubtreeCountsSecondPass[i]++];
+            }
+
+            //Determine the split index.
+            var lastIndex = binCount - 1;
+            var aLeafCounts = new int[lastIndex];
+            var aMerged = new BoundingBox[lastIndex];
+
+            aLeafCounts[0] = binLeafCounts[0];
+            aMerged[0] = binBoundingBoxes[0];
             for (int i = 1; i < lastIndex; ++i)
             {
-                var index = indexMap[i];
-                aLeafCounts[i] = leafCounts[index] + aLeafCounts[i - 1];
-                BoundingBox.Merge(ref aMerged[i - 1], ref boundingBoxes[index], out aMerged[i]);
+                aLeafCounts[i] = binLeafCounts[i] + aLeafCounts[i - 1];
+                BoundingBox.Merge(ref aMerged[i - 1], ref binBoundingBoxes[i], out aMerged[i]);
             }
 
             //Sweep from high to low.
@@ -65,9 +109,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = lastIndex; i >= 1; --i)
             {
                 int aIndex = i - 1;
-                var subtreeIndex = indexMap[i];
-                BoundingBox.Merge(ref bMerged, ref boundingBoxes[subtreeIndex], out bMerged);
-                bLeafCount += leafCounts[subtreeIndex];
+                BoundingBox.Merge(ref bMerged, ref binBoundingBoxes[i], out bMerged);
+                bLeafCount += binLeafCounts[i];
 
                 var aCost = aLeafCounts[aIndex] * ComputeBoundsMetric(ref aMerged[aIndex]);
                 var bCost = bLeafCount * ComputeBoundsMetric(ref bMerged);
@@ -84,6 +127,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
             }
+            //The split index was in terms of bins. Turn it into a subtree index.
+            splitIndex = binStartIndices[splitIndex];
+
 
         }
         unsafe void FindPartitionBinned(ref Subtrees subtrees, int start, int count,
@@ -109,9 +155,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
             BoundingBox xA, xB, yA, yB, zA, zB;
             float xCost, yCost, zCost;
-            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsX, indexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
-            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsY, indexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
-            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsZ, indexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
+            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsX, localIndexMap, indexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
+            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsY, localIndexMap, indexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
+            FindPartitionForAxisBinned(subtrees.BoundingBoxes, subtrees.LeafCounts, subtrees.CentroidsZ, localIndexMap, indexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
 
             int* bestIndexMap;
             if (xCost <= yCost && xCost <= zCost)
@@ -384,7 +430,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        
+
 
 
         private unsafe void TopDownBinnedRefine(int nodeIndex, ref QuickList<int> spareNodes)
