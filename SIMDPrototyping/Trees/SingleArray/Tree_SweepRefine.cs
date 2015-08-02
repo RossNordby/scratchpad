@@ -293,7 +293,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int internalNodeStartIndex = internalNodes.Count;
             float originalTreeletCost;
 
-            CollectSubtrees3(nodeIndex, maximumSubtrees, ref subtreeReferences, ref internalNodes, out originalTreeletCost);
+            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtreeReferences, ref internalNodes, out originalTreeletCost);
 
 
             //Gather necessary information from nodes. (TODO: This could be more efficiently gathered up front... collectsubtrees already touched most of this data!)

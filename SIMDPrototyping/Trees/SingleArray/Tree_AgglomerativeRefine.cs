@@ -52,7 +52,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
             int treeletInternalNodesStartIndex = internalNodes.Count;
-            CollectSubtrees3(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes, out originalTreeletCost);
+            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref internalNodes, out originalTreeletCost);
 
 
 

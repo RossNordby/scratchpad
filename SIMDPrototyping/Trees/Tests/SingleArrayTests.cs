@@ -18,7 +18,7 @@ namespace SIMDPrototyping.Trees.Tests
         public unsafe static void TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, int queryCount, int selfTestCount, int refitCount)
         {
             {
-                
+
                 var warmLeaves = GetLeaves(10, 10, 10, 10, 10);
                 Tree tree = new Tree();
                 //for (int i = 0; i < leaves.Length; ++i)
@@ -94,40 +94,12 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.Validate();
 
                 QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
-                //QuickList<int> subtrees = new QuickList<int>(new BufferPool<int>(), 8);
-                //QuickList<int> internalNodesB = new QuickList<int>(new BufferPool<int>(), 8);
-                //QuickList<int> subtreesB = new QuickList<int>(new BufferPool<int>(), 8);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                 for (int i = 0; i < 300; ++i)
                 {
-                    //subtrees.Count = 0;
-                    internalNodes.Count = 0;
-                    //float treeletCost;
-                    //subtreesB.Count = 0;
-                    //internalNodesB.Count = 0;
-                    //float treeletCostB;
-                    //tree.CollectSubtrees(0, 1024, ref subtrees, ref internalNodes, out treeletCost);
-                    //tree.CollectSubtrees3(0, 1024, ref subtreesB, ref internalNodesB, out treeletCostB);
-                    //if (internalNodes.Count != internalNodesB.Count || subtrees.Count != subtreesB.Count)
-                    //{
-                    //    Console.WriteLine("bad");
-                    //}
-                    //if (treeletCost != treeletCostB)
-                    //{
-                    //    Console.WriteLine("bad");
-                    //}
-                    //for (int p = 0; p < internalNodes.Count; ++p)
-                    //{
-                    //    if (!internalNodesB.Contains(internalNodes[p]))
-                    //        Console.WriteLine("bad");
-                    //}
-                    //for (int p = 0; p < subtreesB.Count; ++p)
-                    //{
-                    //    if (!subtrees.Contains(subtreesB[p]))
-                    //        Console.WriteLine("bad");
-                    //}
+                    //internalNodes.Count = 0;
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
@@ -162,7 +134,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refit Time: {endTime - startTime}");
 
-     
+
                 var list = new QuickList<int>(new BufferPool<int>());
                 var queryMask = queries.Length - 1;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
