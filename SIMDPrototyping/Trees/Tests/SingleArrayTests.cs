@@ -108,22 +108,22 @@ namespace SIMDPrototyping.Trees.Tests
                     internalNodesB.Count = 0;
                     float treeletCost;
                     float treeletCostB;
-                    tree.CollectSubtrees(0, 256, ref subtrees, ref internalNodes, out treeletCost);
-                    tree.CollectSubtrees3(0, 256, ref subtreesB, ref internalNodesB, out treeletCostB);
-                    if (internalNodes.Count != internalNodesB.Count || subtrees.Count != subtreesB.Count)
-                    {
-                        Console.WriteLine("bad");
-                    }
-                    for (int p = 0; p < internalNodes.Count; ++p)
-                    {
-                        if (!internalNodesB.Contains(internalNodes[p]))
-                            Console.WriteLine("bad");
-                    }
-                    for (int p = 0; p < subtreesB.Count; ++p)
-                    {
-                        if (!subtrees.Contains(subtreesB[p]))
-                            Console.WriteLine("bad");
-                    }
+                    //tree.CollectSubtrees(0, 256, ref subtrees, ref internalNodes, out treeletCost);
+                    tree.CollectSubtrees3(0, 1024, ref subtreesB, ref internalNodesB, out treeletCostB);
+                    //if (internalNodes.Count != internalNodesB.Count || subtrees.Count != subtreesB.Count)
+                    //{
+                    //    Console.WriteLine("bad");
+                    //}
+                    //for (int p = 0; p < internalNodes.Count; ++p)
+                    //{
+                    //    if (!internalNodesB.Contains(internalNodes[p]))
+                    //        Console.WriteLine("bad");
+                    //}
+                    //for (int p = 0; p < subtreesB.Count; ++p)
+                    //{
+                    //    if (!subtrees.Contains(subtreesB[p]))
+                    //        Console.WriteLine("bad");
+                    //}
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);

@@ -63,9 +63,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (children[childIndex] >= 0)
                 {
                     int index = Count;
-                    var entry = Entries + index;
-                    entry->Index = children[childIndex];
-                    entry->Cost = Tree.ComputeBoundsMetric(ref bounds[childIndex]);
+                    var cost = Tree.ComputeBoundsMetric(ref bounds[childIndex]);
                     ++Count;
 
                     //Sift up.
@@ -73,21 +71,21 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         var parentIndex = (index - 1) >> 1;
                         var parent = Entries + parentIndex;
-                        if (parent->Cost < entry->Cost)
+                        if (parent->Cost < cost)
                         {
-                            //Need to swap up.
-                            var temp = *entry;
-                            *entry = *parent;
-                            *parent = temp;
-
+                            //Pull the parent down.
+                            Entries[index] = *parent;
                             index = parentIndex;
-                            entry = Entries + index;
                         }
                         else
                         {
+                            //Found the insertion spot.
                             break;
                         }
                     }
+                    var entry = Entries + index;
+                    entry->Index = children[childIndex];
+                    entry->Cost = cost;
 
                     //ValidateHeap(0);
                 }
