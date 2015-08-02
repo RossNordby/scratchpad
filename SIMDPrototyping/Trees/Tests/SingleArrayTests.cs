@@ -94,23 +94,27 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.Validate();
 
                 QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
-                QuickList<int> subtrees = new QuickList<int>(new BufferPool<int>(), 8);
-                QuickList<int> internalNodesB = new QuickList<int>(new BufferPool<int>(), 8);
-                QuickList<int> subtreesB = new QuickList<int>(new BufferPool<int>(), 8);
+                //QuickList<int> subtrees = new QuickList<int>(new BufferPool<int>(), 8);
+                //QuickList<int> internalNodesB = new QuickList<int>(new BufferPool<int>(), 8);
+                //QuickList<int> subtreesB = new QuickList<int>(new BufferPool<int>(), 8);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 30000; ++i)
+                for (int i = 0; i < 300; ++i)
                 {
-                    subtrees.Count = 0;
+                    //subtrees.Count = 0;
                     internalNodes.Count = 0;
-                    float treeletCost;
+                    //float treeletCost;
                     //subtreesB.Count = 0;
                     //internalNodesB.Count = 0;
                     //float treeletCostB;
-                    //tree.CollectSubtrees(0, 2048, ref subtrees, ref internalNodes, out treeletCost);
-                    tree.CollectSubtrees3(0, 128, ref subtrees, ref internalNodes, out treeletCost);
+                    //tree.CollectSubtrees(0, 1024, ref subtrees, ref internalNodes, out treeletCost);
+                    //tree.CollectSubtrees3(0, 1024, ref subtreesB, ref internalNodesB, out treeletCostB);
                     //if (internalNodes.Count != internalNodesB.Count || subtrees.Count != subtreesB.Count)
+                    //{
+                    //    Console.WriteLine("bad");
+                    //}
+                    //if (treeletCost != treeletCostB)
                     //{
                     //    Console.WriteLine("bad");
                     //}
@@ -127,13 +131,13 @@ namespace SIMDPrototyping.Trees.Tests
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
-                    //tree.BottomUpSweepRefine();
+                    tree.BottomUpSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
-                    //tree.TopDownSweepRefine();
+                    tree.TopDownSweepRefine();
                     //tree.Refit();
                     //tree.BottomUpRefine();
                     //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                    //tree.Validate();
+                    tree.Validate();
                 }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
