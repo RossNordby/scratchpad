@@ -32,9 +32,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             centroidBoundingBox.Max = centroidBoundingBox.Min;
             for (int i = 1; i < count; ++i)
             {
-                var boundingBox = subtrees.BoundingBoxes + localIndexMap[i];
-                centroidBoundingBox.Min = Vector3.Min(boundingBox->Min, centroidBoundingBox.Min);
-                centroidBoundingBox.Max = Vector3.Max(boundingBox->Max, centroidBoundingBox.Max);
+                var centroid = subtrees.Centroids + localIndexMap[i];
+                centroidBoundingBox.Min = Vector3.Min(*centroid, centroidBoundingBox.Min);
+                centroidBoundingBox.Max = Vector3.Max(*centroid, centroidBoundingBox.Max);
             }
 
             //Bin along all three axes simultaneously.
