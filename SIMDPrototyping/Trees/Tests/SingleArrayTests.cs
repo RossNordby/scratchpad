@@ -42,8 +42,8 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.Refit();
                 tree.BottomUpAgglomerativeRefine();
                 tree.TopDownAgglomerativeRefine();
-                tree.BottomUpSweepRefine();
-                tree.TopDownSweepRefine();
+                tree.BottomUpBinnedRefine();
+                tree.TopDownBinnedRefine();
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
@@ -102,7 +102,7 @@ namespace SIMDPrototyping.Trees.Tests
                     internalNodes.Count = 0;
 
 
-                    tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
+                    tree.BinnedRefine(0, ref internalNodes, out nodesInvalidated);
                     //tree.BottomUpSweepRefine();
                     //tree.TopDownSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();

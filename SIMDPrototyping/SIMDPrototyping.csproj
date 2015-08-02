@@ -122,6 +122,7 @@
     <Compile Include="MicroFiddling.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
     <Compile Include="Trees\SingleArray\Tree.cs" />
+    <Compile Include="Trees\SingleArray\Tree_BinnedRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_Diagnostics.cs" />
     <Compile Include="Trees\SingleArray\Tree_Add.cs" />
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />

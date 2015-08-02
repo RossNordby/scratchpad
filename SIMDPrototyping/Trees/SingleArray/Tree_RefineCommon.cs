@@ -161,8 +161,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             return false;
         }
     }
-
-
+    
     partial class Tree
     {
 
@@ -219,6 +218,96 @@ namespace SIMDPrototyping.Trees.SingleArray
             internalNodes.Elements[rootIndex] = temp;
         }
 
+
+        unsafe internal struct Subtrees
+        {
+            public BoundingBox* BoundingBoxes;
+            public int* LeafCounts;
+            public int* IndexMap;
+            public float* CentroidsX;
+            public float* CentroidsY;
+            public float* CentroidsZ;
+        }
+
+        unsafe void ValidateStaging(Node* stagingNodes, ref QuickList<int> subtreeNodePointers, int treeletParent, int treeletIndexInParent)
+        {
+            int foundSubtrees, foundLeafCount;
+            QuickList<int> collectedSubtreeReferences = new QuickList<int>(BufferPools<int>.Thread);
+            QuickList<int> internalReferences = new QuickList<int>(BufferPools<int>.Thread);
+            internalReferences.Add(0);
+            ValidateStaging(stagingNodes, 0, ref subtreeNodePointers, ref collectedSubtreeReferences, ref internalReferences, out foundSubtrees, out foundLeafCount);
+            if (treeletParent < -1 || treeletParent >= nodeCount)
+                throw new Exception("Bad treelet parent.");
+            if (treeletIndexInParent < -1 || (treeletParent >= 0 && treeletIndexInParent >= nodes[treeletParent].ChildCount))
+                throw new Exception("Bad treelet index in parent.");
+            if (treeletParent >= 0 && (&nodes[treeletParent].LeafCountA)[treeletIndexInParent] != foundLeafCount)
+            {
+                throw new Exception("Bad leaf count.");
+            }
+            if (subtreeNodePointers.Count != foundSubtrees)
+            {
+                throw new Exception("Bad subtree found count.");
+            }
+            for (int i = 0; i < collectedSubtreeReferences.Count; ++i)
+            {
+                if (!subtreeNodePointers.Contains(collectedSubtreeReferences[i]) || !collectedSubtreeReferences.Contains(subtreeNodePointers[i]))
+                    throw new Exception("Bad subtree reference.");
+            }
+            collectedSubtreeReferences.Dispose();
+            internalReferences.Dispose();
+        }
+        unsafe void ValidateStaging(Node* stagingNodes, int stagingNodeIndex, ref QuickList<int> subtreeNodePointers, ref QuickList<int> collectedSubtreeReferences, ref QuickList<int> internalReferences, out int foundSubtrees, out int foundLeafCount)
+        {
+            var stagingNode = stagingNodes + stagingNodeIndex;
+            var children = &stagingNode->ChildA;
+            var leafCounts = &stagingNode->LeafCountA;
+            foundSubtrees = foundLeafCount = 0;
+            for (int i = 0; i < stagingNode->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    int childFoundSubtrees, childFoundLeafCount;
+                    if (internalReferences.Contains(children[i]))
+                        throw new Exception("A child points to an internal node that was visited. Possible loop, or just general invalid.");
+                    internalReferences.Add(children[i]);
+                    ValidateStaging(stagingNodes, children[i], ref subtreeNodePointers, ref collectedSubtreeReferences, ref internalReferences, out childFoundSubtrees, out childFoundLeafCount);
+
+                    if (childFoundLeafCount != leafCounts[i])
+                        throw new Exception("Bad leaf count.");
+                    foundSubtrees += childFoundSubtrees;
+                    foundLeafCount += childFoundLeafCount;
+                }
+                else
+                {
+                    var subtreeNodePointerIndex = Encode(children[i]);
+                    var subtreeNodePointer = subtreeNodePointers.Elements[subtreeNodePointerIndex];
+                    //Rather than looking up the shuffled SweepSubtree for information, just go back to the source.
+                    if (subtreeNodePointer >= 0)
+                    {
+                        var node = nodes + subtreeNodePointer;
+                        var totalLeafCount = 0;
+                        for (int childIndex = 0; childIndex < node->ChildCount; ++childIndex)
+                        {
+                            totalLeafCount += (&node->LeafCountA)[childIndex];
+                        }
+
+                        if (leafCounts[i] != totalLeafCount)
+                            throw new Exception("bad leaf count.");
+                        foundLeafCount += totalLeafCount;
+                    }
+                    else
+                    {
+                        var leafIndex = Encode(subtreeNodePointer);
+                        if (leafCounts[i] != 1)
+                            throw new Exception("bad leaf count.");
+                        foundLeafCount += 1;
+                    }
+                    ++foundSubtrees;
+                    collectedSubtreeReferences.Add(subtreeNodePointer);
+                }
+            }
+
+        }
 
     }
 }
