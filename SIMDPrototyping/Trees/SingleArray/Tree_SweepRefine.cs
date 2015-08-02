@@ -20,7 +20,6 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-
         unsafe void FindPartitionForAxis(SweepSubtree* subtrees, float* centroids, int* indexMap, int subtreeCount,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
