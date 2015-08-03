@@ -21,7 +21,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             public Vector3* Centroids;
         }
 
-        unsafe void FindPartitionBinned5(ref BinnedSubtrees subtrees, int start, int count,
+        unsafe void FindPartitionBinned(ref BinnedSubtrees subtrees, int start, int count,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
 
@@ -74,25 +74,29 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (span.Z < 1e-7f)
                     span.Z = float.MaxValue;
             }
-            const int binCount = 16;
+            const int maximumBinCount = 16;
+            //There is no real value in having tons of bins when there are very few children.
+            //At low counts, many of them even end up empty.
+            //You can get huge speed boosts by simply dropping the bin count adaptively.
+            var binCount = Math.Min(maximumBinCount, Math.Max(count / 4, 2));
             var inverseBinSize = new Vector3(binCount) / span;
 
             //If the span along an axis is too small, just ignore it.
             var maximumBinIndex = new Vector3(binCount - 1);
 
             //These subtreeBinIndices are potentially very wide. Could do better by pulling from a pool until roslyn stops emitting localsinit for all functions.
-            var subtreeBinIndicesX = new int[count];
-            var subtreeBinIndicesY = new int[count];
-            var subtreeBinIndicesZ = new int[count];
-            var binBoundingBoxesX = new BoundingBox[binCount];
-            var binBoundingBoxesY = new BoundingBox[binCount];
-            var binBoundingBoxesZ = new BoundingBox[binCount];
-            var binLeafCountsX = new int[binCount];
-            var binLeafCountsY = new int[binCount];
-            var binLeafCountsZ = new int[binCount];
-            var binSubtreeCountsX = new int[binCount];
-            var binSubtreeCountsY = new int[binCount];
-            var binSubtreeCountsZ = new int[binCount];
+            var subtreeBinIndicesX = stackalloc int[count];
+            var subtreeBinIndicesY = stackalloc int[count];
+            var subtreeBinIndicesZ = stackalloc int[count];
+            var binBoundingBoxesX = stackalloc BoundingBox[binCount];
+            var binBoundingBoxesY = stackalloc BoundingBox[binCount];
+            var binBoundingBoxesZ = stackalloc BoundingBox[binCount];
+            var binLeafCountsX = stackalloc int[binCount];
+            var binLeafCountsY = stackalloc int[binCount];
+            var binLeafCountsZ = stackalloc int[binCount];
+            var binSubtreeCountsX = stackalloc int[binCount];
+            var binSubtreeCountsY = stackalloc int[binCount];
+            var binSubtreeCountsZ = stackalloc int[binCount];
 
             for (int i = 0; i < binCount; ++i)
             {
@@ -134,12 +138,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Determine split axes for all axes simultaneously.
             //Sweep from low to high.
             var lastIndex = binCount - 1;
-            var aLeafCountsX = new int[lastIndex];
-            var aLeafCountsY = new int[lastIndex];
-            var aLeafCountsZ = new int[lastIndex];
-            var aMergedX = new BoundingBox[lastIndex];
-            var aMergedY = new BoundingBox[lastIndex];
-            var aMergedZ = new BoundingBox[lastIndex];
+            var aLeafCountsX = stackalloc int[lastIndex];
+            var aLeafCountsY = stackalloc int[lastIndex];
+            var aLeafCountsZ = stackalloc int[lastIndex];
+            var aMergedX = stackalloc BoundingBox[lastIndex];
+            var aMergedY = stackalloc BoundingBox[lastIndex];
+            var aMergedZ = stackalloc BoundingBox[lastIndex];
 
             aLeafCountsX[0] = binLeafCountsX[0];
             aLeafCountsY[0] = binLeafCountsY[0];
@@ -241,8 +245,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
 
-            int[] bestBinSubtreeCounts;
-            int[] bestSubtreeBinIndices;
+            int* bestBinSubtreeCounts;
+            int* bestSubtreeBinIndices;
             switch (bestAxis)
             {
                 case 0:
@@ -259,9 +263,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     break;
             }
             //Rebuild the index map.
-            var binStartIndices = new int[binCount];
-            var binSubtreeCountsSecondPass = new int[binCount];
-            var tempIndexMap = new int[count];
+            var binStartIndices = stackalloc int[binCount];
+            var binSubtreeCountsSecondPass = stackalloc int[binCount];
+            var tempIndexMap = stackalloc int[count];
 
             binStartIndices[0] = 0;
             binSubtreeCountsSecondPass[0] = 0;
@@ -286,13 +290,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Transform the split index into object indices.
             splitIndex = binStartIndices[splitIndex] + start;
 
-            if (leafCountA + leafCountB < count)
-            {
-                //Less leaves than subtrees->impossible
-                Console.WriteLine($"baD {leafCountA}, {leafCountB}, {count}");
-            }
-
-
         }
 
 
@@ -307,15 +304,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 int splitIndex;
-                FindPartitionBinned5(ref subtrees, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
-                if (ComputeBoundsMetric(ref a) <= 0 || ComputeBoundsMetric(ref b) <= 0)
-                {
-                    Console.WriteLine($"bad: {a.ToString()}, {b.ToString()}");
-                }
-                if (leafCountA <= 0 || leafCountB <= 0)
-                {
-                    Console.WriteLine($"bad: {leafCountA}, {leafCountB}");
-                }
+                FindPartitionBinned(ref subtrees, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
+                if (splitIndex == 0)
+                    Console.WriteLine("asdF");
 
                 float costA, costB;
                 if (depthRemaining > 0)
@@ -323,8 +314,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     --depthRemaining;
                     SplitSubtreesIntoChildrenBinned(depthRemaining, ref subtrees, start, splitIndex - start, ref a, stagingNodes, stagingNodeIndex, ref stagingNodesCount, out costA);
                     SplitSubtreesIntoChildrenBinned(depthRemaining, ref subtrees, splitIndex, start + count - splitIndex, ref b, stagingNodes, stagingNodeIndex, ref stagingNodesCount, out costB);
-                    if (costA < 0 || costB < 0)
-                        Console.WriteLine($"baD: {costA}, {costB}");
                 }
                 else
                 {
@@ -372,11 +361,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         stagingChildren[childIndexB] = Encode(subtrees.IndexMap[splitIndex]);
                         costB = 0;
                     }
-                    if (costA < 0 || costB < 0)
-                        Console.WriteLine($"baD: {costA}, {costB}");
                 }
-                if (costA < 0 || costB < 0)
-                    Console.WriteLine($"baD: {costA}, {costB}");
                 childrenTreeletsCost = costA + costB;
             }
             else
@@ -425,8 +410,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             SplitSubtreesIntoChildrenBinned(recursionDepth, ref subtrees, start, count, ref boundingBox, stagingNodes, stagingNodeIndex, ref stagingNodeCount, out childTreeletsCost);
-            if (childTreeletsCost < 0)
-                Console.WriteLine("bad");
+
             return stagingNodeIndex;
 
         }
@@ -506,12 +490,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             float newTreeletCost;
             CreateStagingNodeBinned(parent, indexInParent, ref treeletBoundingBox, ref subtrees, 0, subtreeReferences.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
-            if (newTreeletCost < 0)
-                Console.WriteLine("Problem");
+
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (newTreeletCost < originalTreeletCost)
+            if (true) // newTreeletCost < originalTreeletCost)
             {
                 //Reify the nodes.
                 //ValidateLeaves();
