@@ -63,40 +63,37 @@ namespace SIMDPrototyping.Trees.SingleArray
                 splitIndex += start;
                 return;
             }
-            else
-            {
-                //Modify the span to handle degenerate cases.
-                //This will result in degenerate axes all being dumped into the first bin.
-                if (span.X < 1e-7f)
-                    span.X = float.MaxValue;
-                if (span.Y < 1e-7f)
-                    span.Y = float.MaxValue;
-                if (span.Z < 1e-7f)
-                    span.Z = float.MaxValue;
-            }
+
+
             const int maximumBinCount = 16;
             //There is no real value in having tons of bins when there are very few children.
             //At low counts, many of them even end up empty.
             //You can get huge speed boosts by simply dropping the bin count adaptively.
             var binCount = Math.Min(maximumBinCount, Math.Max(count / 4, 2));
-            var inverseBinSize = new Vector3(binCount) / span;
+
+            //Take into account zero-width cases.
+            //This will result in degenerate axes all being dumped into the first bin.
+            var inverseBinSize = new Vector3(
+                span.X > 1e-7f ? binCount / span.X : 0,
+                span.Y > 1e-7f ? binCount / span.Y : 0,
+                span.Z > 1e-7f ? binCount / span.Z : 0);
 
             //If the span along an axis is too small, just ignore it.
             var maximumBinIndex = new Vector3(binCount - 1);
 
             //These subtreeBinIndices are potentially very wide. Could do better by pulling from a pool until roslyn stops emitting localsinit for all functions.
-            var subtreeBinIndicesX = stackalloc int[count];
-            var subtreeBinIndicesY = stackalloc int[count];
-            var subtreeBinIndicesZ = stackalloc int[count];
-            var binBoundingBoxesX = stackalloc BoundingBox[binCount];
-            var binBoundingBoxesY = stackalloc BoundingBox[binCount];
-            var binBoundingBoxesZ = stackalloc BoundingBox[binCount];
-            var binLeafCountsX = stackalloc int[binCount];
-            var binLeafCountsY = stackalloc int[binCount];
-            var binLeafCountsZ = stackalloc int[binCount];
-            var binSubtreeCountsX = stackalloc int[binCount];
-            var binSubtreeCountsY = stackalloc int[binCount];
-            var binSubtreeCountsZ = stackalloc int[binCount];
+            var subtreeBinIndicesX = new int[count];
+            var subtreeBinIndicesY = new int[count];
+            var subtreeBinIndicesZ = new int[count];
+            var binBoundingBoxesX = new BoundingBox[binCount];
+            var binBoundingBoxesY = new BoundingBox[binCount];
+            var binBoundingBoxesZ = new BoundingBox[binCount];
+            var binLeafCountsX = new int[binCount];
+            var binLeafCountsY = new int[binCount];
+            var binLeafCountsZ = new int[binCount];
+            var binSubtreeCountsX = new int[binCount];
+            var binSubtreeCountsY = new int[binCount];
+            var binSubtreeCountsZ = new int[binCount];
 
             for (int i = 0; i < binCount; ++i)
             {
@@ -138,12 +135,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Determine split axes for all axes simultaneously.
             //Sweep from low to high.
             var lastIndex = binCount - 1;
-            var aLeafCountsX = stackalloc int[lastIndex];
-            var aLeafCountsY = stackalloc int[lastIndex];
-            var aLeafCountsZ = stackalloc int[lastIndex];
-            var aMergedX = stackalloc BoundingBox[lastIndex];
-            var aMergedY = stackalloc BoundingBox[lastIndex];
-            var aMergedZ = stackalloc BoundingBox[lastIndex];
+            var aLeafCountsX = new int[lastIndex];
+            var aLeafCountsY = new int[lastIndex];
+            var aLeafCountsZ = new int[lastIndex];
+            var aMergedX = new BoundingBox[lastIndex];
+            var aMergedY = new BoundingBox[lastIndex];
+            var aMergedZ = new BoundingBox[lastIndex];
 
             aLeafCountsX[0] = binLeafCountsX[0];
             aLeafCountsY[0] = binLeafCountsY[0];
@@ -188,21 +185,28 @@ namespace SIMDPrototyping.Trees.SingleArray
                 bLeafCountY += binLeafCountsY[i];
                 bLeafCountZ += binLeafCountsZ[i];
 
-                //It's possible for a lot of bins in a row to be unpopulated. In that event, you'll get a metric of -infinity. To avoid turning that into a propagating NaN, clamp it.
-                Vector3 metricA = Vector3.Max(Vector3.Zero, new Vector3(
-                    ComputeBoundsMetric(ref aMergedX[aIndex]),
-                    ComputeBoundsMetric(ref aMergedY[aIndex]),
-                    ComputeBoundsMetric(ref aMergedZ[aIndex])));
-                Vector3 metricB = Vector3.Max(Vector3.Zero, new Vector3(
-                    ComputeBoundsMetric(ref bMergedX),
-                    ComputeBoundsMetric(ref bMergedY),
-                    ComputeBoundsMetric(ref bMergedZ)));
+                var metricAX = ComputeBoundsMetric(ref aMergedX[aIndex]);
+                var metricAY = ComputeBoundsMetric(ref aMergedY[aIndex]);
+                var metricAZ = ComputeBoundsMetric(ref aMergedZ[aIndex]);
+                var metricBX = ComputeBoundsMetric(ref bMergedX);
+                var metricBY = ComputeBoundsMetric(ref bMergedY);
+                var metricBZ = ComputeBoundsMetric(ref bMergedZ);
 
-                var costCandidateX = aLeafCountsX[aIndex] * metricA.X + bLeafCountX * metricB.X;
-                var costCandidateY = aLeafCountsY[aIndex] * metricA.Y + bLeafCountY * metricB.Y;
-                var costCandidateZ = aLeafCountsZ[aIndex] * metricA.Z + bLeafCountZ * metricB.Z;
-
-                if (costCandidateX >= 0 && costCandidateX < costCandidateY && costCandidateY < costCandidateZ)
+                //It's possible for a lot of bins in a row to be unpopulated. In that event, you'll get a metric of -infinity. Avoid letting that propagate.
+                float costCandidateX, costCandidateY, costCandidateZ;
+                if (metricAX > 0 && metricBX > 0)
+                    costCandidateX = aLeafCountsX[aIndex] * metricAX + bLeafCountX * metricBX;
+                else
+                    costCandidateX = float.MaxValue;
+                if (metricAY > 0 && metricBY > 0)
+                    costCandidateY = aLeafCountsY[aIndex] * metricAY + bLeafCountY * metricBY;
+                else
+                    costCandidateY = float.MaxValue;
+                if (metricAZ > 0 && metricBZ > 0)
+                    costCandidateZ = aLeafCountsZ[aIndex] * metricAZ + bLeafCountZ * metricBZ;
+                else
+                    costCandidateZ = float.MaxValue;
+                if (costCandidateX < costCandidateY && costCandidateX < costCandidateZ)
                 {
                     if (costCandidateX < cost)
                     {
@@ -215,7 +219,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         leafCountB = bLeafCountX;
                     }
                 }
-                else if (costCandidateY >= 0 && costCandidateY < costCandidateZ)
+                else if (costCandidateY < costCandidateZ)
                 {
                     if (costCandidateY < cost)
                     {
@@ -228,7 +232,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         leafCountB = bLeafCountY;
                     }
                 }
-                else if (costCandidateZ >= 0)
+                else
                 {
                     if (costCandidateZ < cost)
                     {
@@ -245,8 +249,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
 
-            int* bestBinSubtreeCounts;
-            int* bestSubtreeBinIndices;
+            int[] bestBinSubtreeCounts;
+            int[] bestSubtreeBinIndices;
             switch (bestAxis)
             {
                 case 0:
@@ -263,9 +267,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     break;
             }
             //Rebuild the index map.
-            var binStartIndices = stackalloc int[binCount];
-            var binSubtreeCountsSecondPass = stackalloc int[binCount];
-            var tempIndexMap = stackalloc int[count];
+            var binStartIndices = new int[binCount];
+            var binSubtreeCountsSecondPass = new int[binCount];
+            var tempIndexMap = new int[count];
 
             binStartIndices[0] = 0;
             binSubtreeCountsSecondPass[0] = 0;

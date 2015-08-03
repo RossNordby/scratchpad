@@ -104,7 +104,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
                     tree.BinnedRefine(0, ref internalNodes, out nodesInvalidated);
-                    
+
                     //tree.BottomUpBinnedRefine();
                     //tree.TopDownBinnedRefine();
                     //tree.BottomUpSweepRefine();
@@ -112,8 +112,8 @@ namespace SIMDPrototyping.Trees.Tests
                     //tree.BottomUpAgglomerativeRefine();
                     //tree.Refit();
                     //tree.BottomUpRefine();
-                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                    //tree.Validate();
+                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                    tree.Validate();
                 }
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
