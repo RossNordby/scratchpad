@@ -21,7 +21,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             public Vector3* Centroids;
         }
 
-        unsafe void FindPartitionBinned(ref BinnedSubtrees subtrees, int start, int count,
+        unsafe void FindPartitionBinned(ref BinnedSubtrees subtrees, int start, int count, ref BoundingBox boundingBox,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
 
@@ -115,11 +115,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var y = (int)binIndices.Y;
                 var z = (int)binIndices.Z;
 
-                var boundingBox = subtrees.BoundingBoxes + subtreeIndex;
+                var subtreeBoundingBox = subtrees.BoundingBoxes + subtreeIndex;
                 var leafCount = subtrees.LeafCounts + subtreeIndex;
-                BoundingBox.Merge(ref binBoundingBoxesX[x], ref *boundingBox, out binBoundingBoxesX[x]);
-                BoundingBox.Merge(ref binBoundingBoxesY[y], ref *boundingBox, out binBoundingBoxesY[y]);
-                BoundingBox.Merge(ref binBoundingBoxesZ[z], ref *boundingBox, out binBoundingBoxesZ[z]);
+                BoundingBox.Merge(ref binBoundingBoxesX[x], ref *subtreeBoundingBox, out binBoundingBoxesX[x]);
+                BoundingBox.Merge(ref binBoundingBoxesY[y], ref *subtreeBoundingBox, out binBoundingBoxesY[y]);
+                BoundingBox.Merge(ref binBoundingBoxesZ[z], ref *subtreeBoundingBox, out binBoundingBoxesZ[z]);
                 binLeafCountsX[x] += *leafCount;
                 binLeafCountsY[y] += *leafCount;
                 binLeafCountsZ[z] += *leafCount;
@@ -169,11 +169,17 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             int bestAxis = 0;
             float cost = float.MaxValue;
-            splitIndex = 0;
+            var binSplitIndex = 0;
             a = nullBoundingBox;
             b = nullBoundingBox;
             leafCountA = 0;
             leafCountB = 0;
+
+            int totalLeafCount = 0;
+            for (int i = 0; i < count; ++i)
+            {
+                totalLeafCount += subtrees.LeafCounts[localIndexMap[i]];
+            }
 
             for (int i = lastIndex; i >= 1; --i)
             {
@@ -212,11 +218,18 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         bestAxis = 0;
                         cost = costCandidateX;
-                        splitIndex = i;
+                        binSplitIndex = i;
                         a = aMergedX[aIndex];
                         b = bMergedX;
                         leafCountA = aLeafCountsX[aIndex];
                         leafCountB = bLeafCountX;
+
+                        if (leafCountA + leafCountB != totalLeafCount)
+                            Console.WriteLine("Bad");
+                        BoundingBox debugMerged;
+                        BoundingBox.Merge(ref a, ref b, out debugMerged);
+                        if (boundingBox.Min != debugMerged.Min || boundingBox.Max != debugMerged.Max)
+                            Console.WriteLine("Bad");
                     }
                 }
                 else if (costCandidateY < costCandidateZ)
@@ -225,11 +238,17 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         bestAxis = 1;
                         cost = costCandidateY;
-                        splitIndex = i;
+                        binSplitIndex = i;
                         a = aMergedY[aIndex];
                         b = bMergedY;
                         leafCountA = aLeafCountsY[aIndex];
                         leafCountB = bLeafCountY;
+                        if (leafCountA + leafCountB != totalLeafCount)
+                            Console.WriteLine("Bad");
+                        BoundingBox debugMerged;
+                        BoundingBox.Merge(ref a, ref b, out debugMerged);
+                        if (boundingBox.Min != debugMerged.Min || boundingBox.Max != debugMerged.Max)
+                            Console.WriteLine("Bad");
                     }
                 }
                 else
@@ -238,11 +257,17 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         bestAxis = 2;
                         cost = costCandidateZ;
-                        splitIndex = i;
+                        binSplitIndex = i;
                         a = aMergedZ[aIndex];
                         b = bMergedZ;
                         leafCountA = aLeafCountsZ[aIndex];
                         leafCountB = bLeafCountZ;
+                        if (leafCountA + leafCountB != totalLeafCount)
+                            Console.WriteLine("Bad");
+                        BoundingBox debugMerged;
+                        BoundingBox.Merge(ref a, ref b, out debugMerged);
+                        if (boundingBox.Min != debugMerged.Min || boundingBox.Max != debugMerged.Max)
+                            Console.WriteLine("Bad");
                     }
                 }
 
@@ -273,26 +298,155 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             binStartIndices[0] = 0;
             binSubtreeCountsSecondPass[0] = 0;
+
+            List<int>[] validateBinSubtrees = new List<int>[binCount];
+            for (int i = 0; i < binCount; ++i)
+            {
+                validateBinSubtrees[i] = new List<int>();
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                validateBinSubtrees[bestSubtreeBinIndices[i]].Add(localIndexMap[i]);
+            }
+            for (int i = 0; i < binCount; ++i)
+            {
+                if (bestBinSubtreeCounts[i] != validateBinSubtrees[i].Count)
+                    Console.WriteLine("Bad");
+            }
+            var validateTempIndexMap = new int[count];
+            int validateIndex = 0;
+            for (int i = 0; i < binCount; ++i)
+            {
+                for (int j = 0; j < validateBinSubtrees[i].Count; ++j)
+                {
+                    validateTempIndexMap[validateIndex++] = validateBinSubtrees[i][j];
+                }
+            }
+
             for (int i = 1; i < binCount; ++i)
             {
                 binStartIndices[i] = binStartIndices[i - 1] + bestBinSubtreeCounts[i - 1];
                 binSubtreeCountsSecondPass[i] = 0;
             }
+
             for (int i = 0; i < count; ++i)
             {
-                tempIndexMap[i] = localIndexMap[binStartIndices[bestSubtreeBinIndices[i]] + binSubtreeCountsSecondPass[bestSubtreeBinIndices[i]]++];
+                tempIndexMap[binStartIndices[bestSubtreeBinIndices[i]] + binSubtreeCountsSecondPass[bestSubtreeBinIndices[i]]++] = localIndexMap[i];
+
+            }
+            for (int i = 0; i < count; ++i)
+            {
+                if (tempIndexMap[i] != validateTempIndexMap[i])
+                    Console.WriteLine("bad");
+            }
+            
+
+            //Transform the split index into object indices.
+            var localSplitIndex = binStartIndices[binSplitIndex];
+            
+
+            float splitCentroid = float.MaxValue;
+            for (int i = localSplitIndex; i < count; ++i)
+            {
+                float candidate = (&subtrees.Centroids[tempIndexMap[i]].X)[bestAxis];
+                if (candidate < splitCentroid)
+                    splitCentroid = candidate;
+            }
+
+            for (int i = 0; i < count; ++i)
+            {
+                if ((i < localSplitIndex && (&subtrees.Centroids[tempIndexMap[i]].X)[bestAxis] > splitCentroid) ||
+                    (i >= localSplitIndex && (&subtrees.Centroids[tempIndexMap[i]].X)[bestAxis] < splitCentroid))
+                {
+                    Console.WriteLine("Centroid allocated poorly");
+                }
+            }
+
+            if (bestAxis == 0)
+            {
+                for (int i = 0; i < localSplitIndex; ++i)
+                {
+                    if (subtrees.Centroids[tempIndexMap[i]].X > splitCentroid)
+                        Console.WriteLine("Bad");
+                }
+                for (int i = localSplitIndex; i < count; ++i)
+                {
+                    if (subtrees.Centroids[tempIndexMap[i]].X < splitCentroid)
+                        Console.WriteLine("Bad");
+                }
+            }
+            else if (bestAxis == 1)
+            {
+                for (int i = 0; i < localSplitIndex; ++i)
+                {
+                    if (subtrees.Centroids[tempIndexMap[i]].Y > splitCentroid)
+                        Console.WriteLine("Bad");
+                }
+                for (int i = localSplitIndex; i < count; ++i)
+                {
+                    if (subtrees.Centroids[tempIndexMap[i]].Y < splitCentroid)
+                        Console.WriteLine("Bad");
+                }
+            }
+            else
+            {
+                for (int i = 0; i < localSplitIndex; ++i)
+                {
+                    if (subtrees.Centroids[tempIndexMap[i]].Z > splitCentroid)
+                        Console.WriteLine("Bad");
+                }
+                for (int i = localSplitIndex; i < count; ++i)
+                {
+                    if (subtrees.Centroids[tempIndexMap[i]].Z < splitCentroid)
+                        Console.WriteLine("Bad");
+                }
             }
 
             //Update the real index map.
             for (int i = 0; i < count; ++i)
             {
+                if (Array.IndexOf<int>(tempIndexMap, localIndexMap[i]) == -1)
+                {
+                    Console.WriteLine("temp index map does not contain every index.");
+                }
                 localIndexMap[i] = tempIndexMap[i];
             }
 
 
 
-            //Transform the split index into object indices.
-            splitIndex = binStartIndices[splitIndex] + start;
+            //Validate the index map by reconstructing the results from the split index.
+            int leafCountValidateA = 0;
+            int leafCountValidateB = 0;
+            var boundingBoxValidateA = nullBoundingBox;
+            var boundingBoxValidateB = nullBoundingBox;
+            for (int i = 0; i < localSplitIndex; ++i)
+            {
+                BoundingBox.Merge(ref subtrees.BoundingBoxes[localIndexMap[i]], ref boundingBoxValidateA, out boundingBoxValidateA);
+                leafCountValidateA += subtrees.LeafCounts[localIndexMap[i]];
+            }
+            for (int i = localSplitIndex; i < count; ++i)
+            {
+                BoundingBox.Merge(ref subtrees.BoundingBoxes[localIndexMap[i]], ref boundingBoxValidateB, out boundingBoxValidateB);
+                leafCountValidateB += subtrees.LeafCounts[localIndexMap[i]];
+            }
+            BoundingBox boundingBoxValidateMerged;
+            BoundingBox.Merge(ref boundingBoxValidateA, ref boundingBoxValidateB, out boundingBoxValidateMerged);
+            int leafCountValidateMerged = leafCountValidateA + leafCountValidateB;
+
+            if (boundingBoxValidateA.Min != a.Min || boundingBoxValidateA.Max != a.Max)
+            {
+                Console.WriteLine("baD");
+            }
+            if (boundingBoxValidateB.Min != b.Min || boundingBoxValidateB.Max != b.Max)
+            {
+                Console.WriteLine("bad");
+            }
+            if (leafCountValidateA != leafCountA || leafCountValidateB != leafCountB)
+            {
+                Console.WriteLine("baD");
+            }
+
+            splitIndex = localSplitIndex + start;
 
         }
 
@@ -308,10 +462,29 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 int splitIndex;
-                FindPartitionBinned(ref subtrees, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
-                if (splitIndex == 0)
+                FindPartitionBinned(ref subtrees, start, count, ref boundingBox, out splitIndex, out a, out b, out leafCountA, out leafCountB);
+                BoundingBox debugMerged;
+                BoundingBox.Merge(ref a, ref b, out debugMerged);
+                if (boundingBox.Min != debugMerged.Min || boundingBox.Max != debugMerged.Max)
+                    Console.WriteLine("Bad");
+                if (splitIndex == start)
                     Console.WriteLine("asdF");
+                var totalLeafCount = 0;
+                for (int i = 0; i < count; ++i)
+                {
+                    totalLeafCount += subtrees.LeafCounts[subtrees.IndexMap[start + i]];
 
+                }
+                if (totalLeafCount != leafCountA + leafCountB)
+                {
+                    Console.WriteLine("Bad");
+                    var difference = totalLeafCount - leafCountA - leafCountB;
+                    for (int i = 0; i < count; ++i)
+                    {
+                        if (subtrees.LeafCounts[subtrees.IndexMap[start + i]] == difference)
+                            Console.WriteLine("found it");
+                    }
+                }
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
@@ -423,7 +596,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
-            const int maximumSubtrees = 1024;
+            const int maximumSubtrees = 8;
             var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int internalNodeStartIndex = internalNodes.Count;
             float originalTreeletCost;
