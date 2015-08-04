@@ -13,17 +13,112 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
-
-        unsafe void SortAlongAxis(float* centroids, int* indexMap, int count)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void Swap(ref int a, ref int b)
         {
+            var temp = a;
+            a = b;
+            b = temp;
+        }
+        unsafe void Quicksort(float* centroids, int* indexMap, int l, int r)
+        {
+            int i = l - 1, j = r, p = l - 1, q = r;
+            float pivot = centroids[indexMap[r]];
+            if (r <= l)
+                return;
+            while (true)
+            {
+                while (centroids[indexMap[++i]] < pivot) ;
+                while (pivot < centroids[indexMap[--j]])
+                {
+                    if (j == l)
+                    {
+                        break;
+                    }
+                }
+                if (i >= j)
+                {
+                    break;
+                }
+                Swap(ref indexMap[i], ref indexMap[j]);
+                if (centroids[indexMap[i]] == pivot)
+                {
+                    p++;
+                    Swap(ref indexMap[p], ref indexMap[i]);
+                }
+                if (pivot == centroids[indexMap[j]])
+                {
+                    q--;
+                    Swap(ref indexMap[j], ref indexMap[q]);
+                }
+            }
+            Swap(ref indexMap[i], ref indexMap[r]);
+            j = i - 1;
+            i = i + 1;
+            for (int k = l; k < p; k++, j--)
+            {
+                Swap(ref indexMap[k], ref indexMap[j]);
+            }
+            for (int k = r - 1; k > q; k--, i++)
+            {
+                Swap(ref indexMap[i], ref indexMap[k]);
+            }
+            Quicksort(centroids, indexMap, l, j);
+            Quicksort(centroids, indexMap, i, r);
+        }
+
+        unsafe void SortAlongAxis(float* centroids, int* indexMap, int max)
+        {
+
             //Assume that the data is already potentially sorted. Pick a pivot in the middle.
             //TODO: try mo3.
-            //TODO: hoare
-            var pivot = centroids[indexMap[count / 2]];
-            for (int i = 0; i < count; ++i)
+            //TODO: try insertion sort for small counts.
+            //TODO: small-first tailcall?
+            //TODO: fat partition to handle equal elements? (games..)
+            if (max > 1)
             {
-                if(centroids[indexMap[i]] < pivot)
+                var pivot = centroids[indexMap[max]];
+
+                int i = -1;
+                int j = max;
+                while (true)
+                {
+                    do
+                    {
+                        ++i;
+                    } while (centroids[indexMap[i]] < pivot);
+                    do
+                    {
+                        --j;
+                    } while (centroids[indexMap[j]] > pivot);
+                    if (i < j)
+                    {
+                        var temp = indexMap[i];
+                        indexMap[i] = indexMap[j];
+                        indexMap[j] = temp;
+                    }
+                    else
+                    {
+                        var temp = indexMap[i];
+                        indexMap[i] = indexMap[max];
+                        indexMap[max] = temp;
+                        break;
+                    }
+                }
+                for (int p = 0; p < i; ++p)
+                {
+                    if (centroids[indexMap[p]] > pivot)
+                        Console.WriteLine("bad paritiotngf");
+                }
+                for (int p = i; p <= max; ++p)
+                {
+                    if (centroids[indexMap[p]] < pivot)
+                        Console.WriteLine("Bad");
+                }
+                SortAlongAxis(centroids, indexMap, i);
+                SortAlongAxis(centroids, indexMap + i, max - i);
             }
+
         }
 
         unsafe void FindPartitionForAxis(BoundingBox* boundingBoxes, int* leafCounts, float* centroids, int* indexMap, int subtreeCount,
@@ -32,24 +127,25 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(subtreeCount > 1);
 
             //Sort the index map according to the centroids.
-            for (int i = 1; i < subtreeCount; ++i)
-            {
-                var index = i;
-                var previousIndex = index - 1;
-                while (centroids[indexMap[index]] < centroids[indexMap[previousIndex]])
-                {
+            //for (int i = 1; i < subtreeCount; ++i)
+            //{
+            //    var index = i;
+            //    var previousIndex = index - 1;
+            //    while (centroids[indexMap[index]] < centroids[indexMap[previousIndex]])
+            //    {
 
-                    var tempPointer = indexMap[index];
-                    indexMap[index] = indexMap[previousIndex];
-                    indexMap[previousIndex] = tempPointer;
+            //        var tempPointer = indexMap[index];
+            //        indexMap[index] = indexMap[previousIndex];
+            //        indexMap[previousIndex] = tempPointer;
 
 
-                    if (previousIndex == 0)
-                        break;
-                    index = previousIndex;
-                    --previousIndex;
-                }
-            }
+            //        if (previousIndex == 0)
+            //            break;
+            //        index = previousIndex;
+            //        --previousIndex;
+            //    }
+            //}
+            Quicksort(centroids, indexMap, 0, subtreeCount - 1);
 
             //Search for the best split.
             //Sweep across from low to high, caching the merged size and leaf count at each point.
