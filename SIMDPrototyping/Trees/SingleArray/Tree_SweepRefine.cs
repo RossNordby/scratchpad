@@ -20,7 +20,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             a = b;
             b = temp;
         }
-        unsafe void Quicksort3(float* centroids, int* indexMap, int l, int r)
+        unsafe void Quicksort(float* centroids, int* indexMap, int l, int r)
         {
             if (r - l <= 30)
             {
@@ -46,12 +46,68 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             else
             {
+                //Use MO3 to find a pivot to compensate for the common already-sorted case and to slightly improve worst-case behavior.
+                var first = centroids[indexMap[l]];
+                int middleIndex = (l + r) / 2;
+                var middle = centroids[indexMap[middleIndex]];
+                var last = centroids[indexMap[r]];
+                int pivotIndex;
+                float pivot;
+                if (first <= middle && first <= last)
+                {
+                    //first is lowest.
+                    if (middle <= last)
+                    {
+                        pivotIndex = middleIndex;
+                        pivot = middle;
+                    }
+                    else
+                    {
+                        pivotIndex = r;
+                        pivot = last;
+                    }
+                }
+                else if (middle <= last)
+                {
+                    //middle is lowest.
+                    if (first <= last)
+                    {
+                        pivotIndex = l;
+                        pivot = first;
+                    }
+                    else
+                    {
+                        pivotIndex = r;
+                        pivot = last;
+                    }
+                }
+                else
+                {
+                    //last is lowest.
+                    if (first <= middle)
+                    {
+                        pivotIndex = l;
+                        pivot = first;
+                    }
+                    else
+                    {
+                        pivotIndex = middleIndex;
+                        pivot = middle;
+                    }
+                }
+
+                ////Choose the middle index as the pivot, since there's a high chance of sortedness.
+                //int pivotIndex = (l + r) / 2;
+                //float pivot = centroids[indexMap[pivotIndex]];
+
+                //Put the pivot into the last slot.
+                Swap(ref indexMap[pivotIndex], ref indexMap[r]);
+
                 //Use bentley-mcilroy 3-way partitioning scheme to avoid performance drops in corner cases.
                 int i = l - 1; //Start one below the partitioning area, because don't know if the first index is actually claimable.
                 int j = r; //The last element of the partition holds the pivot, which is excluded from the swapping process. Same logic as for i.
                 int p = l - 1;
                 int q = r;
-                float pivot = centroids[indexMap[r]];
                 if (r <= l)
                     return;
                 while (true)
@@ -86,7 +142,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                 }
                 //The pivot at r has not been swapped.
-                //Since the loop has terminated, we know that i has reached the the 'greater than pivot' side of the partition.
+                //Since the loop has terminated, we know that i has reached the the '>=pivot' side of the partition.
                 //So, swap the pivot and the first element of the greater-than-pivot side to guarantee sorting.
                 Swap(ref indexMap[i], ref indexMap[r]);
                 j = i - 1;
@@ -99,8 +155,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     Swap(ref indexMap[i], ref indexMap[k]);
                 }
-                Quicksort3(centroids, indexMap, l, j);
-                Quicksort3(centroids, indexMap, i, r);
+                Quicksort(centroids, indexMap, l, j);
+                Quicksort(centroids, indexMap, i, r);
             }
         }
 
@@ -135,7 +191,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //        --previousIndex;
             //    }
             //}
-            Quicksort3(centroids, indexMap, 0, subtreeCount - 1);
+            Quicksort(centroids, indexMap, 0, subtreeCount - 1);
 
 
             //for (int i = 1; i < subtreeCount; ++i)
