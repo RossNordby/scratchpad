@@ -14,6 +14,17 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
+        unsafe void SortAlongAxis(float* centroids, int* indexMap, int count)
+        {
+            //Assume that the data is already potentially sorted. Pick a pivot in the middle.
+            //TODO: try mo3.
+            //TODO: hoare
+            var pivot = centroids[indexMap[count / 2]];
+            for (int i = 0; i < count; ++i)
+            {
+                if(centroids[indexMap[i]] < pivot)
+            }
+        }
 
         unsafe void FindPartitionForAxis(BoundingBox* boundingBoxes, int* leafCounts, float* centroids, int* indexMap, int subtreeCount,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)

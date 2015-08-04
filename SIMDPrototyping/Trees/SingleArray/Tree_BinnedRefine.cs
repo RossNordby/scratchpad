@@ -428,7 +428,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
-            const int maximumSubtrees = 1024;
+            const int maximumSubtrees = 4096;
             var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int internalNodeStartIndex = internalNodes.Count;
             float originalTreeletCost;
@@ -503,7 +503,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (true)//newTreeletCost < originalTreeletCost)
+            if (true) // newTreeletCost < originalTreeletCost)
             {
                 //Reify the nodes.
                 //ValidateLeaves();
