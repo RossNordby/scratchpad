@@ -65,11 +65,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
 
-            const int maximumBinCount = 16;
+            const int maximumBinCount = 64;
             //There is no real value in having tons of bins when there are very few children.
             //At low counts, many of them even end up empty.
             //You can get huge speed boosts by simply dropping the bin count adaptively.
-            var binCount = Math.Min(maximumBinCount, Math.Max(count / 4, 2));
+            var binCount = (int)Math.Min(maximumBinCount, Math.Max(count * .25f, 2));
 
             //Take into account zero-width cases.
             //This will result in degenerate axes all being dumped into the first bin.
@@ -316,7 +316,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 int splitIndex;
                 FindPartitionBinned(ref subtrees, start, count, ref boundingBox, out splitIndex, out a, out b, out leafCountA, out leafCountB);
 
-                
+
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
@@ -503,7 +503,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (newTreeletCost < originalTreeletCost)
+            if (true)//newTreeletCost < originalTreeletCost)
             {
                 //Reify the nodes.
                 //ValidateLeaves();

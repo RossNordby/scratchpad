@@ -365,7 +365,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (newTreeletCost < originalTreeletCost)
+            if (true)//newTreeletCost < originalTreeletCost)
             {
                 //Reify the nodes.
                 //ValidateLeaves();
