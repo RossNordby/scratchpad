@@ -97,7 +97,7 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 800; ++i)
+                for (int i = 0; i < 3000; ++i)
                 {
                     internalNodes.Count = 0;
 
@@ -112,7 +112,7 @@ namespace SIMDPrototyping.Trees.Tests
                     //tree.BottomUpAgglomerativeRefine();
                     //tree.Refit();
                     //tree.BottomUpRefine();
-                    Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
                     //tree.Validate();
                 }
 
