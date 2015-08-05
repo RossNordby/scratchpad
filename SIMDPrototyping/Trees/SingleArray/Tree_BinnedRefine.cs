@@ -122,6 +122,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtrees.BinBoundingBoxesY[i] = nullBoundingBox;
                 subtrees.BinBoundingBoxesZ[i] = nullBoundingBox;
 
+                subtrees.BinSubtreeCountsX[i] = 0;
+                subtrees.BinSubtreeCountsY[i] = 0;
+                subtrees.BinSubtreeCountsZ[i] = 0;
+
                 subtrees.BinLeafCountsX[i] = 0;
                 subtrees.BinLeafCountsY[i] = 0;
                 subtrees.BinLeafCountsZ[i] = 0;
@@ -511,23 +515,24 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Gather necessary information from nodes.
             for (int i = 0; i < subtreeReferences.Count; ++i)
             {
-                var boundingBox = boundingBoxes + i;
+                //TODO: remember to revert to pointer arith
+                //var boundingBox = boundingBoxes + i;
                 indexMap[i] = i;
                 if (subtreeReferences.Elements[i] >= 0)
                 {
                     //It's an internal node.
                     var subtreeNode = nodes + subtreeReferences.Elements[i];
                     var parentNode = nodes + subtreeNode->Parent;
-                    *boundingBox = (&parentNode->A)[subtreeNode->IndexInParent];
-                    centroids[i] = boundingBox->Min + boundingBox->Max;
+                    boundingBoxes[i] = (&parentNode->A)[subtreeNode->IndexInParent];
+                    centroids[i] = boundingBoxes[i].Min + boundingBoxes[i].Max;
                     leafCounts[i] = (&parentNode->LeafCountA)[subtreeNode->IndexInParent];
                 }
                 else
                 {
                     //It's a leaf node.
                     var leaf = leaves + Encode(subtreeReferences.Elements[i]);
-                    *boundingBox = (&nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
-                    centroids[i] = boundingBox->Min + boundingBox->Max;
+                    boundingBoxes[i] = (&nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
+                    centroids[i] = boundingBoxes[i].Min + boundingBoxes[i].Max;
                     leafCounts[i] = 1;
                 }
             }
