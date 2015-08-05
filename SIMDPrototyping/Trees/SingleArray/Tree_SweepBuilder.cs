@@ -233,7 +233,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             node->Parent = parentIndex;
             node->IndexInParent = indexInParent;
 
-            if (count < ChildrenCapacity)
+            if (count <= ChildrenCapacity)
             {
                 //No need to do any sorting. This node can fit every remaining subtree.
                 node->ChildCount = count;

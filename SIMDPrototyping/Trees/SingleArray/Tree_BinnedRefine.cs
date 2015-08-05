@@ -407,7 +407,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var stagingNodeIndex = stagingNodeCount++;
             var stagingNode = stagingNodes + stagingNodeIndex;
 
-            if (count < ChildrenCapacity)
+            if (count <= ChildrenCapacity)
             {
                 //No need to do any sorting. This node can fit every remaining subtree.
                 var localIndexMap = subtrees.IndexMap + start;
