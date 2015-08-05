@@ -434,14 +434,14 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        public unsafe void SweepRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
+        public unsafe void SweepRefine(int nodeIndex, ref QuickQueue<int> spareNodes, out bool nodesInvalidated)
         {
             const int maximumSubtrees = 1024;
-            var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-            int internalNodeStartIndex = internalNodes.Count;
+            var poolIndex = BufferPool<int>.GetPoolIndex(maximumSubtrees);
+            var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
+            var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
-
-            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtreeReferences, ref internalNodes, out originalTreeletCost);
+            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
 
 
             //Gather necessary information from nodes.
@@ -520,25 +520,26 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (true)//newTreeletCost < originalTreeletCost)
+            if (newTreeletCost < originalTreeletCost)
             {
-                //Reify the nodes.
-                //ValidateLeaves();
-                ReifyStagingNode(parent, indexInParent, stagingNodes, 0, stagingNodeCapacity, ref subtreeReferences, ref internalNodes, out nodesInvalidated);
-                //ValidateLeaves();
+                //The refinement is an actual improvement.
+                //Apply the staged nodes to real nodes!
+                var reifiedIndex = ReifyStagingNode(parent, indexInParent, stagingNodes, 0, stagingNodeCapacity, ref subtreeReferences, ref treeletInternalNodes, ref spareNodes, out nodesInvalidated);
+                Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
+                //If any nodes are left over, put them into the spares list for later reuse.
+                int spareNode;
+                while (treeletInternalNodes.TryDequeue(out spareNode))
+                {
+                    spareNodes.Enqueue(spareNode);
+                }
             }
             else
             {
-                //The internal nodes collected by the most recent iteration of CollectSubtrees weren't replaced! Get them out of the pool.
-                //TODO: Would be nice to do this in a slightly less gross way.
-                for (int i = internalNodes.Count - 1; i >= internalNodeStartIndex; --i)
-                {
-                    internalNodes.FastRemoveAt(i);
-                }
                 nodesInvalidated = false;
             }
 
             subtreeReferences.Dispose();
+            treeletInternalNodes.Dispose();
 
         }
 
@@ -546,7 +547,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        private unsafe void TopDownSweepRefine(int nodeIndex, ref QuickList<int> spareNodes)
+        private unsafe void TopDownSweepRefine(int nodeIndex, ref QuickQueue<int> spareNodes)
         {
             bool nodesInvalidated;
             //Validate();
@@ -566,14 +567,14 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
         public unsafe void TopDownSweepRefine()
         {
-            var spareNodes = new QuickList<int>(BufferPools<int>.Thread, 8);
+            var spareNodes = new QuickQueue<int>(BufferPools<int>.Thread, 8);
             TopDownSweepRefine(0, ref spareNodes);
             RemoveUnusedInternalNodes(ref spareNodes);
             spareNodes.Dispose();
         }
 
 
-        unsafe void TryToBottomUpSweepRefine(int[] refinementFlags, int nodeIndex, ref QuickList<int> spareInternalNodes)
+        unsafe void TryToBottomUpSweepRefine(int[] refinementFlags, int nodeIndex, ref QuickQueue<int> spareInternalNodes)
         {
             if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
             {
@@ -598,7 +599,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Note the size: it needs to contain all possible internal nodes.
             //TODO: This is actually bugged, because the refinement flags do not update if the nodes move.
             //And the nodes CAN move.
-            var spareNodes = new QuickList<int>(BufferPools<int>.Thread, 8);
+            var spareNodes = new QuickQueue<int>(BufferPools<int>.Thread, 8);
             var refinementFlags = new int[leafCount * 2 - 1];
             for (int i = 0; i < nodeCount; ++i)
             {

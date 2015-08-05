@@ -164,7 +164,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
-        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
+        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickQueue<int> internalNodes, out float treeletCost)
         {
 
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
@@ -183,10 +183,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             priorityQueue.Insert(node, nodes, ref subtrees);
 
-            //Cache the index of the treelet root. Later, the root will be moved to the end of the list to guarantee that it's the first node that's used.
-            //This provides the guarantee that the treelet root index will not change.
-            var rootIndex = internalNodes.Count;
-            internalNodes.Add(nodeIndex);
+            //The root is inserted first; the dequeue process will find the root first, guaranteeing that the root does not move.
+            internalNodes.Enqueue(nodeIndex);
 
             //Note that the treelet root's cost is excluded from the treeletCost.
             //That's because the treelet root cannot change.
@@ -197,7 +195,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             while (priorityQueue.TryPop(nodes, ref remainingSubtreeSpace, ref subtrees, out highestIndex, out highestCost))
             {
                 treeletCost += highestCost;
-                internalNodes.Add(highestIndex);
+                internalNodes.Enqueue(highestIndex);
 
                 //Add all the children to the set of subtrees.
                 //This is safe because we pre-validated the number of children in the node.
@@ -210,11 +208,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtrees.Add(priorityQueue.Entries[i].Index);
             }
 
-            //Swap the treelet root into the last position so that the first internal node consumed is guaranteed to be the root.
-            var lastIndex = internalNodes.Count - 1;
-            var temp = internalNodes.Elements[lastIndex];
-            internalNodes.Elements[lastIndex] = internalNodes.Elements[rootIndex];
-            internalNodes.Elements[rootIndex] = temp;
         }
 
 
