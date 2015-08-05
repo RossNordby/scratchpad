@@ -428,7 +428,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> internalNodes, out bool nodesInvalidated)
         {
-            const int maximumSubtrees = 4096;
+            const int maximumSubtrees = 1024;
             var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int internalNodeStartIndex = internalNodes.Count;
             float originalTreeletCost;
