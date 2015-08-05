@@ -18,33 +18,37 @@ namespace SIMDPrototyping.Trees.SingleArray
     {
         internal unsafe struct SweepResources
         {
-            public BoundingBox* Bounds;
-            public int* Ids;
-            public int* IndexMap;
-            public int* IndexMapX;
-            public int* IndexMapY;
-            public int* IndexMapZ;
-            public float* CentroidsX;
-            public float* CentroidsY;
-            public float* CentroidsZ;
+            public BoundingBox[] Bounds;
+            public int[] Ids;
+            public int[] IndexMap;
+            public int[] IndexMapX;
+            public int[] IndexMapY;
+            public int[] IndexMapZ;
+            public float[] CentroidsX;
+            public float[] CentroidsY;
+            public float[] CentroidsZ;
+            public BoundingBox* Merged;
         }
 
 
-        unsafe void FindPartitionForAxis(BoundingBox* boundingBoxes, float* centroids, int* indexMap, int count,
+        unsafe void FindPartitionForAxis(BoundingBox[] boundingBoxes, BoundingBox* aMerged, float[] centroids, int[] indexMap, int count,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             Debug.Assert(count > 1);
 
-            Quicksort(centroids, indexMap, 0, count - 1);
+            fixed (float* centroidsPointer = centroids)
+                fixed (int* indexMapPointer = indexMap)
+            {
 
+                Quicksort(centroidsPointer, indexMapPointer, 0, count - 1);
+            }
 
             //Search for the best split.
             //Sweep across from low to high, caching the merged size and leaf count at each point.
             //Index N includes every subtree from 0 to N, inclusive. So index 0 contains subtree 0's information.
             var lastIndex = count - 1;
-            var aMerged = stackalloc BoundingBox[lastIndex];
 
-            *aMerged = boundingBoxes[*indexMap];
+            aMerged[0] = boundingBoxes[indexMap[0]];
             for (int i = 1; i < lastIndex; ++i)
             {
                 var index = indexMap[i];
@@ -89,10 +93,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             //A variety of potential microoptimizations exist here.
 
             //Initialize the per-axis candidate maps.
-            var localIndexMap = leaves.IndexMap + start;
             for (int i = 0; i < count; ++i)
             {
-                var originalValue = localIndexMap[i];
+                var originalValue = leaves.IndexMap[i + start];
                 leaves.IndexMapX[i] = originalValue;
                 leaves.IndexMapY[i] = originalValue;
                 leaves.IndexMapZ[i] = originalValue;
@@ -101,11 +104,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
             BoundingBox xA, xB, yA, yB, zA, zB;
             float xCost, yCost, zCost;
-            FindPartitionForAxis(leaves.Bounds, leaves.CentroidsX, leaves.IndexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
-            FindPartitionForAxis(leaves.Bounds, leaves.CentroidsY, leaves.IndexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
-            FindPartitionForAxis(leaves.Bounds, leaves.CentroidsZ, leaves.IndexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
+            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsX, leaves.IndexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
+            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsY, leaves.IndexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
+            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsZ, leaves.IndexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
 
-            int* bestIndexMap;
+            int[] bestIndexMap;
             if (xCost <= yCost && xCost <= zCost)
             {
                 splitIndex = xSplitIndex;
@@ -135,7 +138,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             for (int i = 0; i < count; ++i)
             {
-                localIndexMap[i] = bestIndexMap[i];
+                leaves.IndexMap[i + start] = bestIndexMap[i];
             }
 
             splitIndex += start;
@@ -153,7 +156,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 int leafCountA, leafCountB;
                 int splitIndex;
                 FindPartition(ref leaves, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
-                
+
                 if (depthRemaining > 0)
                 {
                     --depthRemaining;
@@ -180,7 +183,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                     if (leafCountA > 1)
                     {
-                        children[childIndexA] = CreateSweepBuilderNode(nodeIndex, childIndexA, ref leaves, splitIndex, leafCountA);
+                        children[childIndexA] = CreateSweepBuilderNode(nodeIndex, childIndexA, ref leaves, start, leafCountA);
                     }
                     else
                     {
@@ -231,18 +234,19 @@ namespace SIMDPrototyping.Trees.SingleArray
             var nodeIndex = AllocateNode(out nodesInvalidated);
             Debug.Assert(!nodesInvalidated, "The sweep builder should have allocated enough nodes ahead of time.");
             var node = nodes + nodeIndex;
+            node->Parent = parentIndex;
+            node->IndexInParent = indexInParent;
 
             if (count < ChildrenCapacity)
             {
                 //No need to do any sorting. This node can fit every remaining subtree.
-                var localIndexMap = leaves.IndexMap + start;
                 node->ChildCount = count;
                 var bounds = &node->A;
                 var children = &node->ChildA;
                 var leafCounts = &node->LeafCountA;
                 for (int i = 0; i < count; ++i)
                 {
-                    var index = localIndexMap[i];
+                    var index = leaves.IndexMap[i + start];
                     bool leavesInvalidated;
                     var leafIndex = AddLeaf(leaves.Ids[index], nodeIndex, i, out leavesInvalidated);
                     Debug.Assert(!leavesInvalidated);
@@ -295,7 +299,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
             //Gather necessary information and put it into a convenient format.
-            
+
             var indexMap = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
             var indexMapX = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
             var indexMapY = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
@@ -303,6 +307,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             var centroidsX = floatPool == null ? new float[leafIds.Length] : floatPool.Take(leafIds.Length);
             var centroidsY = floatPool == null ? new float[leafIds.Length] : floatPool.Take(leafIds.Length);
             var centroidsZ = floatPool == null ? new float[leafIds.Length] : floatPool.Take(leafIds.Length);
+            var mergedSize = leafIds.Length * (sizeof(BoundingBox) / sizeof(float));
+            var merged = floatPool == null ? new float[mergedSize] : floatPool.Take(mergedSize);
             fixed (BoundingBox* leafBoundsPointer = leafBounds)
             fixed (int* leafIdsPointer = leafIds)
             fixed (int* indexMapPointer = indexMap)
@@ -312,25 +318,37 @@ namespace SIMDPrototyping.Trees.SingleArray
             fixed (float* centroidsXPointer = centroidsX)
             fixed (float* centroidsYPointer = centroidsY)
             fixed (float* centroidsZPointer = centroidsZ)
+            fixed (float* mergedPointer = merged)
             {
                 SweepResources leaves;
-                leaves.Bounds = leafBoundsPointer;
-                leaves.Ids = leafIdsPointer;
-                leaves.IndexMap = indexMapPointer;
-                leaves.IndexMapX = indexMapXPointer;
-                leaves.IndexMapY = indexMapYPointer;
-                leaves.IndexMapZ = indexMapZPointer;
-                leaves.CentroidsX = centroidsXPointer;
-                leaves.CentroidsY = centroidsYPointer;
-                leaves.CentroidsZ = centroidsZPointer;
+                //leaves.Bounds = leafBoundsPointer;
+                //leaves.Ids = leafIdsPointer;
+                //leaves.IndexMap = indexMapPointer;
+                //leaves.IndexMapX = indexMapXPointer;
+                //leaves.IndexMapY = indexMapYPointer;
+                //leaves.IndexMapZ = indexMapZPointer;
+                //leaves.CentroidsX = centroidsXPointer;
+                //leaves.CentroidsY = centroidsYPointer;
+                //leaves.CentroidsZ = centroidsZPointer;
+                //leaves.Merged = (BoundingBox*)mergedPointer;
+                leaves.Bounds = leafBounds;
+                leaves.Ids = leafIds;
+                leaves.IndexMap = indexMap;
+                leaves.IndexMapX = indexMapX;
+                leaves.IndexMapY = indexMapY;
+                leaves.IndexMapZ = indexMapZ;
+                leaves.CentroidsX = centroidsX;
+                leaves.CentroidsY = centroidsY;
+                leaves.CentroidsZ = centroidsZ;
+                leaves.Merged = (BoundingBox*)mergedPointer;
 
                 for (int i = 0; i < leafIds.Length; ++i)
                 {
-                    var bounds = leaves.Bounds + i;
+                    var bounds = leaves.Bounds[i];
                     leaves.IndexMap[i] = i;
                     //Per-axis index maps don't need to be initialized here. They're filled in at the time of use.
 
-                    var centroid = bounds->Min + bounds->Max;
+                    var centroid = bounds.Min + bounds.Max;
                     centroidsX[i] = centroid.X;
                     centroidsY[i] = centroid.Y;
                     centroidsZ[i] = centroid.Z;
@@ -349,9 +367,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 Array.Clear(centroidsX, 0, leafIds.Length);
                 Array.Clear(centroidsY, 0, leafIds.Length);
                 Array.Clear(centroidsZ, 0, leafIds.Length);
+                Array.Clear(merged, 0, mergedSize);
                 floatPool.GiveBack(centroidsX);
                 floatPool.GiveBack(centroidsY);
                 floatPool.GiveBack(centroidsZ);
+                floatPool.GiveBack(merged);
             }
             if (intPool != null)
             {
