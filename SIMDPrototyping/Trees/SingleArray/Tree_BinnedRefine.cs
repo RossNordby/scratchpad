@@ -190,12 +190,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             leafCountA = 0;
             leafCountB = 0;
 
-            int totalLeafCount = 0;
-            for (int i = 0; i < count; ++i)
-            {
-                totalLeafCount += subtrees.LeafCounts[localIndexMap[i]];
-            }
-
+       
             for (int i = lastIndex; i >= 1; --i)
             {
                 int aIndex = i - 1;
