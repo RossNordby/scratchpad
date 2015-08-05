@@ -36,7 +36,8 @@ namespace SIMDPrototyping.Trees.Tests
                     warmLeaves[i].GetBoundingBox(out leafBounds[i]);
                 }
                 //tree.BuildMedianSplit(leafIds, leafBounds);
-                tree.BuildVolumeHeuristic(leafIds, leafBounds);
+                //tree.BuildVolumeHeuristic(leafIds, leafBounds);
+                tree.SweepBuild(leafIds, leafBounds);
                 Console.WriteLine($"SingleArray Cachewarm Build: {tree.LeafCount}");
 
                 tree.Refit();

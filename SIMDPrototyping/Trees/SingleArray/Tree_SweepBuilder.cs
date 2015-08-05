@@ -18,30 +18,26 @@ namespace SIMDPrototyping.Trees.SingleArray
     {
         internal unsafe struct SweepResources
         {
-            public BoundingBox[] Bounds;
-            public int[] Ids;
-            public int[] IndexMap;
-            public int[] IndexMapX;
-            public int[] IndexMapY;
-            public int[] IndexMapZ;
-            public float[] CentroidsX;
-            public float[] CentroidsY;
-            public float[] CentroidsZ;
+            public BoundingBox* Bounds;
+            public int* Ids;
+            public int* IndexMap;
+            public int* IndexMapX;
+            public int* IndexMapY;
+            public int* IndexMapZ;
+            public float* CentroidsX;
+            public float* CentroidsY;
+            public float* CentroidsZ;
             public BoundingBox* Merged;
         }
 
 
-        unsafe void FindPartitionForAxis(BoundingBox[] boundingBoxes, BoundingBox* aMerged, float[] centroids, int[] indexMap, int count,
+        unsafe void FindPartitionForAxis(BoundingBox* boundingBoxes, BoundingBox* aMerged, float* centroids, int* indexMap, int count,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             Debug.Assert(count > 1);
 
-            fixed (float* centroidsPointer = centroids)
-                fixed (int* indexMapPointer = indexMap)
-            {
 
-                Quicksort(centroidsPointer, indexMapPointer, 0, count - 1);
-            }
+            Quicksort(centroids, indexMap, 0, count - 1);
 
             //Search for the best split.
             //Sweep across from low to high, caching the merged size and leaf count at each point.
@@ -108,7 +104,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsY, leaves.IndexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
             FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsZ, leaves.IndexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
 
-            int[] bestIndexMap;
+            int* bestIndexMap;
             if (xCost <= yCost && xCost <= zCost)
             {
                 splitIndex = xSplitIndex;
@@ -321,25 +317,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             fixed (float* mergedPointer = merged)
             {
                 SweepResources leaves;
-                //leaves.Bounds = leafBoundsPointer;
-                //leaves.Ids = leafIdsPointer;
-                //leaves.IndexMap = indexMapPointer;
-                //leaves.IndexMapX = indexMapXPointer;
-                //leaves.IndexMapY = indexMapYPointer;
-                //leaves.IndexMapZ = indexMapZPointer;
-                //leaves.CentroidsX = centroidsXPointer;
-                //leaves.CentroidsY = centroidsYPointer;
-                //leaves.CentroidsZ = centroidsZPointer;
-                //leaves.Merged = (BoundingBox*)mergedPointer;
-                leaves.Bounds = leafBounds;
-                leaves.Ids = leafIds;
-                leaves.IndexMap = indexMap;
-                leaves.IndexMapX = indexMapX;
-                leaves.IndexMapY = indexMapY;
-                leaves.IndexMapZ = indexMapZ;
-                leaves.CentroidsX = centroidsX;
-                leaves.CentroidsY = centroidsY;
-                leaves.CentroidsZ = centroidsZ;
+                leaves.Bounds = leafBoundsPointer;
+                leaves.Ids = leafIdsPointer;
+                leaves.IndexMap = indexMapPointer;
+                leaves.IndexMapX = indexMapXPointer;
+                leaves.IndexMapY = indexMapYPointer;
+                leaves.IndexMapZ = indexMapZPointer;
+                leaves.CentroidsX = centroidsXPointer;
+                leaves.CentroidsY = centroidsYPointer;
+                leaves.CentroidsZ = centroidsZPointer;
                 leaves.Merged = (BoundingBox*)mergedPointer;
 
                 for (int i = 0; i < leafIds.Length; ++i)
