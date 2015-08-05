@@ -95,20 +95,44 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.Validate();
 
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < refitCount; ++i)
+                {
+                    //for (int i = 0; i < tree.LeafCount; ++i)
+                    //{
+                    //    BoundingBox box;
+                    //    leaves[tree.Leaves[i].Id].GetBoundingBox(out box);
+                    //    tree.UpdateLeafBoundingBox(i, ref box);
+                    //}
+                    tree.Refit();
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray Refit Time1: {endTime - startTime}");
+
+                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlaps(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray SelfTree Time1: {endTime - startTime}, overlaps: {overlaps.Count}");
+
                 QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 3000; ++i)
+                for (int i = 0; i < 1; ++i)
                 {
                     internalNodes.Count = 0;
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
-                    tree.BinnedRefine(0, ref internalNodes, out nodesInvalidated);
+                    //tree.BinnedRefine(0, ref internalNodes, out nodesInvalidated);
 
                     //tree.BottomUpBinnedRefine();
-                    //tree.TopDownBinnedRefine();
+                    tree.TopDownBinnedRefine();
                     //tree.BottomUpSweepRefine();
                     //tree.TopDownSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
@@ -138,7 +162,7 @@ namespace SIMDPrototyping.Trees.Tests
                     tree.Refit();
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SingleArray Refit Time: {endTime - startTime}");
+                Console.WriteLine($"SingleArray Refit Time2: {endTime - startTime}");
 
 
                 var list = new QuickList<int>(new BufferPool<int>());
@@ -155,7 +179,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Array.Clear(list.Elements, 0, list.Elements.Length);
                 list.Dispose();
 
-                var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < selfTestCount; ++i)
                 {
@@ -163,7 +187,7 @@ namespace SIMDPrototyping.Trees.Tests
                     tree.GetSelfOverlaps(ref overlaps);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SingleArray SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+                Console.WriteLine($"SingleArray SelfTree Time2: {endTime - startTime}, overlaps: {overlaps.Count}");
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
