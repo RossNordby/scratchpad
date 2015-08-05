@@ -160,12 +160,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe void QuickSort(float* centroids, int* indexMap, int left, int right)
-        {
-            int i = left - 1;
-            int j = right;
-        }
-
 
         unsafe void FindPartitionForAxis(BoundingBox* boundingBoxes, int* leafCounts, float* centroids, int* indexMap, int subtreeCount,
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
@@ -256,7 +250,6 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             //A variety of potential microoptimizations exist here.
             //Don't reallocate centroids (because JIT is forced to zero by roslyn), do swaps better, etc.
-            var centroids = stackalloc Vector3[count];
             var indexMapX = stackalloc int[count];
             var indexMapY = stackalloc int[count];
             var indexMapZ = stackalloc int[count];
