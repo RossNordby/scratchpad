@@ -135,8 +135,8 @@ namespace SIMDPrototyping.Trees.Tests
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
                     tree.BinnedRefine(0, ref internalNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
-                    //tree.BottomUpBinnedRefine();
-                    //tree.TopDownBinnedRefine(1024);
+                    //tree.BottomUpBinnedRefine(maximumSubtrees);
+                    //tree.TopDownBinnedRefine(maximumSubtrees);
                     //tree.BottomUpSweepRefine();
                     //tree.TopDownSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();

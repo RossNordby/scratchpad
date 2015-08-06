@@ -204,18 +204,18 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        unsafe void FindPartitionBinned(ref BinnedResources subtrees, int start, int count, ref BoundingBox boundingBox,
+        unsafe void FindPartitionBinned(ref BinnedResources resources, int start, int count, ref BoundingBox boundingBox,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
 
             //Initialize the per-axis candidate maps.
-            var localIndexMap = subtrees.IndexMap + start;
+            var localIndexMap = resources.IndexMap + start;
             BoundingBox centroidBoundingBox;
-            centroidBoundingBox.Min = subtrees.Centroids[localIndexMap[0]];
+            centroidBoundingBox.Min = resources.Centroids[localIndexMap[0]];
             centroidBoundingBox.Max = centroidBoundingBox.Min;
             for (int i = 1; i < count; ++i)
             {
-                var centroid = subtrees.Centroids + localIndexMap[i];
+                var centroid = resources.Centroids + localIndexMap[i];
                 centroidBoundingBox.Min = Vector3.Min(*centroid, centroidBoundingBox.Min);
                 centroidBoundingBox.Max = Vector3.Max(*centroid, centroidBoundingBox.Max);
             }
@@ -235,13 +235,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                 leafCountB = 0;
                 for (int i = 0; i < splitIndex; ++i)
                 {
-                    BoundingBox.Merge(ref a, ref subtrees.BoundingBoxes[localIndexMap[i]], out a);
-                    leafCountA += subtrees.LeafCounts[localIndexMap[i]];
+                    BoundingBox.Merge(ref a, ref resources.BoundingBoxes[localIndexMap[i]], out a);
+                    leafCountA += resources.LeafCounts[localIndexMap[i]];
                 }
                 for (int i = splitIndex; i < count; ++i)
                 {
-                    BoundingBox.Merge(ref b, ref subtrees.BoundingBoxes[localIndexMap[i]], out b);
-                    leafCountB += subtrees.LeafCounts[localIndexMap[i]];
+                    BoundingBox.Merge(ref b, ref resources.BoundingBoxes[localIndexMap[i]], out b);
+                    leafCountB += resources.LeafCounts[localIndexMap[i]];
                 }
                 splitIndex += start;
                 return;
@@ -266,64 +266,64 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Initialize bin information.
             for (int i = 0; i < binCount; ++i)
             {
-                subtrees.BinBoundingBoxesX[i] = nullBoundingBox;
-                subtrees.BinBoundingBoxesY[i] = nullBoundingBox;
-                subtrees.BinBoundingBoxesZ[i] = nullBoundingBox;
+                resources.BinBoundingBoxesX[i] = nullBoundingBox;
+                resources.BinBoundingBoxesY[i] = nullBoundingBox;
+                resources.BinBoundingBoxesZ[i] = nullBoundingBox;
 
-                subtrees.BinSubtreeCountsX[i] = 0;
-                subtrees.BinSubtreeCountsY[i] = 0;
-                subtrees.BinSubtreeCountsZ[i] = 0;
+                resources.BinSubtreeCountsX[i] = 0;
+                resources.BinSubtreeCountsY[i] = 0;
+                resources.BinSubtreeCountsZ[i] = 0;
 
-                subtrees.BinLeafCountsX[i] = 0;
-                subtrees.BinLeafCountsY[i] = 0;
-                subtrees.BinLeafCountsZ[i] = 0;
+                resources.BinLeafCountsX[i] = 0;
+                resources.BinLeafCountsY[i] = 0;
+                resources.BinLeafCountsZ[i] = 0;
             }
 
             //Allocate subtrees to bins for all axes simultaneously.
             for (int i = 0; i < count; ++i)
             {
                 var subtreeIndex = localIndexMap[i];
-                var binIndices = Vector3.Min((subtrees.Centroids[subtreeIndex] - centroidBoundingBox.Min) * inverseBinSize, maximumBinIndex);
+                var binIndices = Vector3.Min((resources.Centroids[subtreeIndex] - centroidBoundingBox.Min) * inverseBinSize, maximumBinIndex);
                 var x = (int)binIndices.X;
                 var y = (int)binIndices.Y;
                 var z = (int)binIndices.Z;
 
-                var subtreeBoundingBox = subtrees.BoundingBoxes + subtreeIndex;
-                var leafCount = subtrees.LeafCounts + subtreeIndex;
-                BoundingBox.Merge(ref subtrees.BinBoundingBoxesX[x], ref *subtreeBoundingBox, out subtrees.BinBoundingBoxesX[x]);
-                BoundingBox.Merge(ref subtrees.BinBoundingBoxesY[y], ref *subtreeBoundingBox, out subtrees.BinBoundingBoxesY[y]);
-                BoundingBox.Merge(ref subtrees.BinBoundingBoxesZ[z], ref *subtreeBoundingBox, out subtrees.BinBoundingBoxesZ[z]);
-                subtrees.BinLeafCountsX[x] += *leafCount;
-                subtrees.BinLeafCountsY[y] += *leafCount;
-                subtrees.BinLeafCountsZ[z] += *leafCount;
-                ++subtrees.BinSubtreeCountsX[x];
-                ++subtrees.BinSubtreeCountsY[y];
-                ++subtrees.BinSubtreeCountsZ[z];
+                var subtreeBoundingBox = resources.BoundingBoxes + subtreeIndex;
+                var leafCount = resources.LeafCounts + subtreeIndex;
+                BoundingBox.Merge(ref resources.BinBoundingBoxesX[x], ref *subtreeBoundingBox, out resources.BinBoundingBoxesX[x]);
+                BoundingBox.Merge(ref resources.BinBoundingBoxesY[y], ref *subtreeBoundingBox, out resources.BinBoundingBoxesY[y]);
+                BoundingBox.Merge(ref resources.BinBoundingBoxesZ[z], ref *subtreeBoundingBox, out resources.BinBoundingBoxesZ[z]);
+                resources.BinLeafCountsX[x] += *leafCount;
+                resources.BinLeafCountsY[y] += *leafCount;
+                resources.BinLeafCountsZ[z] += *leafCount;
+                ++resources.BinSubtreeCountsX[x];
+                ++resources.BinSubtreeCountsY[y];
+                ++resources.BinSubtreeCountsZ[z];
 
-                subtrees.SubtreeBinIndicesX[i] = x;
-                subtrees.SubtreeBinIndicesY[i] = y;
-                subtrees.SubtreeBinIndicesZ[i] = z;
+                resources.SubtreeBinIndicesX[i] = x;
+                resources.SubtreeBinIndicesY[i] = y;
+                resources.SubtreeBinIndicesZ[i] = z;
             }
 
             //Determine split axes for all axes simultaneously.
             //Sweep from low to high.
             var lastIndex = binCount - 1;
 
-            subtrees.ALeafCountsX[0] = subtrees.BinLeafCountsX[0];
-            subtrees.ALeafCountsY[0] = subtrees.BinLeafCountsY[0];
-            subtrees.ALeafCountsZ[0] = subtrees.BinLeafCountsZ[0];
-            subtrees.AMergedX[0] = subtrees.BinBoundingBoxesX[0];
-            subtrees.AMergedY[0] = subtrees.BinBoundingBoxesY[0];
-            subtrees.AMergedZ[0] = subtrees.BinBoundingBoxesZ[0];
+            resources.ALeafCountsX[0] = resources.BinLeafCountsX[0];
+            resources.ALeafCountsY[0] = resources.BinLeafCountsY[0];
+            resources.ALeafCountsZ[0] = resources.BinLeafCountsZ[0];
+            resources.AMergedX[0] = resources.BinBoundingBoxesX[0];
+            resources.AMergedY[0] = resources.BinBoundingBoxesY[0];
+            resources.AMergedZ[0] = resources.BinBoundingBoxesZ[0];
             for (int i = 1; i < lastIndex; ++i)
             {
                 var previousIndex = i - 1;
-                subtrees.ALeafCountsX[i] = subtrees.BinLeafCountsX[i] + subtrees.ALeafCountsX[previousIndex];
-                subtrees.ALeafCountsY[i] = subtrees.BinLeafCountsY[i] + subtrees.ALeafCountsY[previousIndex];
-                subtrees.ALeafCountsZ[i] = subtrees.BinLeafCountsZ[i] + subtrees.ALeafCountsZ[previousIndex];
-                BoundingBox.Merge(ref subtrees.AMergedX[previousIndex], ref subtrees.BinBoundingBoxesX[i], out subtrees.AMergedX[i]);
-                BoundingBox.Merge(ref subtrees.AMergedY[previousIndex], ref subtrees.BinBoundingBoxesY[i], out subtrees.AMergedY[i]);
-                BoundingBox.Merge(ref subtrees.AMergedZ[previousIndex], ref subtrees.BinBoundingBoxesZ[i], out subtrees.AMergedZ[i]);
+                resources.ALeafCountsX[i] = resources.BinLeafCountsX[i] + resources.ALeafCountsX[previousIndex];
+                resources.ALeafCountsY[i] = resources.BinLeafCountsY[i] + resources.ALeafCountsY[previousIndex];
+                resources.ALeafCountsZ[i] = resources.BinLeafCountsZ[i] + resources.ALeafCountsZ[previousIndex];
+                BoundingBox.Merge(ref resources.AMergedX[previousIndex], ref resources.BinBoundingBoxesX[i], out resources.AMergedX[i]);
+                BoundingBox.Merge(ref resources.AMergedY[previousIndex], ref resources.BinBoundingBoxesY[i], out resources.AMergedY[i]);
+                BoundingBox.Merge(ref resources.AMergedZ[previousIndex], ref resources.BinBoundingBoxesZ[i], out resources.AMergedZ[i]);
             }
 
             //Sweep from high to low.
@@ -346,16 +346,16 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = lastIndex; i >= 1; --i)
             {
                 int aIndex = i - 1;
-                BoundingBox.Merge(ref bMergedX, ref subtrees.BinBoundingBoxesX[i], out bMergedX);
-                BoundingBox.Merge(ref bMergedY, ref subtrees.BinBoundingBoxesY[i], out bMergedY);
-                BoundingBox.Merge(ref bMergedZ, ref subtrees.BinBoundingBoxesZ[i], out bMergedZ);
-                bLeafCountX += subtrees.BinLeafCountsX[i];
-                bLeafCountY += subtrees.BinLeafCountsY[i];
-                bLeafCountZ += subtrees.BinLeafCountsZ[i];
+                BoundingBox.Merge(ref bMergedX, ref resources.BinBoundingBoxesX[i], out bMergedX);
+                BoundingBox.Merge(ref bMergedY, ref resources.BinBoundingBoxesY[i], out bMergedY);
+                BoundingBox.Merge(ref bMergedZ, ref resources.BinBoundingBoxesZ[i], out bMergedZ);
+                bLeafCountX += resources.BinLeafCountsX[i];
+                bLeafCountY += resources.BinLeafCountsY[i];
+                bLeafCountZ += resources.BinLeafCountsZ[i];
 
-                var metricAX = ComputeBoundsMetric(ref subtrees.AMergedX[aIndex]);
-                var metricAY = ComputeBoundsMetric(ref subtrees.AMergedY[aIndex]);
-                var metricAZ = ComputeBoundsMetric(ref subtrees.AMergedZ[aIndex]);
+                var metricAX = ComputeBoundsMetric(ref resources.AMergedX[aIndex]);
+                var metricAY = ComputeBoundsMetric(ref resources.AMergedY[aIndex]);
+                var metricAZ = ComputeBoundsMetric(ref resources.AMergedZ[aIndex]);
                 var metricBX = ComputeBoundsMetric(ref bMergedX);
                 var metricBY = ComputeBoundsMetric(ref bMergedY);
                 var metricBZ = ComputeBoundsMetric(ref bMergedZ);
@@ -363,15 +363,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //It's possible for a lot of bins in a row to be unpopulated. In that event, you'll get a metric of -infinity. Avoid letting that propagate.
                 float costCandidateX, costCandidateY, costCandidateZ;
                 if (metricAX > 0 && metricBX > 0)
-                    costCandidateX = subtrees.ALeafCountsX[aIndex] * metricAX + bLeafCountX * metricBX;
+                    costCandidateX = resources.ALeafCountsX[aIndex] * metricAX + bLeafCountX * metricBX;
                 else
                     costCandidateX = float.MaxValue;
                 if (metricAY > 0 && metricBY > 0)
-                    costCandidateY = subtrees.ALeafCountsY[aIndex] * metricAY + bLeafCountY * metricBY;
+                    costCandidateY = resources.ALeafCountsY[aIndex] * metricAY + bLeafCountY * metricBY;
                 else
                     costCandidateY = float.MaxValue;
                 if (metricAZ > 0 && metricBZ > 0)
-                    costCandidateZ = subtrees.ALeafCountsZ[aIndex] * metricAZ + bLeafCountZ * metricBZ;
+                    costCandidateZ = resources.ALeafCountsZ[aIndex] * metricAZ + bLeafCountZ * metricBZ;
                 else
                     costCandidateZ = float.MaxValue;
                 if (costCandidateX < costCandidateY && costCandidateX < costCandidateZ)
@@ -381,9 +381,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                         bestAxis = 0;
                         cost = costCandidateX;
                         binSplitIndex = i;
-                        a = subtrees.AMergedX[aIndex];
+                        a = resources.AMergedX[aIndex];
                         b = bMergedX;
-                        leafCountA = subtrees.ALeafCountsX[aIndex];
+                        leafCountA = resources.ALeafCountsX[aIndex];
                         leafCountB = bLeafCountX;
                     }
                 }
@@ -394,9 +394,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                         bestAxis = 1;
                         cost = costCandidateY;
                         binSplitIndex = i;
-                        a = subtrees.AMergedY[aIndex];
+                        a = resources.AMergedY[aIndex];
                         b = bMergedY;
-                        leafCountA = subtrees.ALeafCountsY[aIndex];
+                        leafCountA = resources.ALeafCountsY[aIndex];
                         leafCountB = bLeafCountY;
                     }
                 }
@@ -407,9 +407,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                         bestAxis = 2;
                         cost = costCandidateZ;
                         binSplitIndex = i;
-                        a = subtrees.AMergedZ[aIndex];
+                        a = resources.AMergedZ[aIndex];
                         b = bMergedZ;
-                        leafCountA = subtrees.ALeafCountsZ[aIndex];
+                        leafCountA = resources.ALeafCountsZ[aIndex];
                         leafCountB = bLeafCountZ;
                     }
                 }
@@ -422,42 +422,42 @@ namespace SIMDPrototyping.Trees.SingleArray
             switch (bestAxis)
             {
                 case 0:
-                    bestBinSubtreeCounts = subtrees.BinSubtreeCountsX;
-                    bestSubtreeBinIndices = subtrees.SubtreeBinIndicesX;
+                    bestBinSubtreeCounts = resources.BinSubtreeCountsX;
+                    bestSubtreeBinIndices = resources.SubtreeBinIndicesX;
                     break;
                 case 1:
-                    bestBinSubtreeCounts = subtrees.BinSubtreeCountsY;
-                    bestSubtreeBinIndices = subtrees.SubtreeBinIndicesY;
+                    bestBinSubtreeCounts = resources.BinSubtreeCountsY;
+                    bestSubtreeBinIndices = resources.SubtreeBinIndicesY;
                     break;
                 default:
-                    bestBinSubtreeCounts = subtrees.BinSubtreeCountsZ;
-                    bestSubtreeBinIndices = subtrees.SubtreeBinIndicesZ;
+                    bestBinSubtreeCounts = resources.BinSubtreeCountsZ;
+                    bestSubtreeBinIndices = resources.SubtreeBinIndicesZ;
                     break;
             }
             //Rebuild the index map.
 
-            subtrees.BinStartIndices[0] = 0;
-            subtrees.BinSubtreeCountsSecondPass[0] = 0;
+            resources.BinStartIndices[0] = 0;
+            resources.BinSubtreeCountsSecondPass[0] = 0;
 
             for (int i = 1; i < binCount; ++i)
             {
-                subtrees.BinStartIndices[i] = subtrees.BinStartIndices[i - 1] + bestBinSubtreeCounts[i - 1];
-                subtrees.BinSubtreeCountsSecondPass[i] = 0;
+                resources.BinStartIndices[i] = resources.BinStartIndices[i - 1] + bestBinSubtreeCounts[i - 1];
+                resources.BinSubtreeCountsSecondPass[i] = 0;
             }
 
             for (int i = 0; i < count; ++i)
             {
-                subtrees.TempIndexMap[subtrees.BinStartIndices[bestSubtreeBinIndices[i]] + subtrees.BinSubtreeCountsSecondPass[bestSubtreeBinIndices[i]]++] = localIndexMap[i];
+                resources.TempIndexMap[resources.BinStartIndices[bestSubtreeBinIndices[i]] + resources.BinSubtreeCountsSecondPass[bestSubtreeBinIndices[i]]++] = localIndexMap[i];
             }
 
             //Update the real index map.
             for (int i = 0; i < count; ++i)
             {
-                localIndexMap[i] = subtrees.TempIndexMap[i];
+                localIndexMap[i] = resources.TempIndexMap[i];
             }
 
             //Transform the split index into object indices.
-            splitIndex = subtrees.BinStartIndices[binSplitIndex] + start;
+            splitIndex = resources.BinStartIndices[binSplitIndex] + start;
 
         }
 
@@ -553,6 +553,9 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             var stagingNodeIndex = stagingNodeCount++;
             var stagingNode = resources.StagingNodes + stagingNodeIndex;
+            //The resource memory could contain arbitrary data.
+            //ChildCount will be read, so zero it out.
+            stagingNode->ChildCount = 0;
 
             if (count <= ChildrenCapacity)
             {
@@ -592,15 +595,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
-
-
-            //Create the resources that will be shared during the refinement process.
-            //Some awkwardness: can't stackalloc into anything but a local.
-            //If this seems like a lot, ... well it is. It puts a pretty hard cap
-            //on the size of refinement operations unless you fiddle with the stack size.
-            //Doing all this upfront saves zeroing time (at least until stackalloc is improved).
-
-
             
             //Gather necessary information from nodes.
             for (int i = 0; i < subtreeReferences.Count; ++i)
@@ -657,7 +651,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (newTreeletCost < originalTreeletCost)
+            if (true)//newTreeletCost < originalTreeletCost)
             {
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
