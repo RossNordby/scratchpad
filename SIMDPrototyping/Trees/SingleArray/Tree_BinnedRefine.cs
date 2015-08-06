@@ -8,52 +8,227 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace SIMDPrototyping.Trees.SingleArray
 {
+    public unsafe struct BinnedResources
+    {
+        public BoundingBox* BoundingBoxes;
+        public int* LeafCounts;
+        public int* IndexMap;
+        public Vector3* Centroids;
+
+        public Node* StagingNodes;
+
+        //The binning process requires a lot of auxiliary memory.
+        //Rather than continually reallocating it with stackalloc
+        //and incurring its zeroing cost (at least until that's improved),
+        //create the resources at the beginning of the refinement and reuse them.
+
+        //Subtree related reusable resources.
+        public int* SubtreeBinIndicesX;
+        public int* SubtreeBinIndicesY;
+        public int* SubtreeBinIndicesZ;
+        public int* TempIndexMap;
+
+        public int* ALeafCountsX;
+        public int* ALeafCountsY;
+        public int* ALeafCountsZ;
+        public BoundingBox* AMergedX;
+        public BoundingBox* AMergedY;
+        public BoundingBox* AMergedZ;
+
+        //Bin-space reusable resources.
+        public BoundingBox* BinBoundingBoxesX;
+        public BoundingBox* BinBoundingBoxesY;
+        public BoundingBox* BinBoundingBoxesZ;
+        public int* BinLeafCountsX;
+        public int* BinLeafCountsY;
+        public int* BinLeafCountsZ;
+        public int* BinSubtreeCountsX;
+        public int* BinSubtreeCountsY;
+        public int* BinSubtreeCountsZ;
+
+        public int* BinStartIndices;
+        public int* BinSubtreeCountsSecondPass;
+        
+
+    }
+
+    //public class ByteBuffer
+    //{
+    //    public ByteBuffer()
+    //    {
+    //        Byte
+    //    }
+    //}
+    
+    public class BinnedBackingResources
+    {
+        
+        //TODO: Another option, which would be a bit... cleaner, would be to have a single byte array of sufficient size and then just allocate out of it.
+        public BoundingBox[] BoundingBoxes;
+        public int[] LeafCounts;
+        public int[] IndexMap;
+        public Vector3[] Centroids;
+
+        public Node[] StagingNodes;
+        
+        //Subtree related reusable resources.
+        public int[] SubtreeBinIndicesX;
+        public int[] SubtreeBinIndicesY;
+        public int[] SubtreeBinIndicesZ;
+        public int[] TempIndexMap;
+
+        public int[] ALeafCountsX;
+        public int[] ALeafCountsY;
+        public int[] ALeafCountsZ;
+        public BoundingBox[] AMergedX;
+        public BoundingBox[] AMergedY;
+        public BoundingBox[] AMergedZ;
+
+        //Bin-space reusable resources.
+        public BoundingBox[] BinBoundingBoxesX;
+        public BoundingBox[] BinBoundingBoxesY;
+        public BoundingBox[] BinBoundingBoxesZ;
+        public int[] BinLeafCountsX;
+        public int[] BinLeafCountsY;
+        public int[] BinLeafCountsZ;
+        public int[] BinSubtreeCountsX;
+        public int[] BinSubtreeCountsY;
+        public int[] BinSubtreeCountsZ;
+
+        public int[] BinStartIndices;
+        public int[] BinSubtreeCountsSecondPass;
+
+        GCHandle[] handles;
+        public unsafe BinnedBackingResources(int maximumSubtreeCount, int maximumBinCount)
+        {
+            handles = new GCHandle[26];
+            
+            BoundingBoxes = new BoundingBox[maximumSubtreeCount];
+            LeafCounts = new int[maximumSubtreeCount];
+            IndexMap = new int[maximumSubtreeCount];
+            Centroids = new Vector3[maximumSubtreeCount];
+            int nodeCount = maximumSubtreeCount - 1;
+            StagingNodes = new Node[nodeCount];
+
+            SubtreeBinIndicesX = new int[maximumSubtreeCount];
+            SubtreeBinIndicesY = new int[maximumSubtreeCount];
+            SubtreeBinIndicesZ = new int[maximumSubtreeCount];
+            TempIndexMap = new int[maximumSubtreeCount];
+
+            ALeafCountsX = new int[nodeCount];
+            ALeafCountsY = new int[nodeCount];
+            ALeafCountsZ = new int[nodeCount];
+            AMergedX = new BoundingBox[nodeCount];
+            AMergedY = new BoundingBox[nodeCount];
+            AMergedZ = new BoundingBox[nodeCount];
+
+            BinBoundingBoxesX = new BoundingBox[maximumBinCount];
+            BinBoundingBoxesY = new BoundingBox[maximumBinCount];
+            BinBoundingBoxesZ = new BoundingBox[maximumBinCount];
+            BinLeafCountsX = new int[maximumBinCount];
+            BinLeafCountsY = new int[maximumBinCount];
+            BinLeafCountsZ = new int[maximumBinCount];
+            BinSubtreeCountsX = new int[maximumBinCount];
+            BinSubtreeCountsY = new int[maximumBinCount];
+            BinSubtreeCountsZ = new int[maximumBinCount];
+            BinStartIndices = new int[maximumBinCount];
+            BinSubtreeCountsSecondPass = new int[maximumBinCount];
+        }
+
+        public void Pin(out BinnedResources binnedResources)
+        {
+            Debug.Assert(!handles[0].IsAllocated);
+            handles[0] = GCHandle.Alloc(BoundingBoxes, GCHandleType.Pinned);
+            handles[1] = GCHandle.Alloc(LeafCounts, GCHandleType.Pinned);
+            handles[2] = GCHandle.Alloc(IndexMap, GCHandleType.Pinned);
+            handles[3] = GCHandle.Alloc(Centroids, GCHandleType.Pinned);
+            handles[4] = GCHandle.Alloc(StagingNodes, GCHandleType.Pinned);
+            handles[5] = GCHandle.Alloc(SubtreeBinIndicesX, GCHandleType.Pinned);
+            handles[6] = GCHandle.Alloc(SubtreeBinIndicesY, GCHandleType.Pinned);
+            handles[7] = GCHandle.Alloc(SubtreeBinIndicesZ, GCHandleType.Pinned);
+            handles[8] = GCHandle.Alloc(TempIndexMap, GCHandleType.Pinned);
+            handles[9] = GCHandle.Alloc(ALeafCountsX, GCHandleType.Pinned);
+            handles[10] = GCHandle.Alloc(ALeafCountsX, GCHandleType.Pinned);
+            handles[11] = GCHandle.Alloc(ALeafCountsY, GCHandleType.Pinned);
+            handles[12] = GCHandle.Alloc(ALeafCountsZ, GCHandleType.Pinned);
+            handles[13] = GCHandle.Alloc(AMergedX, GCHandleType.Pinned);
+            handles[14] = GCHandle.Alloc(AMergedY, GCHandleType.Pinned);
+            handles[15] = GCHandle.Alloc(AMergedZ, GCHandleType.Pinned);
+            handles[16] = GCHandle.Alloc(BinBoundingBoxesX, GCHandleType.Pinned);
+            handles[17] = GCHandle.Alloc(BinBoundingBoxesY, GCHandleType.Pinned);
+            handles[18] = GCHandle.Alloc(BinBoundingBoxesZ, GCHandleType.Pinned);
+            handles[19] = GCHandle.Alloc(BinLeafCountsX, GCHandleType.Pinned);
+            handles[20] = GCHandle.Alloc(BinLeafCountsY, GCHandleType.Pinned);
+            handles[21] = GCHandle.Alloc(BinLeafCountsZ, GCHandleType.Pinned);
+            handles[22] = GCHandle.Alloc(BinSubtreeCountsX, GCHandleType.Pinned);
+            handles[23] = GCHandle.Alloc(BinSubtreeCountsY, GCHandleType.Pinned);
+            handles[24] = GCHandle.Alloc(BinSubtreeCountsZ, GCHandleType.Pinned);
+            handles[25] = GCHandle.Alloc(BinStartIndices, GCHandleType.Pinned);
+            handles[26] = GCHandle.Alloc(BinSubtreeCountsSecondPass, GCHandleType.Pinned);
+
+            binnedResources
+
+        }
+
+        public void Unpin()
+        {
+            Debug.Assert(handles[0].IsAllocated);
+            for (int i = 0; i < handles.Length; ++i)
+            {
+                handles[i].Free();
+            }
+        }
+    }
+
+    //public class BinnedResourcePool
+    //{
+        
+    //    SpinLock locker = new SpinLock();
+    //    int maximumAllocatedResourceCount;
+    //    Stack<int> ids = new Stack<int>();
+    //    Stack<int[][]> backingResources = new Stack<int[][]>();
+    //    Dictionary<int, int[][]> outstandingResources = new Dictionary<int, int[][]>();
+
+    //    public void GetBinnedResources(BufferPool<int> pool, out BinnedResources binnedResources)
+    //    {
+    //        int id;
+    //        int[][] backingResource;
+    //        locker.Enter();
+    //        try
+    //        {
+    //            if (ids.Count > 0)
+    //            {
+    //                Debug.Assert(backingResources.Count > 0);
+    //                id = ids.Pop();
+    //                backingResource = backingResources.Pop();
+    //            }
+    //            else
+    //            {
+    //                id = maximumAllocatedResourceCount++;
+    //                backingResources = new 
+    //            }
+    //        }
+    //        finally
+    //        {
+    //            locker.Exit();
+    //        }
+    //    }
+
+    //    public void GiveBack(ref BinnedResources, binnedResources, BufferPool<int> pool)
+    //    {
+    //    }
+    //}
+
+
     partial class Tree
     {
         const int MaximumBinCount = 64;
 
-        unsafe internal struct BinnedResources
-        {
-            public BoundingBox* BoundingBoxes;
-            public int* LeafCounts;
-            public int* IndexMap;
-            public Vector3* Centroids;
 
-            //The binning process requires a lot of auxiliary memory.
-            //Rather than continually reallocating it with stackalloc
-            //and incurring its zeroing cost (at least until that's improved),
-            //create the resources at the beginning of the refinement and reuse them.
-
-            //Subtree related reusable resources.
-            public int* SubtreeBinIndicesX;
-            public int* SubtreeBinIndicesY;
-            public int* SubtreeBinIndicesZ;
-            public int* TempIndexMap;
-
-            public int* ALeafCountsX;
-            public int* ALeafCountsY;
-            public int* ALeafCountsZ;
-            public BoundingBox* AMergedX;
-            public BoundingBox* AMergedY;
-            public BoundingBox* AMergedZ;
-
-            //Bin-space reusable resources.
-            public BoundingBox* BinBoundingBoxesX;
-            public BoundingBox* BinBoundingBoxesY;
-            public BoundingBox* BinBoundingBoxesZ;
-            public int* BinLeafCountsX;
-            public int* BinLeafCountsY;
-            public int* BinLeafCountsZ;
-            public int* BinSubtreeCountsX;
-            public int* BinSubtreeCountsY;
-            public int* BinSubtreeCountsZ;
-
-            public int* BinStartIndices;
-            public int* BinSubtreeCountsSecondPass;
-        }
 
 
         unsafe void FindPartitionBinned(ref BinnedResources subtrees, int start, int count, ref BoundingBox boundingBox,
@@ -194,7 +369,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             leafCountA = 0;
             leafCountB = 0;
 
-       
+
             for (int i = lastIndex; i >= 1; --i)
             {
                 int aIndex = i - 1;
@@ -437,9 +612,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> spareNodes, out bool nodesInvalidated)
+        public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> spareNodes, int maximumSubtrees, ref BinnedResources subtrees, out bool nodesInvalidated)
         {
-            const int maximumSubtrees = 1024;
             var poolIndex = BufferPool<int>.GetPoolIndex(maximumSubtrees);
             var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
@@ -493,7 +667,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             subtrees.SubtreeBinIndicesY = subtreeBinIndicesY;
             subtrees.SubtreeBinIndicesZ = subtreeBinIndicesZ;
             subtrees.TempIndexMap = tempIndexMap;
-            
+
             subtrees.ALeafCountsX = aLeafCountsX;
             subtrees.ALeafCountsY = aLeafCountsY;
             subtrees.ALeafCountsZ = aLeafCountsZ;
@@ -547,6 +721,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int stagingNodeCount = 0;
             int stagingNodeCapacity = subtreeReferences.Count - 1;
             var stagingNodes = stackalloc Node[stagingNodeCapacity];
+            subtrees.StagingNodes = stagingNodes;
 
             BoundingBox treeletBoundingBox;
             if (parent >= 0)
@@ -564,7 +739,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
             float newTreeletCost;
-            CreateStagingNodeBinned(parent, indexInParent, ref treeletBoundingBox, ref subtrees, 0, subtreeReferences.Count, stagingNodes, ref stagingNodeCount, out newTreeletCost);
+            CreateStagingNodeBinned(parent, indexInParent, ref treeletBoundingBox, ref subtrees, 0, subtreeReferences.Count, subtrees.StagingNodes, ref stagingNodeCount, out newTreeletCost);
 
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
