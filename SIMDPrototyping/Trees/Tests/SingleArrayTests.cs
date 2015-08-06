@@ -120,19 +120,23 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray SelfTree Time1: {endTime - startTime}, overlaps: {overlaps.Count}");
 
                 QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
+                MemoryRegion region;
+                BinnedResources resources;
+                const int maximumSubtrees = 1024;
+                Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out region, out resources);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 10; ++i)
+                for (int i = 0; i < 3000; ++i)
                 {
                     internalNodes.Count = 0;
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
-                    //tree.BinnedRefine(0, ref internalNodes, out nodesInvalidated);
+                    tree.BinnedRefine(0, ref internalNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
                     //tree.BottomUpBinnedRefine();
-                    tree.TopDownBinnedRefine();
+                    //tree.TopDownBinnedRefine(1024);
                     //tree.BottomUpSweepRefine();
                     //tree.TopDownSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
@@ -144,6 +148,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
+                region.Dispose();
 
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
