@@ -123,7 +123,7 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 1; ++i)
+                for (int i = 0; i < 10; ++i)
                 {
                     internalNodes.Count = 0;
 

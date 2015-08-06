@@ -305,6 +305,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //To make the staging node real, it requires an accurate parent pointer, index in parent, and child indices.
             //Copy the staging node into the real tree.
+            //We take the staging node's child bounds, child indices, leaf counts, and child count.
+            //The parent and index in parent are provided by the caller.
             var stagingNode = stagingNodes + stagingNodeIndex;
             var internalNode = nodes + internalNodeIndex;
             *internalNode = *stagingNode;
