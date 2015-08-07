@@ -119,7 +119,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray SelfTree Time1: {endTime - startTime}, overlaps: {overlaps.Count}");
 
-                QuickList<int> internalNodes = new QuickList<int>(new BufferPool<int>(), 8);
+                QuickList<int> spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 int[] buffer;
                 MemoryRegion region;
                 BinnedResources resources;
@@ -128,16 +128,16 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 3; ++i)
+                for (int i = 0; i < 5; ++i)
                 {
-                    internalNodes.Count = 0;
+                    spareNodes.Count = 0;
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
-                    //tree.BinnedRefine(0, ref internalNodes, maximumSubtrees, ref resources, out nodesInvalidated);
+                    //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
-                    //tree.BottomUpBinnedRefine(maximumSubtrees);
-                    //tree.TopDownBinnedRefine(maximumSubtrees);
+                    tree.BottomUpBinnedRefine(maximumSubtrees);
+                    tree.TopDownBinnedRefine(maximumSubtrees);
                     //tree.BottomUpSweepRefine();
                     //tree.TopDownSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
@@ -147,10 +147,19 @@ namespace SIMDPrototyping.Trees.Tests
                     //tree.Validate();
                 }
 
+
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                tree.RemoveUnusedInternalNodes(ref spareNodes);
                 Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
                 region.Dispose();
                 BufferPools<int>.Thread.GiveBack(buffer);
+
+
+                tree.Validate();
+                var oldTree = tree;
+                tree = tree.CreateOptimized();
+                oldTree.Dispose();
+                tree.Validate();
 
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 

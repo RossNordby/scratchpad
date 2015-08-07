@@ -46,7 +46,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 #elif NODE2
             2;
 #endif
-        Node[] nodesArray;
+        public Node[] Nodes;
         GCHandle nodesHandle;
         Node* nodes;
         int nodeCount;
@@ -74,7 +74,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             get
             {
-                return LeavesArray.Length;
+                return Leaves.Length;
             }
             set
             {
@@ -85,9 +85,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 Debug.Assert(leavesHandle.IsAllocated);
                 leavesHandle.Free();
                 var newLeaves = new Leaf[value];
-                Array.Copy(LeavesArray, newLeaves, LeavesArray.Length);
-                LeavesArray = newLeaves;
-                leavesHandle = GCHandle.Alloc(LeavesArray, GCHandleType.Pinned);
+                Array.Copy(Leaves, newLeaves, Leaves.Length);
+                Leaves = newLeaves;
+                leavesHandle = GCHandle.Alloc(Leaves, GCHandleType.Pinned);
                 leaves = (Leaf*)nodesHandle.AddrOfPinnedObject();
             }
         }
@@ -101,7 +101,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             get
 
             {
-                return nodesArray.Length;
+                return Nodes.Length;
 
             }
             set
@@ -112,10 +112,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 Debug.Assert(nodesHandle.IsAllocated);
                 nodesHandle.Free();
-                var newNodes = new Node[nodesArray.Length * 2];
-                Array.Copy(nodesArray, newNodes, nodesArray.Length);
-                nodesArray = newNodes;
-                nodesHandle = GCHandle.Alloc(nodesArray, GCHandleType.Pinned);
+                var newNodes = new Node[Nodes.Length * 2];
+                Array.Copy(Nodes, newNodes, Nodes.Length);
+                Nodes = newNodes;
+                nodesHandle = GCHandle.Alloc(Nodes, GCHandleType.Pinned);
                 nodes = (Node*)nodesHandle.AddrOfPinnedObject();
             }
         }
@@ -124,7 +124,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         //Pointerized leaves don't really affect much. It just gets rid of the occasional bounds check, but that wasn't 
         //anywhere close to a bottleneck before. The ability to index into children of nodes is far more important.
-        public Leaf[] LeavesArray;
+        public Leaf[] Leaves;
         GCHandle leavesHandle;
         Leaf* leaves;
         int leafCount;
@@ -139,7 +139,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int AddLeaf(int id, int nodeIndex, int childIndex, out bool leavesInvalidated)
         {
-            if (leafCount == LeavesArray.Length)
+            if (leafCount == Leaves.Length)
             {
                 LeafCapacity *= 2;
                 leavesInvalidated = true;
@@ -154,24 +154,20 @@ namespace SIMDPrototyping.Trees.SingleArray
             leaf->ChildIndex = childIndex;
             return leafCount++;
         }
+        
 
-
-        public unsafe void GetLeafBoundingBox(int i, out BoundingBox boundingBox)
+        /// <summary>
+        /// Constructs an empty tree.
+        /// </summary>
+        /// <param name="initialLeafCapacity">Initial number of leaves to allocate room for.</param>
+        public unsafe Tree(int initialLeafCapacity = 4096)
         {
-            boundingBox = (&nodes[leaves[i].NodeIndex].A)[leaves[i].ChildIndex];
-        }
-
-
-        public unsafe Tree(int initialLeafCapacity = 4096, int initialTreeDepth = 8)
-        {
-            if (initialTreeDepth <= 0)
-                throw new ArgumentException("Initial tree depth must be positive.");
             if (initialLeafCapacity <= 0)
                 throw new ArgumentException("Initial leaf capacity must be positive.");
 
             //The number of nodes in the worst case could be equivalent to a binary tree.
-            nodesArray = new Node[Math.Max(1, initialLeafCapacity * 2 - 1)];
-            nodesHandle = GCHandle.Alloc(nodesArray, GCHandleType.Pinned);
+            Nodes = new Node[Math.Max(1, initialLeafCapacity - 1)];
+            nodesHandle = GCHandle.Alloc(Nodes, GCHandleType.Pinned);
             nodes = (Node*)nodesHandle.AddrOfPinnedObject();
 
             //The root always exists, even if there are no children in it. Makes certain bookkeeping simpler.
@@ -179,10 +175,33 @@ namespace SIMDPrototyping.Trees.SingleArray
             nodes->Parent = -1;
             nodes->IndexInParent = -1;
 
-            LeavesArray = new Leaf[initialLeafCapacity];
-            leavesHandle = GCHandle.Alloc(LeavesArray, GCHandleType.Pinned);
+            Leaves = new Leaf[initialLeafCapacity];
+            leavesHandle = GCHandle.Alloc(Leaves, GCHandleType.Pinned);
             leaves = (Leaf*)leavesHandle.AddrOfPinnedObject();
         }
+
+        /// <summary>
+        /// Constructs a tree directly from provided leaves and nodes with no copying or validation.
+        /// </summary>
+        /// <param name="leaves">Leaves to use in the tree.</param>
+        /// <param name="nodes">Nodes to use in the tree.</param>
+        /// <param name="leafCount">Number of leaves in the tree. If negative, the length of the leaves array is used.</param>
+        /// <param name="nodeCount">Number of nodes in the tree. If negative, the length of the nodes array is used.</param>
+        public unsafe Tree(Leaf[] leaves, Node[] nodes, int leafCount = -1, int nodeCount = -1)
+        {
+            this.Leaves = leaves;
+            this.Nodes = nodes;
+            this.nodesHandle = GCHandle.Alloc(Nodes, GCHandleType.Pinned);
+            this.nodes = (Node*)nodesHandle.AddrOfPinnedObject();
+            this.leavesHandle = GCHandle.Alloc(Leaves, GCHandleType.Pinned);
+            this.leaves = (Leaf*)leavesHandle.AddrOfPinnedObject();
+            if (leafCount < 0)
+                this.leafCount = leaves.Length;
+            if (nodeCount < 0)
+                this.nodeCount = nodes.Length; 
+            
+        }
+        
 
         //Node initialNode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

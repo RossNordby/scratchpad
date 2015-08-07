@@ -355,7 +355,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             return internalNodeIndex;
         }
 
-        void RemoveUnusedInternalNodes(ref QuickList<int> spareNodes)
+        public void RemoveUnusedInternalNodes(ref QuickList<int> spareNodes)
         {
             if (spareNodes.Count > 0)
             {

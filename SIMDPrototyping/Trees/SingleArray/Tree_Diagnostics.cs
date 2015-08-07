@@ -151,9 +151,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 throw new Exception($"Invalid negative node count of {nodeCount}");
             }
-            else if (nodeCount > nodesArray.Length)
+            else if (nodeCount > Nodes.Length)
             {
-                throw new Exception($"Invalid node count of {nodeCount}, larger than nodes array length {nodesArray.Length}.");
+                throw new Exception($"Invalid node count of {nodeCount}, larger than nodes array length {Nodes.Length}.");
             }
             if (LeafCount > 0 && (nodes[0].IndexInParent != -1 || nodes[0].IndexInParent != -1))
             {
