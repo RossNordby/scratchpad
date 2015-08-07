@@ -129,13 +129,14 @@
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_AgglomerativeRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_RefineCommon.cs" />
+    <Compile Include="Trees\SingleArray\Tree_AritySelfTreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_SweepRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_SweepBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_VolumeQuery.cs" />
     <Compile Include="Trees\SingleArray\Tree_Refit.cs" />
     <Compile Include="Trees\SingleArray\Tree_AddGlobal.cs" />
     <Compile Include="Trees\SingleArray\Tree_Remove.cs" />
-    <Compile Include="Trees\SingleArray\Tree_TreeQueries.cs" />
+    <Compile Include="Trees\SingleArray\Tree_SelfTreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_VHBuilder.cs" />
     <Compile Include="Trees\Node.cs" />
     <Compile Include="Trees\Baseline\Tree_Diagnostics.cs" />

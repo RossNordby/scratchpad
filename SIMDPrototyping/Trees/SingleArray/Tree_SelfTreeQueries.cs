@@ -15,12 +15,11 @@ namespace SIMDPrototyping.Trees.SingleArray
     }
     partial class Tree
     {
-        unsafe void TestLeafAgainstNode<TResultList>(int leafIndex, ref BoundingBox leafBounds, int levelIndex, int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
+        unsafe void TestLeafAgainstNode<TResultList>(int leafIndex, ref BoundingBox leafBounds, int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
             var node = nodes + nodeIndex;
             var bounds = &node->A;
             var children = &node->ChildA;
-            int nextLevel = levelIndex + 1;
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (BoundingBox.Intersects(ref leafBounds, ref bounds[i]))
@@ -31,14 +30,14 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                     else
                     {
-                        TestLeafAgainstNode(leafIndex, ref leafBounds, nextLevel, children[i], ref results);
+                        TestLeafAgainstNode(leafIndex, ref leafBounds, children[i], ref results);
                     }
                 }
             }
         }
 
 
-        unsafe void GetOverlapsBetweenDifferentNodes<TResultList>(int levelIndex, int aIndex, int bIndex, ref TResultList results) where TResultList : IList<Overlap>
+        unsafe void GetOverlapsBetweenDifferentNodes<TResultList>(int aIndex, int bIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
             var a = nodes + aIndex;
             var b = nodes + bIndex;
@@ -46,7 +45,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             var aChildren = &a->ChildA;
             var bBounds = &b->A;
             var bChildren = &b->ChildA;
-            int nextLevel = levelIndex + 1;
 
             //There are no shared children, so test them all.
             for (int i = 0; i < a->ChildCount; ++i)
@@ -55,41 +53,44 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     if (BoundingBox.Intersects(ref aBounds[i], ref bBounds[j]))
                     {
-                        if (aChildren[i] >= 0 & bChildren[j] >= 0)
+                        if (aChildren[i] >= 0)
                         {
-                            GetOverlapsBetweenDifferentNodes(nextLevel, aChildren[i], bChildren[j], ref results);
+                            if (bChildren[j] >= 0)
+                            {
+                                GetOverlapsBetweenDifferentNodes(aChildren[i], bChildren[j], ref results);
+                            }
+                            else
+                            {
+                                //leaf B versus node A.
+                                TestLeafAgainstNode(Encode(bChildren[j]), ref bBounds[j], aChildren[i], ref results);
+                            }
                         }
-                        else if (aChildren[i] < 0 & bChildren[j] >= 0)
+                        else if (bChildren[j] >= 0)
                         {
                             //leaf A versus node B.
-                            TestLeafAgainstNode(Encode(aChildren[i]), ref aBounds[i], nextLevel, bChildren[j], ref results);
-                        }
-                        else if (aChildren[i] >= 0 & bChildren[j] < 0)
-                        {
-                            //leaf B versus node A.
-                            TestLeafAgainstNode(Encode(bChildren[j]), ref bBounds[j], nextLevel, aChildren[i], ref results);
+                            TestLeafAgainstNode(Encode(aChildren[i]), ref aBounds[i], bChildren[j], ref results);
                         }
                         else
                         {
                             //Two leaves.
                             results.Add(new Overlap { A = Encode(aChildren[i]), B = Encode(bChildren[j]) });
                         }
+
                     }
                 }
             }
         }
 
-        unsafe void GetOverlapsInNode<TResultList>(int levelIndex, int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
+        unsafe void GetOverlapsInNode<TResultList>(int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
             var node = nodes + nodeIndex;
             var bounds = &node->A;
             var children = &node->ChildA;
-            int nextLevel = levelIndex + 1;
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (children[i] >= 0)
                 {
-                    GetOverlapsInNode(nextLevel, children[i], ref results);
+                    GetOverlapsInNode(children[i], ref results);
                 }
             }
             //Test all different nodes.
@@ -99,19 +100,22 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     if (BoundingBox.Intersects(ref bounds[i], ref bounds[j]))
                     {
-                        if (children[i] >= 0 & children[j] >= 0)
+                        if (children[i] >= 0)
                         {
-                            GetOverlapsBetweenDifferentNodes(nextLevel, children[i], children[j], ref results);
+                            if (children[j] >= 0)
+                            {
+                                GetOverlapsBetweenDifferentNodes(children[i], children[j], ref results);
+                            }
+                            else
+                            {
+                                //leaf B versus node A.
+                                TestLeafAgainstNode(Encode(children[j]), ref bounds[j], children[i], ref results);
+                            }
                         }
-                        else if (children[i] < 0 & children[j] >= 0)
+                        else if (children[j] >= 0)
                         {
                             //leaf A versus node B.
-                            TestLeafAgainstNode(Encode(children[i]), ref bounds[i], nextLevel, children[j], ref results);
-                        }
-                        else if (children[i] >= 0 & children[j] < 0)
-                        {
-                            //leaf B versus node A.
-                            TestLeafAgainstNode(Encode(children[j]), ref bounds[j], nextLevel, children[i], ref results);
+                            TestLeafAgainstNode(Encode(children[i]), ref bounds[i], children[j], ref results);
                         }
                         else
                         {
@@ -125,7 +129,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
         public void GetSelfOverlaps<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
         {
-            GetOverlapsInNode(0, 0, ref results);
+            GetOverlapsInNode(0, ref results);
 
         }
 
