@@ -53,7 +53,12 @@ namespace SIMDPrototyping.Trees.Tests
 
                 var overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 tree.GetSelfOverlaps(ref overlaps);
-                Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlaps2(ref overlaps);
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlapsExplicit(ref overlaps);
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
 
@@ -212,7 +217,7 @@ namespace SIMDPrototyping.Trees.Tests
                 for (int i = 0; i < selfTestCount; ++i)
                 {
                     overlaps.Count = 0;
-                    tree.GetSelfOverlaps2(ref overlaps);
+                    tree.GetSelfOverlapsExplicit(ref overlaps);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Arity-Dedicated SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
