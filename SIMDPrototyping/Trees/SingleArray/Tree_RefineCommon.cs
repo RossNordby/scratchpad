@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace SIMDPrototyping.Trees.SingleArray
 {
-    internal struct SubtreeHeapEntry
+    public struct SubtreeHeapEntry
     {
         public int Index;
         public float Cost;
@@ -164,7 +164,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
-        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtrees, ref QuickQueue<int> internalNodes, out float treeletCost)
+        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, SubtreeHeapEntry* entries, ref QuickList<int> subtrees, ref QuickQueue<int> internalNodes, out float treeletCost)
         {
 
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
@@ -178,7 +178,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(maximumSubtrees >= node->ChildCount, "Can't only consider some of a node's children, but specified maximumSubtrees precludes the treelet root's children.");
             //All of treelet root's children are included immediately. (Follows from above requirement.)
             
-            var entries = stackalloc SubtreeHeapEntry[maximumSubtrees];
             var priorityQueue = new SubtreeBinaryHeap(entries);
 
             priorityQueue.Insert(node, nodes, ref subtrees);

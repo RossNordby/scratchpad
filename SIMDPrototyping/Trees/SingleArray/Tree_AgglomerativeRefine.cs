@@ -52,7 +52,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
-            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtrees, ref treeletInternalNodes, out originalTreeletCost);
+            var entries = stackalloc SubtreeHeapEntry[maximumSubtrees];
+            CollectSubtrees(nodeIndex, maximumSubtrees, entries, ref subtrees, ref treeletInternalNodes, out originalTreeletCost);
 
 
 

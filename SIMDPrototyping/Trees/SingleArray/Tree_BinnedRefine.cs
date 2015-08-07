@@ -19,6 +19,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         public int* IndexMap;
         public Vector3* Centroids;
 
+        public SubtreeHeapEntry* SubtreeHeapEntries;
         public Node* StagingNodes;
 
         //The binning process requires a lot of auxiliary memory.
@@ -58,7 +59,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
     public unsafe
 #if DEBUG
-        class 
+        class
 #else
         struct
 #endif
@@ -161,6 +162,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 16 * (3 + 3 + 1) + sizeof(BoundingBox) * (maximumSubtreeCount + 3 * nodeCount + 3 * MaximumBinCount) +
                 16 * (6 + 3 + 8) + sizeof(int) * (maximumSubtreeCount * 6 + nodeCount * 3 + MaximumBinCount * 8) +
                 16 * (1) + sizeof(Vector3) * maximumSubtreeCount +
+                16 * (1) + sizeof(SubtreeHeapEntry) * maximumSubtreeCount +
                 16 * (1) + sizeof(Node) * nodeCount;
 
             //Divide by 4 due to int.
@@ -175,6 +177,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             resources.LeafCounts = (int*)region.Allocate(sizeof(int) * maximumSubtreeCount);
             resources.IndexMap = (int*)region.Allocate(sizeof(int) * maximumSubtreeCount);
             resources.Centroids = (Vector3*)region.Allocate(sizeof(Vector3) * maximumSubtreeCount);
+            resources.SubtreeHeapEntries = (SubtreeHeapEntry*)region.Allocate(sizeof(SubtreeHeapEntry) * maximumSubtreeCount);
             resources.StagingNodes = (Node*)region.Allocate(sizeof(Node) * nodeCount);
 
             resources.SubtreeBinIndicesX = (int*)region.Allocate(sizeof(int) * maximumSubtreeCount);
@@ -594,8 +597,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
-            CollectSubtrees(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
-            
+            CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
+
             //Gather necessary information from nodes.
             for (int i = 0; i < subtreeReferences.Count; ++i)
             {
