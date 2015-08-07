@@ -128,13 +128,13 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 3000; ++i)
+                for (int i = 0; i < 3; ++i)
                 {
                     internalNodes.Count = 0;
 
 
                     //tree.SweepRefine(0, ref internalNodes, out nodesInvalidated);
-                    tree.BinnedRefine(0, ref internalNodes, maximumSubtrees, ref resources, out nodesInvalidated);
+                    //tree.BinnedRefine(0, ref internalNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
                     //tree.BottomUpBinnedRefine(maximumSubtrees);
                     //tree.TopDownBinnedRefine(maximumSubtrees);
