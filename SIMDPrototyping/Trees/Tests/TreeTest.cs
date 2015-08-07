@@ -133,9 +133,9 @@ namespace SIMDPrototyping.Trees.Tests
         public static void Test()
         {
             float leafSize = 10;
-            int queryCount = 100;
-            int selfTestCount = 10;
-            int refitCount = 100;
+            int queryCount = 1;
+            int selfTestCount = 100;
+            int refitCount = 1;
 
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
@@ -170,7 +170,7 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestBaseline(leaves, queries, queryCount, selfTestCount, refitCount);
+                //TestBaseline(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
                 leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
 #else
@@ -190,7 +190,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var queries = GetBEPUQueryLocations(queryLocationCount, queryBounds, querySize);
 
                 GC.Collect();
-                TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
+                //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
             }
 
         }

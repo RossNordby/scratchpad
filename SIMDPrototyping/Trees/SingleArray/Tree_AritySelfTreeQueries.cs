@@ -30,13 +30,17 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var a = BoundingBox.Intersects(ref leafBounds, ref node->A);
             var b = BoundingBox.Intersects(ref leafBounds, ref node->B);
+
+            var nodeChildA = node->ChildA;
+            var nodeChildB = node->ChildB;
+
             if (a)
             {
-                DispatchTestForLeaf(leafIndex, ref leafBounds, node->ChildA, ref results);
+                DispatchTestForLeaf(leafIndex, ref leafBounds, nodeChildA, ref results);
             }
             if (b)
             {
-                DispatchTestForLeaf(leafIndex, ref leafBounds, node->ChildB, ref results);
+                DispatchTestForLeaf(leafIndex, ref leafBounds, nodeChildB, ref results);
             }
         }
 
@@ -71,7 +75,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             var a = nodes + aIndex;
             var b = nodes + bIndex;
-
+            
             //There are no shared children, so test them all.
             var aa = BoundingBox.Intersects(ref a->A, ref b->A);
             var ab = BoundingBox.Intersects(ref a->A, ref b->B);
@@ -100,15 +104,21 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void GetOverlapsInNode2<TResultList>(int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
             var node = nodes + nodeIndex;
-            if (node->ChildA >= 0)
-                GetOverlapsInNode2(node->ChildA, ref results);
-            if (node->ChildB >= 0)
-                GetOverlapsInNode2(node->ChildB, ref results);
+
+            var nodeChildA = node->ChildA;
+            var nodeChildB = node->ChildB;
+
+            var ab = BoundingBox.Intersects(ref node->A, ref node->B);
+
+            if (nodeChildA >= 0)
+                GetOverlapsInNode2(nodeChildA, ref results);
+            if (nodeChildB >= 0)
+                GetOverlapsInNode2(nodeChildB, ref results);
 
             //Test all different nodes.
-            if (BoundingBox.Intersects(ref node->A, ref node->B))
+            if (ab)
             {
-                DispatchTestForNodes(node->ChildA, node->ChildB, ref node->A, ref node->B, ref results);
+                DispatchTestForNodes(nodeChildA, nodeChildB, ref node->A, ref node->B, ref results);
             }
 
         }
