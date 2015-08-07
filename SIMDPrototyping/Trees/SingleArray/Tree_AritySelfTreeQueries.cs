@@ -125,11 +125,13 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        struct PairToTest
+        unsafe struct PairToTest
         {
             public int A;
             public int B;
+            public BoundingBox* LeafBounds;
         }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void PushPair(int a, int b, PairToTest* stack, ref int nextToVisit)
@@ -140,7 +142,17 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void TestDifferentNodes<TResultList>(int childA, int childB, ref BoundingBox a, ref BoundingBox b, PairToTest* stack, ref int nextToVisit, ref TResultList results) where TResultList : IList<Overlap>
+        unsafe void PushPair(int encodedLeafIndex, BoundingBox* leafBounds, int b, PairToTest* stack, ref int nextToVisit)
+        {
+            //Potential microoptimizations here
+            stack[++nextToVisit] = new PairToTest { A = encodedLeafIndex, B = b, LeafBounds = leafBounds };
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestDifferentNodes<TResultList>(int childA, int childB, BoundingBox* a, BoundingBox* b,
+            PairToTest* stack, ref int nextToVisit,
+            ref TResultList results) where TResultList : IList<Overlap>
         {
             if (childA >= 0)
             {
@@ -151,13 +163,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                 else
                 {
                     //leaf B versus node A.
-                    TestLeafAgainstNode2(Encode(childB), ref b, childA, ref results);
+                    PushPair(childB, b, childA, stack, ref nextToVisit);
                 }
             }
             else if (childB >= 0)
             {
                 //leaf A versus node B.
-                TestLeafAgainstNode2(Encode(childA), ref a, childB, ref results);
+                PushPair(childA, a, childB, stack, ref nextToVisit);
             }
             else
             {
@@ -168,7 +180,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void GetSelfOverlapsExplicit<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
         {
-            var stack = stackalloc PairToTest[128];
+            var stack = stackalloc PairToTest[32];
             int nextToVisit = 0;
 
             stack->A = 0;
@@ -193,35 +205,68 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                     if (ab)
                     {
-                        TestDifferentNodes(node->ChildA, node->ChildB, ref node->A, ref node->B, stack, ref nextToVisit, ref results);
+                        TestDifferentNodes(node->ChildA, node->ChildB, &node->A, &node->B, stack, ref nextToVisit, ref results);
                     }
                 }
                 else
                 {
-                    //Different nodes  
-                    var a = nodes + pairToTest->A;
-                    var b = nodes + pairToTest->B;
-                    var aa = BoundingBox.Intersects(ref a->A, ref b->A);
-                    var ab = BoundingBox.Intersects(ref a->A, ref b->B);
-                    var ba = BoundingBox.Intersects(ref a->B, ref b->A);
-                    var bb = BoundingBox.Intersects(ref a->B, ref b->B);
+                    if (pairToTest->A < 0)
+                    {
+                        //It's a leaf-versus-not-leaf.
+                        var internalNode = nodes + pairToTest->B;
+                        var a = BoundingBox.Intersects(ref *pairToTest->LeafBounds, ref internalNode->A);
+                        var b = BoundingBox.Intersects(ref *pairToTest->LeafBounds, ref internalNode->B);
+                        if (a)
+                        {
+                            if (internalNode->ChildA >= 0)
+                            {
+                                PushPair(pairToTest->A, pairToTest->LeafBounds, internalNode->ChildA, stack, ref nextToVisit);
+                            }
+                            else
+                            {
+                                results.Add(new Overlap { A = Encode(pairToTest->A), B = Encode(pairToTest->B) });
+                            }
+                        }
+                        if (b)
+                        {
+                            if (internalNode->ChildB >= 0)
+                            {
+                                PushPair(pairToTest->A, pairToTest->LeafBounds, internalNode->ChildB, stack, ref nextToVisit);
+                            }
+                            else
+                            {
+                                results.Add(new Overlap { A = Encode(pairToTest->A), B = Encode(pairToTest->B) });
+                            }
+                        }
+
+                    }
+                    else
+                    {
+                        //Different nodes  
+                        var a = nodes + pairToTest->A;
+                        var b = nodes + pairToTest->B;
+                        var aa = BoundingBox.Intersects(ref a->A, ref b->A);
+                        var ab = BoundingBox.Intersects(ref a->A, ref b->B);
+                        var ba = BoundingBox.Intersects(ref a->B, ref b->A);
+                        var bb = BoundingBox.Intersects(ref a->B, ref b->B);
 
 
-                    if (aa)
-                    {
-                        TestDifferentNodes(a->ChildA, b->ChildA, ref a->A, ref b->A, stack, ref nextToVisit, ref results);
-                    }
-                    if (ab)
-                    {
-                        TestDifferentNodes(a->ChildA, b->ChildB, ref a->A, ref b->B, stack, ref nextToVisit, ref results);
-                    }
-                    if (ba)
-                    {
-                        TestDifferentNodes(a->ChildB, b->ChildA, ref a->B, ref b->A, stack, ref nextToVisit, ref results);
-                    }
-                    if (bb)
-                    {
-                        TestDifferentNodes(a->ChildB, b->ChildB, ref a->B, ref b->B, stack, ref nextToVisit, ref results);
+                        if (aa)
+                        {
+                            TestDifferentNodes(a->ChildA, b->ChildA, &a->A, &b->A, stack, ref nextToVisit, ref results);
+                        }
+                        if (ab)
+                        {
+                            TestDifferentNodes(a->ChildA, b->ChildB, &a->A, &b->B, stack, ref nextToVisit, ref results);
+                        }
+                        if (ba)
+                        {
+                            TestDifferentNodes(a->ChildB, b->ChildA, &a->B, &b->A, stack, ref nextToVisit, ref results);
+                        }
+                        if (bb)
+                        {
+                            TestDifferentNodes(a->ChildB, b->ChildB, &a->B, &b->B, stack, ref nextToVisit, ref results);
+                        }
                     }
                 }
 
