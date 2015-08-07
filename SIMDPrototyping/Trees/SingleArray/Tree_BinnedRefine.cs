@@ -152,7 +152,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         const int MaximumBinCount = 64;
 
 
-        public static unsafe void CreateBinnedResources(BufferPool<int> bufferPool, int maximumSubtreeCount, out MemoryRegion region, out BinnedResources resources)
+        public static unsafe void CreateBinnedResources(BufferPool<int> bufferPool, int maximumSubtreeCount, out int[] buffer, out MemoryRegion region, out BinnedResources resources)
         {
             int nodeCount = maximumSubtreeCount - 1;
             //Note alignment. Probably won't provide any actual benefit- if the CLR doesn't provide aligned memory by default,
@@ -169,7 +169,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //We're using int buffers because they are the most commonly requested resource type, so the resource stands a higher chance of being reused.
             int poolIndex = BufferPool<int>.GetPoolIndex(bytesRequired / 4);
 
-            var buffer = bufferPool.TakeFromPoolIndex(poolIndex);
+            buffer = bufferPool.TakeFromPoolIndex(poolIndex);
 
             region = new MemoryRegion(buffer);
 
@@ -704,12 +704,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             var pool = BufferPools<int>.Thread;
 
             var spareNodes = new QuickList<int>(pool, 8);
+            int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
-            CreateBinnedResources(pool, maximumSubtrees, out region, out resources);
+            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
             TopDownBinnedRefine(0, maximumSubtrees, ref spareNodes, ref resources);
             RemoveUnusedInternalNodes(ref spareNodes);
             region.Dispose();
+            pool.GiveBack(buffer);
             spareNodes.Dispose();
         }
 
@@ -742,9 +744,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             var pool = BufferPools<int>.Thread;
 
             var spareNodes = new QuickList<int>(pool, 8);
+            int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
-            CreateBinnedResources(pool, maximumSubtrees, out region, out resources);
+            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
             var refinementFlags = new int[leafCount * 2 - 1];
             for (int i = 0; i < nodeCount; ++i)
             {
@@ -759,6 +762,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             RemoveUnusedInternalNodes(ref spareNodes);
             spareNodes.Dispose();
             region.Dispose();
+            pool.GiveBack(buffer);
         }
     }
 }

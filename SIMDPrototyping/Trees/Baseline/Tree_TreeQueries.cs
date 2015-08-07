@@ -149,9 +149,7 @@ namespace SIMDPrototyping.Trees.Baseline
                 }
                 leafQueryResults.Count = 0;
             }
-#if DEBUG
-            leafQueryResults.Pool.SuppressCleanBufferAsserts = true;
-#endif
+
             leafQueryResults.Dispose();
         }
         
