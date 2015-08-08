@@ -83,7 +83,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (childB >= 0)
                 {
-                    GetOverlapsBetweenDifferentNodes4(nodes + childA, nodes + childB, ref results);
+                    GetOverlapsBetweenDifferentNodes42(nodes + childA, nodes + childB, ref results);
                 }
                 else
                 {
@@ -101,6 +101,447 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Two leaves.
                 results.Add(new Overlap { A = Encode(childA), B = Encode(childB) });
             }
+        }
+
+        unsafe void GetOverlapsBetweenDifferentNodes42<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
+        {
+            //All of these are guaranteed to be needed.
+            var aa = BoundingBox.Intersects(ref a->A, ref b->A);
+            var ab = BoundingBox.Intersects(ref a->A, ref b->B);
+            var ba = BoundingBox.Intersects(ref a->B, ref b->A);
+            var bb = BoundingBox.Intersects(ref a->B, ref b->B);
+
+            switch (a->ChildCount)
+            {
+                
+                case 4:
+                    {
+                        var ca = BoundingBox.Intersects(ref a->C, ref b->A);
+                        var cb = BoundingBox.Intersects(ref a->C, ref b->B);
+                        var da = BoundingBox.Intersects(ref a->D, ref b->A);
+                        var db = BoundingBox.Intersects(ref a->D, ref b->B);
+
+                        switch (b->ChildCount)
+                        {
+                           case 4:
+                                {
+                                    var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+                                    var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+                                    var cc = BoundingBox.Intersects(ref a->C, ref b->C);
+                                    var dc = BoundingBox.Intersects(ref a->D, ref b->C);
+                                    var ad = BoundingBox.Intersects(ref a->A, ref b->D);
+                                    var bd = BoundingBox.Intersects(ref a->B, ref b->D);
+                                    var cd = BoundingBox.Intersects(ref a->C, ref b->D);
+                                    var dd = BoundingBox.Intersects(ref a->D, ref b->D);
+
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ac)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                                    }
+                                    if (ad)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildD, ref a->A, ref b->D, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (bc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                                    }
+                                    if (bd)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildD, ref a->B, ref b->D, ref results);
+                                    }
+                                    if (ca)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                                    }
+                                    if (cb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                                    }
+                                    if (cc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildC, ref a->C, ref b->C, ref results);
+                                    }
+                                    if (cd)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildD, ref a->C, ref b->D, ref results);
+                                    }
+                                    if (da)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildA, ref a->D, ref b->A, ref results);
+                                    }
+                                    if (db)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildB, ref a->D, ref b->B, ref results);
+                                    }
+                                    if (dc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildC, ref a->D, ref b->C, ref results);
+                                    }
+                                    if (dd)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildD, ref a->D, ref b->D, ref results);
+                                    }
+                                }
+                                break;
+                            case 3:
+                                {
+                                    var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+                                    var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+                                    var cc = BoundingBox.Intersects(ref a->C, ref b->C);
+                                    var dc = BoundingBox.Intersects(ref a->D, ref b->C);
+
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ac)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (bc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                                    }
+                                    if (ca)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                                    }
+                                    if (cb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                                    }
+                                    if (cc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildC, ref a->C, ref b->C, ref results);
+                                    }
+                                    if (da)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildA, ref a->D, ref b->A, ref results);
+                                    }
+                                    if (db)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildB, ref a->D, ref b->B, ref results);
+                                    }
+                                    if (dc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildC, ref a->D, ref b->C, ref results);
+                                    }
+                                }
+                                break;
+                            default:
+                                {
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (ca)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                                    }
+                                    if (cb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                                    }
+                                    if (da)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildA, ref a->D, ref b->A, ref results);
+                                    }
+                                    if (db)
+                                    {
+                                        DispatchTestForNodes4(a->ChildD, b->ChildB, ref a->D, ref b->B, ref results);
+                                    }
+                                }
+                                break;
+                        }
+
+                       
+                    }
+                    break;
+                case 3:
+                    {
+                        var ca = BoundingBox.Intersects(ref a->C, ref b->A);
+                        var cb = BoundingBox.Intersects(ref a->C, ref b->B);
+
+                        switch (b->ChildCount)
+                        {
+                            case 4:
+                                {
+                                    var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+                                    var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+                                    var cc = BoundingBox.Intersects(ref a->C, ref b->C);
+                                    var ad = BoundingBox.Intersects(ref a->A, ref b->D);
+                                    var bd = BoundingBox.Intersects(ref a->B, ref b->D);
+                                    var cd = BoundingBox.Intersects(ref a->C, ref b->D);
+
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ac)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                                    }
+                                    if (ad)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildD, ref a->A, ref b->D, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (bc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                                    }
+                                    if (bd)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildD, ref a->B, ref b->D, ref results);
+                                    }
+                                    if (ca)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                                    }
+                                    if (cb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                                    }
+                                    if (cc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildC, ref a->C, ref b->C, ref results);
+                                    }
+                                    if (cd)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildD, ref a->C, ref b->D, ref results);
+                                    }
+                                }
+                                break;
+                            case 3:
+                                {
+                                    var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+                                    var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+                                    var cc = BoundingBox.Intersects(ref a->C, ref b->C);
+
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ac)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (bc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                                    }
+                                    if (ca)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                                    }
+                                    if (cb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                                    }
+                                    if (cc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildC, ref a->C, ref b->C, ref results);
+                                    }
+                                }
+                                break;
+                            default:
+                                {
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (ca)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                                    }
+                                    if (cb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                                    }
+                                }
+                                break;
+                        }
+                    }
+                    break;
+                default:
+                    {
+                        switch (b->ChildCount)
+                        {
+                            case 4:
+                                {
+                                    var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+                                    var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+                                    var ad = BoundingBox.Intersects(ref a->A, ref b->D);
+                                    var bd = BoundingBox.Intersects(ref a->B, ref b->D);
+
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ac)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                                    }
+                                    if (ad)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildD, ref a->A, ref b->D, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (bc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                                    }
+                                    if (bd)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildD, ref a->B, ref b->D, ref results);
+                                    }
+                                }
+                                break;
+                            case 3:
+                                {
+                                    var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+                                    var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ac)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                    if (bc)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                                    }
+                                }
+                                break;
+                            default:
+                                {
+                                    if (aa)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+                                    }
+                                    if (ab)
+                                    {
+                                        DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+                                    }
+                                    if (ba)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+                                    }
+                                    if (bb)
+                                    {
+                                        DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+                                    }
+                                }
+                                break;
+                        }
+                        
+                    }
+                    break;
+            }
+
+
         }
 
         unsafe void GetOverlapsBetweenDifferentNodes4<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
@@ -126,6 +567,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var dc = a->ChildCount > 3 && b->ChildCount > 2 && BoundingBox.Intersects(ref a->D, ref b->C);
             var dd = a->ChildCount > 3 && b->ChildCount > 3 && BoundingBox.Intersects(ref a->D, ref b->D);
 
+
             if (aa)
             {
                 DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
@@ -134,6 +576,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
             }
+
+
             if (ac)
             {
                 DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
@@ -240,7 +684,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 bd = false;
                 cd = false;
             }
-            
+
 
             //Test all different nodes.
             if (ab)
