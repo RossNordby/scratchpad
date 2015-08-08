@@ -83,7 +83,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (childB >= 0)
                 {
-                    GetOverlapsBetweenDifferentNodes42(nodes + childA, nodes + childB, ref results);
+                    GetOverlapsBetweenDifferentNodes4If(nodes + childA, nodes + childB, ref results);
                 }
                 else
                 {
@@ -103,7 +103,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe void GetOverlapsBetweenDifferentNodes42<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
+        unsafe void GetOverlapsBetweenDifferentNodes4Switch<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
         {
             //All of these are guaranteed to be needed.
             var aa = BoundingBox.Intersects(ref a->A, ref b->A);
@@ -113,7 +113,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             switch (a->ChildCount)
             {
-                
+
                 case 4:
                     {
                         var ca = BoundingBox.Intersects(ref a->C, ref b->A);
@@ -123,7 +123,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                         switch (b->ChildCount)
                         {
-                           case 4:
+                            case 4:
                                 {
                                     var ac = BoundingBox.Intersects(ref a->A, ref b->C);
                                     var bc = BoundingBox.Intersects(ref a->B, ref b->C);
@@ -295,7 +295,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 break;
                         }
 
-                       
+
                     }
                     break;
                 case 3:
@@ -536,12 +536,125 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 }
                                 break;
                         }
-                        
+
                     }
                     break;
             }
 
 
+        }
+
+        unsafe void GetOverlapsBetweenDifferentNodes4If<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
+        {
+            //There are no shared children, so test them all.
+            var aa = BoundingBox.Intersects(ref a->A, ref b->A);
+            var ab = BoundingBox.Intersects(ref a->A, ref b->B);
+            var ba = BoundingBox.Intersects(ref a->B, ref b->A);
+            var bb = BoundingBox.Intersects(ref a->B, ref b->B);
+
+
+            var ac = BoundingBox.Intersects(ref a->A, ref b->C);
+            var ad = BoundingBox.Intersects(ref a->A, ref b->D);
+            var bc = BoundingBox.Intersects(ref a->B, ref b->C);
+            var bd = BoundingBox.Intersects(ref a->B, ref b->D);
+
+            if (aa)
+            {
+                DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
+            }
+            if (ab)
+            {
+                DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
+            }
+            if (b->ChildCount > 2)
+            {
+                if (ac)
+                {
+                    DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
+                }
+                if (b->ChildCount > 3 & ad)
+                {
+                    DispatchTestForNodes4(a->ChildA, b->ChildD, ref a->A, ref b->D, ref results);
+                }
+            }
+
+            if (ba)
+            {
+                DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
+            }
+            if (bb)
+            {
+                DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
+            }
+            if (b->ChildCount > 2)
+            {
+                if (bc)
+                {
+                    DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
+                }
+                if (b->ChildCount > 3 & bd)
+                {
+                    DispatchTestForNodes4(a->ChildB, b->ChildD, ref a->B, ref b->D, ref results);
+                }
+            }
+
+            if (a->ChildCount > 2)
+            {
+
+                var ca = BoundingBox.Intersects(ref a->C, ref b->A);
+                var cb = BoundingBox.Intersects(ref a->C, ref b->B);
+                var cc = BoundingBox.Intersects(ref a->C, ref b->C);
+                var cd = BoundingBox.Intersects(ref a->C, ref b->D);
+
+                if (ca)
+                {
+                    DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
+                }
+                if (cb)
+                {
+                    DispatchTestForNodes4(a->ChildC, b->ChildB, ref a->C, ref b->B, ref results);
+                }
+                if (b->ChildCount > 2)
+                {
+                    if (cc)
+                    {
+                        DispatchTestForNodes4(a->ChildC, b->ChildC, ref a->C, ref b->C, ref results);
+                    }
+                    if (b->ChildCount > 3 & cd)
+                    {
+                        DispatchTestForNodes4(a->ChildC, b->ChildD, ref a->C, ref b->D, ref results);
+                    }
+                }
+
+                if (a->ChildCount > 3)
+                {
+
+                    var da = BoundingBox.Intersects(ref a->D, ref b->A);
+                    var db = BoundingBox.Intersects(ref a->D, ref b->B);
+                    var dc = BoundingBox.Intersects(ref a->D, ref b->C);
+                    var dd = BoundingBox.Intersects(ref a->D, ref b->D);
+
+                    if (da)
+                    {
+                        DispatchTestForNodes4(a->ChildD, b->ChildA, ref a->D, ref b->A, ref results);
+                    }
+                    if (db)
+                    {
+                        DispatchTestForNodes4(a->ChildD, b->ChildB, ref a->D, ref b->B, ref results);
+                    }
+                    if (b->ChildCount > 2)
+                    {
+                        if (dc)
+                        {
+                            DispatchTestForNodes4(a->ChildD, b->ChildC, ref a->D, ref b->C, ref results);
+                        }
+                        if (b->ChildCount > 3 & dd)
+                        {
+                            DispatchTestForNodes4(a->ChildD, b->ChildD, ref a->D, ref b->D, ref results);
+                        }
+                    }
+                }
+            }
         }
 
         unsafe void GetOverlapsBetweenDifferentNodes4<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
