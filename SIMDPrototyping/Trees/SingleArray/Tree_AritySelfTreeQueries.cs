@@ -13,6 +13,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
+#if NODE2
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void DispatchTestForLeaf<TResultList>(int leafIndex, ref BoundingBox leafBounds, int nodeIndex, ref TResultList results) where TResultList : IList<Overlap>
         {
@@ -353,7 +354,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void GetSelfOverlapsExplicit2<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
         {
-            var stack = stackalloc TestPair[512];
+            var stack = stackalloc TestPair[32];
 
             stack->A = nodes;
             stack->Type = PairType.SameNode;
@@ -436,11 +437,18 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
             }
+        }
+
+#endif
 
 
-
-
+        public unsafe void GetSelfOverlapsArityDedicated<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
+        {
+#if NODE2
+            GetOverlapsInNode2(nodes, ref results);
+#endif
 
         }
+
     }
 }
