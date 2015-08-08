@@ -59,6 +59,8 @@ namespace SIMDPrototyping.Trees.Tests
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 tree.GetSelfOverlapsExplicit(ref overlaps);
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                tree.GetSelfOverlapsExplicit2(ref overlaps);
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
 
@@ -207,7 +209,7 @@ namespace SIMDPrototyping.Trees.Tests
                 for (int i = 0; i < selfTestCount; ++i)
                 {
                     overlaps.Count = 0;
-                    tree.GetSelfOverlaps(ref overlaps);
+                    tree.GetSelfOverlaps2(ref overlaps);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray SelfTree Time2: {endTime - startTime}, overlaps: {overlaps.Count}");
@@ -221,6 +223,16 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Arity-Dedicated SelfTree Time: {endTime - startTime}, overlaps: {overlaps.Count}");
+
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                for (int i = 0; i < selfTestCount; ++i)
+                {
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlapsExplicit2(ref overlaps);
+                }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"SingleArray Arity-Dedicated SelfTree Time2: {endTime - startTime}, overlaps: {overlaps.Count}");
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
