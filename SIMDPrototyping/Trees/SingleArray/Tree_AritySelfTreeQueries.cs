@@ -446,6 +446,8 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
 #if NODE2
             GetOverlapsInNode2(nodes, ref results);
+#elif NODE4
+            GetOverlapsInNode4(nodes, ref results);
 #endif
 
         }

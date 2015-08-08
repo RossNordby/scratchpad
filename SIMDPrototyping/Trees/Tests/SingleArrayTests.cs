@@ -55,12 +55,8 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.GetSelfOverlaps(ref overlaps);
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                tree.GetSelfOverlaps2(ref overlaps);
-
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                tree.GetSelfOverlapsExplicit(ref overlaps);
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                tree.GetSelfOverlapsExplicit2(ref overlaps);
+                tree.GetSelfOverlapsArityDedicated(ref overlaps);
+                
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
 
