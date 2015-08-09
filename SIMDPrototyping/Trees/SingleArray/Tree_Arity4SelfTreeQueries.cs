@@ -547,52 +547,44 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void GetOverlapsBetweenDifferentNodes4If<TResultList>(Node* a, Node* b, ref TResultList results) where TResultList : IList<Overlap>
         {
             //There are no shared children, so test them all.
-            var aa = BoundingBox.Intersects(ref a->A, ref b->A);
-            var ab = BoundingBox.Intersects(ref a->A, ref b->B);
-            var ba = BoundingBox.Intersects(ref a->B, ref b->A);
-            var bb = BoundingBox.Intersects(ref a->B, ref b->B);
+            
+            
 
-
-            var ac = BoundingBox.Intersects(ref a->A, ref b->C);
-            var ad = BoundingBox.Intersects(ref a->A, ref b->D);
-            var bc = BoundingBox.Intersects(ref a->B, ref b->C);
-            var bd = BoundingBox.Intersects(ref a->B, ref b->D);
-
-            if (aa)
+            if (BoundingBox.Intersects(ref a->A, ref b->A))
             {
                 DispatchTestForNodes4(a->ChildA, b->ChildA, ref a->A, ref b->A, ref results);
             }
-            if (ab)
+            if (BoundingBox.Intersects(ref a->A, ref b->B))
             {
                 DispatchTestForNodes4(a->ChildA, b->ChildB, ref a->A, ref b->B, ref results);
             }
             if (b->ChildCount > 2)
             {
-                if (ac)
+                if (BoundingBox.Intersects(ref a->A, ref b->C))
                 {
                     DispatchTestForNodes4(a->ChildA, b->ChildC, ref a->A, ref b->C, ref results);
                 }
-                if (b->ChildCount > 3 & ad)
+                if (b->ChildCount > 3 && BoundingBox.Intersects(ref a->A, ref b->D))
                 {
                     DispatchTestForNodes4(a->ChildA, b->ChildD, ref a->A, ref b->D, ref results);
                 }
             }
 
-            if (ba)
+            if (BoundingBox.Intersects(ref a->B, ref b->A))
             {
                 DispatchTestForNodes4(a->ChildB, b->ChildA, ref a->B, ref b->A, ref results);
             }
-            if (bb)
+            if (BoundingBox.Intersects(ref a->B, ref b->B))
             {
                 DispatchTestForNodes4(a->ChildB, b->ChildB, ref a->B, ref b->B, ref results);
             }
             if (b->ChildCount > 2)
             {
-                if (bc)
+                if (BoundingBox.Intersects(ref a->B, ref b->C))
                 {
                     DispatchTestForNodes4(a->ChildB, b->ChildC, ref a->B, ref b->C, ref results);
                 }
-                if (b->ChildCount > 3 & bd)
+                if (b->ChildCount > 3 && BoundingBox.Intersects(ref a->B, ref b->D))
                 {
                     DispatchTestForNodes4(a->ChildB, b->ChildD, ref a->B, ref b->D, ref results);
                 }
@@ -603,9 +595,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                 var ca = BoundingBox.Intersects(ref a->C, ref b->A);
                 var cb = BoundingBox.Intersects(ref a->C, ref b->B);
-                var cc = BoundingBox.Intersects(ref a->C, ref b->C);
-                var cd = BoundingBox.Intersects(ref a->C, ref b->D);
-
+   
                 if (ca)
                 {
                     DispatchTestForNodes4(a->ChildC, b->ChildA, ref a->C, ref b->A, ref results);
@@ -616,11 +606,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 if (b->ChildCount > 2)
                 {
-                    if (cc)
+                    if (BoundingBox.Intersects(ref a->C, ref b->C))
                     {
                         DispatchTestForNodes4(a->ChildC, b->ChildC, ref a->C, ref b->C, ref results);
                     }
-                    if (b->ChildCount > 3 & cd)
+                    if (b->ChildCount > 3 && BoundingBox.Intersects(ref a->C, ref b->D))
                     {
                         DispatchTestForNodes4(a->ChildC, b->ChildD, ref a->C, ref b->D, ref results);
                     }
@@ -631,9 +621,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                     var da = BoundingBox.Intersects(ref a->D, ref b->A);
                     var db = BoundingBox.Intersects(ref a->D, ref b->B);
-                    var dc = BoundingBox.Intersects(ref a->D, ref b->C);
-                    var dd = BoundingBox.Intersects(ref a->D, ref b->D);
-
+    
                     if (da)
                     {
                         DispatchTestForNodes4(a->ChildD, b->ChildA, ref a->D, ref b->A, ref results);
@@ -644,11 +632,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                     if (b->ChildCount > 2)
                     {
-                        if (dc)
+                        if (BoundingBox.Intersects(ref a->D, ref b->C))
                         {
                             DispatchTestForNodes4(a->ChildD, b->ChildC, ref a->D, ref b->C, ref results);
                         }
-                        if (b->ChildCount > 3 & dd)
+                        if (b->ChildCount > 3 && BoundingBox.Intersects(ref a->D, ref b->D))
                         {
                             DispatchTestForNodes4(a->ChildD, b->ChildD, ref a->D, ref b->D, ref results);
                         }
@@ -828,6 +816,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
         public unsafe void GetSelfOverlaps4<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
         {
+            
             GetOverlapsInNode4(nodes, ref results);
 
         }

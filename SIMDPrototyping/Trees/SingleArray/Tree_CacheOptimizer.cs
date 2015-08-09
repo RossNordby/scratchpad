@@ -9,7 +9,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
-        
+
 
         unsafe int OptimizeDFS(int optimizedParentIndex, int nodeIndex, Node* optimizedNodes, Leaf* optimizedLeaves, ref int optimizedNodeCount, ref int optimizedLeafCount)
         {
@@ -35,6 +35,50 @@ namespace SIMDPrototyping.Trees.SingleArray
                     optimizedLeaf->ChildIndex = i;
                     children[i] = Encode(optimizedLeafIndex);
 
+                }
+            }
+            return optimizedNodeIndex;
+        }
+
+        unsafe void OptimizeGroupDFS(Node* optimizedNodes, Leaf* optimizedLeaves, ref int optimizedNodeCount, ref int optimizedLeafCount)
+        {
+            OptimizeGroupDFS(
+        }
+        unsafe void OptimizeGroupDFS(int optimizedNodeIndex, int optimizedParentNodeIndex, int nodeIndex, Node* optimizedNodes, Leaf* optimizedLeaves, ref int optimizedNodeCount, ref int optimizedLeafCount)
+        {
+            var node = nodes + nodeIndex;
+
+            var optimizedNode = optimizedNodes + optimizedNodeIndex;
+            *optimizedNode = *node;
+            optimizedNode->Parent = optimizedParentNodeIndex;
+            var optimizedChildren = &optimizedNode->ChildA;
+            var nodeChildren = &node->ChildA;
+
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+
+                if (nodeChildren[i] >= 0)
+                {
+                    optimizedChildren[i] = optimizedNodeCount++;
+
+                }
+                else
+                {
+                    var leafIndex = Encode(nodeChildren[i]);
+                    var optimizedLeafIndex = optimizedLeafCount++;
+                    var optimizedLeaf = optimizedLeaves + optimizedLeafIndex;
+                    optimizedLeaf->Id = leaves[leafIndex].Id;
+                    optimizedLeaf->NodeIndex = optimizedNodeIndex;
+                    optimizedLeaf->ChildIndex = i;
+                    optimizedChildren[i] = Encode(optimizedLeafIndex);
+
+                }
+            }
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (nodeChildren[i] >= 0)
+                {
+                    OptimizeGroupDFS(optimizedChildren[i], optimizedNodeIndex, nodeChildren[i], optimizedNodes, optimizedLeaves, ref optimizedNodeCount, ref optimizedLeafCount);
                 }
             }
             return optimizedNodeIndex;

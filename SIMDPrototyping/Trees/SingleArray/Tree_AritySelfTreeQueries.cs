@@ -444,6 +444,10 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void GetSelfOverlapsArityDedicated<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
         {
+            //If there is only one child, there's no need to recurse.
+            //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
+            if (nodes->ChildCount < 2)
+                return;
 #if NODE2
             GetOverlapsInNode2(nodes, ref results);
 #elif NODE4

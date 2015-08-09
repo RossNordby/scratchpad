@@ -127,8 +127,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
         }
-        public void GetSelfOverlaps<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
-        {
+        public unsafe void GetSelfOverlaps<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
+        {           
             GetOverlapsInNode(0, ref results);
 
         }

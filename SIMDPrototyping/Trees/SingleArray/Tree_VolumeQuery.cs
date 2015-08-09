@@ -229,8 +229,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     results.Add(Encode(node->ChildA));
                 }
             }
-            if (childCount < 2)
-                return;
             var d = BoundingBox.Intersects(ref query, ref node->D);
             if (b)
             {
@@ -466,8 +464,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     results.Add(Encode(node->ChildA));
                 }
             }
-            if (childCount < 2)
-                return;
             var d = BoundingBox.Intersects(ref query, ref node->D);
             if (b)
             {
@@ -594,8 +590,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     results.Add(Encode(node->ChildA));
                 }
             }
-            if (childCount < 2)
-                return;
             d = BoundingBox.Intersects(ref query, ref node->D);
             if (b)
             {
@@ -821,8 +815,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                     results.Add(Encode(node->ChildA));
                 }
             }
-            if (childCount < 2)
-                return;
             if (b)
             {
                 if (node->ChildB >= 0)
@@ -844,17 +836,25 @@ namespace SIMDPrototyping.Trees.SingleArray
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
             //Assumption: root is always zero.
-
+            if (nodes->ChildCount == 1)
+            {
+                Debug.Assert(nodes->ChildA < 0, "If the root only has one child, it must be a leaf.");
+                if (BoundingBox.Intersects(ref boundingBox, ref nodes->A))
+                {
+                    results.Add(Encode(nodes->ChildA));
+                }
+                return;
+            }
 #if NODE2
             TestRecursive2(0, ref boundingBox, ref results);
 #elif NODE4
-                        TestRecursive4(0, ref boundingBox, ref results);
+            TestRecursive4(0, ref boundingBox, ref results);
 #elif NODE8
-                        TestRecursive8(0, ref boundingBox, ref results);
+            TestRecursive8(0, ref boundingBox, ref results);
 #elif NODE16
-                        TestRecursive16(0, ref boundingBox, ref results);
+            TestRecursive16(0, ref boundingBox, ref results);
 #else
-                        TestRecursive(0, ref boundingBox, ref results);
+            TestRecursive(0, ref boundingBox, ref results);
 #endif
         }
 

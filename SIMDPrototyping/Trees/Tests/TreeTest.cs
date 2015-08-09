@@ -135,7 +135,7 @@ namespace SIMDPrototyping.Trees.Tests
             float leafSize = 10;
             int queryCount = 1;
             int selfTestCount = 100;
-            int refitCount = 1;
+            int refitCount = 100;
 
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!

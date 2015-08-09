@@ -131,7 +131,7 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 5; ++i)
+                for (int i = 0; i < 50; ++i)
                 {
                     spareNodes.Count = 0;
 
@@ -139,8 +139,8 @@ namespace SIMDPrototyping.Trees.Tests
                     //tree.SweepRefine(0, ref spareNodes, out nodesInvalidated);
                     //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
-                    //tree.BottomUpBinnedRefine(maximumSubtrees);
-                    //tree.TopDownBinnedRefine(maximumSubtrees);
+                    tree.BottomUpBinnedRefine(maximumSubtrees);
+                    tree.TopDownBinnedRefine(maximumSubtrees);
                     //tree.BottomUpSweepRefine();
                     //tree.TopDownSweepRefine();
                     //tree.BottomUpAgglomerativeRefine();
@@ -160,13 +160,12 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
 
-                tree.Validate();
-                var oldTree = tree;
-                tree = tree.CreateOptimized();
-                oldTree.Dispose();
-                tree.Validate();
-
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                //tree.Validate();
+                //var oldTree = tree;
+                //tree = tree.CreateOptimized();
+                //oldTree.Dispose();
+                //tree.Validate();
+                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
