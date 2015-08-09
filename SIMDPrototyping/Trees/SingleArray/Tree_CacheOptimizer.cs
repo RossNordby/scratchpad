@@ -42,7 +42,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void OptimizeGroupDFS(Node* optimizedNodes, Leaf* optimizedLeaves, ref int optimizedNodeCount, ref int optimizedLeafCount)
         {
-            OptimizeGroupDFS(
+            optimizedNodeCount = 1;
+            OptimizeGroupDFS(0, -1, 0, optimizedNodes, optimizedLeaves, ref optimizedNodeCount, ref optimizedLeafCount);
         }
         unsafe void OptimizeGroupDFS(int optimizedNodeIndex, int optimizedParentNodeIndex, int nodeIndex, Node* optimizedNodes, Leaf* optimizedLeaves, ref int optimizedNodeCount, ref int optimizedLeafCount)
         {
@@ -81,7 +82,51 @@ namespace SIMDPrototyping.Trees.SingleArray
                     OptimizeGroupDFS(optimizedChildren[i], optimizedNodeIndex, nodeChildren[i], optimizedNodes, optimizedLeaves, ref optimizedNodeCount, ref optimizedLeafCount);
                 }
             }
-            return optimizedNodeIndex;
+        }
+
+        struct NodeToVisit
+        {
+            public int NodeIndex;
+            public int OptimizedIndex;
+            public int OptimizedParentIndex;
+        }
+
+        unsafe void OptimizeBFS(Node* optimizedNodes, Leaf* optimizedLeaves, ref int optimizedNodeCount, ref int optimizedLeafCount)
+        {
+            var nodesToVisit = new Queue<NodeToVisit>();
+            nodesToVisit.Enqueue(new NodeToVisit { NodeIndex = 0, OptimizedIndex = 0, OptimizedParentIndex = -1 });
+            optimizedNodeCount = 1;
+
+            while (nodesToVisit.Count > 0)
+            {
+                var nodeToVisit = nodesToVisit.Dequeue();
+                var node = nodes + nodeToVisit.NodeIndex;
+                var optimizedNodeIndex = nodeToVisit.OptimizedIndex;
+                var optimizedNode = optimizedNodes + optimizedNodeIndex;
+                *optimizedNode = *node;
+                optimizedNode->Parent = nodeToVisit.OptimizedParentIndex;
+                var optimizedChildren = &optimizedNode->ChildA;
+                var nodeChildren = &node->ChildA;
+
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    if (nodeChildren[i] >= 0)
+                    {
+                        optimizedChildren[i] = optimizedNodeCount++;
+                        nodesToVisit.Enqueue(new NodeToVisit { NodeIndex = nodeChildren[i], OptimizedIndex = optimizedChildren[i], OptimizedParentIndex = optimizedNodeIndex });
+                    }
+                    else
+                    {
+                        var leafIndex = Encode(nodeChildren[i]);
+                        var optimizedLeafIndex = optimizedLeafCount++;
+                        var optimizedLeaf = optimizedLeaves + optimizedLeafIndex;
+                        optimizedLeaf->Id = leaves[leafIndex].Id;
+                        optimizedLeaf->NodeIndex = optimizedNodeIndex;
+                        optimizedLeaf->ChildIndex = i;
+                        optimizedChildren[i] = Encode(optimizedLeafIndex);
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -102,6 +147,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 int optimizedNodeCount = 0;
                 int optimizedLeafCount = 0;
                 OptimizeDFS(-1, 0, optimizedNodes, optimizedLeaves, ref optimizedNodeCount, ref optimizedLeafCount);
+                //OptimizeGroupDFS(optimizedNodes, optimizedLeaves, ref optimizedNodeCount, ref optimizedLeafCount);
+                //OptimizeBFS(optimizedNodes, optimizedLeaves, ref optimizedNodeCount, ref optimizedLeafCount);
                 Debug.Assert(optimizedNodeCount == nodeCount);
                 Debug.Assert(optimizedLeafCount == leafCount);
             }

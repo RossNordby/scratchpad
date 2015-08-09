@@ -131,7 +131,7 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 50; ++i)
+                for (int i = 0; i < 0; ++i)
                 {
                     spareNodes.Count = 0;
 
@@ -160,12 +160,12 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
 
-                //tree.Validate();
-                //var oldTree = tree;
-                //tree = tree.CreateOptimized();
-                //oldTree.Dispose();
-                //tree.Validate();
-                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                tree.Validate();
+                var oldTree = tree;
+                tree = tree.CreateOptimized();
+                oldTree.Dispose();
+                tree.Validate();
+                Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
