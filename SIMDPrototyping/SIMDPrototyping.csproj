@@ -127,8 +127,10 @@
     <Compile Include="Trees\SingleArray\Tree_CacheOptimizer.cs" />
     <Compile Include="Trees\SingleArray\Tree_Diagnostics.cs" />
     <Compile Include="Trees\SingleArray\Tree_Add.cs" />
+    <Compile Include="Trees\SingleArray\Tree_IncrementalCacheOptimizer.cs" />
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_AgglomerativeRefine.cs" />
+    <Compile Include="Trees\SingleArray\Tree_CollectSubtreesDirect.cs" />
     <Compile Include="Trees\SingleArray\Tree_RefineCommon.cs" />
     <Compile Include="Trees\SingleArray\Tree_Arity4SelfTreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_SweepRefine.cs" />
