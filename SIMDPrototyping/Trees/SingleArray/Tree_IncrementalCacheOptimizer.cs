@@ -11,8 +11,22 @@ namespace SIMDPrototyping.Trees.SingleArray
     {
         unsafe void SwapNodes(int indexA, int indexB)
         {
+
+
+
+
             var a = nodes + indexA;
             var b = nodes + indexB;
+
+            if (a->Parent == indexB)
+            {
+                //B is A's parent. Special case!
+                //Be careful; don't stomp values.
+            }
+            else if (b->Parent == indexA)
+            {
+                //A is B's parent. Special case!
+            }
 
             var temp = *a;
             *a = *b;
