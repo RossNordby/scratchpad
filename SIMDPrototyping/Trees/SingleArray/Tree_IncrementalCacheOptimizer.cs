@@ -21,6 +21,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Update the children pointers in the parents.
             if (a->Parent == -1 || a->Parent >= nodeCount || b->Parent == -1 || b->Parent >= nodeCount)
                 throw new Exception("baD");
+            if (a->Parent == indexA || a->Parent == indexB || b->Parent == indexA || b->Parent == indexB)
+                Console.WriteLine("Unresolvable cycle");
             (&nodes[a->Parent].ChildA)[a->IndexInParent] = indexA;
             (&nodes[b->Parent].ChildA)[b->IndexInParent] = indexB;
             //Update the parent pointers of the children.
@@ -67,7 +69,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 Console.WriteLine("HUH?");
             }
-            
+
         }
 
         public unsafe void IncrementalCacheOptimize(int nodeIndex)
@@ -81,33 +83,57 @@ namespace SIMDPrototyping.Trees.SingleArray
             var targetIndex = nodeIndex + 1;
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (children[i] == nodeIndex)
+                //Only update the first internal child's position.
+                if (children[i] >= 0 && children[i] != targetIndex)
                 {
-                    Console.WriteLine("This happened!");
-                }
-                //Note: while swapping into the final positions, as computed using leaf counts, guarantees
-                //that the children will never need to move again, there is no hard requirement that they jump *here*.
-                //So making this work for n-ary trees would look something like 'ignore the positioning of children that aren't the first one'.
-                //Would be interesting to see the cache behavior of that.
-                if (children[i] >= 0)
-                {
-                    if (children[i] != targetIndex)
+                    Validate();
                     {
-                        Validate();
+                        var child = nodes + children[i];
+                        for (int j = 0; j < child->ChildCount; ++j)
                         {
-                            var child = nodes + children[i];
-                            for (int j = 0; j < child->ChildCount; ++j)
-                            {
-                                if ((&child->ChildA)[j] == targetIndex)
-                                    Console.WriteLine("asdf");
-                            }
+                            if ((&child->ChildA)[j] == targetIndex)
+                                Console.WriteLine("asdf");
                         }
-                        SwapNodes(children[i], targetIndex);
-                        Validate();
                     }
-                    targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
+                    for (int j = 0; j < node->ChildCount; ++j)
+                    {
+                        if (children[i] == targetIndex)
+                            Console.WriteLine("bad"); 
+                    }
+                    SwapNodes(children[i], targetIndex);
+                    Validate();
+                    break;
                 }
             }
+            //for (int i = 0; i < node->ChildCount; ++i)
+            //{
+            //    if (children[i] == nodeIndex)
+            //    {
+            //        Console.WriteLine("This happened!");
+            //    }
+            //    //Note: while swapping into the final positions, as computed using leaf counts, guarantees
+            //    //that the children will never need to move again, there is no hard requirement that they jump *here*.
+            //    //So making this work for n-ary trees would look something like 'ignore the positioning of children that aren't the first one'.
+            //    //Would be interesting to see the cache behavior of that.
+            //    if (children[i] >= 0)
+            //    {
+            //        if (children[i] != targetIndex)
+            //        {
+            //            Validate();
+            //            {
+            //                var child = nodes + children[i];
+            //                for (int j = 0; j < child->ChildCount; ++j)
+            //                {
+            //                    if ((&child->ChildA)[j] == targetIndex)
+            //                        Console.WriteLine("asdf");
+            //                }
+            //            }
+            //            SwapNodes(children[i], targetIndex);
+            //            Validate();
+            //        }
+            //        targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
+            //    }
+            //}
             //var originalChildren = stackalloc int[node->ChildCount];
             //var originalLeafCounts = stackalloc int[node->ChildCount];
             //for (int i = 0; i < node->ChildCount; ++i)

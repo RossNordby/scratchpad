@@ -166,7 +166,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //oldTree.Dispose();
                 //tree.Validate();
                 //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                for (int i = 0; i < 7; ++i)
+                for (int i = 0; i < leaves.Length - 1; ++i)
                 {
                     tree.IncrementalCacheOptimize(i);
                     tree.Validate();
