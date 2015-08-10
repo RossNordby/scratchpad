@@ -58,6 +58,16 @@ namespace SIMDPrototyping.Trees.SingleArray
                     leaves[leafIndex].NodeIndex = indexB;
                 }
             }
+
+            if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
+            {
+                Console.WriteLine("HUH?");
+            }
+            if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
+            {
+                Console.WriteLine("HUH?");
+            }
+            
         }
 
         public unsafe void IncrementalCacheOptimize(int nodeIndex)
@@ -71,6 +81,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             var targetIndex = nodeIndex + 1;
             for (int i = 0; i < node->ChildCount; ++i)
             {
+                if (children[i] == nodeIndex)
+                {
+                    Console.WriteLine("This happened!");
+                }
                 //Note: while swapping into the final positions, as computed using leaf counts, guarantees
                 //that the children will never need to move again, there is no hard requirement that they jump *here*.
                 //So making this work for n-ary trees would look something like 'ignore the positioning of children that aren't the first one'.
@@ -79,44 +93,54 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     if (children[i] != targetIndex)
                     {
+                        Validate();
+                        {
+                            var child = nodes + children[i];
+                            for (int j = 0; j < child->ChildCount; ++j)
+                            {
+                                if ((&child->ChildA)[j] == targetIndex)
+                                    Console.WriteLine("asdf");
+                            }
+                        }
                         SwapNodes(children[i], targetIndex);
+                        Validate();
                     }
                     targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
                 }
             }
-            var originalChildren = stackalloc int[node->ChildCount];
-            var originalLeafCounts = stackalloc int[node->ChildCount];
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                originalChildren[i] = children[i];
-                originalLeafCounts[i] = leafCounts[i];
-            }
-            var originalCount = node->ChildCount;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (children[i] >= 0)
-                {
-                    IncrementalCacheOptimize(children[i]);
-                }
-                if (originalCount != node->ChildCount)
-                {
-                    Console.WriteLine("expectation badly violated; current node was corrupted. probably moved elsewhere.");
-                }
-                for (int j = 0; j < node->ChildCount; ++j)
-                {
-                    if (leafCounts[j] != originalLeafCounts[j])
-                    {
-                        Console.WriteLine("Expectation badly violated; current node was corrupted. probably moved elsewhere.");
-                    }
-                }
-                for (int j = 0; j < node->ChildCount; ++j)
-                {
-                    if (children[j] != originalChildren[j])
-                    {
-                        Console.WriteLine("Expectation violated, child pointers were moved despite being in ostensibly final positions.");
-                    }
-                }
-            }
+            //var originalChildren = stackalloc int[node->ChildCount];
+            //var originalLeafCounts = stackalloc int[node->ChildCount];
+            //for (int i = 0; i < node->ChildCount; ++i)
+            //{
+            //    originalChildren[i] = children[i];
+            //    originalLeafCounts[i] = leafCounts[i];
+            //}
+            //var originalCount = node->ChildCount;
+            //for (int i = 0; i < node->ChildCount; ++i)
+            //{
+            //    if (children[i] >= 0)
+            //    {
+            //        IncrementalCacheOptimize(children[i]);
+            //    }
+            //    if (originalCount != node->ChildCount)
+            //    {
+            //        Console.WriteLine("expectation badly violated; current node was corrupted. probably moved elsewhere.");
+            //    }
+            //    for (int j = 0; j < node->ChildCount; ++j)
+            //    {
+            //        if (leafCounts[j] != originalLeafCounts[j])
+            //        {
+            //            Console.WriteLine("Expectation badly violated; current node was corrupted. probably moved elsewhere.");
+            //        }
+            //    }
+            //    for (int j = 0; j < node->ChildCount; ++j)
+            //    {
+            //        if (children[j] != originalChildren[j])
+            //        {
+            //            Console.WriteLine("Expectation violated, child pointers were moved despite being in ostensibly final positions.");
+            //        }
+            //    }
+            //}
 
         }
     }
