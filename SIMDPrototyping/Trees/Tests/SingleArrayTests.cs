@@ -171,7 +171,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.Validate();
                 //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 1; ++t)
+                for (int t = 0; t < 100; ++t)
                 {
                     for (int i = 0; i < leaves.Length - 1; ++i)
                     {

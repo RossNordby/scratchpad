@@ -218,42 +218,51 @@ namespace SIMDPrototyping.Trees.SingleArray
             return ComputeMaximumDepth(nodes, 0);
         }
 
-        unsafe void MeasureCacheQuality(int nodeIndex, out int contiguousCount, out int nodesWithInternalChildrenCount)
+        unsafe void MeasureCacheQuality(int nodeIndex, out int foundNodes, out float nodeScore, out int scoreableNodeCount)
         {
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
-            contiguousCount = 0;
-            nodesWithInternalChildrenCount = 0;
+            nodeScore = 0;
+            scoreableNodeCount = 0;
+            foundNodes = 0;
+            int correctlyPositionedImmediateChildren = 0;
+            int immediateInternalChildren = 0;
+            int expectedChildIndex = nodeIndex + 1;
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (children[i] >= 0)
                 {
-                    nodesWithInternalChildrenCount = 1;
-                    if (children[i] == nodeIndex + 1)
-                        contiguousCount = 1;
-                    break;
-                }
-            }
-            if (nodesWithInternalChildrenCount == 1)
-            {
-                for (int i = 0; i < node->ChildCount; ++i)
-                {
-                    if (children[i] >= 0)
+                    ++immediateInternalChildren;
+                    if (children[i] == expectedChildIndex)
                     {
-                        int childContiguousCount;
-                        int childNodesWithInternalChildrenCount;
-                        MeasureCacheQuality(children[i], out childContiguousCount, out childNodesWithInternalChildrenCount);
-                        contiguousCount += childContiguousCount;
-                        nodesWithInternalChildrenCount += childNodesWithInternalChildrenCount;
+                        ++correctlyPositionedImmediateChildren;
                     }
+                    int childFoundNodes;
+                    float childNodeScore;
+                    int childScoreableNodes;
+                    MeasureCacheQuality(children[i], out childFoundNodes, out childNodeScore, out childScoreableNodes);
+                    foundNodes += childFoundNodes;
+                    expectedChildIndex += childFoundNodes;
+                    nodeScore += childNodeScore;
+                    scoreableNodeCount += childScoreableNodes;
                 }
+
+            }
+
+            ++foundNodes;
+            //Include this node.
+            if (immediateInternalChildren > 0)
+            {
+                nodeScore += correctlyPositionedImmediateChildren / (float)immediateInternalChildren;
+                ++scoreableNodeCount;
             }
         }
         public unsafe float MeasureCacheQuality()
         {
-            int contiguousCount, nodesWithInternalChildrenCount;
-            MeasureCacheQuality(0, out contiguousCount, out nodesWithInternalChildrenCount);
-            return contiguousCount / (float)nodesWithInternalChildrenCount;
+            float nodeScore;
+            int foundNodes, scoreableNodeCount;
+            MeasureCacheQuality(0, out foundNodes, out nodeScore, out scoreableNodeCount);
+            return nodeScore / (float)scoreableNodeCount;
 
         }
 

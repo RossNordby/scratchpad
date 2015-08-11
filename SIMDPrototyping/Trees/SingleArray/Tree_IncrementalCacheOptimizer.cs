@@ -161,6 +161,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         SwapNodes(children[i], targetIndex);
                         //Validate();
                     }
+                    //break;
                     targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
                 }
             }
