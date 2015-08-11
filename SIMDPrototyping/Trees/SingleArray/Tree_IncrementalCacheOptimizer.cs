@@ -75,58 +75,58 @@ namespace SIMDPrototyping.Trees.SingleArray
             var leafCounts = &node->LeafCountA;
 
 
-            {
+            //{
 
-                int largestIndex = -1;
-                float largestMetric = 0;
-                var bounds = &node->A;
-                for (int i = 0; i < node->ChildCount; ++i)
-                {
-                    if (children[i] >= 0) //Only swap internal nodes forward, because leaf nodes are irrelevant to cache behavior.
-                    {
-                        var metric = ComputeBoundsMetric(ref bounds[i]);
-                        if (metric > largestMetric)
-                        {
-                            largestIndex = i;
-                            largestMetric = metric;
-                        }
-                    }
-                }
-                if (largestIndex > 0)
-                {
-                    //The largest index should be in the first slot, because the first slot is stored contiguously.
-                    //(There are other ways to guarantee this- like during construction, or even just choosing different target indices above-
-                    //but this just makes things simple.)
-                    var tempBounds = bounds[0];
-                    bounds[0] = bounds[largestIndex];
-                    bounds[largestIndex] = tempBounds;
-                    var tempChild = children[0];
-                    children[0] = children[largestIndex];
-                    children[largestIndex] = tempChild;
-                    var tempLeafCount = leafCounts[0];
-                    leafCounts[0] = leafCounts[largestIndex];
-                    leafCounts[largestIndex] = tempLeafCount;
+            //    int largestIndex = -1;
+            //    float largestMetric = 0;
+            //    var bounds = &node->A;
+            //    for (int i = 0; i < node->ChildCount; ++i)
+            //    {
+            //        if (children[i] >= 0) //Only swap internal nodes forward, because leaf nodes are irrelevant to cache behavior.
+            //        {
+            //            var metric = ComputeBoundsMetric(ref bounds[i]);
+            //            if (metric > largestMetric)
+            //            {
+            //                largestIndex = i;
+            //                largestMetric = metric;
+            //            }
+            //        }
+            //    }
+            //    if (largestIndex > 0)
+            //    {
+            //        //The largest index should be in the first slot, because the first slot is stored contiguously.
+            //        //(There are other ways to guarantee this- like during construction, or even just choosing different target indices above-
+            //        //but this just makes things simple.)
+            //        var tempBounds = bounds[0];
+            //        bounds[0] = bounds[largestIndex];
+            //        bounds[largestIndex] = tempBounds;
+            //        var tempChild = children[0];
+            //        children[0] = children[largestIndex];
+            //        children[largestIndex] = tempChild;
+            //        var tempLeafCount = leafCounts[0];
+            //        leafCounts[0] = leafCounts[largestIndex];
+            //        leafCounts[largestIndex] = tempLeafCount;
 
-                    if (children[0] >= 0)
-                    {
-                        nodes[children[0]].IndexInParent = 0;
-                    }
-                    else
-                    {
-                        var leafIndex = Encode(children[0]);
-                        leaves[leafIndex].ChildIndex = 0;
-                    }
-                    if (children[largestIndex] >= 0)
-                    {
-                        nodes[children[largestIndex]].IndexInParent = largestIndex;
-                    }
-                    else
-                    {
-                        var leafIndex = Encode(children[largestIndex]);
-                        leaves[leafIndex].ChildIndex = largestIndex;
-                    }
-                }
-            }
+            //        if (children[0] >= 0)
+            //        {
+            //            nodes[children[0]].IndexInParent = 0;
+            //        }
+            //        else
+            //        {
+            //            var leafIndex = Encode(children[0]);
+            //            leaves[leafIndex].ChildIndex = 0;
+            //        }
+            //        if (children[largestIndex] >= 0)
+            //        {
+            //            nodes[children[largestIndex]].IndexInParent = largestIndex;
+            //        }
+            //        else
+            //        {
+            //            var leafIndex = Encode(children[largestIndex]);
+            //            leaves[leafIndex].ChildIndex = largestIndex;
+            //        }
+            //    }
+            //}
 
 
 

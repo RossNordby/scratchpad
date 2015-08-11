@@ -21,14 +21,16 @@ namespace SIMDPrototyping.Trees.Tests
 
     public static partial class TreeTest
     {
-        static TestCollidableBEPU[] GetRandomLeavesBEPU(int leafCount, BoundingBox bounds, Vector3 leafSize)
+        static TestCollidableBEPU[] GetRandomLeavesBEPU(int leafCount, BoundingBox bounds, Vector3 minimumSize, Vector3 maximumSize, float sizePower)
         {
             var leaves = new TestCollidableBEPU[leafCount];
             Random random = new Random(5);
 
             var range = bounds.Max - bounds.Min;
+            var sizeRange = maximumSize - minimumSize;
             for (int i = 0; i < leafCount; ++i)
             {
+                var leafSize = minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange;
                 var min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
                 var max = min + leafSize;
 
@@ -39,14 +41,16 @@ namespace SIMDPrototyping.Trees.Tests
 
         }
 
-        static TestCollidable[] GetRandomLeaves(int leafCount, BoundingBox bounds, Vector3 leafSize)
+        static TestCollidable[] GetRandomLeaves(int leafCount, BoundingBox bounds, Vector3 minimumSize, Vector3 maximumSize, float sizePower)
         {
             var leaves = new TestCollidable[leafCount];
             Random random = new Random(5);
 
             var range = bounds.Max - bounds.Min;
+            var sizeRange = maximumSize - minimumSize;
             for (int i = 0; i < leafCount; ++i)
             {
+                var leafSize = minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange;
                 leaves[i] = new TestCollidable();
                 leaves[i].BoundingBox.Min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
                 leaves[i].BoundingBox.Max = leaves[i].BoundingBox.Min + leafSize;
@@ -55,6 +59,7 @@ namespace SIMDPrototyping.Trees.Tests
             return leaves;
 
         }
+
         static TestCollidableBEPU[] GetLeavesBEPU(int width, int height, int length, float size, float gap)
         {
             var leaves = new TestCollidableBEPU[width * height * length];
@@ -132,7 +137,9 @@ namespace SIMDPrototyping.Trees.Tests
         }
         public static void Test()
         {
-            float leafSize = 10;
+            float leafMinSize = 10;
+            float leafMaxSize = 10;
+            float leafSizePower = 1;
             int queryCount = 1;
             int selfTestCount = 100;
             int refitCount = 100;
@@ -158,21 +165,21 @@ namespace SIMDPrototyping.Trees.Tests
                 var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
 
 #if RANDOMLEAVES
-                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
 #else
                 var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
                 //TestVectorized(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
-                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
 #else
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
                 //TestBaseline(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
-                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
 #else
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
@@ -183,7 +190,7 @@ namespace SIMDPrototyping.Trees.Tests
             {
 
 #if RANDOMLEAVES
-                var leaves = GetRandomLeavesBEPU(randomLeafCount, randomLeafBounds, new Vector3(leafSize));
+                var leaves = GetRandomLeavesBEPU(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
 #else
                 var leaves = GetLeavesBEPU(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
