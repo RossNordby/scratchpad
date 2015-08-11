@@ -84,7 +84,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             //TODO: consider swapping children around so that the first child is the largest child. That maximizes the chance that the in-cache node is chosen,
             //because the probability of volume query traversal is proportional to volume. (Or surface area for rays...)
 
-
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (targetIndex >= nodeCount)
@@ -107,7 +106,27 @@ namespace SIMDPrototyping.Trees.SingleArray
                     targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
                 }
             }
-            
+
+            int largestIndex = 0;
+            float largestMetric = ComputeBoundsMetric(ref node->A);
+            var bounds = &node->A;
+            for (int i = 1; i < node->ChildCount; ++i)
+            {
+                var metric = ComputeBoundsMetric(ref bounds[i]);
+                if (metric > largestMetric)
+                {
+                    largestIndex = i;
+                    largestMetric = metric;
+                }
+            }
+            if (largestIndex != 0)
+            {
+                //The largest index should be in the first slot, because the first slot is stored contiguously.
+                //(There are other ways to guarantee this- like during construction, or even just choosing different target indices above-
+                //but this just makes things simple.)
+
+            }
+
 
         }
     }
