@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SIMDPrototyping.Trees.SingleArray
@@ -82,6 +83,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             //to stil choose something which converged.
             //TODO: consider swapping children around so that the first child is the largest child. That maximizes the chance that the in-cache node is chosen,
             //because the probability of volume query traversal is proportional to volume. (Or surface area for rays...)
+
+
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (targetIndex >= nodeCount)

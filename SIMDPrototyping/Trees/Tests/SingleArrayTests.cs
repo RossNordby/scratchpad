@@ -56,14 +56,15 @@ namespace SIMDPrototyping.Trees.Tests
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 tree.GetSelfOverlapsArityDedicated(ref overlaps);
-                
+
+                tree.IncrementalCacheOptimize(0);
 
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-
 
                 tree.GetSelfOverlapsViaQueries(ref overlaps);
                 Console.WriteLine($"Cachewarm overlaps: {overlaps.Count}");
                 tree.Dispose();
+
             }
 
             {
@@ -131,24 +132,24 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 10; ++i)
-                {
-                    spareNodes.Count = 0;
+                //for (int i = 0; i < 10; ++i)
+                //{
+                //    spareNodes.Count = 0;
 
 
-                    //tree.SweepRefine(0, ref spareNodes, out nodesInvalidated);
-                    //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
+                //    //tree.SweepRefine(0, ref spareNodes, out nodesInvalidated);
+                //    //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
-                    tree.BottomUpBinnedRefine(maximumSubtrees);
-                    tree.TopDownBinnedRefine(maximumSubtrees);
-                    //tree.BottomUpSweepRefine();
-                    //tree.TopDownSweepRefine();
-                    //tree.BottomUpAgglomerativeRefine();
-                    //tree.Refit();
-                    //tree.BottomUpRefine();
-                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                    //tree.Validate();
-                }
+                //    tree.BottomUpBinnedRefine(maximumSubtrees);
+                //    tree.TopDownBinnedRefine(maximumSubtrees);
+                //    //tree.BottomUpSweepRefine();
+                //    //tree.TopDownSweepRefine();
+                //    //tree.BottomUpAgglomerativeRefine();
+                //    //tree.Refit();
+                //    //tree.BottomUpRefine();
+                //    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                //    //tree.Validate();
+                //}
 
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -167,12 +168,15 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.Validate();
                 //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length - 1; ++i)
+                for (int t = 0; t < 1; ++t)
                 {
-                    tree.IncrementalCacheOptimize(i);
-                    //tree.Validate();
+                    for (int i = 0; i < leaves.Length - 1; ++i)
+                    {
+                        tree.IncrementalCacheOptimize(i);
+                    }
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                tree.Validate();
                 Console.WriteLine($"Incremental Cache Optimize Time: {endTime - startTime}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
