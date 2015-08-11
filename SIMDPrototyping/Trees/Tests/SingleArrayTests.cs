@@ -134,7 +134,7 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 5; ++i)
+                for (int i = 0; i < 1; ++i)
                 {
                     spareNodes.Count = 0;
 
@@ -169,19 +169,22 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree = tree.CreateOptimized();
                 //oldTree.Dispose();
                 //tree.Validate();
-                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 100; ++t)
+                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}"); 
+                for (int t = 0; t < 10; ++t)
                 {
-                    for (int i = 0; i < leaves.Length - 1; ++i)
-                    {
-                        tree.IncrementalCacheOptimize(i);
-                    }
+                    startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    
+
+                    //for (int i = 0; i < leaves.Length - 1; ++i)
+                    //{
+                    //    tree.IncrementalCacheOptimize(i);
+                    //}
+                    tree.RefitAndOptimize();
+                    endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    Console.WriteLine($"Incremental Cache RefitOptimize Time: {endTime - startTime}");
+                    Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
                 }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 tree.Validate();
-                Console.WriteLine($"Incremental Cache Optimize Time: {endTime - startTime}");
-                Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");

@@ -169,5 +169,72 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
         }
+
+        unsafe int RefitAndOptimize(int nodeIndex, out BoundingBox boundingBox)
+        {
+            var node = nodes + nodeIndex;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+
+            int targetIndex = nodeIndex + 1;
+
+            int descendantCount = 1;
+            if (node->ChildA >= 0)
+            {
+                if (node->ChildA != targetIndex)
+                {
+                    SwapNodes(node->ChildA, targetIndex);
+                }
+                var childDescendantCount = RefitAndOptimize(node->ChildA, out node->A);
+                targetIndex += childDescendantCount - 1;
+                descendantCount += childDescendantCount;
+            }
+            if (node->ChildB >= 0)
+            {
+                if (node->ChildB != targetIndex)
+                {
+                    SwapNodes(node->ChildB, targetIndex);
+                }
+                var childDescendantCount = RefitAndOptimize(node->ChildB, out node->B);
+                targetIndex += childDescendantCount - 1;
+                descendantCount += childDescendantCount;
+            }
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            for (int i = 2; i < node->ChildCount; ++i)
+            {
+                if ((&node->ChildA)[i] >= 0)
+                {
+                    if ((&node->ChildA)[i] != targetIndex)
+                    {
+                        SwapNodes(node->ChildB, targetIndex);
+                    }
+                    var childDescendantCount = RefitAndOptimize((&node->ChildA)[i], out (&node->A)[i]);
+                    targetIndex += childDescendantCount - 1;
+                    descendantCount += childDescendantCount;
+                }
+                BoundingBox.Merge(ref (&node->A)[i], ref boundingBox, out boundingBox);
+            }
+            return descendantCount;
+        }
+
+        public unsafe void RefitAndOptimize()
+        {
+            //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
+            var rootChildren = &nodes->ChildA;
+            var rootBounds = &nodes->A;
+            int targetIndex = 1;
+            for (int i = 0; i < nodes->ChildCount; ++i)
+            {
+                if (rootChildren[i] >= 0)
+                {
+                    if (rootChildren[i] != targetIndex)
+                    {
+                        SwapNodes(rootChildren[i], targetIndex);
+                    }
+                    var childDescendantCount = RefitAndOptimize(rootChildren[i], out rootBounds[i]);
+                    targetIndex += childDescendantCount - 1;
+                }
+            }
+        }
     }
 }

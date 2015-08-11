@@ -198,7 +198,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void UpdateLeafBoundingBox(int leafIndex, ref BoundingBox boundingBox)
+        unsafe void UpdateLeafBoundingBox(int leafIndex, ref BoundingBox boundingBox)
         {
             (&nodes[leaves[leafIndex].NodeIndex].A)[leaves[leafIndex].ChildIndex] = boundingBox;
         }
