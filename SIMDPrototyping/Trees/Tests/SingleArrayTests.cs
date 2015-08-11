@@ -166,11 +166,14 @@ namespace SIMDPrototyping.Trees.Tests
                 //oldTree.Dispose();
                 //tree.Validate();
                 //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length - 1; ++i)
                 {
                     tree.IncrementalCacheOptimize(i);
-                    tree.Validate();
+                    //tree.Validate();
                 }
+                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                Console.WriteLine($"Incremental Cache Optimize Time: {endTime - startTime}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");

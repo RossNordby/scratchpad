@@ -98,29 +98,29 @@ namespace SIMDPrototyping.Trees.SingleArray
             (&nodes[b->Parent].ChildA)[b->IndexInParent] = indexB;
 
 
-            if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
-            {
-                Console.WriteLine("HUH?");
-            }
-            if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
-            {
-                Console.WriteLine("HUH?");
-            }
+            //if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
+            //{
+            //    Console.WriteLine("HUH?");
+            //}
+            //if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
+            //{
+            //    Console.WriteLine("HUH?");
+            //}
             //Update the parent pointers of the children.
             var children = &a->ChildA;
             for (int i = 0; i < a->ChildCount; ++i)
             {
                 if (children[i] >= 0)
                 {
-                    if (children[i] > nodeCount)
-                        Console.WriteLine("bad");
+                    //if (children[i] > nodeCount)
+                    //    Console.WriteLine("bad");
                     nodes[children[i]].Parent = indexA;
                 }
                 else
                 {
                     var leafIndex = Encode(children[i]);
-                    if (leafIndex > leafCount)
-                        Console.WriteLine("bad");
+                    //if (leafIndex > leafCount)
+                    //    Console.WriteLine("bad");
                     leaves[leafIndex].NodeIndex = indexA;
                 }
             }
@@ -129,27 +129,27 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (children[i] >= 0)
                 {
-                    if (children[i] > nodeCount)
-                        Console.WriteLine("bad");
+                    //if (children[i] > nodeCount)
+                    //    Console.WriteLine("bad");
                     nodes[children[i]].Parent = indexB;
                 }
                 else
                 {
                     var leafIndex = Encode(children[i]);
-                    if (leafIndex > leafCount)
-                        Console.WriteLine("bad");
+                    //if (leafIndex > leafCount)
+                    //    Console.WriteLine("bad");
                     leaves[leafIndex].NodeIndex = indexB;
                 }
             }
 
-            if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
-            {
-                Console.WriteLine("HUH?");
-            }
-            if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
-            {
-                Console.WriteLine("HUH?");
-            }
+            //if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
+            //{
+            //    Console.WriteLine("HUH?");
+            //}
+            //if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
+            //{
+            //    Console.WriteLine("HUH?");
+            //}
 
         }
 
@@ -162,7 +162,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
             var targetIndex = nodeIndex + 1;
-            
+
+
+            //Note that we pull all children up to their final positions relative to the current node index.
+            //This helps ensure that more nodes can converge to their final positions- if we didn't do this,
+            //a full top-down cache optimization could end up leaving some nodes near the bottom of the tree and without any room for their children.
+            //TODO: N-ary tree support. Tricky without subtree count and without fixed numbers of children per node, but it may be possible
+            //to stil choose something which converged.
+            //TODO: consider swapping children around so that the first child is the largest child. That maximizes the chance that the in-cache node is chosen,
+            //because the probability of volume query traversal is proportional to volume. (Or surface area for rays...)
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (targetIndex >= nodeCount)
@@ -174,29 +182,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //We could aggressively swap this node upward. More complicated.
                     break;
                 }
-                //Only update the first internal child's position.
                 if (children[i] >= 0)
                 {
                     if (children[i] != targetIndex)
                     {
-                        Validate();
-                        //{
-                        //    var child = nodes + children[i];
-                        //    for (int j = 0; j < child->ChildCount; ++j)
-                        //    {
-                        //        if ((&child->ChildA)[j] == targetIndex)
-                        //            Console.WriteLine("asdf");
-                        //    }
-                        //}
-                        //for (int j = 0; j < node->ChildCount; ++j)
-                        //{
-                        //    if (children[i] == targetIndex)
-                        //        Console.WriteLine("bad");
-                        //}
+                        //Validate();
                         SwapNodes(children[i], targetIndex);
-                        Validate();
+                        //Validate();
                     }
-                    break;
+                    targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
                 }
             }
             //for (int i = 0; i < node->ChildCount; ++i)
