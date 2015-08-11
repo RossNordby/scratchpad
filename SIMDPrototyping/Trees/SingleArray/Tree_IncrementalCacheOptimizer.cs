@@ -77,19 +77,22 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             {
 
-                int largestIndex = 0;
-                float largestMetric = ComputeBoundsMetric(ref node->A);
+                int largestIndex = -1;
+                float largestMetric = 0;
                 var bounds = &node->A;
-                for (int i = 1; i < node->ChildCount; ++i)
+                for (int i = 0; i < node->ChildCount; ++i)
                 {
-                    var metric = ComputeBoundsMetric(ref bounds[i]);
-                    if (metric > largestMetric)
+                    if (children[i] >= 0) //Only swap internal nodes forward, because leaf nodes are irrelevant to cache behavior.
                     {
-                        largestIndex = i;
-                        largestMetric = metric;
+                        var metric = ComputeBoundsMetric(ref bounds[i]);
+                        if (metric > largestMetric)
+                        {
+                            largestIndex = i;
+                            largestMetric = metric;
+                        }
                     }
                 }
-                if (largestIndex != 0)
+                if (largestIndex > 0)
                 {
                     //The largest index should be in the first slot, because the first slot is stored contiguously.
                     //(There are other ways to guarantee this- like during construction, or even just choosing different target indices above-
