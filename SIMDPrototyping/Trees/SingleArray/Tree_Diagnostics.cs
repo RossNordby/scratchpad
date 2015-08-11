@@ -159,7 +159,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 throw new Exception($"Invalid parent pointers on root.");
             }
-            
+
             int foundLeafCount;
             var standInBounds = new BoundingBox();
 
@@ -216,6 +216,45 @@ namespace SIMDPrototyping.Trees.SingleArray
         public unsafe int ComputeMaximumDepth()
         {
             return ComputeMaximumDepth(nodes, 0);
+        }
+
+        unsafe void MeasureCacheQuality(int nodeIndex, out int contiguousCount, out int nodesWithInternalChildrenCount)
+        {
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+            contiguousCount = 0;
+            nodesWithInternalChildrenCount = 0;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    nodesWithInternalChildrenCount = 1;
+                    if (children[i] == nodeIndex + 1)
+                        contiguousCount = 1;
+                    break;
+                }
+            }
+            if (nodesWithInternalChildrenCount == 1)
+            {
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    if (children[i] >= 0)
+                    {
+                        int childContiguousCount;
+                        int childNodesWithInternalChildrenCount;
+                        MeasureCacheQuality(children[i], out childContiguousCount, out childNodesWithInternalChildrenCount);
+                        contiguousCount += childContiguousCount;
+                        nodesWithInternalChildrenCount += childNodesWithInternalChildrenCount;
+                    }
+                }
+            }
+        }
+        public unsafe float MeasureCacheQuality()
+        {
+            int contiguousCount, nodesWithInternalChildrenCount;
+            MeasureCacheQuality(0, out contiguousCount, out nodesWithInternalChildrenCount);
+            return contiguousCount / (float)nodesWithInternalChildrenCount;
+
         }
 
     }

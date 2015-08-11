@@ -123,6 +123,8 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray SelfTree Time1: {endTime - startTime}, overlaps: {overlaps.Count}");
 
+                Console.WriteLine($"SingleArray Cache Quality Before: {tree.MeasureCacheQuality()}");
+
                 QuickList<int> spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 int[] buffer;
                 MemoryRegion region;
@@ -159,6 +161,7 @@ namespace SIMDPrototyping.Trees.Tests
                 BufferPools<int>.Thread.GiveBack(buffer);
 
                 Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
 
 
                 //tree.Validate();
@@ -178,6 +181,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 tree.Validate();
                 Console.WriteLine($"Incremental Cache Optimize Time: {endTime - startTime}");
+                Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
