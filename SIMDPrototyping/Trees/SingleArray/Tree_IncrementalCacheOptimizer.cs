@@ -11,76 +11,12 @@ namespace SIMDPrototyping.Trees.SingleArray
     {
         unsafe void SwapNodes(int indexA, int indexB)
         {
-
-
-
-
-            //var a = nodes + indexA;
-            //var b = nodes + indexB;
-
-
-            ////Notify every child of B that it has moved to A.
-            //var children = &b->ChildA;
-            //for (int i = 0; i < b->ChildCount; ++i)
-            //{
-            //    if (children[i] >= 0)
-            //    {
-            //        nodes[children[i]].Parent = indexA;
-            //    }
-            //    else
-            //    {
-            //        var leafIndex = Encode(children[i]);
-            //        leaves[leafIndex].NodeIndex = indexA;
-            //    }
-            //}
-            ////Notify every child of A that it has moved to B.
-            //children = &a->ChildA;
-            //for (int i = 0; i < a->ChildCount; ++i)
-            //{
-            //    if (children[i] >= 0)
-            //    {
-            //        nodes[children[i]].Parent = indexB;
-            //    }
-            //    else
-            //    {
-            //        var leafIndex = Encode(children[i]);
-            //        leaves[leafIndex].NodeIndex = indexB;
-            //    }
-            //}
-            ////In the event that B is the parent of A or vice versa, the above will update A or B's parent pointer.
-            ////That invalidates the parent pointer until this entire function is complete.
-            ////So, if e.g. B is a parent of A, updating the child pointer of the parent cannot make use of the parent index anymore.
-
-            ////Update the child pointer in the parent. 
-            ////A will mvoe to indexB.
-            //if (a->Parent == indexA) //If B was the parent of A, this could happen and the parent pointer is invalidated.
-            //    (&b->ChildA)[a->IndexInParent] = indexB;
-            //else
-            //    (&nodes[a->Parent].ChildA)[a->IndexInParent] = indexB;
-
-            ////B will move to indexA.
-            //if (b->Parent == indexB) //If A was the parent of B, this could happen and the parent pointer is invalidated.
-            //    (&a->ChildA)[b->IndexInParent] = indexA;
-            //else
-            //    (&nodes[b->Parent].ChildB)[b->IndexInParent] = indexA;
-
-
-            //var temp = *a;
-            //*a = *b;
-            //*b = temp;
-
             var a = nodes + indexA;
             var b = nodes + indexB;
 
             var temp = *a;
             *a = *b;
             *b = temp;
-
-            //Update the children pointers in the parents.
-            //if (a->Parent == -1 || a->Parent >= nodeCount || b->Parent == -1 || b->Parent >= nodeCount)
-            //    throw new Exception("baD");
-            //if (a->Parent == indexA || a->Parent == indexB || b->Parent == indexA || b->Parent == indexB)
-            //    Console.WriteLine("Unresolvable cycle");
 
             if (a->Parent == indexA)
             {
@@ -91,36 +27,24 @@ namespace SIMDPrototyping.Trees.SingleArray
             else if (b->Parent == indexB)
             {
                 //The original A's parent was B.
-                //that parent has moved.
+                //That parent has moved.
                 b->Parent = indexA;
             }
             (&nodes[a->Parent].ChildA)[a->IndexInParent] = indexA;
             (&nodes[b->Parent].ChildA)[b->IndexInParent] = indexB;
 
 
-            //if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
-            //{
-            //    Console.WriteLine("HUH?");
-            //}
-            //if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
-            //{
-            //    Console.WriteLine("HUH?");
-            //}
             //Update the parent pointers of the children.
             var children = &a->ChildA;
             for (int i = 0; i < a->ChildCount; ++i)
             {
                 if (children[i] >= 0)
                 {
-                    //if (children[i] > nodeCount)
-                    //    Console.WriteLine("bad");
                     nodes[children[i]].Parent = indexA;
                 }
                 else
                 {
                     var leafIndex = Encode(children[i]);
-                    //if (leafIndex > leafCount)
-                    //    Console.WriteLine("bad");
                     leaves[leafIndex].NodeIndex = indexA;
                 }
             }
@@ -129,27 +53,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (children[i] >= 0)
                 {
-                    //if (children[i] > nodeCount)
-                    //    Console.WriteLine("bad");
                     nodes[children[i]].Parent = indexB;
                 }
                 else
                 {
                     var leafIndex = Encode(children[i]);
-                    //if (leafIndex > leafCount)
-                    //    Console.WriteLine("bad");
                     leaves[leafIndex].NodeIndex = indexB;
                 }
             }
-
-            //if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
-            //{
-            //    Console.WriteLine("HUH?");
-            //}
-            //if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
-            //{
-            //    Console.WriteLine("HUH?");
-            //}
 
         }
 
@@ -193,68 +104,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
                 }
             }
-            //for (int i = 0; i < node->ChildCount; ++i)
-            //{
-            //    if (children[i] == nodeIndex)
-            //    {
-            //        Console.WriteLine("This happened!");
-            //    }
-            //    //Note: while swapping into the final positions, as computed using leaf counts, guarantees
-            //    //that the children will never need to move again, there is no hard requirement that they jump *here*.
-            //    //So making this work for n-ary trees would look something like 'ignore the positioning of children that aren't the first one'.
-            //    //Would be interesting to see the cache behavior of that.
-            //    if (children[i] >= 0)
-            //    {
-            //        if (children[i] != targetIndex)
-            //        {
-            //            Validate();
-            //            {
-            //                var child = nodes + children[i];
-            //                for (int j = 0; j < child->ChildCount; ++j)
-            //                {
-            //                    if ((&child->ChildA)[j] == targetIndex)
-            //                        Console.WriteLine("asdf");
-            //                }
-            //            }
-            //            SwapNodes(children[i], targetIndex);
-            //            Validate();
-            //        }
-            //        targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
-            //    }
-            //}
-            //var originalChildren = stackalloc int[node->ChildCount];
-            //var originalLeafCounts = stackalloc int[node->ChildCount];
-            //for (int i = 0; i < node->ChildCount; ++i)
-            //{
-            //    originalChildren[i] = children[i];
-            //    originalLeafCounts[i] = leafCounts[i];
-            //}
-            //var originalCount = node->ChildCount;
-            //for (int i = 0; i < node->ChildCount; ++i)
-            //{
-            //    if (children[i] >= 0)
-            //    {
-            //        IncrementalCacheOptimize(children[i]);
-            //    }
-            //    if (originalCount != node->ChildCount)
-            //    {
-            //        Console.WriteLine("expectation badly violated; current node was corrupted. probably moved elsewhere.");
-            //    }
-            //    for (int j = 0; j < node->ChildCount; ++j)
-            //    {
-            //        if (leafCounts[j] != originalLeafCounts[j])
-            //        {
-            //            Console.WriteLine("Expectation badly violated; current node was corrupted. probably moved elsewhere.");
-            //        }
-            //    }
-            //    for (int j = 0; j < node->ChildCount; ++j)
-            //    {
-            //        if (children[j] != originalChildren[j])
-            //        {
-            //            Console.WriteLine("Expectation violated, child pointers were moved despite being in ostensibly final positions.");
-            //        }
-            //    }
-            //}
+            
 
         }
     }
