@@ -15,30 +15,97 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
+            //var a = nodes + indexA;
+            //var b = nodes + indexB;
+
+
+            ////Notify every child of B that it has moved to A.
+            //var children = &b->ChildA;
+            //for (int i = 0; i < b->ChildCount; ++i)
+            //{
+            //    if (children[i] >= 0)
+            //    {
+            //        nodes[children[i]].Parent = indexA;
+            //    }
+            //    else
+            //    {
+            //        var leafIndex = Encode(children[i]);
+            //        leaves[leafIndex].NodeIndex = indexA;
+            //    }
+            //}
+            ////Notify every child of A that it has moved to B.
+            //children = &a->ChildA;
+            //for (int i = 0; i < a->ChildCount; ++i)
+            //{
+            //    if (children[i] >= 0)
+            //    {
+            //        nodes[children[i]].Parent = indexB;
+            //    }
+            //    else
+            //    {
+            //        var leafIndex = Encode(children[i]);
+            //        leaves[leafIndex].NodeIndex = indexB;
+            //    }
+            //}
+            ////In the event that B is the parent of A or vice versa, the above will update A or B's parent pointer.
+            ////That invalidates the parent pointer until this entire function is complete.
+            ////So, if e.g. B is a parent of A, updating the child pointer of the parent cannot make use of the parent index anymore.
+
+            ////Update the child pointer in the parent. 
+            ////A will mvoe to indexB.
+            //if (a->Parent == indexA) //If B was the parent of A, this could happen and the parent pointer is invalidated.
+            //    (&b->ChildA)[a->IndexInParent] = indexB;
+            //else
+            //    (&nodes[a->Parent].ChildA)[a->IndexInParent] = indexB;
+
+            ////B will move to indexA.
+            //if (b->Parent == indexB) //If A was the parent of B, this could happen and the parent pointer is invalidated.
+            //    (&a->ChildA)[b->IndexInParent] = indexA;
+            //else
+            //    (&nodes[b->Parent].ChildB)[b->IndexInParent] = indexA;
+
+
+            //var temp = *a;
+            //*a = *b;
+            //*b = temp;
+
             var a = nodes + indexA;
             var b = nodes + indexB;
-
-            if (a->Parent == indexB)
-            {
-                //B is A's parent. Special case!
-                //Be careful; don't stomp values.
-            }
-            else if (b->Parent == indexA)
-            {
-                //A is B's parent. Special case!
-            }
 
             var temp = *a;
             *a = *b;
             *b = temp;
 
             //Update the children pointers in the parents.
-            if (a->Parent == -1 || a->Parent >= nodeCount || b->Parent == -1 || b->Parent >= nodeCount)
-                throw new Exception("baD");
-            if (a->Parent == indexA || a->Parent == indexB || b->Parent == indexA || b->Parent == indexB)
-                Console.WriteLine("Unresolvable cycle");
+            //if (a->Parent == -1 || a->Parent >= nodeCount || b->Parent == -1 || b->Parent >= nodeCount)
+            //    throw new Exception("baD");
+            //if (a->Parent == indexA || a->Parent == indexB || b->Parent == indexA || b->Parent == indexB)
+            //    Console.WriteLine("Unresolvable cycle");
+
+            if (a->Parent == indexA)
+            {
+                //The original B's parent was A.
+                //That parent has moved.
+                a->Parent = indexB;
+            }
+            else if (b->Parent == indexB)
+            {
+                //The original A's parent was B.
+                //that parent has moved.
+                b->Parent = indexA;
+            }
             (&nodes[a->Parent].ChildA)[a->IndexInParent] = indexA;
             (&nodes[b->Parent].ChildA)[b->IndexInParent] = indexB;
+
+
+            if ((&nodes[a->Parent].ChildA)[a->IndexInParent] != indexA)
+            {
+                Console.WriteLine("HUH?");
+            }
+            if ((&nodes[b->Parent].ChildA)[b->IndexInParent] != indexB)
+            {
+                Console.WriteLine("HUH?");
+            }
             //Update the parent pointers of the children.
             var children = &a->ChildA;
             for (int i = 0; i < a->ChildCount; ++i)
@@ -95,27 +162,40 @@ namespace SIMDPrototyping.Trees.SingleArray
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
             var targetIndex = nodeIndex + 1;
+            
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                //Only update the first internal child's position.
-                if (children[i] >= 0 && children[i] != targetIndex)
+                if (targetIndex >= nodeCount)
                 {
-                    Validate();
+                    //This attempted swap would reach beyond the allocated nodes.
+                    //That means the current node is quite a bit a lower than it should be.
+                    //Later refinement attempts should fix this, but for now, do nothing.
+                    //Other options:
+                    //We could aggressively swap this node upward. More complicated.
+                    break;
+                }
+                //Only update the first internal child's position.
+                if (children[i] >= 0)
+                {
+                    if (children[i] != targetIndex)
                     {
-                        var child = nodes + children[i];
-                        for (int j = 0; j < child->ChildCount; ++j)
-                        {
-                            if ((&child->ChildA)[j] == targetIndex)
-                                Console.WriteLine("asdf");
-                        }
+                        Validate();
+                        //{
+                        //    var child = nodes + children[i];
+                        //    for (int j = 0; j < child->ChildCount; ++j)
+                        //    {
+                        //        if ((&child->ChildA)[j] == targetIndex)
+                        //            Console.WriteLine("asdf");
+                        //    }
+                        //}
+                        //for (int j = 0; j < node->ChildCount; ++j)
+                        //{
+                        //    if (children[i] == targetIndex)
+                        //        Console.WriteLine("bad");
+                        //}
+                        SwapNodes(children[i], targetIndex);
+                        Validate();
                     }
-                    for (int j = 0; j < node->ChildCount; ++j)
-                    {
-                        if (children[i] == targetIndex)
-                            Console.WriteLine("bad"); 
-                    }
-                    SwapNodes(children[i], targetIndex);
-                    Validate();
                     break;
                 }
             }

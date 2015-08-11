@@ -159,8 +159,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 throw new Exception($"Invalid parent pointers on root.");
             }
-
-
+            
             int foundLeafCount;
             var standInBounds = new BoundingBox();
 
