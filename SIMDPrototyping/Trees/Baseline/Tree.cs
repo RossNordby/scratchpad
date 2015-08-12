@@ -376,6 +376,7 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildCount = 0;
             node.Parent = 0;
             node.IndexInParent = 0;
+            node.RefineFlag = 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

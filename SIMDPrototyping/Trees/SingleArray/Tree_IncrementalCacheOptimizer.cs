@@ -1,4 +1,6 @@
-﻿using System;
+﻿using BEPUutilities.DataStructures;
+using BEPUutilities.ResourceManagement;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -65,11 +67,98 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
+        public unsafe void IncrementalCacheOptimizeMultithreaded(int nodeIndex)
+        {
+            //Multithreaded cache optimization attempts to acquire a lock on every involved node.
+            //If any lock fails, it just abandons the entire attempt.
+            //That's acceptable- the incremental optimization only cares about eventual success.
+            var node = nodes + nodeIndex;
+            bool nodeLock = 0 == Interlocked.CompareExchange(ref node->RefineFlag, 1, 0);
+            if (nodeLock)
+            {
+                //Note that the child pointers are not guaranteed to be unchanging just because we locked the node.
+                //That requires locking all the children.
+                bool allChildrenLocked = true;
+                var children = &node->ChildA;
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    //It is very possible that this child pointer could swap between now and the compare exchange read. 
+                    //However, a child pointer will not turn from an internal node (positive) to a leaf node (negative), and that's all that matters.
+                    if (children[i] >= 0)
+                    {
+                        var lockTaken = 0 == Interlocked.CompareExchange(ref nodes[children[i]].RefineFlag, 1, 0);
+                        if (!lockTaken)
+                        {
+                            allChildrenLocked = false;
+                            //Release any child locks. Note that these children pointers cannot have changed due to the lock we already took.
+                            for (int j = 0; j < i; ++j)
+                            {
+                                if (children[i] >= 0)
+                                {
+                                    nodes[children[i]].RefineFlag = 0;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (allChildrenLocked)
+                {
+                    var leafCounts = &node->LeafCountA;
+                    var targetIndex = nodeIndex + 1;
+
+
+                    //Note that we pull all children up to their final positions relative to the current node index.
+                    //This helps ensure that more nodes can converge to their final positions- if we didn't do this,
+                    //a full top-down cache optimization could end up leaving some nodes near the bottom of the tree and without any room for their children.
+                    //TODO: N-ary tree support. Tricky without subtree count and without fixed numbers of children per node, but it may be possible
+                    //to stil choose something which converged.
+
+                    for (int i = 0; i < node->ChildCount; ++i)
+                    {
+                        if (targetIndex >= nodeCount)
+                        {
+                            //This attempted swap would reach beyond the allocated nodes.
+                            //That means the current node is quite a bit a lower than it should be.
+                            //Later refinement attempts should fix this, but for now, do nothing.
+                            //Other options:
+                            //We could aggressively swap this node upward. More complicated.
+                            break;
+                        }
+                        if (children[i] >= 0)
+                        {
+                            if (children[i] != targetIndex)
+                            {
+                                //if (0 == Interlocked.CompareExchange(ref nodes[targetIndex].RefineFlag, 1, 0))
+                                {
+                                    SwapNodes(children[i], targetIndex);
+                                    //Unlock.
+                                    nodes[targetIndex].RefineFlag = 0;
+                                    //break;
+                                }
+                            }
+                            targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
+                        }
+                    }
+
+
+                    //Unlock children.
+                    for (int j = 0; j < node->ChildCount; ++j)
+                    {
+                        if (children[j] >= 0)
+                        {
+                            nodes[children[j]].RefineFlag = 0;
+                        }
+                    }
+                }
+                //Unlock the node.
+                node->RefineFlag = 0;
+            }
+        }
+
         public unsafe void IncrementalCacheOptimize(int nodeIndex)
         {
             Debug.Assert(ChildrenCapacity == 2, "the multi-swap of children only works on 2-ary trees due to child count guarantees. Is it even necessary?");
-            //This node can only be moved during the execution of this function if:
-            //1) a descendant of this node's target position is nodeIndex: can't happen because all target positions are relative to, and higher than, this node index.
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
@@ -139,8 +228,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             //a full top-down cache optimization could end up leaving some nodes near the bottom of the tree and without any room for their children.
             //TODO: N-ary tree support. Tricky without subtree count and without fixed numbers of children per node, but it may be possible
             //to stil choose something which converged.
-            //TODO: consider swapping children around so that the first child is the largest child. That maximizes the chance that the in-cache node is chosen,
-            //because the probability of volume query traversal is proportional to volume. (Or surface area for rays...)
 
             for (int i = 0; i < node->ChildCount; ++i)
             {
@@ -170,71 +257,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        unsafe int RefitAndOptimize(int nodeIndex, out BoundingBox boundingBox)
-        {
-            var node = nodes + nodeIndex;
-            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
-            Debug.Assert(node->ChildCount >= 2);
 
-            int targetIndex = nodeIndex + 1;
-
-            int descendantCount = 1;
-            if (node->ChildA >= 0)
-            {
-                if (node->ChildA != targetIndex)
-                {
-                    SwapNodes(node->ChildA, targetIndex);
-                }
-                var childDescendantCount = RefitAndOptimize(node->ChildA, out node->A);
-                targetIndex += childDescendantCount - 1;
-                descendantCount += childDescendantCount;
-            }
-            if (node->ChildB >= 0)
-            {
-                if (node->ChildB != targetIndex)
-                {
-                    SwapNodes(node->ChildB, targetIndex);
-                }
-                var childDescendantCount = RefitAndOptimize(node->ChildB, out node->B);
-                targetIndex += childDescendantCount - 1;
-                descendantCount += childDescendantCount;
-            }
-            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
-            for (int i = 2; i < node->ChildCount; ++i)
-            {
-                if ((&node->ChildA)[i] >= 0)
-                {
-                    if ((&node->ChildA)[i] != targetIndex)
-                    {
-                        SwapNodes(node->ChildB, targetIndex);
-                    }
-                    var childDescendantCount = RefitAndOptimize((&node->ChildA)[i], out (&node->A)[i]);
-                    targetIndex += childDescendantCount - 1;
-                    descendantCount += childDescendantCount;
-                }
-                BoundingBox.Merge(ref (&node->A)[i], ref boundingBox, out boundingBox);
-            }
-            return descendantCount;
-        }
-
-        public unsafe void RefitAndOptimize()
-        {
-            //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
-            var rootChildren = &nodes->ChildA;
-            var rootBounds = &nodes->A;
-            int targetIndex = 1;
-            for (int i = 0; i < nodes->ChildCount; ++i)
-            {
-                if (rootChildren[i] >= 0)
-                {
-                    if (rootChildren[i] != targetIndex)
-                    {
-                        SwapNodes(rootChildren[i], targetIndex);
-                    }
-                    var childDescendantCount = RefitAndOptimize(rootChildren[i], out rootBounds[i]);
-                    targetIndex += childDescendantCount - 1;
-                }
-            }
-        }
     }
+
 }

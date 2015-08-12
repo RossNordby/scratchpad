@@ -248,6 +248,7 @@ namespace SIMDPrototyping.Trees
         public int ChildCount;
         public int Parent;
         public int IndexInParent;
+        public int RefineFlag;
     }
 #endif
 }
