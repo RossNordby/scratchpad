@@ -95,7 +95,7 @@ namespace SIMDPrototyping.Trees.Tests
                 int nodeCount, childCount;
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
 
                 tree.Validate();
 
@@ -134,57 +134,103 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                for (int i = 0; i < 5; ++i)
-                {
-                    spareNodes.Count = 0;
+                //for (int i = 0; i < 5; ++i)
+                //{
+                //    spareNodes.Count = 0;
 
 
-                    //tree.SweepRefine(0, ref spareNodes, out nodesInvalidated);
-                    //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
+                //    //tree.SweepRefine(0, ref spareNodes, out nodesInvalidated);
+                //    //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
-                    tree.BottomUpBinnedRefine(maximumSubtrees);
-                    tree.TopDownBinnedRefine(maximumSubtrees);
-                    //tree.BottomUpSweepRefine();
-                    //tree.TopDownSweepRefine();
-                    //tree.BottomUpAgglomerativeRefine();
-                    //tree.Refit();
-                    //tree.BottomUpRefine();
-                    //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
-                    //tree.Validate();
-                }
+                //    tree.BottomUpBinnedRefine(maximumSubtrees);
+                //    tree.TopDownBinnedRefine(maximumSubtrees);
+                //    //tree.BottomUpSweepRefine();
+                //    //tree.TopDownSweepRefine();
+                //    //tree.BottomUpAgglomerativeRefine();
+                //    //tree.Refit();
+                //    //tree.BottomUpRefine();
+                //    //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                //    //tree.Validate();
+                //}
 
 
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                tree.RemoveUnusedInternalNodes(ref spareNodes);
                 Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
-                region.Dispose();
-                BufferPools<int>.Thread.GiveBack(buffer);
 
-                Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
 
-                for (int i = 0; i < leaves.Length - 1; ++i)
-                {
-                    tree.IncrementalCacheOptimizeMultithreaded(i);
-                }
+
+                //**************** Incremental Testing
+                //for (int i = 0; i < leaves.Length - 1; ++i)
+                //{
+                //    tree.IncrementalCacheOptimizeMultithreaded(i);
+                //}
                 //tree.Validate();
                 //var oldTree = tree;
                 //tree = tree.CreateOptimized();
                 //oldTree.Dispose();
                 //tree.Validate();
-                //Console.WriteLine($"Cost heuristic: {tree.MeasureCostMetric()}");
+                //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 100; ++t)
+                for (int t = 0; t < 1024; ++t)
                 {
-                    for (int i = 0; i < leaves.Length - 1; ++i)
+                    //var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+
+                    tree.Refit();
+                    //if (t < 500)
                     {
-                        tree.IncrementalCacheOptimizeMultithreaded(i);
+                        const int skip = 1024;
+                        var startIndex = (t * 257) % skip;
+                        for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        {
+                            tree.BinnedRefine(i, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
+                        }
+                        tree.RemoveUnusedInternalNodes(ref spareNodes);
                     }
+                    ////Do a uniform distribution of cache optimizers, too.
+                    //const int offsetMax = 16;
+                    //var offset = t % offsetMax;
+                    //for (int i = offset; i < tree.NodeCount; i += 16)
+                    //{
+                    //    tree.IncrementalCacheOptimize(i);
+                    //}
+
+                    {
+
+                        const int skip = 4096;
+                        const int intervalLength = 1024;
+                        var startIndex = (t * intervalLength) % skip;
+                        for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        {
+                            var end = Math.Min(tree.NodeCount, i + intervalLength);
+                            for (int j = i; j < end; ++j)
+                            {
+                                tree.IncrementalCacheOptimizeMultithreaded(j);
+                            }
+                        }
+                    }
+                    //var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    //if (t % 64 == 0)
+                    //{
+                    //    Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");
+                    //    Console.WriteLine($"Refine/Optimize Time: {endTimeInner - startTimeInner}");
+                    //    Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+
+                    //}
+                    //tree.Validate();
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 tree.Validate();
                 Console.WriteLine($"Incremental Cache Optimize Time: {endTime - startTime}");
                 Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
+                Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+
+                region.Dispose();
+                tree.RemoveUnusedInternalNodes(ref spareNodes);
+                BufferPools<int>.Thread.GiveBack(buffer);
+
+                //********************
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");

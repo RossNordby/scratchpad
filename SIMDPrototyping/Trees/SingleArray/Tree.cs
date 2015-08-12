@@ -136,6 +136,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+        public int NodeCount
+        {
+            get
+            {
+                return nodeCount;
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int AddLeaf(int id, int nodeIndex, int childIndex, out bool leavesInvalidated)
         {
@@ -154,7 +162,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             leaf->ChildIndex = childIndex;
             return leafCount++;
         }
-        
+
 
         /// <summary>
         /// Constructs an empty tree.
@@ -198,10 +206,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (leafCount < 0)
                 this.leafCount = leaves.Length;
             if (nodeCount < 0)
-                this.nodeCount = nodes.Length; 
-            
+                this.nodeCount = nodes.Length;
+
         }
-        
+
 
         //Node initialNode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
