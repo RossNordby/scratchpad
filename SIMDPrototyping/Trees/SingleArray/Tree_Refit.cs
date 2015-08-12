@@ -11,7 +11,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
-   
+
 
         unsafe void Refit(int nodeIndex, out BoundingBox boundingBox)
         {
@@ -214,6 +214,49 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     Refit(rootChildren[i], out rootBounds[i]);
                 }
+            }
+        }
+
+
+
+
+        unsafe struct StackElement
+        {
+            public int NodeIndex;
+            public BoundingBox* ParentBounds;
+        }
+
+        public unsafe void RefitNonrecursive2()
+        {
+            if (nodes->ChildCount < 2)
+            {
+                Debug.Assert(nodes->ChildCount == 0 || (nodes->ChildCount == 1 && nodes->ChildA < 0), "If there is only one child in a node, it should be a leaf- otherwise this node is a waste.");
+                //Nothing to refit.
+                return;
+            }
+            var stack = stackalloc StackElement[512];
+            int count = 1;
+            BoundingBox standin;
+            stack[0].NodeIndex = 0;
+            stack[0].ParentBounds = &standin;
+            while (count > 0)
+            {
+                var stackElement = stack[--count];
+                var node = nodes + stackElement.NodeIndex;
+
+                var bounds = &node->A;
+                var children = &node->ChildA;
+                var lastIndex = node->ChildCount - 1;
+                for (int i = lastIndex; i >= 0; --i)
+                {
+                    var index = count++;
+                    stack[index].NodeIndex = children[i];
+                    stack[index].ParentBounds = bounds + i;
+                }
+                
+                //todo: this doesnt work- should do this on pop, but we incorrectly pop early
+                BoundingBox.Merge(ref node->A, ref node->B, out *stackElement.ParentBounds);
+
             }
         }
 
