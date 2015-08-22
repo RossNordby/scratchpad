@@ -234,7 +234,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Nothing to refit.
                 return;
             }
-            var stack = stackalloc StackElement[512];
+            var stack = stackalloc StackElement[64];
             int count = 1;
             BoundingBox standin;
             stack[0].NodeIndex = 0;
@@ -242,22 +242,52 @@ namespace SIMDPrototyping.Trees.SingleArray
             while (count > 0)
             {
                 var endOfStack = count - 1;
-                var stackElement = stack[endOfStack];
-                var node = nodes + stackElement.NodeIndex;
+                var stackElement = stack + endOfStack;
 
-                var bounds = &node->A;
-                var children = &node->ChildA;
-                //Note backwards order to ensure proper prefix traversal.
-                var lastIndex = node->ChildCount - 1;
-                for (int i = lastIndex; i >= 0; --i)
+               
+                if (stackElement->NodeIndex >= 0)
                 {
-                    var index = count++;
-                    stack[index].NodeIndex = children[i];
-                    stack[index].ParentBounds = bounds + i;
+                    var node = nodes + stackElement->NodeIndex;
+
+                    var children = &node->ChildA;
+                    var bounds = &node->A;
+
+                    //this is the first time the node is being visited.
+                    //Push all children onto the stack. Note reverse order: ensure that the tree is visited in a cache friendly way (stored as depth first order).
+                    for (int i = node->ChildCount - 1; i >= 0; --i)
+                    {
+                        var childIndex = children[i];
+                        //There is another child to visit. Is it an internal node?
+                        if (childIndex >= 0)
+                        {
+                            //It's an internal node, so enqueue the child.
+                            var newStackElement = stack + count;
+                            newStackElement->NodeIndex = childIndex;
+                            newStackElement->ParentBounds = bounds + i;
+                            ++count;
+                        }
+                    }
+                    stackElement->NodeIndex = Encode(stackElement->NodeIndex);
+                }
+                else
+                {
+                    //Second time visited; children are complete.
+                    var node = nodes + Encode(stackElement->NodeIndex);
+
+
+                    //Merge
+                    BoundingBox.Merge(ref node->A, ref node->B, out *stackElement->ParentBounds);
+                    var bounds = &node->A;
+                    for (int i = 2; i < node->ChildCount; ++i)
+                    {
+                        BoundingBox.Merge(ref *stackElement->ParentBounds, ref bounds[i], out *stackElement->ParentBounds);
+                    }
+                    //Pop
+                    count = endOfStack;
                 }
 
-                //todo: this doesnt work- should do this on pop, but we incorrectly pop early
-                BoundingBox.Merge(ref node->A, ref node->B, out *stackElement.ParentBounds);
+
+
 
             }
         }
