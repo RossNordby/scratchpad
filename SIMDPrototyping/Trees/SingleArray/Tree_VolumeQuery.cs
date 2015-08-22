@@ -48,8 +48,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var stackCapacity = (ChildrenCapacity - 1) * maximumDepth + 1;
             var stack = stackalloc int[stackCapacity];
             int count = 0;
-
-            var boundingBoxWide = new BoundingBoxWide(ref boundingBox);
+            
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             Test(stack, ref count, ref boundingBox, nodes, ref results);
 
@@ -119,6 +118,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 TestRecursivePrecache(internalNodeIndices[i], ref query, ref results);
             }
         }
+        
+
 #if NODE4
 
         struct Precache
@@ -830,6 +831,74 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
         }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void Test2<TResultList>(int* stack, ref int count, ref BoundingBox query, Node* node,
+           ref TResultList results) where TResultList : IList<int>
+        {
+            //Every internal node has at least two children.
+            bool b = BoundingBox.Intersects(ref query, ref node->B);
+            bool a = BoundingBox.Intersects(ref query, ref node->A);
+            //Reverse order for cache.
+            if (b)
+            {
+                if (node->ChildA >= 0)
+                {
+                    stack[count++] = node->ChildA;
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildA));
+                }
+            }
+            if (a)
+            {
+                if (node->ChildB >= 0)
+                {
+                    stack[count++] = node->ChildB;
+                }
+                else
+                {
+                    results.Add(Encode(node->ChildB));
+                }
+            }
+
+            
+        }
+
+
+
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void Query2<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
+        {
+            //TODO: could optimize this by keeping the next target out of the stack.
+            const int stackCapacity = 64;
+            var stack = stackalloc int[stackCapacity];
+            int count = 0;
+
+            if (nodes->ChildCount < 2)
+            {
+                Debug.Assert(nodes->ChildA < 0, "If the root only has one child, it should be a leaf node, otherwise the build process produced a very poor tree.");
+                if (BoundingBox.Intersects(ref boundingBox, ref nodes->A))
+                {
+                    results.Add(Encode(nodes->ChildA));
+                }
+                return;
+            }
+            
+            //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
+            Test(stack, ref count, ref boundingBox, nodes, ref results);
+
+            while (count > 0)
+            {
+                --count;
+                var nodeIndex = stack[count];
+
+                Test(stack, ref count, ref boundingBox, nodes + nodeIndex, ref results);
+            }
+        }
+
 #endif
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

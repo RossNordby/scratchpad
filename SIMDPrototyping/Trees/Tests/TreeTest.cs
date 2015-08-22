@@ -140,7 +140,7 @@ namespace SIMDPrototyping.Trees.Tests
             float leafMinSize = 10;
             float leafMaxSize = 10;
             float leafSizePower = 1;
-            int queryCount = 1;
+            int queryCount = 1000000;
             int selfTestCount = 1;
             int refitCount = 100;
 

@@ -234,8 +234,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
-
-                tree.RefitNonrecursive2();
+                
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < refitCount; ++i)
                 {
@@ -245,7 +244,7 @@ namespace SIMDPrototyping.Trees.Tests
                     //    leaves[tree.Leaves[i].Id].GetBoundingBox(out box);
                     //    tree.UpdateLeafBoundingBox(i, ref box);
                     //}
-                    tree.RefitNonrecursive2();
+                    tree.Refit();
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Refit Time2: {endTime - startTime}");
@@ -257,7 +256,7 @@ namespace SIMDPrototyping.Trees.Tests
                 for (int i = 0; i < queryCount; ++i)
                 {
                     list.Count = 0;
-                    //tree.Query(ref queries[i & queryMask], ref list);
+                    //tree.Query2(ref queries[i & queryMask], ref list);
                     tree.QueryRecursive(ref queries[i & queryMask], ref list);
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
