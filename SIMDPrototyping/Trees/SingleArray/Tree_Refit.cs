@@ -241,11 +241,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             stack[0].ParentBounds = &standin;
             while (count > 0)
             {
-                var stackElement = stack[--count];
+                var endOfStack = count - 1;
+                var stackElement = stack[endOfStack];
                 var node = nodes + stackElement.NodeIndex;
 
                 var bounds = &node->A;
                 var children = &node->ChildA;
+                //Note backwards order to ensure proper prefix traversal.
                 var lastIndex = node->ChildCount - 1;
                 for (int i = lastIndex; i >= 0; --i)
                 {
@@ -253,12 +255,74 @@ namespace SIMDPrototyping.Trees.SingleArray
                     stack[index].NodeIndex = children[i];
                     stack[index].ParentBounds = bounds + i;
                 }
-                
+
                 //todo: this doesnt work- should do this on pop, but we incorrectly pop early
                 BoundingBox.Merge(ref node->A, ref node->B, out *stackElement.ParentBounds);
 
             }
         }
+
+        unsafe struct StackElement2
+        {
+            public int NodeIndex;
+            public int NextChildIndexToVisit;
+            public BoundingBox* ParentBounds;
+        }
+
+        public unsafe void RefitNonrecursive22()
+        {
+            if (nodes->ChildCount < 2)
+            {
+                Debug.Assert(nodes->ChildCount == 0 || (nodes->ChildCount == 1 && nodes->ChildA < 0), "If there is only one child in a node, it should be a leaf- otherwise this node is a waste.");
+                //Nothing to refit.
+                return;
+            }
+            var stack = stackalloc StackElement2[512];
+            int count = 1;
+            BoundingBox standin;
+            stack[0].NodeIndex = 0;
+            stack[0].NextChildIndexToVisit = -1;
+            stack[0].ParentBounds = &standin;
+            while (count > 0)
+            {
+                var endOfStack = count - 1;
+                var stackElement = stack + endOfStack;
+
+
+                var node = nodes + stackElement->NodeIndex;
+
+
+                ++stackElement->NextChildIndexToVisit;
+                if (stackElement->NextChildIndexToVisit < node->ChildCount)
+                {
+                    //There is another child to visit.
+                    var childIndex = (&node->ChildA)[stackElement->NextChildIndexToVisit];
+                    if (childIndex >= 0)
+                    {
+                        //It's an internal node, so enqueue the child.
+                        var newStackElement = stack + count;
+                        newStackElement->NextChildIndexToVisit = -1;
+                        newStackElement->NodeIndex = childIndex;
+                        newStackElement->ParentBounds = &(&node->A)[stackElement->NextChildIndexToVisit];
+                        ++count;
+                    }
+                }
+                else
+                {
+                    //No more children.   
+                    //TODO: could use the node's parent pointers to access the bounds slot directly...
+                    BoundingBox.Merge(ref node->A, ref node->B, out *stackElement->ParentBounds);
+                    count = endOfStack;
+                }
+
+
+
+
+
+
+            }
+        }
+
 
     }
 }
