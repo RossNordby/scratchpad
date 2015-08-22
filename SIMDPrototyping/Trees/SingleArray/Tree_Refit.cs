@@ -38,6 +38,24 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+        unsafe void Refit2(int nodeIndex, out BoundingBox boundingBox)
+        {
+            var node = nodes + nodeIndex;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+
+            if (node->ChildA >= 0)
+            {
+                Refit(node->ChildA, out node->A);
+            }
+            if (node->ChildB >= 0)
+            {
+                Refit(node->ChildB, out node->B);
+            }
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+
+        }
+
         unsafe void RefitCached(int nodeIndex, out BoundingBox boundingBox)
         {
             var node = nodes + nodeIndex;
@@ -212,7 +230,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (rootChildren[i] >= 0)
                 {
+#if NODE2
+                    Refit2(rootChildren[i], out rootBounds[i]);
+#else
                     Refit(rootChildren[i], out rootBounds[i]);
+#endif
                 }
             }
         }
@@ -239,12 +261,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             BoundingBox standin;
             stack[0].NodeIndex = 0;
             stack[0].ParentBounds = &standin;
+
             while (count > 0)
             {
                 var endOfStack = count - 1;
                 var stackElement = stack + endOfStack;
 
-               
+
                 if (stackElement->NodeIndex >= 0)
                 {
                     var node = nodes + stackElement->NodeIndex;
