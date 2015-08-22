@@ -277,7 +277,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Nothing to refit.
                 return;
             }
-            var stack = stackalloc StackElement2[512];
+            var stack = stackalloc StackElement2[64];
             int count = 1;
             BoundingBox standin;
             stack[0].NodeIndex = 0;
@@ -291,12 +291,21 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                 var node = nodes + stackElement->NodeIndex;
 
+                var children = &node->ChildA;
 
-                ++stackElement->NextChildIndexToVisit;
-                if (stackElement->NextChildIndexToVisit < node->ChildCount)
+                while (true)
                 {
-                    //There is another child to visit.
-                    var childIndex = (&node->ChildA)[stackElement->NextChildIndexToVisit];
+                    ++stackElement->NextChildIndexToVisit;
+                    if (stackElement->NextChildIndexToVisit >= node->ChildCount)
+                    {
+                        //No more children.   
+                        //TODO: could use the node's parent pointers to access the bounds slot directly...
+                        BoundingBox.Merge(ref node->A, ref node->B, out *stackElement->ParentBounds);
+                        count = endOfStack;
+                        break;
+                    }
+                    var childIndex = children[stackElement->NextChildIndexToVisit];
+                    //There is another child to visit. Is it an internal node?
                     if (childIndex >= 0)
                     {
                         //It's an internal node, so enqueue the child.
@@ -305,15 +314,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                         newStackElement->NodeIndex = childIndex;
                         newStackElement->ParentBounds = &(&node->A)[stackElement->NextChildIndexToVisit];
                         ++count;
+                        break;
                     }
+
                 }
-                else
-                {
-                    //No more children.   
-                    //TODO: could use the node's parent pointers to access the bounds slot directly...
-                    BoundingBox.Merge(ref node->A, ref node->B, out *stackElement->ParentBounds);
-                    count = endOfStack;
-                }
+
 
 
 
