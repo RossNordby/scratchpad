@@ -824,7 +824,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 #endif
-
-
+    
     }
 }

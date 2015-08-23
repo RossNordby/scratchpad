@@ -30,9 +30,10 @@ namespace SIMDPrototyping.Trees.Tests
             var sizeRange = maximumSize - minimumSize;
             for (int i = 0; i < leafCount; ++i)
             {
-                var leafSize = minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange;
-                var min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
-                var max = min + leafSize;
+                var halfLeafSize = 0.5f * (minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange);
+                var position = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
+                var min = position - halfLeafSize;
+                var max = position + halfLeafSize;
 
                 leaves[i] = new TestCollidableBEPU();
                 leaves[i].BoundingBox = new BEPUutilities.BoundingBox(new BEPUutilities.Vector3(min.X, min.Y, min.Z), new BEPUutilities.Vector3(max.X, max.Y, max.Z));
@@ -50,10 +51,9 @@ namespace SIMDPrototyping.Trees.Tests
             var sizeRange = maximumSize - minimumSize;
             for (int i = 0; i < leafCount; ++i)
             {
-                var leafSize = minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange;
                 leaves[i] = new TestCollidable();
-                leaves[i].BoundingBox.Min = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
-                leaves[i].BoundingBox.Max = leaves[i].BoundingBox.Min + leafSize;
+                leaves[i].HalfSize = 0.5f * (minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange);
+                leaves[i].Position = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
 
             }
             return leaves;
@@ -92,8 +92,8 @@ namespace SIMDPrototyping.Trees.Tests
                     for (int k = 0; k < length; ++k)
                     {
                         var collidable = new TestCollidable();
-                        collidable.BoundingBox.Min = new Vector3(i * offset, j * offset, k * offset);
-                        collidable.BoundingBox.Max = collidable.BoundingBox.Min + new Vector3(size);
+                        collidable.HalfSize = new Vector3(size * 0.5f);
+                        collidable.Position = collidable.HalfSize + new Vector3(i * offset, j * offset, k * offset);
                         leaves[height * length * i + length * j + k] = collidable;
                     }
                 }
@@ -184,7 +184,7 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestSingleArray(leaves, queries, queryCount, selfTestCount, refitCount);
+                TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount);
             }
 
             {
