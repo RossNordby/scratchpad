@@ -598,6 +598,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
+
             //CollectSubtreesDirect(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             //Console.WriteLine($"Number of subtrees: {subtreeReferences.Count}");
 
@@ -656,7 +657,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (true)//newTreeletCost < originalTreeletCost)
+            if (newTreeletCost < originalTreeletCost)
             {
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
@@ -765,6 +766,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             spareNodes.Dispose();
             region.Dispose();
             pool.GiveBack(buffer);
+        }
+
+
+        public unsafe void PartialRefine()
+        {
         }
     }
 }

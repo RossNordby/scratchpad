@@ -213,7 +213,7 @@ namespace SIMDPrototyping.Trees.Tests
                     tree.Refit();
                     //if (t < 500)
                     {
-                        const int skip = 9999999;
+                        const int skip = 99999999;
                         var startIndex = 0;// (t * 257) % skip;
                         for (int i = startIndex; i < tree.NodeCount; i += skip)
                         {
@@ -237,7 +237,7 @@ namespace SIMDPrototyping.Trees.Tests
                         }
                     }
                     var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                    if (t % 64 == 0)
+                    if (t % 16 == 0)
                     {
                         Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");
                         Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");

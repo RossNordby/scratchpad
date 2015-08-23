@@ -26,7 +26,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             Count = 0;
         }
 
-    
+
         public unsafe void Insert(Node* node, Node* nodes, ref QuickList<int> subtrees)
         {
             var children = &node->ChildA;
@@ -59,7 +59,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     var entry = Entries + index;
                     entry->Index = children[childIndex];
                     entry->Cost = cost;
-                    
+
                 }
                 else
                 {
@@ -76,7 +76,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             entry = Entries[0];
             --Count;
             var cost = Entries[Count].Cost;
-            
+
             //Pull the elements up to fill in the gap.
             int index = 0;
             while (true)
@@ -127,7 +127,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             //Move the last entry into position.
             Entries[index] = Entries[Count];
-            
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -141,9 +141,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 SubtreeHeapEntry entry;
                 Pop(out entry);
                 var node = nodes + entry.Index;
-                var changeInChildCount = node->ChildCount - 1;
+                var changeInChildCount = remainingSubtreeSpace - node->ChildCount == 0 ? node->ChildCount : node->ChildCount - 1;
                 if (remainingSubtreeSpace >= changeInChildCount)
                 {
+                    //This node's children can be included successfully in the remaining space.
                     index = entry.Index;
                     cost = entry.Cost;
                     remainingSubtreeSpace -= changeInChildCount;
@@ -152,6 +153,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 else
                 {
                     //Since we won't be able to find this later, it needs to be added now.
+                    //We popped the previous entry off the queue, so the remainingSubtreeSpace does not change by re-adding it.
+                    //(remainingSubtreeSpace = maximumSubtreesCount - (priorityQueue.Count + subtrees.Count))
                     subtrees.Add(entry.Index);
                 }
             }
@@ -160,7 +163,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             return false;
         }
     }
-    
+
     partial class Tree
     {
 
@@ -177,7 +180,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var node = nodes + nodeIndex;
             Debug.Assert(maximumSubtrees >= node->ChildCount, "Can't only consider some of a node's children, but specified maximumSubtrees precludes the treelet root's children.");
             //All of treelet root's children are included immediately. (Follows from above requirement.)
-            
+
             var priorityQueue = new SubtreeBinaryHeap(entries);
 
             priorityQueue.Insert(node, nodes, ref subtrees);
