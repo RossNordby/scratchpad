@@ -128,7 +128,7 @@ namespace SIMDPrototyping.Trees.Tests
                 int[] buffer;
                 MemoryRegion region;
                 BinnedResources resources;
-                const int maximumSubtrees = 1024;
+                const int maximumSubtrees = 262144;
                 QuickList<int> spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 QuickList<int> subtreeReferences = new QuickList<int>(new BufferPool<int>(), BufferPool<int>.GetPoolIndex(maximumSubtrees));
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
@@ -179,7 +179,7 @@ namespace SIMDPrototyping.Trees.Tests
                 {
                     leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);
                 }
-                const float dt = 1 / 60f;
+                const float dt = 1f / 60f;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int t = 0; t < 1024; ++t)
                 {
@@ -221,13 +221,16 @@ namespace SIMDPrototyping.Trees.Tests
                         //    subtreeReferences.Count = 0;
                         //    tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
                         //}
-                        //tree.RemoveUnusedInternalNodes(ref spareNodes);
+
+                        subtreeReferences.Count = 0;
+                        tree.BinnedRefine(0, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
 
                         //tree.PartialRefine(t, 2000, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
-                        //tree.RemoveUnusedInternalNodes(ref spareNodes);
 
 
-                        tree.RefineTest(maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
+                        //tree.RecursiveRefine(maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
+
+                        //tree.RefitRefine(maximumSubtrees, 1.1f);
                         tree.RemoveUnusedInternalNodes(ref spareNodes);
                     }
 

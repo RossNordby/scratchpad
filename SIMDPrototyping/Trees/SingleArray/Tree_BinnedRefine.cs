@@ -559,6 +559,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //The resource memory could contain arbitrary data.
             //ChildCount will be read, so zero it out.
             stagingNode->ChildCount = 0;
+            stagingNode->PreviousVolume = ComputeBoundsMetric(ref boundingBox);
 
             if (count <= ChildrenCapacity)
             {
@@ -657,7 +658,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (newTreeletCost < originalTreeletCost)
+            if (true) // newTreeletCost < originalTreeletCost)
             {
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
@@ -811,7 +812,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             subtreeReferences.Dispose();
         }
 
-        public unsafe void RefineTest(int nodeIndex, int maximumSubtrees, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        unsafe void RecursiveRefine(int nodeIndex, int maximumSubtrees, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
             QuickList<int> subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
 
@@ -827,7 +828,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (subtreeReferences.Elements[i] >= 0)
                 {
-                    RefineTest(subtreeReferences.Elements[i], maximumSubtrees, ref spareNodes, ref binnedResources, out invalidated);
+                    RecursiveRefine(subtreeReferences.Elements[i], maximumSubtrees, ref spareNodes, ref binnedResources, out invalidated);
                     if (invalidated)
                     {
                         nodesInvalidated = true;
@@ -838,9 +839,84 @@ namespace SIMDPrototyping.Trees.SingleArray
             subtreeReferences.Dispose();
         }
 
-        public unsafe void RefineTest(int maximumSubtrees, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        public unsafe void RecursiveRefine(int maximumSubtrees, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
-            RefineTest(0, maximumSubtrees, ref spareNodes, ref binnedResources, out nodesInvalidated);
+            RecursiveRefine(0, maximumSubtrees, ref spareNodes, ref binnedResources, out nodesInvalidated);
+        }
+
+
+        public unsafe void RefitRefine(int maximumSubtrees, float threshold)
+        {
+            var pool = BufferPools<int>.Thread;
+            var spareNodes = new QuickList<int>(pool, 8);
+            var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+            int[] buffer;
+            MemoryRegion region;
+            BinnedResources resources;
+            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
+
+
+            BoundingBox boundingBox;
+            bool nodesInvalidated;
+            RefitRefine(0, maximumSubtrees, threshold, ref subtreeReferences, ref spareNodes, ref resources, out boundingBox, out nodesInvalidated);
+
+
+            RemoveUnusedInternalNodes(ref spareNodes);
+            region.Dispose();
+            pool.GiveBack(buffer);
+            spareNodes.Dispose();
+        }
+
+
+        unsafe void RefitRefine(int nodeIndex, int maximumSubtrees, float threshold,
+            ref QuickList<int> subtreeReferences, ref QuickList<int> spareNodes, ref BinnedResources resources, out BoundingBox boundingBox, out bool nodesInvalidated)
+        {
+            var node = nodes + nodeIndex;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+            nodesInvalidated = false;
+
+        
+
+            if (node->ChildA >= 0)
+            {
+                bool invalidated;
+                RefitRefine(node->ChildA, maximumSubtrees, threshold, ref subtreeReferences, ref spareNodes, ref resources, out node->A, out invalidated);
+                if (invalidated)
+                {
+                    node = nodes + nodeIndex;
+                    nodesInvalidated = true;
+                }
+            }
+            if (node->ChildB >= 0)
+            {
+                bool invalidated;
+                RefitRefine(node->ChildB, maximumSubtrees, threshold, ref subtreeReferences, ref spareNodes, ref resources, out node->B, out invalidated);
+                if (invalidated)
+                {
+                    node = nodes + nodeIndex;
+                    nodesInvalidated = true;
+                }
+            }
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+
+            //TODO: doing this ahead of time would save a lot of time. Consider what happens when a leaf node gets teleported- you can get a chain of refines all the way to the root without a lot of benefit.
+            //Youw ill be using out of date information to refine on, though. uncf.
+
+            //BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            var metric = ComputeBoundsMetric(ref boundingBox);
+            if (metric > node->PreviousVolume * threshold)
+            {
+                bool invalidated;
+                BinnedRefine(nodeIndex, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out invalidated);
+                BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+                node->PreviousVolume = ComputeBoundsMetric(ref boundingBox);
+                subtreeReferences.Count = 0;
+                if (invalidated)
+                    nodesInvalidated = true;
+            }
+
+
         }
     }
 }

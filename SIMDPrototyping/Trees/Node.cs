@@ -249,6 +249,7 @@ namespace SIMDPrototyping.Trees
         public int Parent;
         public int IndexInParent;
         public int RefineFlag;
+        public float PreviousVolume;
     }
 #endif
 }
