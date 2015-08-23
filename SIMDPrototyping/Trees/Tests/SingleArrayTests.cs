@@ -129,7 +129,7 @@ namespace SIMDPrototyping.Trees.Tests
                 int[] buffer;
                 MemoryRegion region;
                 BinnedResources resources;
-                const int maximumSubtrees = 262144;
+                const int maximumSubtrees = 1024;
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -213,12 +213,15 @@ namespace SIMDPrototyping.Trees.Tests
                     tree.Refit();
                     //if (t < 500)
                     {
-                        const int skip = 99999999;
-                        var startIndex = 0;// (t * 257) % skip;
-                        for (int i = startIndex; i < tree.NodeCount; i += skip)
-                        {
-                            tree.BinnedRefine(i, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
-                        }
+                        //const int skip = 99999999;
+                        //var startIndex = 0;// (t * 257) % skip;
+                        //for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        //{
+                        //    tree.BinnedRefine(i, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
+                        //}
+                        //tree.RemoveUnusedInternalNodes(ref spareNodes);
+
+                        tree.PartialRefine(t, 8, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
                         tree.RemoveUnusedInternalNodes(ref spareNodes);
                     }
 

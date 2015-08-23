@@ -769,8 +769,43 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        public unsafe void PartialRefine()
+        unsafe void PartialRefine(int index, int depth, int offset, int skip, ref QuickList<int> spareNodes, int maximumSubtrees, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
+            nodesInvalidated = false;
+            var node = nodes + index;
+            var children = &node->ChildA;
+            int nextDepth = depth + 1;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    bool childNodesInvalidated;
+                    PartialRefine(children[i], nextDepth, offset, skip, ref spareNodes, maximumSubtrees, ref binnedResources, out childNodesInvalidated);
+                    if (childNodesInvalidated)
+                    {
+                        node = nodes + index;
+                        children = &node->ChildA;
+                        nodesInvalidated = true;
+                    }
+                }
+            }
+
+            //Do a bottom-up refit.
+            if (depth == 0 || (depth + offset) % skip == 0)
+            {
+                bool currentNodesInvalidated;
+                BinnedRefine(index, ref spareNodes, maximumSubtrees, ref binnedResources, out currentNodesInvalidated);
+                if (currentNodesInvalidated)
+                {
+                    nodesInvalidated = true;
+                }
+            }
+
+
+        }
+        public unsafe void PartialRefine(int offset, int skip, ref QuickList<int> spareNodes, int maximumSubtrees, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        {
+            PartialRefine(0, 0, offset, skip, ref spareNodes, maximumSubtrees, ref binnedResources, out nodesInvalidated);
         }
     }
 }
