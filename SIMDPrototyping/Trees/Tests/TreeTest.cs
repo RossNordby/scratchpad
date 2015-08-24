@@ -32,11 +32,11 @@ namespace SIMDPrototyping.Trees.Tests
             {
                 var halfLeafSize = 0.5f * (minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange);
                 var position = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
-                var min = position - halfLeafSize;
-                var max = position + halfLeafSize;
 
                 leaves[i] = new TestCollidableBEPU();
-                leaves[i].BoundingBox = new BEPUutilities.BoundingBox(new BEPUutilities.Vector3(min.X, min.Y, min.Z), new BEPUutilities.Vector3(max.X, max.Y, max.Z));
+                leaves[i].Position = new BEPUutilities.Vector3(position.X, position.Y, position.Z);
+                leaves[i].HalfSize = new BEPUutilities.Vector3(halfLeafSize.X, halfLeafSize.Y, halfLeafSize.Z);
+                leaves[i].UpdateBoundingBox();
             }
             return leaves;
 
@@ -142,7 +142,7 @@ namespace SIMDPrototyping.Trees.Tests
             float leafSizePower = 1;
             int queryCount = 1000000;
             int selfTestCount = 1;
-            int refitCount = 100;
+            int refitCount = 1;
 
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
@@ -184,7 +184,8 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount);
+                //TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount);
+
             }
 
             {
@@ -198,6 +199,8 @@ namespace SIMDPrototyping.Trees.Tests
 
                 GC.Collect();
                 //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
+                TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount);
+
             }
 
         }

@@ -214,7 +214,7 @@ namespace SIMDPrototyping.Trees.Tests
                     tree.Refit();
                     //if (t < 500)
                     {
-                        const int skip = 32;
+                        const int skip = 64;
                         var startIndex = (int)((t * 79151L) % skip);
                         for (int i = startIndex; i < tree.NodeCount; i += skip)
                         {
@@ -239,7 +239,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                     {
 
-                        const int skip = 4096;
+                        const int skip = 1024;
                         const int intervalLength = 1024;
                         var startIndex = (t * intervalLength) % skip;
                         for (int i = startIndex; i < tree.NodeCount; i += skip)

@@ -38,7 +38,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 BoundingBox.Merge(ref rootBounds[i], ref merged, out merged);
             }
-            float rootHeuristic = ComputeBoundsMetric(ref merged);
+            float rootMetric = ComputeBoundsMetric(ref merged);
 
             const float leafCost = 1;
             const float internalNodeCost = 1;
@@ -64,7 +64,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
                 }
             }
-            return totalCost / rootHeuristic;
+            return totalCost / rootMetric;
 
         }
 
