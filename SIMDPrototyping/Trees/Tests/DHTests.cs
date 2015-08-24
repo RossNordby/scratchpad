@@ -67,14 +67,14 @@ namespace SIMDPrototyping.Trees.Tests
 
 
                 Random random = new Random(5);
-                const float maxVelocity = 100;
+                const float maxVelocity = 10;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f) * 2);
                 }
                 const float dt = 1f / 60f;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 1024; ++t)
+                for (int t = 0; t < 16384; ++t)
                 {
                     //Update the positions of objects.
                     for (int i = 0; i < leaves.Length; ++i)
@@ -106,7 +106,7 @@ namespace SIMDPrototyping.Trees.Tests
                     var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     if (t % 16 == 0)
                     {
-                        Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                        Console.WriteLine($"Cost metric {t}: {tree.MeasureCostMetric()}");
                         Console.WriteLine($"Refit/Revalidate time: {endTimeInner - startTimeInner}");
 
                     }

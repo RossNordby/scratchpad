@@ -812,7 +812,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             subtreeReferences.Dispose();
         }
 
-        unsafe void RecursiveRefine(int nodeIndex, int maximumSubtrees, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        unsafe void RecursiveRefine(int nodeIndex, int maximumSubtrees, ref int treeSizeSeed, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
             QuickList<int> subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
 
@@ -839,9 +839,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             subtreeReferences.Dispose();
         }
 
-        public unsafe void RecursiveRefine(int maximumSubtrees, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        public unsafe void RecursiveRefine(int maximumSubtrees, int treeSizeSeed, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
-            RecursiveRefine(0, maximumSubtrees, ref spareNodes, ref binnedResources, out nodesInvalidated);
+            RecursiveRefine(0, maximumSubtrees, ref treeSizeSeed, ref spareNodes, ref binnedResources, out nodesInvalidated);
         }
 
 

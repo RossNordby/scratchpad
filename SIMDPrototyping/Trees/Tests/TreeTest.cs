@@ -141,7 +141,7 @@ namespace SIMDPrototyping.Trees.Tests
             float leafMaxSize = 10;
             float leafSizePower = 1;
             int queryCount = 1000000;
-            int selfTestCount = 1;
+            int selfTestCount = 10;
             int refitCount = 1;
 
             Vector3 querySize = new Vector3(20);
@@ -184,7 +184,7 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                //TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount);
+                TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount);
 
             }
 
@@ -199,7 +199,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 GC.Collect();
                 //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
-                TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount);
+                //TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount);
 
             }
 

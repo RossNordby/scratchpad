@@ -181,7 +181,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 const float dt = 1f / 60f;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 1024; ++t)
+                for (int t = 0; t < 4096; ++t)
                 {
                     //Update the positions of objects.
                     for (int i = 0; i < tree.LeafCount; ++i)
@@ -212,29 +212,57 @@ namespace SIMDPrototyping.Trees.Tests
                     var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     tree.Refit();
+                    
                     //if (t < 500)
                     {
-                        const int skip = 64;
-                        var startIndex = (int)((t * 79151L) % skip);
-                        for (int i = startIndex; i < tree.NodeCount; i += skip)
-                        {
-                            subtreeReferences.Count = 0;
-                            tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
-                        }
+                        //const int skip = 8;
+                        //var startIndex = (int)((t * 79151L) % skip);
+                        //for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        //{
+                        //    subtreeReferences.Count = 0;
+                        //    //Avoid refitting any node which doesn't have enough children to warrant a full refine.
+                        //    var node = tree.Nodes[i];
+                        //    var leafCounts = &node.LeafCountA;
+                        //    int leafCount = 0;
+                        //    for (int childIndex = 0; childIndex < node.ChildCount; ++childIndex)
+                        //    {
+                        //        leafCount += leafCounts[childIndex];
+                        //    }
+                        //    if (leafCount > Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
+                        //    {
+                        //        tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
+                        //    }
+                        //}
 
 
                         //tree.PartialRefine(t, 2000, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
 
 
-                        //tree.RecursiveRefine(maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
+                        tree.RecursiveRefine(maximumSubtrees, t, ref spareNodes, ref resources, out nodesInvalidated);
 
                         //tree.RefitRefine(maximumSubtrees, 1.1f);
 
                         //subtreeReferences.Count = 0;
-                        //tree.BinnedRefine(0, ref subtreeReferences, 1024, ref spareNodes, ref resources, out nodesInvalidated);
+                        //tree.BinnedRefine(0, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out nodesInvalidated);
 
 
                         tree.RemoveUnusedInternalNodes(ref spareNodes);
+
+
+                        //const int skip = 4;
+                        //var startIndex = (int)((t * 79151L) % skip);
+                        //for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        //{
+                        //    subtreeReferences.Count = 0;
+                        //    var leaf = tree.Leaves[i];
+                        //    BoundingBox boundingBox;
+                        //    tree.GetLeafBoundingBox(i, out boundingBox);
+                        //    tree.RemoveAt(i);
+
+                        //    tree.Add(leaf.Id, ref boundingBox);
+                            
+                            
+                        //}
                     }
 
                     {
