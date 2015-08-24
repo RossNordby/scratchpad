@@ -36,7 +36,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (children[childIndex] >= 0)
                 {
                     int index = Count;
-                    var cost = Tree.ComputeBoundsMetric(ref bounds[childIndex]);
+                    var cost = Tree.ComputeBoundsMetric(ref bounds[childIndex]);// - node->PreviousMetric;
                     ++Count;
 
                     //Sift up.

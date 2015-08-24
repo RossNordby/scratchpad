@@ -559,7 +559,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //The resource memory could contain arbitrary data.
             //ChildCount will be read, so zero it out.
             stagingNode->ChildCount = 0;
-            stagingNode->PreviousVolume = ComputeBoundsMetric(ref boundingBox);
+            stagingNode->PreviousMetric = ComputeBoundsMetric(ref boundingBox);
 
             if (count <= ChildrenCapacity)
             {
@@ -905,12 +905,12 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
             var metric = ComputeBoundsMetric(ref boundingBox);
-            if (metric > node->PreviousVolume * threshold)
+            if (metric > node->PreviousMetric * threshold)
             {
                 bool invalidated;
                 BinnedRefine(nodeIndex, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref resources, out invalidated);
                 BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
-                node->PreviousVolume = ComputeBoundsMetric(ref boundingBox);
+                node->PreviousMetric = ComputeBoundsMetric(ref boundingBox);
                 subtreeReferences.Count = 0;
                 if (invalidated)
                     nodesInvalidated = true;
