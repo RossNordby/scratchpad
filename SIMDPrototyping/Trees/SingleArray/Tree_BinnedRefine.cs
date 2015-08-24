@@ -816,9 +816,14 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             QuickList<int> subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
 
+            //Vary the size between 0.5 and 1 times the maximumSubtrees.
+            ulong halfMaximumSubtrees = (ulong)(maximumSubtrees / 2);
+            ++treeSizeSeed;
+            var size = ((ulong)(treeSizeSeed * treeSizeSeed) * 413158511UL + 735632797UL) % halfMaximumSubtrees;
+            var targetSubtreeCount = (int)(size + halfMaximumSubtrees);
             nodesInvalidated = false;
             bool invalidated;
-            BinnedRefine(nodeIndex, ref subtreeReferences, maximumSubtrees, ref spareNodes, ref binnedResources, out invalidated);
+            BinnedRefine(nodeIndex, ref subtreeReferences, targetSubtreeCount, ref spareNodes, ref binnedResources, out invalidated);
             if (invalidated)
             {
                 nodesInvalidated = true;
@@ -828,7 +833,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (subtreeReferences.Elements[i] >= 0)
                 {
-                    RecursiveRefine(subtreeReferences.Elements[i], maximumSubtrees, ref spareNodes, ref binnedResources, out invalidated);
+                    RecursiveRefine(subtreeReferences.Elements[i], maximumSubtrees, ref treeSizeSeed, ref spareNodes, ref binnedResources, out invalidated);
                     if (invalidated)
                     {
                         nodesInvalidated = true;
@@ -876,7 +881,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(node->ChildCount >= 2);
             nodesInvalidated = false;
 
-        
+
 
             if (node->ChildA >= 0)
             {
