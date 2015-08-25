@@ -132,6 +132,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
                 var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+                RawList<int> treeletInternalNodesCopy = new RawList<int>(maximumSubtrees);
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -162,6 +163,7 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
 
+                var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
 
                 //**************** Incremental Testing
                 //for (int i = 0; i < leaves.Length - 1; ++i)
@@ -213,13 +215,14 @@ namespace SIMDPrototyping.Trees.Tests
                     var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     tree.Refit();
-
                     //if (t < 500)
                     {
                         //tree.RefitRefine(maximumSubtrees, 1.5f);
 
                         const int skip = 8;
                         var startIndex = (int)((t * 79151L) % skip);
+                        int numberOfDuplicates = 0;
+                        int refinementCount = 0;
                         for (int i = startIndex; i < tree.NodeCount; i += skip)
                         {
                             subtreeReferences.Count = 0;
@@ -232,11 +235,24 @@ namespace SIMDPrototyping.Trees.Tests
                             {
                                 leafCount += leafCounts[childIndex];
                             }
-                            if (leafCount > Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
+                            if (true)//leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                             {
-                                tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                                tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                                ++refinementCount;
+                                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                                {
+                                    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
+                                    {
+                                        ++numberOfDuplicates;
+                                    }
+                                }
                             }
                         }
+                        Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
+                        Console.WriteLine($"Refinement count: {refinementCount}");
+                        Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)tree.NodeCount}");
+                        Console.WriteLine($"Fraction of duplicates visited: {numberOfDuplicates / (double)visitedNodes.Count}");
+                        visitedNodes.FastClear();
 
 
                         //tree.PartialRefine(t, 2000, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
@@ -263,8 +279,8 @@ namespace SIMDPrototyping.Trees.Tests
                         //    tree.RemoveAt(i);
 
                         //    tree.Add(leaf.Id, ref boundingBox);
-                            
-                            
+
+
                         //}
                     }
 
