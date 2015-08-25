@@ -247,24 +247,24 @@ namespace SIMDPrototyping.Trees.Tests
                                 if (random.NextDouble() >= p)
                                 //if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                                 {
-                                    tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
-                                    //tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
-                                    //++refinementCount;
-                                    //for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
-                                    //{
-                                    //    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
-                                    //    {
-                                    //        ++numberOfDuplicates;
-                                    //    }
-                                    //}
+                                    //tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                                    tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                                    ++refinementCount;
+                                    for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                                    {
+                                        if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
+                                        {
+                                            ++numberOfDuplicates;
+                                        }
+                                    }
                                 }
                             }
                         }
-                        //Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
-                        //Console.WriteLine($"Refinement count: {refinementCount}");
-                        //Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)tree.NodeCount}");
-                        //Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count):0)}");
-                        //visitedNodes.FastClear();
+                        Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
+                        Console.WriteLine($"Refinement count: {refinementCount}");
+                        Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)tree.NodeCount}");
+                        Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
+                        visitedNodes.FastClear();
 
 
                         //tree.PartialRefine(t, 2000, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
