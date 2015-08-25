@@ -601,10 +601,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             //CollectSubtreesDirect(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
-            if (treeletInternalNodesCopy.Capacity < treeletInternalNodes.Count)
-                treeletInternalNodesCopy.Capacity = treeletInternalNodes.Count;
-            treeletInternalNodes.CopyTo(treeletInternalNodesCopy.Elements, 0);
-            treeletInternalNodesCopy.Count = treeletInternalNodes.Count;
+            if (treeletInternalNodesCopy != null)
+            {
+                if (treeletInternalNodesCopy.Capacity < treeletInternalNodes.Count)
+                    treeletInternalNodesCopy.Capacity = treeletInternalNodes.Count;
+                treeletInternalNodes.CopyTo(treeletInternalNodesCopy.Elements, 0);
+                treeletInternalNodesCopy.Count = treeletInternalNodes.Count;
+            }
             //Console.WriteLine($"Number of subtrees: {subtreeReferences.Count}");
 
             //Gather necessary information from nodes.

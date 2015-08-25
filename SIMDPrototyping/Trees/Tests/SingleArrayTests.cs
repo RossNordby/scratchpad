@@ -215,6 +215,7 @@ namespace SIMDPrototyping.Trees.Tests
                     var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     tree.Refit();
+
                     //if (t < 500)
                     {
                         //tree.RefitRefine(maximumSubtrees, 1.5f);
@@ -235,24 +236,35 @@ namespace SIMDPrototyping.Trees.Tests
                             {
                                 leafCount += leafCounts[childIndex];
                             }
-                            if (true)//leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
+                            if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                             {
-                                tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
-                                ++refinementCount;
-                                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                                const float MinimumProbability = 0.000f;
+                                var p = 1 - (MinimumProbability + (leafCount / (float)tree.LeafCount) * (1 - MinimumProbability));
+                                p = p * p * p * p;
+                                p = p * p * p * p;
+                                p = p * p * p * p;
+                                p = p * p * p * p;
+                                if (random.NextDouble() >= p)
+                                //if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                                 {
-                                    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
-                                    {
-                                        ++numberOfDuplicates;
-                                    }
+                                    tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                                    //tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                                    //++refinementCount;
+                                    //for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                                    //{
+                                    //    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
+                                    //    {
+                                    //        ++numberOfDuplicates;
+                                    //    }
+                                    //}
                                 }
                             }
                         }
-                        Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
-                        Console.WriteLine($"Refinement count: {refinementCount}");
-                        Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)tree.NodeCount}");
-                        Console.WriteLine($"Fraction of duplicates visited: {numberOfDuplicates / (double)visitedNodes.Count}");
-                        visitedNodes.FastClear();
+                        //Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
+                        //Console.WriteLine($"Refinement count: {refinementCount}");
+                        //Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)tree.NodeCount}");
+                        //Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count):0)}");
+                        //visitedNodes.FastClear();
 
 
                         //tree.PartialRefine(t, 2000, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
