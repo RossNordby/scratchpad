@@ -220,7 +220,7 @@ namespace SIMDPrototyping.Trees.Tests
                     {
                         //tree.RefitRefine(maximumSubtrees, 1.5f);
 
-                        const int skip = 8;
+                        const int skip = 1;
                         var startIndex = (int)((t * 79151L) % skip);
                         int numberOfDuplicates = 0;
                         int refinementCount = 0;
@@ -242,8 +242,8 @@ namespace SIMDPrototyping.Trees.Tests
                                 var p = 1 - (MinimumProbability + (leafCount / (float)tree.LeafCount) * (1 - MinimumProbability));
                                 p = p * p * p * p;
                                 p = p * p * p * p;
-                                p = p * p * p * p;
-                                p = p * p * p * p;
+                                //p = p * p * p * p;
+                                //p = p * p * p * p;
                                 if (random.NextDouble() >= p)
                                 //if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                                 {
