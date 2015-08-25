@@ -236,26 +236,17 @@ namespace SIMDPrototyping.Trees.Tests
                             {
                                 leafCount += leafCounts[childIndex];
                             }
+
                             if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                             {
-                                const float MinimumProbability = 0.000f;
-                                var p = 1 - (MinimumProbability + (leafCount / (float)tree.LeafCount) * (1 - MinimumProbability));
-                                p = p * p * p * p;
-                                p = p * p * p * p;
-                                //p = p * p * p * p;
-                                //p = p * p * p * p;
-                                if (random.NextDouble() >= p)
-                                //if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
+                                //tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                                tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                                ++refinementCount;
+                                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
                                 {
-                                    //tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
-                                    tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
-                                    ++refinementCount;
-                                    for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                                    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
                                     {
-                                        if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
-                                        {
-                                            ++numberOfDuplicates;
-                                        }
+                                        ++numberOfDuplicates;
                                     }
                                 }
                             }
