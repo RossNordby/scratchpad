@@ -724,6 +724,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             region.Dispose();
             pool.GiveBack(buffer);
             spareNodes.Dispose();
+            subtreeReferences.Dispose();
         }
 
 
@@ -774,6 +775,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Console.WriteLine($"root children: {nodes->ChildCount}");
             RemoveUnusedInternalNodes(ref spareNodes);
             spareNodes.Dispose();
+            subtreeReferences.Dispose();
             region.Dispose();
             pool.GiveBack(buffer);
         }

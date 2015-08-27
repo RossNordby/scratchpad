@@ -72,6 +72,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var volumeChange = postmetric - premetric + changeA + changeB; //TODO: would clamping produce a superior result?
 
+            //TODO: Should the treelet root node's volume change really be included? You cannot refine away the root's volume change, after all.
+            //And that is the whole reason why we're storing the local cost change...
             //Cache the volume change in the node for later analysis.
             node->LocalCostChange = postmetric >= 1e-9f ? volumeChange / postmetric : float.MaxValue;
 
@@ -90,6 +92,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes->LocalCostChange = 0;
                 return 0;
             }
+            //TODO: Should the root node's volume change really be included? You cannot refine away the root's volume change, after all.
             var rootChildren = &nodes->ChildA;
             var rootBounds = &nodes->A;
             float volumeChange = 0;
@@ -120,19 +123,25 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         struct MarkInvariants
         {
+            public int PeriodicOffset;
+            public int Period;
+            public float RefinementThreshold;
+            public int LeafCountThreshold;
+            public float DistancePenaltySlope;
+            public float DistancePenaltyOffset;
         }
 
-        unsafe void MarkForRefinement2(int index, int periodicOffset, int period, int refinementThreshold, int leafCountThreshold, int distanceFromLastRefinement, ref QuickList<int> refinementTargets)
+        unsafe void MarkForRefinement2(int index, int distanceFromLastRefinement, ref MarkInvariants invariants, ref QuickList<int> refinementTargets)
         {
             var node = nodes + index;
 
             //Scale down the cost change of refinements which are near other refinements.
             //This reduces the frequency of pointless doublework.
-            var scaledCostChange = node->LocalCostChange * Math.Min(1, distanceFromLastRefinement * slope + offset);
+            var scaledCostChange = node->LocalCostChange * Math.Min(1, Math.Max(0, distanceFromLastRefinement * invariants.DistancePenaltySlope + invariants.DistancePenaltyOffset));
 
             bool refined;
-            if (scaledCostChange > refinementThreshold || //If true, this node's subtree changed a lot since the previous frame relative to its size.
-                (index - periodicOffset) % period == 0) //If true, this node was chosen as one of the periodic nodes.
+            if (scaledCostChange > invariants.RefinementThreshold || //If true, this node's subtree changed a lot since the previous frame relative to its size.
+                (index - invariants.PeriodicOffset) % invariants.Period == 0 || index == 0) //If true, this node was chosen as one of the periodic nodes.
             {
                 node->RefineFlag = 1;
                 refinementTargets.Add(index);
@@ -145,17 +154,62 @@ namespace SIMDPrototyping.Trees.SingleArray
                 refined = false;
             }
 
-            for (int i = 0; i <
+            var children = &node->ChildA;
+            var leafCounts = &node->LeafCountA;
+            int distance = refined ? 1 : distanceFromLastRefinement + 1;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (leafCounts[i] >= invariants.LeafCountThreshold && children[i] >= 0)
+                {
+                    MarkForRefinement2(children[i], distance, ref invariants, ref refinementTargets);
+                }
+            }
+
         }
 
-        unsafe void RefitAndRefine(ref QuickList<int> refinementTargets, int maximumSubtrees = 1024)
+        unsafe void RefitAndRefine(ref QuickList<int> refinementTargets, int frameIndex, float aggressivenessScale, int maximumSubtrees = 1024)
         {
-            int leafCountThreshold = (int)Math.Min(leafCount, 0.75f * maximumSubtrees);
+            var levelsInRefine = Math.Log(maximumSubtrees, ChildrenCapacity);
 
-            var costChange = RefitAndScore2(leafCountThreshold);
+            MarkInvariants invariants;
+            invariants.LeafCountThreshold = (int)Math.Min(leafCount, 0.75f * maximumSubtrees);
 
-            MarkForRefinement2(0, leafCountThreshold, ref refinementTargets);
+            var costChange = RefitAndScore2(invariants.LeafCountThreshold);
+            var aggressiveness = Math.Max(0, costChange * aggressivenessScale);
 
+            //Higher aggressiveness->lower period.
+            //Is the need for higher aggressiveness linear, or nonlinear? Nonlinear unbounded seems more obvious.
+            invariants.Period = (int)(1f / (aggressiveness + 1));
+            invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+            const float minimumMultiplier = 0.1f;
+            invariants.DistancePenaltyOffset = minimumMultiplier;
+            invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / levelsInRefine);
+            invariants.RefinementThreshold = .3f / (aggressiveness + 1);
+            
+            MarkForRefinement2(0, int.MaxValue, ref invariants, ref refinementTargets);
+
+            //Refine all marked targets.
+            var pool = BufferPools<int>.Thread;
+
+            var spareNodes = new QuickList<int>(pool, 8);
+            var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+            var treeletInternalNodes = new QuickQueue<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+            int[] buffer;
+            MemoryRegion region;
+            BinnedResources resources;
+            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
+
+            for (int i = 0; i < refinementTargets.Count; ++i)
+            {
+                subtreeReferences.Count = 0;
+                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated); 
+            }
+            RemoveUnusedInternalNodes(ref spareNodes);
+            region.Dispose();
+            pool.GiveBack(buffer);
+            spareNodes.Dispose();
+            subtreeReferences.Dispose();
+            treeletInternalNodes.Dispose();
         }
 
 
