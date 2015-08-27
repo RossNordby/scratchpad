@@ -133,6 +133,7 @@
     <Compile Include="Trees\SingleArray\Tree_CollectSubtreesDirect.cs" />
     <Compile Include="Trees\SingleArray\Tree_RefineCommon.cs" />
     <Compile Include="Trees\SingleArray\Tree_Arity4SelfTreeQueries.cs" />
+    <Compile Include="Trees\SingleArray\Tree_RefinementScheduling.cs" />
     <Compile Include="Trees\SingleArray\Tree_SweepRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_SweepBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_Utilities.cs" />

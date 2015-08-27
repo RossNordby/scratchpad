@@ -46,11 +46,11 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             if (node->ChildA >= 0)
             {
-                Refit(node->ChildA, out node->A);
+                Refit2(node->ChildA, out node->A);
             }
             if (node->ChildB >= 0)
             {
-                Refit(node->ChildB, out node->B);
+                Refit2(node->ChildB, out node->B);
             }
             BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
 
