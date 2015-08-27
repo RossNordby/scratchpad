@@ -376,6 +376,7 @@ namespace SIMDPrototyping.Trees.Baseline
             node.ChildCount = 0;
             node.Parent = 0;
             node.IndexInParent = 0;
+            node.LocalCostChange = 0; //This is a bit dumb. It's a union...
             node.RefineFlag = 0;
         }
 

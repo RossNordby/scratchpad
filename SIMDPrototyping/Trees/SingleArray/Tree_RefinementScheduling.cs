@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -12,44 +13,152 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
-        unsafe float RefitRefine2(int nodeIndex, ref BoundingBox boundingBox)
+        unsafe float RefitAndScoreLower2(int nodeIndex, ref BoundingBox boundingBox)
         {
             var node = nodes + nodeIndex;
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
 
             var premetric = ComputeBoundsMetric(ref boundingBox);
+            float changeA, changeB;
             if (node->ChildA >= 0)
             {
-                RefitRefine2(node->ChildA, ref node->A);
+                changeA = RefitAndScoreLower2(node->ChildA, ref node->A);
             }
+            else
+                changeA = 0;
             if (node->ChildB >= 0)
             {
-                RefitRefine2(node->ChildB, ref node->B);
+                changeB = RefitAndScoreLower2(node->ChildB, ref node->B);
             }
+            else
+                changeB = 0;
             BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
             var postmetric = ComputeBoundsMetric(ref boundingBox);
 
-            return postmetric - premetric;
+            return postmetric - premetric + changeA + changeB; //TODO: would clamping produce a superior result?
 
         }
-        unsafe void RefitRefine2()
+
+        unsafe float RefitAndScoreUpper2(int nodeIndex, int leafCountThreshold, ref BoundingBox boundingBox)
+        {
+            var node = nodes + nodeIndex;
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            Debug.Assert(node->ChildCount >= 2);
+
+            var premetric = ComputeBoundsMetric(ref boundingBox);
+            float changeA, changeB;
+            if (node->ChildA >= 0)
+            {
+                if (node->LeafCountA > leafCountThreshold)
+                    changeA = RefitAndScoreUpper2(node->ChildA, leafCountThreshold, ref node->A);
+                else
+                    changeA = RefitAndScoreLower2(node->ChildA, ref node->A);
+
+            }
+            else
+                changeA = 0;
+            if (node->ChildB >= 0)
+            {
+                if (node->LeafCountB > leafCountThreshold)
+                    changeB = RefitAndScoreUpper2(node->ChildB, leafCountThreshold, ref node->B);
+                else
+                    changeB = RefitAndScoreLower2(node->ChildB, ref node->B);
+            }
+            else
+                changeB = 0;
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            var postmetric = ComputeBoundsMetric(ref boundingBox);
+
+            var volumeChange = postmetric - premetric + changeA + changeB; //TODO: would clamping produce a superior result?
+
+            //Cache the volume change in the node for later analysis.
+            node->LocalCostChange = postmetric >= 1e-9f ? volumeChange / postmetric : float.MaxValue;
+
+
+            return volumeChange;
+
+        }
+
+        unsafe float RefitAndScore2(int leafCountThreshold)
         {
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
+            if (nodes->ChildCount < 2)
+            {
+                Debug.Assert(nodes->ChildA < 0, "If there's only one child, it should be a leaf.");
+                //If there's only a leaf (or no children), then there's no internal nodes capable of changing in volume, so there's no relevant change in cost.
+                nodes->LocalCostChange = 0;
+                return 0;
+            }
             var rootChildren = &nodes->ChildA;
             var rootBounds = &nodes->A;
+            float volumeChange = 0;
+            BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
+            BoundingBox postmerge = premerge;
             for (int i = 0; i < nodes->ChildCount; ++i)
             {
+                BoundingBox.Merge(ref rootBounds[i], ref premerge, out premerge);
                 if (rootChildren[i] >= 0)
                 {
 #if NODE2
-                    Refit2(rootChildren[i], out rootBounds[i]);
+                    volumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
 #else
-                    Refit(rootChildren[i], out rootBounds[i]);
+                    volumeChange += RefitAndScoreUpper(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
 #endif
                 }
+                BoundingBox.Merge(ref rootBounds[i], ref postmerge, out postmerge);
             }
+            var premetric = ComputeBoundsMetric(ref premerge);
+            var postmetric = ComputeBoundsMetric(ref postmerge);
+            volumeChange += postmetric - premetric; //TODO: would clamping produce a superior result?
+            var costChange = postmetric >= 1e-9f ? volumeChange / postmetric : float.MaxValue;
+            nodes->LocalCostChange = costChange;
+
+            return costChange;
         }
+
+
+        struct MarkInvariants
+        {
+        }
+
+        unsafe void MarkForRefinement2(int index, int periodicOffset, int period, int refinementThreshold, int leafCountThreshold, int distanceFromLastRefinement, ref QuickList<int> refinementTargets)
+        {
+            var node = nodes + index;
+
+            //Scale down the cost change of refinements which are near other refinements.
+            //This reduces the frequency of pointless doublework.
+            var scaledCostChange = node->LocalCostChange * Math.Min(1, distanceFromLastRefinement * slope + offset);
+
+            bool refined;
+            if (scaledCostChange > refinementThreshold || //If true, this node's subtree changed a lot since the previous frame relative to its size.
+                (index - periodicOffset) % period == 0) //If true, this node was chosen as one of the periodic nodes.
+            {
+                node->RefineFlag = 1;
+                refinementTargets.Add(index);
+                refined = true;
+            }
+            else
+            {
+                //Clear the refine flag so subtree collection properly ignores it.
+                node->RefineFlag = 0;
+                refined = false;
+            }
+
+            for (int i = 0; i <
+        }
+
+        unsafe void RefitAndRefine(ref QuickList<int> refinementTargets, int maximumSubtrees = 1024)
+        {
+            int leafCountThreshold = (int)Math.Min(leafCount, 0.75f * maximumSubtrees);
+
+            var costChange = RefitAndScore2(leafCountThreshold);
+
+            MarkForRefinement2(0, leafCountThreshold, ref refinementTargets);
+
+        }
+
+
 
 
         //public unsafe void RefitRefine(int maximumSubtrees, float threshold)
@@ -106,7 +215,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         //        if (leafCount >= minimumLeafCount)
         //        {
         //            markedNodes.Add(i);
-                   
+
         //        }
         //    }
         //}

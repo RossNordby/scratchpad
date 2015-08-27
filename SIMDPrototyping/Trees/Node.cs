@@ -237,18 +237,37 @@ namespace SIMDPrototyping.Trees
     /// 2-wide tree node.
     /// </summary>
     //[StructLayout(LayoutKind.Sequential, Size = 64 /*80*/)]
+    [StructLayout(LayoutKind.Explicit)]
     public unsafe struct Node
     {
+        [FieldOffset(0)]
         public BoundingBox A;
+        [FieldOffset(12)]
         public BoundingBox B;
+        [FieldOffset(24)]
         public int ChildA;
+        [FieldOffset(28)]
         public int ChildB;
+        [FieldOffset(32)]
         public int LeafCountA;
+        [FieldOffset(36)]
         public int LeafCountB;
+        [FieldOffset(40)]
         public int ChildCount;
+        [FieldOffset(44)]
         public int Parent;
+        [FieldOffset(48)]
         public int IndexInParent;
+        [FieldOffset(52)]
         public int RefineFlag;
+        /// <summary>
+        /// Cached change in cost of the tree starting at this node since the previous frame.
+        /// The local cost change is unioned with the refine flags. They're never used simultaneously.
+        /// This will be overwritten right after use, so don't expect anything meaningful here outside of refinement scheduling's scope.
+        /// </summary>
+        [FieldOffset(52)]
+        public float LocalCostChange;
+
     }
 #endif
 }
