@@ -128,7 +128,7 @@ namespace SIMDPrototyping.Trees.Tests
                 int[] buffer;
                 MemoryRegion region;
                 BinnedResources resources;
-                const int maximumSubtrees = 1024;
+                const int maximumSubtrees = 262144;
                 var spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
                 var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
@@ -178,7 +178,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.Validate();
                 //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 Random random = new Random(5);
-                const float maxVelocity = 1;
+                const float maxVelocity = 0;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);
@@ -237,8 +237,8 @@ namespace SIMDPrototyping.Trees.Tests
                     //}
 
 
-                    refinementTargets.Count = 0;
-                    tree.RefitAndRefine(ref refinementTargets, t, 1, maximumSubtrees);
+                    //refinementTargets.Count = 0;
+                    //tree.RefitAndRefine(ref refinementTargets, t, 1, maximumSubtrees);
                     //Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
                     //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
@@ -326,16 +326,17 @@ namespace SIMDPrototyping.Trees.Tests
 
                         //}
                     }
-                    //tree.Refit();
-                    //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                    //for (int i = 0; i < 100; ++i)
-                    //{
+                    tree.Refit();
+                    startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    for (int i = 0; i < 10; ++i)
+                    {
 
-                    //    subtreeReferences.Count = 0;
-                    //    treeletInternalNodes.FastClear();
-                    //    tree.BinnedRefine(0, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
-                    //}
-                    //tree.RemoveUnusedInternalNodes(ref spareNodes);
+                        subtreeReferences.Count = 0;
+                        treeletInternalNodes.FastClear();
+                        tree.BinnedRefine(0, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                    }
+                    tree.RemoveUnusedInternalNodes(ref spareNodes);
+                    var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     {
@@ -353,7 +354,6 @@ namespace SIMDPrototyping.Trees.Tests
                             }
                         }
                     }
-                    var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     if (t % 16 == 0)
                     {
                         Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");

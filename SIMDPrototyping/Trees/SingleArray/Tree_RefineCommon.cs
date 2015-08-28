@@ -141,7 +141,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 SubtreeHeapEntry entry;
                 Pop(out entry);
                 var node = nodes + entry.Index;
-                var changeInChildCount = remainingSubtreeSpace - node->ChildCount == 0 ? node->ChildCount : node->ChildCount - 1;
+                //Choose to expand this node, or not.
+                //Only choose to expand if its children will fit.
+                //Any time a node is expanded, the existing node is removed from the set of potential subtrees stored in the priorityQueue.
+                //So, the change in remainingSubtreeSpace = maximumSubtreesCount - (priorityQueue.Count + subtrees.Count) is childCount - 1.
+                //This is ALWAYS the case.
+                var changeInChildCount = node->ChildCount - 1;
                 if (remainingSubtreeSpace >= changeInChildCount && node->RefineFlag == 0)
                 {
                     //This node's children can be included successfully in the remaining space.

@@ -210,7 +210,9 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void FindPartitionBinned(ref BinnedResources resources, int start, int count, ref BoundingBox boundingBox,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
+            var totalStartTime = Stopwatch.GetTimestamp();
 
+            var startCentroidBoundsTime = Stopwatch.GetTimestamp();
             //Initialize the per-axis candidate maps.
             var localIndexMap = resources.IndexMap + start;
             BoundingBox centroidBoundingBox;
@@ -222,6 +224,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 centroidBoundingBox.Min = Vector3.Min(*centroid, centroidBoundingBox.Min);
                 centroidBoundingBox.Max = Vector3.Max(*centroid, centroidBoundingBox.Max);
             }
+            var endCentroidBoundsTime = Stopwatch.GetTimestamp();
+            var centroidBoundsTime = (endCentroidBoundsTime - startCentroidBoundsTime) / (double)Stopwatch.Frequency;
+            if (count == 262144)
+                Console.WriteLine($"Centroid Bounds Time (ms): {centroidBoundsTime * 1e3}");
+
 
             //Bin along all three axes simultaneously.
             var nullBoundingBox = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
@@ -282,6 +289,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 resources.BinLeafCountsZ[i] = 0;
             }
 
+            var startAllocateToBins = Stopwatch.GetTimestamp();
             //Allocate subtrees to bins for all axes simultaneously.
             for (int i = 0; i < count; ++i)
             {
@@ -307,6 +315,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 resources.SubtreeBinIndicesY[i] = y;
                 resources.SubtreeBinIndicesZ[i] = z;
             }
+            var endAllocateToBins = Stopwatch.GetTimestamp();
+            var allocateTime = (endAllocateToBins - startAllocateToBins) / (double)Stopwatch.Frequency;
+            if (count == 262144)
+                Console.WriteLine($"Allocate To Bins Time (ms): {allocateTime * 1e3}");
 
             //Determine split axes for all axes simultaneously.
             //Sweep from low to high.
@@ -448,6 +460,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 resources.BinSubtreeCountsSecondPass[i] = 0;
             }
 
+            var startIndexMapTime = Stopwatch.GetTimestamp();
+
             for (int i = 0; i < count; ++i)
             {
                 resources.TempIndexMap[resources.BinStartIndices[bestSubtreeBinIndices[i]] + resources.BinSubtreeCountsSecondPass[bestSubtreeBinIndices[i]]++] = localIndexMap[i];
@@ -458,10 +472,19 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 localIndexMap[i] = resources.TempIndexMap[i];
             }
+            var endIndexMapTime = Stopwatch.GetTimestamp();
+            var indexMapTime = (endIndexMapTime - startIndexMapTime) / (double)Stopwatch.Frequency;
+            if (count == 262144)
+                Console.WriteLine($"Indexmap time (ms): {indexMapTime * 1e3f}");
 
             //Transform the split index into object indices.
             splitIndex = resources.BinStartIndices[binSplitIndex] + start;
 
+
+            var totalEndTime = Stopwatch.GetTimestamp();
+            var totalTime = (totalEndTime - totalStartTime) / (double)Stopwatch.Frequency;
+            if (count == 262144)
+                Console.WriteLine($"Total time (ms): {totalTime * 1e3f}, measured percent: {(centroidBoundsTime + allocateTime + indexMapTime) / totalTime}");
         }
 
 
@@ -600,6 +623,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             Debug.Assert(treeletInternalNodes.Elements.Length >= maximumSubtrees - 1, "Internal nodes queue should have a backing array large enough to hold all possible treelet internal nodes.");
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
+            Debug.Assert(subtreeReferences.Count <= maximumSubtrees);
+            
             //CollectSubtreesDirect(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             if (treeletInternalNodesCopy != null)
             {
