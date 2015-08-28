@@ -12,12 +12,6 @@ using System.Runtime.InteropServices;
 
 namespace SIMDPrototyping.Trees.SingleArray
 {
-    public struct BinProperties
-    {
-        public BoundingBox BoundingBox;
-        public int LeafCount;
-        public int SubtreeCount;
-    }
     public unsafe struct BinnedResources
     {
         public BoundingBox* BoundingBoxes;
@@ -47,9 +41,15 @@ namespace SIMDPrototyping.Trees.SingleArray
         public BoundingBox* AMergedZ;
 
         //Bin-space reusable resources.
-        public BinProperties* BinPropertiesX;
-        public BinProperties* BinPropertiesY;
-        public BinProperties* BinPropertiesZ;
+        public BoundingBox* BinBoundingBoxesX;
+        public BoundingBox* BinBoundingBoxesY;
+        public BoundingBox* BinBoundingBoxesZ;
+        public int* BinLeafCountsX;
+        public int* BinLeafCountsY;
+        public int* BinLeafCountsZ;
+        public int* BinSubtreeCountsX;
+        public int* BinSubtreeCountsY;
+        public int* BinSubtreeCountsZ;
 
         public int* BinStartIndices;
         public int* BinSubtreeCountsSecondPass;
@@ -159,9 +159,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             //it's highly unlikely that anything is built to expect or benefit from aligned memory (at the software level, anyway).
             //(And I don't think the vector types are aligned.)
             int bytesRequired =
-                16 * (3 + 3) + sizeof(BoundingBox) * (maximumSubtreeCount + 3 * nodeCount) +
-                16 * (6 + 3 + 2) + sizeof(int) * (maximumSubtreeCount * 6 + nodeCount * 3 + MaximumBinCount * 2) +
-                16 * (3) + sizeof(BinProperties) * (MaximumBinCount * 3) +
+                16 * (3 + 3 + 1) + sizeof(BoundingBox) * (maximumSubtreeCount + 3 * nodeCount + 3 * MaximumBinCount) +
+                16 * (6 + 3 + 8) + sizeof(int) * (maximumSubtreeCount * 6 + nodeCount * 3 + MaximumBinCount * 8) +
                 16 * (1) + sizeof(Vector3) * maximumSubtreeCount +
                 16 * (1) + sizeof(SubtreeHeapEntry) * maximumSubtreeCount +
                 16 * (1) + sizeof(Node) * nodeCount;
@@ -193,9 +192,16 @@ namespace SIMDPrototyping.Trees.SingleArray
             resources.AMergedY = (BoundingBox*)region.Allocate(sizeof(BoundingBox) * nodeCount);
             resources.AMergedZ = (BoundingBox*)region.Allocate(sizeof(BoundingBox) * nodeCount);
 
-            resources.BinPropertiesX = (BinProperties*)region.Allocate(sizeof(BinProperties) * MaximumBinCount);
-            resources.BinPropertiesY = (BinProperties*)region.Allocate(sizeof(BinProperties) * MaximumBinCount);
-            resources.BinPropertiesZ = (BinProperties*)region.Allocate(sizeof(BinProperties) * MaximumBinCount);
+
+            resources.BinBoundingBoxesX = (BoundingBox*)region.Allocate(sizeof(BoundingBox) * MaximumBinCount);
+            resources.BinBoundingBoxesY = (BoundingBox*)region.Allocate(sizeof(BoundingBox) * MaximumBinCount);
+            resources.BinBoundingBoxesZ = (BoundingBox*)region.Allocate(sizeof(BoundingBox) * MaximumBinCount);
+            resources.BinLeafCountsX = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
+            resources.BinLeafCountsY = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
+            resources.BinLeafCountsZ = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
+            resources.BinSubtreeCountsX = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
+            resources.BinSubtreeCountsY = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
+            resources.BinSubtreeCountsZ = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
             resources.BinStartIndices = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
             resources.BinSubtreeCountsSecondPass = (int*)region.Allocate(sizeof(int) * MaximumBinCount);
         }
@@ -272,22 +278,17 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Initialize bin information.
             for (int i = 0; i < binCount; ++i)
             {
-                var x = resources.BinPropertiesX + i;
-                var y = resources.BinPropertiesY + i;
-                var z = resources.BinPropertiesZ + i;
+                resources.BinBoundingBoxesX[i] = nullBoundingBox;
+                resources.BinBoundingBoxesY[i] = nullBoundingBox;
+                resources.BinBoundingBoxesZ[i] = nullBoundingBox;
 
-                x->BoundingBox = nullBoundingBox;
-                x->SubtreeCount = 0;
-                x->LeafCount = 0;
+                resources.BinSubtreeCountsX[i] = 0;
+                resources.BinSubtreeCountsY[i] = 0;
+                resources.BinSubtreeCountsZ[i] = 0;
 
-                y->BoundingBox = nullBoundingBox;
-                y->SubtreeCount = 0;
-                y->LeafCount = 0;
-
-                z->BoundingBox = nullBoundingBox;
-                z->SubtreeCount = 0;
-                z->LeafCount = 0;
-
+                resources.BinLeafCountsX[i] = 0;
+                resources.BinLeafCountsY[i] = 0;
+                resources.BinLeafCountsZ[i] = 0;
             }
 
             var startAllocateToBins = Stopwatch.GetTimestamp();
@@ -307,22 +308,17 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var leafCount = resources.LeafCounts + subtreeIndex;
                 var subtreeBoundingBox = resources.BoundingBoxes + subtreeIndex;
 
-                var binX = resources.BinPropertiesX + x;
-                var binY = resources.BinPropertiesY + y;
-                var binZ = resources.BinPropertiesZ + z;
+                resources.BinLeafCountsX[x] += *leafCount;
+                resources.BinLeafCountsY[y] += *leafCount;
+                resources.BinLeafCountsZ[z] += *leafCount;
 
-                BoundingBox.Merge(ref binX->BoundingBox, ref *subtreeBoundingBox, out binX->BoundingBox);
-                BoundingBox.Merge(ref binY->BoundingBox, ref *subtreeBoundingBox, out binY->BoundingBox);
-                BoundingBox.Merge(ref binZ->BoundingBox, ref *subtreeBoundingBox, out binZ->BoundingBox);
+                ++resources.BinSubtreeCountsX[x];
+                ++resources.BinSubtreeCountsY[y];
+                ++resources.BinSubtreeCountsZ[z];
 
-                binX->LeafCount += *leafCount;
-                binY->LeafCount += *leafCount;
-                binZ->LeafCount += *leafCount;
-
-                ++binX->SubtreeCount;
-                ++binY->SubtreeCount;
-                ++binZ->SubtreeCount;
-
+                BoundingBox.Merge(ref resources.BinBoundingBoxesX[x], ref *subtreeBoundingBox, out resources.BinBoundingBoxesX[x]);
+                BoundingBox.Merge(ref resources.BinBoundingBoxesY[y], ref *subtreeBoundingBox, out resources.BinBoundingBoxesY[y]);
+                BoundingBox.Merge(ref resources.BinBoundingBoxesZ[z], ref *subtreeBoundingBox, out resources.BinBoundingBoxesZ[z]);
             }
             var endAllocateToBins = Stopwatch.GetTimestamp();
             var allocateTime = (endAllocateToBins - startAllocateToBins) / (double)Stopwatch.Frequency;
@@ -333,21 +329,21 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Sweep from low to high.
             var lastIndex = binCount - 1;
 
-            resources.ALeafCountsX[0] = resources.BinPropertiesX[0].LeafCount;
-            resources.ALeafCountsY[0] = resources.BinPropertiesY[0].LeafCount;
-            resources.ALeafCountsZ[0] = resources.BinPropertiesZ[0].LeafCount;
-            resources.AMergedX[0] = resources.BinPropertiesX[0].BoundingBox;
-            resources.AMergedY[0] = resources.BinPropertiesY[0].BoundingBox;
-            resources.AMergedZ[0] = resources.BinPropertiesZ[0].BoundingBox;
+            resources.ALeafCountsX[0] = resources.BinLeafCountsX[0];
+            resources.ALeafCountsY[0] = resources.BinLeafCountsY[0];
+            resources.ALeafCountsZ[0] = resources.BinLeafCountsZ[0];
+            resources.AMergedX[0] = resources.BinBoundingBoxesX[0];
+            resources.AMergedY[0] = resources.BinBoundingBoxesY[0];
+            resources.AMergedZ[0] = resources.BinBoundingBoxesZ[0];
             for (int i = 1; i < lastIndex; ++i)
             {
                 var previousIndex = i - 1;
-                resources.ALeafCountsX[i] = resources.BinPropertiesX[i].LeafCount + resources.ALeafCountsX[previousIndex];
-                resources.ALeafCountsY[i] = resources.BinPropertiesY[i].LeafCount + resources.ALeafCountsY[previousIndex];
-                resources.ALeafCountsZ[i] = resources.BinPropertiesZ[i].LeafCount + resources.ALeafCountsZ[previousIndex];
-                BoundingBox.Merge(ref resources.AMergedX[previousIndex], ref resources.BinPropertiesX[i].BoundingBox, out resources.AMergedX[i]);
-                BoundingBox.Merge(ref resources.AMergedY[previousIndex], ref resources.BinPropertiesY[i].BoundingBox, out resources.AMergedY[i]);
-                BoundingBox.Merge(ref resources.AMergedZ[previousIndex], ref resources.BinPropertiesZ[i].BoundingBox, out resources.AMergedZ[i]);
+                resources.ALeafCountsX[i] = resources.BinLeafCountsX[i] + resources.ALeafCountsX[previousIndex];
+                resources.ALeafCountsY[i] = resources.BinLeafCountsY[i] + resources.ALeafCountsY[previousIndex];
+                resources.ALeafCountsZ[i] = resources.BinLeafCountsZ[i] + resources.ALeafCountsZ[previousIndex];
+                BoundingBox.Merge(ref resources.AMergedX[previousIndex], ref resources.BinBoundingBoxesX[i], out resources.AMergedX[i]);
+                BoundingBox.Merge(ref resources.AMergedY[previousIndex], ref resources.BinBoundingBoxesY[i], out resources.AMergedY[i]);
+                BoundingBox.Merge(ref resources.AMergedZ[previousIndex], ref resources.BinBoundingBoxesZ[i], out resources.AMergedZ[i]);
             }
 
             //Sweep from high to low.
@@ -370,12 +366,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = lastIndex; i >= 1; --i)
             {
                 int aIndex = i - 1;
-                BoundingBox.Merge(ref bMergedX, ref resources.BinPropertiesX[i].BoundingBox, out bMergedX);
-                BoundingBox.Merge(ref bMergedY, ref resources.BinPropertiesY[i].BoundingBox, out bMergedY);
-                BoundingBox.Merge(ref bMergedZ, ref resources.BinPropertiesZ[i].BoundingBox, out bMergedZ);
-                bLeafCountX += resources.BinPropertiesX[i].LeafCount;
-                bLeafCountY += resources.BinPropertiesY[i].LeafCount;
-                bLeafCountZ += resources.BinPropertiesZ[i].LeafCount;
+                BoundingBox.Merge(ref bMergedX, ref resources.BinBoundingBoxesX[i], out bMergedX);
+                BoundingBox.Merge(ref bMergedY, ref resources.BinBoundingBoxesY[i], out bMergedY);
+                BoundingBox.Merge(ref bMergedZ, ref resources.BinBoundingBoxesZ[i], out bMergedZ);
+                bLeafCountX += resources.BinLeafCountsX[i];
+                bLeafCountY += resources.BinLeafCountsY[i];
+                bLeafCountZ += resources.BinLeafCountsZ[i];
 
                 var metricAX = ComputeBoundsMetric(ref resources.AMergedX[aIndex]);
                 var metricAY = ComputeBoundsMetric(ref resources.AMergedY[aIndex]);
@@ -441,20 +437,20 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
 
-            BinProperties* bestBinProperties;
+            int* bestBinSubtreeCounts;
             int* bestSubtreeBinIndices;
             switch (bestAxis)
             {
                 case 0:
-                    bestBinProperties = resources.BinPropertiesX;
+                    bestBinSubtreeCounts = resources.BinSubtreeCountsX;
                     bestSubtreeBinIndices = resources.SubtreeBinIndicesX;
                     break;
                 case 1:
-                    bestBinProperties = resources.BinPropertiesY;
+                    bestBinSubtreeCounts = resources.BinSubtreeCountsY;
                     bestSubtreeBinIndices = resources.SubtreeBinIndicesY;
                     break;
                 default:
-                    bestBinProperties = resources.BinPropertiesZ;
+                    bestBinSubtreeCounts = resources.BinSubtreeCountsZ;
                     bestSubtreeBinIndices = resources.SubtreeBinIndicesZ;
                     break;
             }
@@ -465,7 +461,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             for (int i = 1; i < binCount; ++i)
             {
-                resources.BinStartIndices[i] = resources.BinStartIndices[i - 1] + bestBinProperties[i - 1].SubtreeCount;
+                resources.BinStartIndices[i] = resources.BinStartIndices[i - 1] + bestBinSubtreeCounts[i - 1];
                 resources.BinSubtreeCountsSecondPass[i] = 0;
             }
 
