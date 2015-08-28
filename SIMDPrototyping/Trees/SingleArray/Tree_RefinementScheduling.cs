@@ -187,20 +187,38 @@ namespace SIMDPrototyping.Trees.SingleArray
             invariants.LeafCountThreshold = (int)Math.Min(leafCount, 0.75f * maximumSubtrees);
 
             var costChange = RefitAndScore2(invariants.LeafCountThreshold);
+
+
             var aggressiveness = Math.Max(0, costChange * aggressivenessScale);
 
             //Higher aggressiveness->lower period.
             //Is the need for higher aggressiveness linear, or nonlinear? Nonlinear unbounded seems more obvious.
-            invariants.Period = (int)(16f / (aggressiveness + 1)) + 1;
-            //invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
-            invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
-            invariants.MinimumDistance = (int)(levelsInRefine * 0.5);
+            invariants.Period = Math.Max(2, (int)(16f / (aggressiveness + .01f)) + 1);
+            invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+            //invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
+            invariants.MinimumDistance = 0;// (int)(levelsInRefine * 0.25);
             const float minimumMultiplier = 0.1f;
             invariants.DistancePenaltyOffset = minimumMultiplier;
             invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / (levelsInRefine * 0.65f));
             invariants.RefinementThreshold = 1f / (aggressiveness + 1);
 
             MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
+
+
+            if (costChange > 1000)
+            {
+                //Something silly is going on. The usual approach does not scale well to this level of explosive corruption.
+                //Just rebuild it.
+                maximumSubtrees = LeafCount;
+                refinementTargets.Add(0);
+                //Make sure collectsubtrees can gather all the nodes.
+                for (int i = 0; i < refinementTargets.Count; ++i)
+                {
+                    nodes[i].RefineFlag = 0;
+                }
+                //Note: yes, this does some redundant work. But the amount of work required to do the partially redundant MarkForRefinement is absolutely nothing compared to this full rebuild.
+
+            }
 
             //Refine all marked targets.
             var pool = BufferPools<int>.Thread;
@@ -213,7 +231,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             BinnedResources resources;
             CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
 
-            for (int i = 0; i < refinementTargets.Count; ++i)
+            for (int i = refinementTargets.Count - 1; i >= 0; --i)
             {
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.FastClear();
