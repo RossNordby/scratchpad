@@ -204,9 +204,9 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void FindPartitionBinned(ref BinnedResources resources, int start, int count, ref BoundingBox boundingBox,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
-            var totalStartTime = Stopwatch.GetTimestamp();
+            //var totalStartTime = Stopwatch.GetTimestamp();
 
-            var startCentroidBoundsTime = Stopwatch.GetTimestamp();
+            //var startCentroidBoundsTime = Stopwatch.GetTimestamp();
             //Initialize the per-axis candidate maps.
             var localIndexMap = resources.IndexMap + start;
             BoundingBox centroidBoundingBox;
@@ -219,10 +219,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 centroidBoundingBox.Min = Vector3.Min(*centroid, centroidBoundingBox.Min);
                 centroidBoundingBox.Max = Vector3.Max(*centroid, centroidBoundingBox.Max);
             }
-            var endCentroidBoundsTime = Stopwatch.GetTimestamp();
-            var centroidBoundsTime = (endCentroidBoundsTime - startCentroidBoundsTime) / (double)Stopwatch.Frequency;
-            if (count == 262144)
-                Console.WriteLine($"Centroid Bounds Time (ms): {centroidBoundsTime * 1e3}");
+            //var endCentroidBoundsTime = Stopwatch.GetTimestamp();
+            //var centroidBoundsTime = (endCentroidBoundsTime - startCentroidBoundsTime) / (double)Stopwatch.Frequency;
+            //if (count == 262144)
+            //    Console.WriteLine($"Centroid Bounds Time (ms): {centroidBoundsTime * 1e3}");
 
 
             //Bin along all three axes simultaneously.
@@ -290,7 +290,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             }
 
-            var startAllocateToBins = Stopwatch.GetTimestamp();
+            //var startAllocateToBins = Stopwatch.GetTimestamp();
             //Allocate subtrees to bins for all axes simultaneously.
             for (int i = 0; i < count; ++i)
             {
@@ -324,10 +324,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 ++binZ->SubtreeCount;
 
             }
-            var endAllocateToBins = Stopwatch.GetTimestamp();
-            var allocateTime = (endAllocateToBins - startAllocateToBins) / (double)Stopwatch.Frequency;
-            if (count == 262144)
-                Console.WriteLine($"Allocate To Bins Time (ms): {allocateTime * 1e3}");
+            //var endAllocateToBins = Stopwatch.GetTimestamp();
+            //var allocateTime = (endAllocateToBins - startAllocateToBins) / (double)Stopwatch.Frequency;
+            //if (count == 262144)
+            //    Console.WriteLine($"Allocate To Bins Time (ms): {allocateTime * 1e3}");
 
             //Determine split axes for all axes simultaneously.
             //Sweep from low to high.
@@ -342,12 +342,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 1; i < lastIndex; ++i)
             {
                 var previousIndex = i - 1;
-                resources.ALeafCountsX[i] = resources.BinPropertiesX[i].LeafCount + resources.ALeafCountsX[previousIndex];
-                resources.ALeafCountsY[i] = resources.BinPropertiesY[i].LeafCount + resources.ALeafCountsY[previousIndex];
-                resources.ALeafCountsZ[i] = resources.BinPropertiesZ[i].LeafCount + resources.ALeafCountsZ[previousIndex];
-                BoundingBox.Merge(ref resources.AMergedX[previousIndex], ref resources.BinPropertiesX[i].BoundingBox, out resources.AMergedX[i]);
-                BoundingBox.Merge(ref resources.AMergedY[previousIndex], ref resources.BinPropertiesY[i].BoundingBox, out resources.AMergedY[i]);
-                BoundingBox.Merge(ref resources.AMergedZ[previousIndex], ref resources.BinPropertiesZ[i].BoundingBox, out resources.AMergedZ[i]);
+                var binX = resources.BinPropertiesX + i;
+                var binY = resources.BinPropertiesY + i;
+                var binZ = resources.BinPropertiesZ + i;
+                resources.ALeafCountsX[i] = binX->LeafCount + resources.ALeafCountsX[previousIndex];
+                resources.ALeafCountsY[i] = binY->LeafCount + resources.ALeafCountsY[previousIndex];
+                resources.ALeafCountsZ[i] = binZ->LeafCount + resources.ALeafCountsZ[previousIndex];
+                BoundingBox.Merge(ref resources.AMergedX[previousIndex], ref binX->BoundingBox, out resources.AMergedX[i]);
+                BoundingBox.Merge(ref resources.AMergedY[previousIndex], ref binY->BoundingBox, out resources.AMergedY[i]);
+                BoundingBox.Merge(ref resources.AMergedZ[previousIndex], ref binZ->BoundingBox, out resources.AMergedZ[i]);
             }
 
             //Sweep from high to low.
@@ -370,12 +373,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = lastIndex; i >= 1; --i)
             {
                 int aIndex = i - 1;
-                BoundingBox.Merge(ref bMergedX, ref resources.BinPropertiesX[i].BoundingBox, out bMergedX);
-                BoundingBox.Merge(ref bMergedY, ref resources.BinPropertiesY[i].BoundingBox, out bMergedY);
-                BoundingBox.Merge(ref bMergedZ, ref resources.BinPropertiesZ[i].BoundingBox, out bMergedZ);
-                bLeafCountX += resources.BinPropertiesX[i].LeafCount;
-                bLeafCountY += resources.BinPropertiesY[i].LeafCount;
-                bLeafCountZ += resources.BinPropertiesZ[i].LeafCount;
+                var binX = resources.BinPropertiesX + i;
+                var binY = resources.BinPropertiesY + i;
+                var binZ = resources.BinPropertiesZ + i;
+                BoundingBox.Merge(ref bMergedX, ref binX->BoundingBox, out bMergedX);
+                BoundingBox.Merge(ref bMergedY, ref binY->BoundingBox, out bMergedY);
+                BoundingBox.Merge(ref bMergedZ, ref binZ->BoundingBox, out bMergedZ);
+                bLeafCountX += binX->LeafCount;
+                bLeafCountY += binY->LeafCount;
+                bLeafCountZ += binZ->LeafCount;
 
                 var metricAX = ComputeBoundsMetric(ref resources.AMergedX[aIndex]);
                 var metricAY = ComputeBoundsMetric(ref resources.AMergedY[aIndex]);
@@ -465,11 +471,12 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             for (int i = 1; i < binCount; ++i)
             {
-                resources.BinStartIndices[i] = resources.BinStartIndices[i - 1] + bestBinProperties[i - 1].SubtreeCount;
+                int previousIndex = i - 1;
+                resources.BinStartIndices[i] = resources.BinStartIndices[previousIndex] + bestBinProperties[previousIndex].SubtreeCount;
                 resources.BinSubtreeCountsSecondPass[i] = 0;
             }
 
-            var startIndexMapTime = Stopwatch.GetTimestamp();
+            //var startIndexMapTime = Stopwatch.GetTimestamp();
 
             for (int i = 0; i < count; ++i)
             {
@@ -482,19 +489,19 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 localIndexMap[i] = resources.TempIndexMap[i];
             }
-            var endIndexMapTime = Stopwatch.GetTimestamp();
-            var indexMapTime = (endIndexMapTime - startIndexMapTime) / (double)Stopwatch.Frequency;
-            if (count == 262144)
-                Console.WriteLine($"Indexmap time (ms): {indexMapTime * 1e3f}");
+            //var endIndexMapTime = Stopwatch.GetTimestamp();
+            //var indexMapTime = (endIndexMapTime - startIndexMapTime) / (double)Stopwatch.Frequency;
+            //if (count == 262144)
+            //    Console.WriteLine($"Indexmap time (ms): {indexMapTime * 1e3f}");
 
             //Transform the split index into object indices.
             splitIndex = resources.BinStartIndices[binSplitIndex] + start;
 
 
-            var totalEndTime = Stopwatch.GetTimestamp();
-            var totalTime = (totalEndTime - totalStartTime) / (double)Stopwatch.Frequency;
-            if (count == 262144)
-                Console.WriteLine($"Total time (ms): {totalTime * 1e3f}, measured percent: {(centroidBoundsTime + allocateTime + indexMapTime) / totalTime}");
+            //var totalEndTime = Stopwatch.GetTimestamp();
+            //var totalTime = (totalEndTime - totalStartTime) / (double)Stopwatch.Frequency;
+            //if (count == 262144)
+            //    Console.WriteLine($"Total time (ms): {totalTime * 1e3f}, measured percent: {(centroidBoundsTime + allocateTime + indexMapTime) / totalTime}");
         }
 
 
