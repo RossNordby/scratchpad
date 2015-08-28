@@ -132,6 +132,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
                 var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+                var refinementTargets = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex((int)(tree.LeafCount / (maximumSubtrees * 0.5f))));
                 RawList<int> treeletInternalNodesCopy = new RawList<int>(maximumSubtrees);
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
@@ -214,13 +215,17 @@ namespace SIMDPrototyping.Trees.Tests
                     }
                     var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                    tree.Refit();
+                    refinementTargets.Count = 0;
+                    tree.RefitAndRefine(ref refinementTargets, t, 1);
+                    Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
+                    Console.WriteLine($"Refinement count: {refinementTargets.Count}");
+                    //tree.Refit();
 
-                    //if (t < 500)
+                    if (false)
                     {
                         //tree.RefitRefine(maximumSubtrees, 1.5f);
 
-                        const int skip = 1;
+                        const int skip = 8;
                         var startIndex = (int)((t * 79151L) % skip);
                         int numberOfDuplicates = 0;
                         int refinementCount = 0;

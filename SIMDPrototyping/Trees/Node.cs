@@ -242,30 +242,30 @@ namespace SIMDPrototyping.Trees
     {
         [FieldOffset(0)]
         public BoundingBox A;
-        [FieldOffset(12)]
-        public BoundingBox B;
         [FieldOffset(24)]
-        public int ChildA;
-        [FieldOffset(28)]
-        public int ChildB;
-        [FieldOffset(32)]
-        public int LeafCountA;
-        [FieldOffset(36)]
-        public int LeafCountB;
-        [FieldOffset(40)]
-        public int ChildCount;
-        [FieldOffset(44)]
-        public int Parent;
+        public BoundingBox B;
         [FieldOffset(48)]
-        public int IndexInParent;
+        public int ChildA;
         [FieldOffset(52)]
+        public int ChildB;
+        [FieldOffset(56)]
+        public int LeafCountA;
+        [FieldOffset(60)]
+        public int LeafCountB;
+        [FieldOffset(64)]
+        public int ChildCount;
+        [FieldOffset(68)]
+        public int Parent;
+        [FieldOffset(72)]
+        public int IndexInParent;
+        [FieldOffset(76)]
         public int RefineFlag;
         /// <summary>
         /// Cached change in cost of the tree starting at this node since the previous frame.
         /// The local cost change is unioned with the refine flags. They're never used simultaneously.
         /// This will be overwritten right after use, so don't expect anything meaningful here outside of refinement scheduling's scope.
         /// </summary>
-        [FieldOffset(52)]
+        [FieldOffset(76)]
         public float LocalCostChange;
 
     }

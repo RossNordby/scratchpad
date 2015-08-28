@@ -142,7 +142,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 Pop(out entry);
                 var node = nodes + entry.Index;
                 var changeInChildCount = remainingSubtreeSpace - node->ChildCount == 0 ? node->ChildCount : node->ChildCount - 1;
-                if (remainingSubtreeSpace >= changeInChildCount)
+                if (remainingSubtreeSpace >= changeInChildCount)// && node->RefineFlag == 0)
                 {
                     //This node's children can be included successfully in the remaining space.
                     index = entry.Index;
@@ -152,6 +152,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 else
                 {
+                    //Either this node's children did not fit, or it was a refinement target. Refinement targets cannot be expanded.
                     //Since we won't be able to find this later, it needs to be added now.
                     //We popped the previous entry off the queue, so the remainingSubtreeSpace does not change by re-adding it.
                     //(remainingSubtreeSpace = maximumSubtreesCount - (priorityQueue.Count + subtrees.Count))
@@ -176,6 +177,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //(You could lift this restriction and only take some nodes, but it would complicate things. You could not simply remove
             //the parent and add its children to go deeper; it would require doing some post-fixup on the results of the construction
             //or perhaps constraining the generation process to leave room for the unaffected nodes.)
+
 
             var node = nodes + nodeIndex;
             Debug.Assert(maximumSubtrees >= node->ChildCount, "Can't only consider some of a node's children, but specified maximumSubtrees precludes the treelet root's children.");
