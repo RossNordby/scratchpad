@@ -218,6 +218,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             BoundingBox centroidBoundingBox;
             centroidBoundingBox.Min = resources.Centroids[localIndexMap[0]];
             centroidBoundingBox.Max = centroidBoundingBox.Min;
+
             for (int i = 1; i < count; ++i)
             {
                 var centroid = resources.Centroids + localIndexMap[i];
@@ -307,7 +308,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var leafCount = resources.LeafCounts + subtreeIndex;
                 var subtreeBoundingBox = resources.BoundingBoxes + subtreeIndex;
 
-
                 resources.BinLeafCountsX[x] += *leafCount;
                 resources.BinLeafCountsY[y] += *leafCount;
                 resources.BinLeafCountsZ[z] += *leafCount;
@@ -315,6 +315,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 ++resources.BinSubtreeCountsX[x];
                 ++resources.BinSubtreeCountsY[y];
                 ++resources.BinSubtreeCountsZ[z];
+
                 BoundingBox.Merge(ref resources.BinBoundingBoxesX[x], ref *subtreeBoundingBox, out resources.BinBoundingBoxesX[x]);
                 BoundingBox.Merge(ref resources.BinBoundingBoxesY[y], ref *subtreeBoundingBox, out resources.BinBoundingBoxesY[y]);
                 BoundingBox.Merge(ref resources.BinBoundingBoxesZ[z], ref *subtreeBoundingBox, out resources.BinBoundingBoxesZ[z]);
@@ -468,7 +469,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             for (int i = 0; i < count; ++i)
             {
-                resources.TempIndexMap[resources.BinStartIndices[bestSubtreeBinIndices[i]] + resources.BinSubtreeCountsSecondPass[bestSubtreeBinIndices[i]]++] = localIndexMap[i];
+                var index = bestSubtreeBinIndices[i];
+                resources.TempIndexMap[resources.BinStartIndices[index] + resources.BinSubtreeCountsSecondPass[index]++] = localIndexMap[i];
             }
 
             //Update the real index map.
@@ -628,7 +630,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             Debug.Assert(subtreeReferences.Count <= maximumSubtrees);
-            
+
             //CollectSubtreesDirect(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             if (treeletInternalNodesCopy != null)
             {
