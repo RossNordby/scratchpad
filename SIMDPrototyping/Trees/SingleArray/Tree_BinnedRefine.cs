@@ -269,6 +269,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 span.X > 1e-7f ? binCount / span.X : 0,
                 span.Y > 1e-7f ? binCount / span.Y : 0,
                 span.Z > 1e-7f ? binCount / span.Z : 0);
+            //inverseBinSize = new Vector3(inverseBinSize.X, inverseBinSize.Y, inverseBinSize.Z);
 
             //If the span along an axis is too small, just ignore it.
             var maximumBinIndex = new Vector3(binCount - 1);
@@ -299,21 +300,24 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var y = (int)binIndices.Y;
                 var z = (int)binIndices.Z;
 
-                var subtreeBoundingBox = resources.BoundingBoxes + subtreeIndex;
-                var leafCount = resources.LeafCounts + subtreeIndex;
-                BoundingBox.Merge(ref resources.BinBoundingBoxesX[x], ref *subtreeBoundingBox, out resources.BinBoundingBoxesX[x]);
-                BoundingBox.Merge(ref resources.BinBoundingBoxesY[y], ref *subtreeBoundingBox, out resources.BinBoundingBoxesY[y]);
-                BoundingBox.Merge(ref resources.BinBoundingBoxesZ[z], ref *subtreeBoundingBox, out resources.BinBoundingBoxesZ[z]);
-                resources.BinLeafCountsX[x] += *leafCount;
-                resources.BinLeafCountsY[y] += *leafCount;
-                resources.BinLeafCountsZ[z] += *leafCount;
-                ++resources.BinSubtreeCountsX[x];
-                ++resources.BinSubtreeCountsY[y];
-                ++resources.BinSubtreeCountsZ[z];
-
                 resources.SubtreeBinIndicesX[i] = x;
                 resources.SubtreeBinIndicesY[i] = y;
                 resources.SubtreeBinIndicesZ[i] = z;
+
+                var leafCount = resources.LeafCounts + subtreeIndex;
+                var subtreeBoundingBox = resources.BoundingBoxes + subtreeIndex;
+
+
+                resources.BinLeafCountsX[x] += *leafCount;
+                resources.BinLeafCountsY[y] += *leafCount;
+                resources.BinLeafCountsZ[z] += *leafCount;
+
+                ++resources.BinSubtreeCountsX[x];
+                ++resources.BinSubtreeCountsY[y];
+                ++resources.BinSubtreeCountsZ[z];
+                BoundingBox.Merge(ref resources.BinBoundingBoxesX[x], ref *subtreeBoundingBox, out resources.BinBoundingBoxesX[x]);
+                BoundingBox.Merge(ref resources.BinBoundingBoxesY[y], ref *subtreeBoundingBox, out resources.BinBoundingBoxesY[y]);
+                BoundingBox.Merge(ref resources.BinBoundingBoxesZ[z], ref *subtreeBoundingBox, out resources.BinBoundingBoxesZ[z]);
             }
             var endAllocateToBins = Stopwatch.GetTimestamp();
             var allocateTime = (endAllocateToBins - startAllocateToBins) / (double)Stopwatch.Frequency;
