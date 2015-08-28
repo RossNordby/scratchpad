@@ -215,14 +215,49 @@ namespace SIMDPrototyping.Trees.Tests
                     }
                     var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
+                    List<int> refinementTargets2 = new List<int>();
+                    {
+                        const int skip = 8;
+                        var startIndex = (int)((t * 79151L) % skip);
+                        for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        {
+                            var node = tree.Nodes[i];
+                            var leafCounts = &node.LeafCountA;
+                            int leafCount = 0;
+                            for (int childIndex = 0; childIndex < node.ChildCount; ++childIndex)
+                            {
+                                leafCount += leafCounts[childIndex];
+                            }
+
+                            if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
+                            {
+                                refinementTargets2.Add(i);
+                            }
+                        }
+                    }
+
+
                     refinementTargets.Count = 0;
                     tree.RefitAndRefine(ref refinementTargets, t, 1);
-                    Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
-                    Console.WriteLine($"Refinement count: {refinementTargets.Count}");
-                    //tree.Refit();
+                    //Console.WriteLine($"Tree depth: {tree.ComputeMaximumDepth()}");
+                    //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
+
+
+
+                    //Array.Sort(refinementTargets.Elements, 0, refinementTargets.Count);
+                    //refinementTargets2.Sort();
+
+                    //for (int j = 0; j < refinementTargets.Count; ++j)
+                    //{
+                    //    if (refinementTargets[j] != refinementTargets2[j])
+                    //        Console.WriteLine("bad");
+                    //}
+
 
                     if (false)
                     {
+                        tree.Refit();
+
                         //tree.RefitRefine(maximumSubtrees, 1.5f);
 
                         const int skip = 8;

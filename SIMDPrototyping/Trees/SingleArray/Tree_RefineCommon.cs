@@ -142,7 +142,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 Pop(out entry);
                 var node = nodes + entry.Index;
                 var changeInChildCount = remainingSubtreeSpace - node->ChildCount == 0 ? node->ChildCount : node->ChildCount - 1;
-                if (remainingSubtreeSpace >= changeInChildCount)// && node->RefineFlag == 0)
+                if (remainingSubtreeSpace >= changeInChildCount && node->RefineFlag == 0)
                 {
                     //This node's children can be included successfully in the remaining space.
                     index = entry.Index;

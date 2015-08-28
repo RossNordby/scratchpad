@@ -70,15 +70,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
             var postmetric = ComputeBoundsMetric(ref boundingBox);
 
-            var volumeChange = postmetric - premetric + changeA + changeB; //TODO: would clamping produce a superior result?
+            var childVolumeChange = changeA + changeB;
 
-            //TODO: Should the treelet root node's volume change really be included? You cannot refine away the root's volume change, after all.
-            //And that is the whole reason why we're storing the local cost change...
             //Cache the volume change in the node for later analysis.
-            node->LocalCostChange = postmetric >= 1e-9f ? volumeChange / postmetric : float.MaxValue;
+            //Current volume change is not included- the choice of whether to refine a node doesn't rely on that particular node's combined bounds, only its children.
+            node->LocalCostChange = postmetric >= 1e-9f ? childVolumeChange / postmetric : float.MaxValue;
 
 
-            return volumeChange;
+            return postmetric - premetric + childVolumeChange;//TODO: would clamping produce a superior result?
 
         }
 
@@ -95,7 +94,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //TODO: Should the root node's volume change really be included? You cannot refine away the root's volume change, after all.
             var rootChildren = &nodes->ChildA;
             var rootBounds = &nodes->A;
-            float volumeChange = 0;
+            float childVolumeChange = 0;
             BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             BoundingBox postmerge = premerge;
             for (int i = 0; i < nodes->ChildCount; ++i)
@@ -104,7 +103,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (rootChildren[i] >= 0)
                 {
 #if NODE2
-                    volumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
+                    childVolumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
 #else
                     volumeChange += RefitAndScoreUpper(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
 #endif
@@ -113,11 +112,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             var premetric = ComputeBoundsMetric(ref premerge);
             var postmetric = ComputeBoundsMetric(ref postmerge);
-            volumeChange += postmetric - premetric; //TODO: would clamping produce a superior result?
-            var costChange = postmetric >= 1e-9f ? volumeChange / postmetric : float.MaxValue;
+            //Current volume change is not included- the choice of whether to refine a node doesn't rely on that particular node's combined bounds, only its children.
+            float inversePostMetric = 1f / postmetric;
+            var costChange = postmetric >= 1e-9f ? childVolumeChange * inversePostMetric : float.MaxValue;
             nodes->LocalCostChange = costChange;
 
-            return costChange;
+            return (postmetric - premetric) * inversePostMetric + costChange;//TODO: would clamping produce a superior result?
         }
 
 
@@ -144,8 +144,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var costScale = Math.Min(1, Math.Max(0, (distanceFromLastRefinement - invariants.MinimumDistance) * invariants.DistancePenaltySlope + invariants.DistancePenaltyOffset));
                 var scaledCostChange = node->LocalCostChange * costScale;
 
-                if (scaledCostChange > invariants.RefinementThreshold || //If true, this node's subtree changed a lot since the previous frame relative to its size.
-                    (index - invariants.PeriodicOffset) % invariants.Period == 0 || index == 0) //If true, this node was chosen as one of the periodic nodes.
+                //if (scaledCostChange > invariants.RefinementThreshold || //If true, this node's subtree changed a lot since the previous frame relative to its size.
+                //    (index - invariants.PeriodicOffset) % invariants.Period == 0 || index == 0) //If true, this node was chosen as one of the periodic nodes.
+                if ((index) % invariants.Period == invariants.PeriodicOffset || index == 0)
                 {
                     node->RefineFlag = 1;
                     refinementTargets.Add(index);
@@ -160,6 +161,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             else
             {
+                node->RefineFlag = 0;
                 refined = false;
             }
 
@@ -169,6 +171,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (leafCounts[i] >= invariants.LeafCountThreshold && children[i] >= 0)
+                //if (children[i] >= 0)
                 {
                     MarkForRefinement2(children[i], distance, ref invariants, ref refinementTargets);
                 }
@@ -189,14 +192,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Higher aggressiveness->lower period.
             //Is the need for higher aggressiveness linear, or nonlinear? Nonlinear unbounded seems more obvious.
             invariants.Period = (int)(16f / (aggressiveness + 1)) + 1;
-            invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+            //invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+            invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
             invariants.MinimumDistance = (int)(levelsInRefine * 0.5);
             const float minimumMultiplier = 0.1f;
             invariants.DistancePenaltyOffset = minimumMultiplier;
             invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / (levelsInRefine * 0.65f));
             invariants.RefinementThreshold = 1f / (aggressiveness + 1);
 
-            MarkForRefinement2(0, int.MaxValue, ref invariants, ref refinementTargets);
+            MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
 
             //Refine all marked targets.
             var pool = BufferPools<int>.Thread;
