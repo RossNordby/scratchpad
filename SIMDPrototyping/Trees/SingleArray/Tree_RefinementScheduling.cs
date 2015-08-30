@@ -16,6 +16,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe float RefitAndScoreLower2(int nodeIndex, ref BoundingBox boundingBox)
         {
             var node = nodes + nodeIndex;
+
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
 
@@ -43,6 +44,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe float RefitAndScoreUpper2(int nodeIndex, int leafCountThreshold, ref BoundingBox boundingBox)
         {
             var node = nodes + nodeIndex;
+
             //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
             Debug.Assert(node->ChildCount >= 2);
 
@@ -50,7 +52,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             float changeA, changeB;
             if (node->ChildA >= 0)
             {
-                if (node->LeafCountA > leafCountThreshold)
+                if (node->LeafCountA >= leafCountThreshold)
                     changeA = RefitAndScoreUpper2(node->ChildA, leafCountThreshold, ref node->A);
                 else
                     changeA = RefitAndScoreLower2(node->ChildA, ref node->A);
@@ -60,7 +62,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 changeA = 0;
             if (node->ChildB >= 0)
             {
-                if (node->LeafCountB > leafCountThreshold)
+                if (node->LeafCountB >= leafCountThreshold)
                     changeB = RefitAndScoreUpper2(node->ChildB, leafCountThreshold, ref node->B);
                 else
                     changeB = RefitAndScoreLower2(node->ChildB, ref node->B);
@@ -83,6 +85,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe float RefitAndScore2(int leafCountThreshold)
         {
+
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             if (nodes->ChildCount < 2)
             {
@@ -94,6 +97,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //TODO: Should the root node's volume change really be included? You cannot refine away the root's volume change, after all.
             var rootChildren = &nodes->ChildA;
             var rootBounds = &nodes->A;
+            var rootLeafCounts = &nodes->LeafCountA;
             float childVolumeChange = 0;
             BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             BoundingBox postmerge = premerge;
@@ -103,9 +107,17 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (rootChildren[i] >= 0)
                 {
 #if NODE2
-                    childVolumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
+                    if (rootLeafCounts[i] >= leafCountThreshold)
+                        childVolumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
+                    else
+                        childVolumeChange += RefitAndScoreLower2(rootChildren[i], ref rootBounds[i]);
+
 #else
-                    volumeChange += RefitAndScoreUpper(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
+                    if (rootLeafCounts[i] >= leafCountThreshold)
+                        volumeChange += RefitAndScoreUpper(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
+                    else
+                        childVolumeChange += RefitAndScoreLower(rootChildren[i], ref rootBounds[i]);
+
 #endif
                 }
                 BoundingBox.Merge(ref rootBounds[i], ref postmerge, out postmerge);
@@ -116,6 +128,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             float inversePostMetric = 1f / postmetric;
             var costChange = postmetric >= 1e-9f ? childVolumeChange * inversePostMetric : float.MaxValue;
             nodes->LocalCostChange = costChange;
+
 
             return (postmetric - premetric) * inversePostMetric + costChange;//TODO: would clamping produce a superior result?
         }
@@ -179,6 +192,51 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
+        unsafe void MarkForRefinement22(int index, ref MarkInvariants invariants, ref QuickList<int> refinementCandidates)
+        {
+            var node = nodes + index;
+
+            node->RefineFlag = 0; //clear out old flag info... may get set to 1 later.
+
+            var children = &node->ChildA;
+            var leafCounts = &node->LeafCountA;
+            bool isWavefrontNode = false;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0 && leafCounts[i] >= invariants.LeafCountThreshold)
+                {
+                    MarkForRefinement22(children[i], ref invariants, ref refinementCandidates);
+                }
+                else
+                {
+                    //Either it's a leaf or it's an internal node without many children.
+                    //Either way, this node is on the forefront.
+                    isWavefrontNode = true;
+                }
+            }
+
+            if (isWavefrontNode)
+                refinementCandidates.Add(index);
+
+
+        }
+
+        unsafe void ValidateRefineFlags(int index)
+        {
+            var node = nodes + index;
+            if (node->RefineFlag != 0)
+                Console.WriteLine("BAD");
+
+            var children = &node->ChildA;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    ValidateRefineFlags(children[i]);
+                }
+            }
+        }
+
         public unsafe void RefitAndRefine(ref QuickList<int> refinementTargets, int frameIndex, float aggressivenessScale, int maximumSubtrees = 1024)
         {
             var levelsInRefine = Math.Log(maximumSubtrees, ChildrenCapacity);
@@ -186,13 +244,25 @@ namespace SIMDPrototyping.Trees.SingleArray
             MarkInvariants invariants;
             invariants.LeafCountThreshold = (int)Math.Min(leafCount, 0.75f * maximumSubtrees);
 
+            //ValidateRefineFlags(0);
             var costChange = RefitAndScore2(invariants.LeafCountThreshold);
 
 
             var aggressiveness = Math.Max(0, costChange * aggressivenessScale);
 
-            //Higher aggressiveness->lower period.
-            //Is the need for higher aggressiveness linear, or nonlinear? Nonlinear unbounded seems more obvious.
+            ////Higher aggressiveness->lower period.
+            ////Is the need for higher aggressiveness linear, or nonlinear? Nonlinear unbounded seems more obvious.
+            //invariants.Period = Math.Max(2, (int)(16f / (aggressiveness + .01f)) + 1);
+            //invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+            ////invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
+            //invariants.MinimumDistance = 0;// (int)(levelsInRefine * 0.25);
+            //const float minimumMultiplier = 0.1f;
+            //invariants.DistancePenaltyOffset = minimumMultiplier;
+            //invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / (levelsInRefine * 0.65f));
+            //invariants.RefinementThreshold = 1f / (aggressiveness + 1);
+
+            //MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
+
             invariants.Period = Math.Max(2, (int)(16f / (aggressiveness + .01f)) + 1);
             invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
             //invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
@@ -202,7 +272,24 @@ namespace SIMDPrototyping.Trees.SingleArray
             invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / (levelsInRefine * 0.65f));
             invariants.RefinementThreshold = 1f / (aggressiveness + 1);
 
-            MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
+
+            //Collect the refinement candidates.
+            MarkForRefinement22(0, ref invariants, ref refinementTargets);
+
+            //ValidateRefineFlags(0);
+
+            invariants.Period = Math.Min(refinementTargets.Count, invariants.Period);
+            invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+
+            int actualRefinementTargetsCount = 0;
+            for (int i = invariants.PeriodicOffset; i < refinementTargets.Count; i += invariants.Period)
+            {
+                refinementTargets[actualRefinementTargetsCount++] = refinementTargets[i];
+                nodes[refinementTargets[i]].RefineFlag = 1;
+            }
+            refinementTargets.Count = actualRefinementTargetsCount;
+            if (!refinementTargets.Contains(0))
+                refinementTargets.Add(0);
 
 
             if (costChange > 1000)
@@ -231,7 +318,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             BinnedResources resources;
             CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
 
-            for (int i = refinementTargets.Count - 1; i >= 0; --i)
+            for (int i = 0; i < refinementTargets.Count; ++i)
             {
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.FastClear();

@@ -696,7 +696,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);
 
-            if (true) // newTreeletCost < originalTreeletCost)
+            if (true)//newTreeletCost < originalTreeletCost)
             {
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
