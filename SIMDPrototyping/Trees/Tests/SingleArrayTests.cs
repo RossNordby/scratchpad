@@ -337,10 +337,10 @@ namespace SIMDPrototyping.Trees.Tests
                     //}
                     //tree.RemoveUnusedInternalNodes(ref spareNodes);
 
-                    startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     {
 
-                        const int skip = 1024;
+                        const int skip = 4096;
                         const int intervalLength = 1024;
                         var startIndex = (t * intervalLength) % skip;
                         for (int i = startIndex; i < tree.NodeCount; i += skip)

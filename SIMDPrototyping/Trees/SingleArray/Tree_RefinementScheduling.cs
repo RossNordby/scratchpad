@@ -192,7 +192,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        unsafe void MarkForRefinement22(int index, ref MarkInvariants invariants, ref QuickList<int> refinementCandidates)
+        unsafe void MarkForRefinement22(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates)
         {
             var node = nodes + index;
 
@@ -203,9 +203,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             bool isWavefrontNode = false;
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (children[i] >= 0 && leafCounts[i] >= invariants.LeafCountThreshold)
+                if (children[i] >= 0 && leafCounts[i] >= leafCountThreshold)
                 {
-                    MarkForRefinement22(children[i], ref invariants, ref refinementCandidates);
+                    MarkForRefinement22(children[i], leafCountThreshold, ref refinementCandidates);
                 }
                 else
                 {
@@ -263,33 +263,33 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
 
-            invariants.Period = Math.Max(2, (int)(16f / (aggressiveness + .01f)) + 1);
-            invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
-            //invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
-            invariants.MinimumDistance = 0;// (int)(levelsInRefine * 0.25);
-            const float minimumMultiplier = 0.1f;
-            invariants.DistancePenaltyOffset = minimumMultiplier;
-            invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / (levelsInRefine * 0.65f));
-            invariants.RefinementThreshold = 1f / (aggressiveness + 1);
+            float portion = Math.Min(1, aggressiveness * 0.5f);
 
 
             //Collect the refinement candidates.
-            MarkForRefinement22(0, ref invariants, ref refinementTargets);
-
+            MarkForRefinement22(0, invariants.LeafCountThreshold, ref refinementTargets);
             //ValidateRefineFlags(0);
 
-            invariants.Period = Math.Min(refinementTargets.Count, invariants.Period);
-            invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
+            var targetRefinementScale = Math.Max(1, refinementTargets.Count * portion);
+            var period = (int)(refinementTargets.Count / targetRefinementScale);
+            var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
+            
 
             int actualRefinementTargetsCount = 0;
-            for (int i = invariants.PeriodicOffset; i < refinementTargets.Count; i += invariants.Period)
+            int targetRefinementCount = (int)targetRefinementScale;
+            for (int i = 0; i < targetRefinementCount; ++i)
             {
-                refinementTargets[actualRefinementTargetsCount++] = refinementTargets[i];
-                nodes[refinementTargets[i]].RefineFlag = 1;
+                var index = i * period + offset;
+                if (index >= refinementTargets.Count)
+                    index -= refinementTargets.Count;
+                Debug.Assert(index < refinementTargets.Count && index >= 0);
+                refinementTargets[actualRefinementTargetsCount++] = refinementTargets[index];
+                nodes[refinementTargets[index]].RefineFlag = 1;
             }
             refinementTargets.Count = actualRefinementTargetsCount;
-            if (!refinementTargets.Contains(0))
-                refinementTargets.Add(0);
+            //if (!refinementTargets.Contains(0))
+            //    refinementTargets.Add(0);
+            Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
 
             if (costChange > 1000)
