@@ -192,7 +192,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        unsafe void MarkForRefinement22(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates)
+        unsafe void MarkForRefinement22(int index, int leafCount, int leafCountThreshold, ref QuickList<int> refinementCandidates, out int newThreshold)
         {
             var node = nodes + index;
 
@@ -201,22 +201,46 @@ namespace SIMDPrototyping.Trees.SingleArray
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
             bool isWavefrontNode = false;
+            newThreshold = leafCountThreshold;
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (children[i] >= 0 && leafCounts[i] >= leafCountThreshold)
                 {
-                    MarkForRefinement22(children[i], leafCountThreshold, ref refinementCandidates);
+                    int candidateNewThreshold;
+                    MarkForRefinement22(children[i], leafCounts[i], leafCountThreshold, ref refinementCandidates, out candidateNewThreshold);
+                    if (candidateNewThreshold == leafCountThreshold)
+                        Console.WriteLine("asdF");
+                    if (candidateNewThreshold > newThreshold)
+                        newThreshold = candidateNewThreshold;
                 }
                 else
                 {
                     //Either it's a leaf or it's an internal node without many children.
                     //Either way, this node is on the forefront.
+
                     isWavefrontNode = true;
                 }
             }
 
+
             if (isWavefrontNode)
+            {
+                //Note that we do not set the refinement flag here. These are CANDIDATES; a subset of actual targets will be selected later.
                 refinementCandidates.Add(index);
+                newThreshold = Math.Min(newThreshold * leafCountThreshold, this.leafCount);
+            }
+            else
+            {
+                //newThreshold guaranteed to be defined by the loop if we're here. If isWavefrontNode is false, then at least one child set newThreshold (all children, in fact).
+                Debug.Assert(newThreshold > leafCountThreshold);
+                if (leafCount >= newThreshold)
+                {
+                    refinementCandidates.Add(index);
+                    newThreshold = Math.Min(newThreshold * leafCountThreshold, this.leafCount);
+                }
+            }
+
+
 
 
         }
@@ -242,7 +266,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var levelsInRefine = Math.Log(maximumSubtrees, ChildrenCapacity);
 
             MarkInvariants invariants;
-            invariants.LeafCountThreshold = (int)Math.Min(leafCount, 0.75f * maximumSubtrees);
+            invariants.LeafCountThreshold = (int)Math.Min(leafCount, 0.3f * maximumSubtrees);
 
             //ValidateRefineFlags(0);
             var costChange = RefitAndScore2(invariants.LeafCountThreshold);
@@ -267,13 +291,14 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             //Collect the refinement candidates.
-            MarkForRefinement22(0, invariants.LeafCountThreshold, ref refinementTargets);
+            int newThreshold;
+            MarkForRefinement22(0, leafCount, invariants.LeafCountThreshold, ref refinementTargets, out newThreshold);
             //ValidateRefineFlags(0);
 
-            var targetRefinementScale = Math.Max(1, refinementTargets.Count * portion);
+            var targetRefinementScale = Math.Max(4, refinementTargets.Count * portion);
             var period = (int)(refinementTargets.Count / targetRefinementScale);
             var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
-            
+
 
             int actualRefinementTargetsCount = 0;
             int targetRefinementCount = (int)targetRefinementScale;
