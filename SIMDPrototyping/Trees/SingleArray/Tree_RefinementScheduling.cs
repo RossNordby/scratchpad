@@ -52,7 +52,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             float changeA, changeB;
             if (node->ChildA >= 0)
             {
-                if (node->LeafCountA >= leafCountThreshold)
+                if (node->LeafCountA > leafCountThreshold)
                     changeA = RefitAndScoreUpper2(node->ChildA, leafCountThreshold, ref node->A);
                 else
                     changeA = RefitAndScoreLower2(node->ChildA, ref node->A);
@@ -62,7 +62,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 changeA = 0;
             if (node->ChildB >= 0)
             {
-                if (node->LeafCountB >= leafCountThreshold)
+                if (node->LeafCountB > leafCountThreshold)
                     changeB = RefitAndScoreUpper2(node->ChildB, leafCountThreshold, ref node->B);
                 else
                     changeB = RefitAndScoreLower2(node->ChildB, ref node->B);
@@ -107,13 +107,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (rootChildren[i] >= 0)
                 {
 #if NODE2
-                    if (rootLeafCounts[i] >= leafCountThreshold)
+                    if (rootLeafCounts[i] > leafCountThreshold)
                         childVolumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
                     else
                         childVolumeChange += RefitAndScoreLower2(rootChildren[i], ref rootBounds[i]);
 
 #else
-                    if (rootLeafCounts[i] >= leafCountThreshold)
+                    if (rootLeafCounts[i] > leafCountThreshold)
                         volumeChange += RefitAndScoreUpper(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
                     else
                         childVolumeChange += RefitAndScoreLower(rootChildren[i], ref rootBounds[i]);
@@ -192,53 +192,69 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        unsafe void MarkForRefinement22(int index, int leafCount, int leafCountThreshold, ref QuickList<int> refinementCandidates, out int newThreshold)
+        unsafe void MarkForRefinement22(int index, int parentLeafCount, int leafCount, int leafCountThreshold, ref QuickList<int> refinementCandidates, out int newThreshold)
         {
+            Debug.Assert(leafCountThreshold > 1);
+
             var node = nodes + index;
 
             node->RefineFlag = 0; //clear out old flag info... may get set to 1 later.
 
+
             var children = &node->ChildA;
             var leafCounts = &node->LeafCountA;
-            bool isWavefrontNode = false;
-            newThreshold = leafCountThreshold;
+            bool isWavefrontParent = false;
+            newThreshold = int.MaxValue;
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (children[i] >= 0 && leafCounts[i] >= leafCountThreshold)
+
+                if (children[i] >= 0)
                 {
-                    int candidateNewThreshold;
-                    MarkForRefinement22(children[i], leafCounts[i], leafCountThreshold, ref refinementCandidates, out candidateNewThreshold);
-                    if (candidateNewThreshold == leafCountThreshold)
-                        Console.WriteLine("asdF");
-                    if (candidateNewThreshold > newThreshold)
-                        newThreshold = candidateNewThreshold;
+                    if (leafCounts[i] <= leafCountThreshold)
+                    {
+                        //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
+                        //Since we don't traverse into these children, there is no need to check the parent's leaf count.
+                        refinementCandidates.Add(children[i]);
+                        isWavefrontParent = true;
+                        newThreshold = leafCountThreshold;
+                    }
+                    else
+                    {
+                        int candidateNewThreshold;
+                        MarkForRefinement22(children[i], leafCount, leafCounts[i], leafCountThreshold, ref refinementCandidates, out candidateNewThreshold);
+
+                        if (candidateNewThreshold < newThreshold)
+                            newThreshold = candidateNewThreshold;
+                    }
                 }
                 else
                 {
-                    //Either it's a leaf or it's an internal node without many children.
-                    //Either way, this node is on the forefront.
-
-                    isWavefrontNode = true;
+                    newThreshold = leafCountThreshold;
                 }
+                //Leaves are not considered members of the wavefront. They're not *refinement candidates* since they're not internal nodes.
+                //The threshold does not need to be modified when a leaf node is encountered.
+
+
             }
 
-
-            if (isWavefrontNode)
+            //TODO: smaller than leafCountThreshold multiplicative factor?
+            const float scale = 0.25f;
+            const float minimum = 1f / (scale * scale);
+            if (isWavefrontParent)
             {
-                //Note that we do not set the refinement flag here. These are CANDIDATES; a subset of actual targets will be selected later.
+                //This was a wavefront parent, so set the threshold for the parent to be accepted.
+                var scaledLeafThreshold = scale * leafCountThreshold;
+                newThreshold = (int)Math.Min(Math.Max(minimum, scaledLeafThreshold * scaledLeafThreshold), this.leafCount);
+            }
+
+            if (leafCount <= newThreshold && parentLeafCount > newThreshold)
+            {
+                //This is a transition node.
                 refinementCandidates.Add(index);
-                newThreshold = Math.Min(newThreshold * leafCountThreshold, this.leafCount);
+                newThreshold = Math.Min(newThreshold * (int)(leafCountThreshold * scale), this.leafCount);
             }
-            else
-            {
-                //newThreshold guaranteed to be defined by the loop if we're here. If isWavefrontNode is false, then at least one child set newThreshold (all children, in fact).
-                Debug.Assert(newThreshold > leafCountThreshold);
-                if (leafCount >= newThreshold)
-                {
-                    refinementCandidates.Add(index);
-                    newThreshold = Math.Min(newThreshold * leafCountThreshold, this.leafCount);
-                }
-            }
+
+
 
 
 
@@ -266,7 +282,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var levelsInRefine = Math.Log(maximumSubtrees, ChildrenCapacity);
 
             MarkInvariants invariants;
-            invariants.LeafCountThreshold = (int)Math.Min(leafCount, 0.3f * maximumSubtrees);
+            invariants.LeafCountThreshold = (int)Math.Min(leafCount, maximumSubtrees);
 
             //ValidateRefineFlags(0);
             var costChange = RefitAndScore2(invariants.LeafCountThreshold);
@@ -287,12 +303,12 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
 
-            float portion = Math.Min(1, aggressiveness * 0.5f);
+            float portion = 1;// Math.Min(1, aggressiveness * 0.5f);
 
 
             //Collect the refinement candidates.
             int newThreshold;
-            MarkForRefinement22(0, leafCount, invariants.LeafCountThreshold, ref refinementTargets, out newThreshold);
+            MarkForRefinement22(0, int.MaxValue, this.leafCount, invariants.LeafCountThreshold, ref refinementTargets, out newThreshold);
             //ValidateRefineFlags(0);
 
             var targetRefinementScale = Math.Max(4, refinementTargets.Count * portion);
@@ -314,7 +330,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             refinementTargets.Count = actualRefinementTargetsCount;
             //if (!refinementTargets.Contains(0))
             //    refinementTargets.Add(0);
-            Console.WriteLine($"Refinement count: {refinementTargets.Count}");
+            //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
 
             if (costChange > 1000)
@@ -343,17 +359,34 @@ namespace SIMDPrototyping.Trees.SingleArray
             BinnedResources resources;
             CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
 
+
+            var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
+            RawList<int> treeletInternalNodesCopy = new RawList<int>();
+            int numberOfDuplicates = 0;
+            //for (int i = refinementTargets.Count - 1; i >= 0; --i)
             for (int i = 0; i < refinementTargets.Count; ++i)
             {
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.FastClear();
                 bool nodesInvalidated;
-                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
                 nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+
+                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                {
+                    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
+                    {
+                        ++numberOfDuplicates;
+                    }
+                }
             }
+            Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
+            Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
+            visitedNodes.Dispose();
+
             RemoveUnusedInternalNodes(ref spareNodes);
             region.Dispose();
             pool.GiveBack(buffer);

@@ -147,8 +147,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //So, the change in remainingSubtreeSpace = maximumSubtreesCount - (priorityQueue.Count + subtrees.Count) is childCount - 1.
                 //This is ALWAYS the case.
                 var changeInChildCount = node->ChildCount - 1;
-                if (remainingSubtreeSpace >= changeInChildCount && node->RefineFlag == 0)
+                if (remainingSubtreeSpace >= changeInChildCount)// && node->RefineFlag == 0)
                 {
+                    //Debug.Fail("don't forget to reenable the refine flag condition");
                     //This node's children can be included successfully in the remaining space.
                     index = entry.Index;
                     cost = entry.Cost;

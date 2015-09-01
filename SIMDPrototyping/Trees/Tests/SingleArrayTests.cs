@@ -178,7 +178,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.Validate();
                 //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 Random random = new Random(5);
-                const float maxVelocity = 1;
+                const float maxVelocity = 10;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);
@@ -340,7 +340,7 @@ namespace SIMDPrototyping.Trees.Tests
                     //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     {
 
-                        const int skip = 4096;
+                        const int skip = 1024;
                         const int intervalLength = 1024;
                         var startIndex = (t * intervalLength) % skip;
                         for (int i = startIndex; i < tree.NodeCount; i += skip)
@@ -360,6 +360,7 @@ namespace SIMDPrototyping.Trees.Tests
                         Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");
                         Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                         Console.WriteLine($"Refine/Optimize Time: {endTimeInner - startTimeInner}");
+                        Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
                     }
                     tree.Validate();
