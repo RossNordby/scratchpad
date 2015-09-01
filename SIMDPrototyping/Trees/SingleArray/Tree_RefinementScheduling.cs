@@ -313,7 +313,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var targetRefinementScale = Math.Max(4, refinementTargets.Count * portion);
             var period = (int)(refinementTargets.Count / targetRefinementScale);
-            var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
+            var offset = 0;// (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
 
 
             int actualRefinementTargetsCount = 0;
@@ -381,6 +381,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         ++numberOfDuplicates;
                     }
+                }
+                for (int j = i + 1; j < refinementTargets.Count; ++j)
+                {
+                    if (treeletInternalNodesCopy.Contains(refinementTargets[j]))
+                        Console.WriteLine("asdF");
                 }
             }
             Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
