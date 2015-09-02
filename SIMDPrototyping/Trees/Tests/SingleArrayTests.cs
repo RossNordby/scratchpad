@@ -178,7 +178,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.Validate();
                 //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 Random random = new Random(5);
-                const float maxVelocity = 10;
+                const float maxVelocity = 1000;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);

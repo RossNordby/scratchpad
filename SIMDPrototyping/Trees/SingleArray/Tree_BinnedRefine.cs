@@ -692,6 +692,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             float newTreeletCost;
             CreateStagingNodeBinned(parent, indexInParent, ref treeletBoundingBox, ref resources, 0, subtreeReferences.Count, ref stagingNodeCount, out newTreeletCost);
+            //Copy the refine flag over from the treelet root so that it persists.
+            resources.StagingNodes[0].RefineFlag = node->RefineFlag;
 
 
             //ValidateStaging(stagingNodes, sweepSubtrees, ref subtreeReferences, parent, indexInParent);

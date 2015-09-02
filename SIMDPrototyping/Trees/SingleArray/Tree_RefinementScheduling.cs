@@ -247,12 +247,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 newThreshold = (int)Math.Min(Math.Max(minimum, scaledLeafThreshold * scaledLeafThreshold), this.leafCount);
             }
 
-            if (leafCount <= newThreshold && parentLeafCount > newThreshold)
-            {
-                //This is a transition node.
-                refinementCandidates.Add(index);
-                newThreshold = Math.Min(newThreshold * (int)(leafCountThreshold * scale), this.leafCount);
-            }
+            //if (true)//leafCount <= newThreshold && parentLeafCount > newThreshold)
+            //{
+            //    //This is a transition node.
+            //    refinementCandidates.Add(index);
+            //    newThreshold = Math.Min(newThreshold * (int)(leafCountThreshold * scale), this.leafCount);
+            //}
 
 
 
@@ -328,8 +328,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes[refinementTargets[index]].RefineFlag = 1;
             }
             refinementTargets.Count = actualRefinementTargetsCount;
-            //if (!refinementTargets.Contains(0))
-            //    refinementTargets.Add(0);
+            if (!refinementTargets.Contains(0))
+            {
+                refinementTargets.Add(0);
+                nodes->RefineFlag = 1;
+            }
             //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
 
@@ -357,7 +360,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
-            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
+            CreateBinnedResources(pool, maximumSubtrees * 4, out buffer, out region, out resources);
 
 
             var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
@@ -369,7 +372,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.FastClear();
                 bool nodesInvalidated;
-                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, refinementTargets[i] == 0 ? maximumSubtrees * 1: maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
@@ -382,12 +385,16 @@ namespace SIMDPrototyping.Trees.SingleArray
                         ++numberOfDuplicates;
                     }
                 }
-                for (int j = i + 1; j < refinementTargets.Count; ++j)
-                {
-                    if (treeletInternalNodesCopy.Contains(refinementTargets[j]))
-                        Console.WriteLine("asdF");
-                }
+                //for (int j = i + 1; j < refinementTargets.Count; ++j)
+                //{
+                //    if (treeletInternalNodesCopy.Contains(refinementTargets[j]))
+                //        Console.WriteLine("asdF");
+                //}
             }
+            //for (int i = 0; i < refinementTargets.Count; ++i)
+            //{
+            //    nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+            //}
             Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
             Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
             visitedNodes.Dispose();
