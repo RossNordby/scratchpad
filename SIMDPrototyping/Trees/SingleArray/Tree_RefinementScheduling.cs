@@ -14,201 +14,65 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
-        unsafe float RefitAndScoreLower2(int nodeIndex, ref BoundingBox boundingBox)
+        unsafe float RefitAndMeasure(int nodeIndex, ref BoundingBox boundingBox)
         {
             var node = nodes + nodeIndex;
 
-            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
+            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first ones.
             Debug.Assert(node->ChildCount >= 2);
 
             var premetric = ComputeBoundsMetric(ref boundingBox);
-            float changeA, changeB;
+            float childChange = 0;
             if (node->ChildA >= 0)
             {
-                changeA = RefitAndScoreLower2(node->ChildA, ref node->A);
+                childChange += RefitAndMeasure(node->ChildA, ref node->A);
             }
-            else
-                changeA = 0;
             if (node->ChildB >= 0)
             {
-                changeB = RefitAndScoreLower2(node->ChildB, ref node->B);
+                childChange += RefitAndMeasure(node->ChildB, ref node->B);
             }
-            else
-                changeB = 0;
             BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
-            var postmetric = ComputeBoundsMetric(ref boundingBox);
 
-            return postmetric - premetric + changeA + changeB; //TODO: would clamping produce a superior result?
+#if !NODE2
+            for (int i = 2; i < node->ChildCount; ++i)
+            {
+                var child = (&node->ChildA)[i];
+                if (child >= 0)
+                {
+                    childChange = RefitAndScoreLower2(child, ref (&node->A)[i]);
+                }
+                BoundingBox.Merge(ref boundingBox, ref (&node->A)[i], out boundingBox);
+            }
+#endif
+
+            var postmetric = ComputeBoundsMetric(ref boundingBox);
+            return postmetric - premetric + childChange; //TODO: would clamping produce a superior result?
 
         }
 
-        unsafe float RefitAndScoreUpper2(int nodeIndex, int leafCountThreshold, ref BoundingBox boundingBox)
+
+
+
+        unsafe float RefitAndMark(int leafCountThreshold, ref QuickList<int> refinementCandidates)
         {
-            var node = nodes + nodeIndex;
-
-            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first one.
-            Debug.Assert(node->ChildCount >= 2);
-
-            var premetric = ComputeBoundsMetric(ref boundingBox);
-            float changeA, changeB;
-            if (node->ChildA >= 0)
-            {
-                if (node->LeafCountA > leafCountThreshold)
-                    changeA = RefitAndScoreUpper2(node->ChildA, leafCountThreshold, ref node->A);
-                else
-                    changeA = RefitAndScoreLower2(node->ChildA, ref node->A);
-
-            }
-            else
-                changeA = 0;
-            if (node->ChildB >= 0)
-            {
-                if (node->LeafCountB > leafCountThreshold)
-                    changeB = RefitAndScoreUpper2(node->ChildB, leafCountThreshold, ref node->B);
-                else
-                    changeB = RefitAndScoreLower2(node->ChildB, ref node->B);
-            }
-            else
-                changeB = 0;
-            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
-            var postmetric = ComputeBoundsMetric(ref boundingBox);
-
-            var childVolumeChange = changeA + changeB;
-
-            //Cache the volume change in the node for later analysis.
-            //Current volume change is not included- the choice of whether to refine a node doesn't rely on that particular node's combined bounds, only its children.
-            node->LocalCostChange = postmetric >= 1e-9f ? childVolumeChange / postmetric : float.MaxValue;
-
-
-            return postmetric - premetric + childVolumeChange;//TODO: would clamping produce a superior result?
-
-        }
-
-        unsafe float RefitAndScore2(int leafCountThreshold)
-        {
-
-            //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             if (nodes->ChildCount < 2)
             {
                 Debug.Assert(nodes->ChildA < 0, "If there's only one child, it should be a leaf.");
                 //If there's only a leaf (or no children), then there's no internal nodes capable of changing in volume, so there's no relevant change in cost.
-                nodes->LocalCostChange = 0;
                 return 0;
             }
-            //TODO: Should the root node's volume change really be included? You cannot refine away the root's volume change, after all.
-            var rootChildren = &nodes->ChildA;
-            var rootBounds = &nodes->A;
-            var rootLeafCounts = &nodes->LeafCountA;
-            float childVolumeChange = 0;
+
+            var bounds = &nodes->A;
+            var children = &nodes->ChildA;
+            var leafCounts = &nodes->LeafCountA;
+            float childChange = 0;
             BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             BoundingBox postmerge = premerge;
             for (int i = 0; i < nodes->ChildCount; ++i)
             {
-                BoundingBox.Merge(ref rootBounds[i], ref premerge, out premerge);
-                if (rootChildren[i] >= 0)
-                {
-#if NODE2
-                    if (rootLeafCounts[i] > leafCountThreshold)
-                        childVolumeChange += RefitAndScoreUpper2(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
-                    else
-                        childVolumeChange += RefitAndScoreLower2(rootChildren[i], ref rootBounds[i]);
-
-#else
-                    if (rootLeafCounts[i] > leafCountThreshold)
-                        volumeChange += RefitAndScoreUpper(rootChildren[i], leafCountThreshold, ref rootBounds[i]);
-                    else
-                        childVolumeChange += RefitAndScoreLower(rootChildren[i], ref rootBounds[i]);
-
-#endif
-                }
-                BoundingBox.Merge(ref rootBounds[i], ref postmerge, out postmerge);
-            }
-            var premetric = ComputeBoundsMetric(ref premerge);
-            var postmetric = ComputeBoundsMetric(ref postmerge);
-            //Current volume change is not included- the choice of whether to refine a node doesn't rely on that particular node's combined bounds, only its children.
-            float inversePostMetric = 1f / postmetric;
-            var costChange = postmetric >= 1e-9f ? childVolumeChange * inversePostMetric : float.MaxValue;
-            nodes->LocalCostChange = costChange;
-
-
-            return (postmetric - premetric) * inversePostMetric + costChange;//TODO: would clamping produce a superior result?
-        }
-
-
-        struct MarkInvariants
-        {
-            public int PeriodicOffset;
-            public int Period;
-            public float RefinementThreshold;
-            public int LeafCountThreshold;
-            public float DistancePenaltySlope;
-            public float DistancePenaltyOffset;
-            public int MinimumDistance;
-        }
-
-        unsafe void MarkForRefinement2(int index, int distanceFromLastRefinement, ref MarkInvariants invariants, ref QuickList<int> refinementTargets)
-        {
-            var node = nodes + index;
-
-            bool refined;
-            if (distanceFromLastRefinement > invariants.MinimumDistance)
-            {
-                //Scale down the cost change of refinements which are near other refinements.
-                //This reduces the frequency of pointless doublework.
-                var costScale = Math.Min(1, Math.Max(0, (distanceFromLastRefinement - invariants.MinimumDistance) * invariants.DistancePenaltySlope + invariants.DistancePenaltyOffset));
-                var scaledCostChange = node->LocalCostChange * costScale;
-
-                //if (scaledCostChange > invariants.RefinementThreshold || //If true, this node's subtree changed a lot since the previous frame relative to its size.
-                //    (index - invariants.PeriodicOffset) % invariants.Period == 0 || index == 0) //If true, this node was chosen as one of the periodic nodes.
-                if ((index) % invariants.Period == invariants.PeriodicOffset || index == 0)
-                {
-                    node->RefineFlag = 1;
-                    refinementTargets.Add(index);
-                    refined = true;
-                }
-                else
-                {
-                    //Clear the refine flag so subtree collection properly ignores it.
-                    node->RefineFlag = 0;
-                    refined = false;
-                }
-            }
-            else
-            {
-                node->RefineFlag = 0;
-                refined = false;
-            }
-
-            var children = &node->ChildA;
-            var leafCounts = &node->LeafCountA;
-            int distance = refined ? 1 : distanceFromLastRefinement + 1;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (leafCounts[i] >= invariants.LeafCountThreshold && children[i] >= 0)
-                //if (children[i] >= 0)
-                {
-                    MarkForRefinement2(children[i], distance, ref invariants, ref refinementTargets);
-                }
-            }
-
-        }
-
-        unsafe void MarkForRefinement22(int index, int parentLeafCount, int leafCount, int leafCountThreshold, ref QuickList<int> refinementCandidates, out int newThreshold)
-        {
-            Debug.Assert(leafCountThreshold > 1);
-
-            var node = nodes + index;
-
-            node->RefineFlag = 0; //clear out old flag info... may get set to 1 later.
-
-
-            var children = &node->ChildA;
-            var leafCounts = &node->LeafCountA;
-            bool isWavefrontParent = false;
-            newThreshold = int.MaxValue;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-
+                BoundingBox.Merge(ref bounds[i], ref premerge, out premerge);
+                //Note: these conditions mean the root will never be considered a wavefront node. That's acceptable;
+                //it will be included regardless.
                 if (children[i] >= 0)
                 {
                     if (leafCounts[i] <= leafCountThreshold)
@@ -216,47 +80,93 @@ namespace SIMDPrototyping.Trees.SingleArray
                         //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
                         //Since we don't traverse into these children, there is no need to check the parent's leaf count.
                         refinementCandidates.Add(children[i]);
-                        isWavefrontParent = true;
-                        newThreshold = leafCountThreshold;
+                        childChange += RefitAndMeasure(children[i], ref bounds[i]);
                     }
                     else
                     {
-                        int candidateNewThreshold;
-                        MarkForRefinement22(children[i], leafCount, leafCounts[i], leafCountThreshold, ref refinementCandidates, out candidateNewThreshold);
-
-                        if (candidateNewThreshold < newThreshold)
-                            newThreshold = candidateNewThreshold;
+                        childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
                     }
+                }
+                BoundingBox.Merge(ref bounds[i], ref postmerge, out postmerge);
+            }
+
+            var premetric = ComputeBoundsMetric(ref premerge);
+            var postmetric = ComputeBoundsMetric(ref postmerge);
+
+            if (postmetric >= 0)
+            {
+                return (postmetric - premetric + childChange) / postmetric;
+            }
+            return 0;
+        }
+
+        unsafe float RefitAndMark(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates, ref BoundingBox boundingBox)
+        {
+            Debug.Assert(leafCountThreshold > 1);
+
+            var node = nodes + index;
+            Debug.Assert(node->ChildCount >= 2);
+            Debug.Assert(node->RefineFlag == 0);
+            float childChange = 0;
+
+            var premetric = ComputeBoundsMetric(ref boundingBox);
+            //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
+            //Add them to a list of refinement candidates.
+            //Note that leaves are not included, since they can't be refinement candidates.
+            if (node->ChildA >= 0)
+            {
+                if (node->LeafCountA <= leafCountThreshold)
+                {
+                    refinementCandidates.Add(node->ChildA);
+                    childChange += RefitAndMeasure(node->ChildA, ref node->A);
                 }
                 else
                 {
-                    newThreshold = leafCountThreshold;
+                    childChange += RefitAndMark(node->ChildA, leafCountThreshold, ref refinementCandidates, ref node->A);
                 }
-                //Leaves are not considered members of the wavefront. They're not *refinement candidates* since they're not internal nodes.
-                //The threshold does not need to be modified when a leaf node is encountered.
-
-
             }
-
-            //TODO: smaller than leafCountThreshold multiplicative factor?
-            const float scale = 0.25f;
-            const float minimum = 1f / (scale * scale);
-            if (isWavefrontParent)
+            if (node->ChildB >= 0)
             {
-                //This was a wavefront parent, so set the threshold for the parent to be accepted.
-                var scaledLeafThreshold = scale * leafCountThreshold;
-                newThreshold = (int)Math.Min(Math.Max(minimum, scaledLeafThreshold * scaledLeafThreshold), this.leafCount);
+                if (node->LeafCountB <= leafCountThreshold)
+                {
+                    refinementCandidates.Add(node->ChildB);
+                    childChange += RefitAndMeasure(node->ChildB, ref node->B);
+                }
+                else
+                {
+                    childChange += RefitAndMark(node->ChildB, leafCountThreshold, ref refinementCandidates, ref node->B);
+                }
             }
 
-            //if (true)//leafCount <= newThreshold && parentLeafCount > newThreshold)
-            //{
-            //    //This is a transition node.
-            //    refinementCandidates.Add(index);
-            //    newThreshold = Math.Min(newThreshold * (int)(leafCountThreshold * scale), this.leafCount);
-            //}
+            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
 
+#if !NODE2
+            var bounds = &node->A;
+            var children = &node->ChildA;
+            var leafCounts = &node->LeafCountA;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    if (leafCounts[i] <= leafCountThreshold)
+                    {
+                        //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
+                        //Since we don't traverse into these children, there is no need to check the parent's leaf count.
+                        refinementCandidates.Add(children[i]);
+                        childChange += RefitAndMeasure(children[i], ref bounds[i]);
+                    }
+                    else
+                    {
+                        childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
+                    }
+                }
+                BoundingBox.Merge(ref bounds[i], ref boundingBox, out boundingBox);
+                //Leaves are not considered members of the wavefront. They're not *refinement candidates* since they're not internal nodes.
+            }
+#endif
+            var postmetric = ComputeBoundsMetric(ref boundingBox);
 
-
+            return postmetric - premetric + childChange; //TODO: Would clamp provide better results?
 
 
 
@@ -289,11 +199,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
 
             //ValidateRefineFlags(0);
-            var costChange = RefitAndScore2(leafCountThreshold);
-
             //Collect the refinement candidates.
-            int newThreshold;
-            MarkForRefinement22(0, int.MaxValue, this.leafCount, leafCountThreshold, ref refinementTargets, out newThreshold);
+            var costChange = RefitAndMark(leafCountThreshold, ref refinementTargets);
             //ValidateRefineFlags(0);
 
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
