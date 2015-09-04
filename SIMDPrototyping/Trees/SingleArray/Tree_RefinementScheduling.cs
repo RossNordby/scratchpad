@@ -350,8 +350,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
 
 
-            var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
-            int numberOfDuplicates = 0;
+            //var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
+            //int numberOfDuplicates = 0;
             //for (int i = refinementTargets.Count - 1; i >= 0; --i)
             for (int i = 0; i < refinementTargets.Count; ++i)
             {
@@ -364,13 +364,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
                 //nodes[refinementTargets.Elements[i]].RefineFlag = 0;
 
-                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodes.Count; ++internalNodeIndex)
-                {
-                    if (!visitedNodes.Add(treeletInternalNodes[internalNodeIndex]))
-                    {
-                        ++numberOfDuplicates;
-                    }
-                }
+                //for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodes.Count; ++internalNodeIndex)
+                //{
+                //    if (!visitedNodes.Add(treeletInternalNodes[internalNodeIndex]))
+                //    {
+                //        ++numberOfDuplicates;
+                //    }
+                //}
                 //for (int j = i + 1; j < refinementTargets.Count; ++j)
                 //{
                 //    if (treeletInternalNodesCopy.Contains(refinementTargets[j]))
@@ -383,14 +383,17 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             //Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
             //Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
-            visitedNodes.Dispose();
+            //visitedNodes.Dispose();
 
             RemoveUnusedInternalNodes(ref spareNodes);
             region.Dispose();
             pool.GiveBack(buffer);
             spareNodes.Dispose();
+            subtreeReferences.Count = 0;
             subtreeReferences.Dispose();
+            treeletInternalNodes.Count = 0;
             treeletInternalNodes.Dispose();
+            refinementTargets.Count = 0;
             refinementTargets.Dispose();
 
             //It's safe to use the refinementTargets' nodes because the refinements never move the treelet roots.
@@ -422,7 +425,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 IncrementalCacheOptimizeLocking(i);
                 //tree.IncrementalCacheOptimize(i);
             }
-            Console.WriteLine($"Cache optimize count: {cacheOptimizeCount}, effective: {end - startIndex}");
+            //Console.WriteLine($"Cache optimize count: {cacheOptimizeCount}, effective: {end - startIndex}");
 
             return actualRefinementTargetsCount;
         }
