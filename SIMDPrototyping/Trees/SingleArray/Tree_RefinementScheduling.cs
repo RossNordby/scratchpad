@@ -195,7 +195,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Don't proceed if the tree is empty.
             if (leafCount == 0)
                 return 0;
-            int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 2);
+            int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
             var refinementTargets = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex((int)(leafCount / (maximumSubtrees * 0.5f))));
 
             int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
@@ -206,7 +206,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //ValidateRefineFlags(0);
 
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
-            float refinePortion = Math.Min(1, refineAggressiveness * 0.5f);
+            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
             var targetRefinementScale = Math.Max(Math.Ceiling(refinementTargets.Count * 0.03f), refinementTargets.Count * refinePortion);
             var period = (int)(refinementTargets.Count / targetRefinementScale);
             var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);

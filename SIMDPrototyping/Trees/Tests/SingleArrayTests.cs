@@ -168,9 +168,9 @@ namespace SIMDPrototyping.Trees.Tests
                 //**************** Dynamic Testing
                 tree.RecursiveIncrementalCacheOptimizeLocking(0);
                 Random random = new Random(5);
-                const float minVelocity = 0;
-                const float maxVelocity = 0;
-                const float velocityDistributionPower = 4;
+                const float minVelocity = 1;
+                const float maxVelocity = 10;
+                const float velocityDistributionPower = 10;
                 const float portionOfMovingLeaves = 1f;
                 for (int i = 0; i < leaves.Length * portionOfMovingLeaves; ++i)
                 {
@@ -214,7 +214,6 @@ namespace SIMDPrototyping.Trees.Tests
 
 
                     //tree.Refit();
-                    //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     //for (int i = 0; i < 1; ++i)
                     //{
 
@@ -226,8 +225,6 @@ namespace SIMDPrototyping.Trees.Tests
 
                     var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                    var testStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-
                     overlaps.Count = 0;
                     tree.GetSelfOverlapsArityDedicated(ref overlaps);
 
@@ -235,13 +232,15 @@ namespace SIMDPrototyping.Trees.Tests
 
                     if (t % 16 == 0)
                     {
-                        Console.WriteLine("____________________________________________");
+                        Console.WriteLine($"_________________{t}_________________");
                         Console.WriteLine($"Refinement count: {refinementCount}");
-                        Console.WriteLine($"Refine time: {refineEndTime - refineStartTime}");
-                        Console.WriteLine($"Test time: {testEndTime - testStartTime}");
-                        Console.WriteLine($"TIME: {testEndTime - refineStartTime}");
-                        Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
-                        Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");
+                        Console.WriteLine($"Refine time:      {refineEndTime - refineStartTime}");
+                        Console.WriteLine($"Test time:        {testEndTime - refineEndTime}");
+                        Console.WriteLine($"TIME:             {testEndTime - refineStartTime}");
+                        Console.WriteLine($"Cost metric:      {tree.MeasureCostMetric()}");
+                        Console.WriteLine($"Overlaps:         {overlaps.Count}");
+                        Console.WriteLine($"Cache Quality:    {tree.MeasureCacheQuality()}");
+                        GC.Collect();
                     }
                     tree.Validate();
                 }
