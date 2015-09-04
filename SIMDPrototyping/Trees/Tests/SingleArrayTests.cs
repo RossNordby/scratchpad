@@ -167,10 +167,10 @@ namespace SIMDPrototyping.Trees.Tests
                 //**************** Dynamic Testing
                 tree.RecursiveIncrementalCacheOptimizeLocking(0);
                 Random random = new Random(5);
-                const float minVelocity = 1;
-                const float maxVelocity = 1;
+                const float minVelocity = 10;
+                const float maxVelocity = 10;
                 const float velocityDistributionPower = 4;
-                const float portionOfMovingLeaves = 0.5f;
+                const float portionOfMovingLeaves = 1f;
                 for (int i = 0; i < leaves.Length * portionOfMovingLeaves; ++i)
                 {
                     var velocity = (float)(minVelocity + (maxVelocity - minVelocity) * Math.Pow(random.NextDouble(), velocityDistributionPower));

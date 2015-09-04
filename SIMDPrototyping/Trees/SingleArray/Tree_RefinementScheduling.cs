@@ -297,15 +297,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //ValidateRefineFlags(0);
 
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
-            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
-            var targetRefinementScale = Math.Max(4, refinementTargets.Count * refinePortion);
+            float refinePortion = Math.Min(1, refineAggressiveness * 0.5f);
+            var targetRefinementScale = Math.Max(Math.Ceiling(refinementTargets.Count * 0.03f), refinementTargets.Count * refinePortion);
             var period = (int)(refinementTargets.Count / targetRefinementScale);
             var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
 
 
             int actualRefinementTargetsCount = 0;
             int targetRefinementCount = (int)targetRefinementScale;
-            for (int i = 0; i < targetRefinementCount; ++i)
+            for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
                 var index = i * period + offset;
                 if (index >= refinementTargets.Count)
@@ -323,20 +323,20 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
 
-            if (costChange > 1000)
-            {
-                //Something silly is going on. The usual approach does not scale well to this level of explosive corruption.
-                //Just rebuild it.
-                maximumSubtrees = LeafCount;
-                refinementTargets.Add(0);
-                //Make sure collectsubtrees can gather all the nodes.
-                for (int i = 0; i < refinementTargets.Count; ++i)
-                {
-                    nodes[i].RefineFlag = 0;
-                }
-                //Note: yes, this does some redundant work. But the amount of work required to do the partially redundant MarkForRefinement is absolutely nothing compared to this full rebuild.
+            //if (costChange > 1000)
+            //{
+            //    //Something silly is going on. The usual approach does not scale well to this level of explosive corruption.
+            //    //Just rebuild it.
+            //    maximumSubtrees = LeafCount;
+            //    refinementTargets.Add(0);
+            //    //Make sure collectsubtrees can gather all the nodes.
+            //    for (int i = 0; i < refinementTargets.Count; ++i)
+            //    {
+            //        nodes[i].RefineFlag = 0;
+            //    }
+            //    //Note: yes, this does some redundant work. But the amount of work required to do the partially redundant MarkForRefinement is absolutely nothing compared to this full rebuild.
 
-            }
+            //}
 
             //Refine all marked targets.
             var pool = BufferPools<int>.Thread;
@@ -358,29 +358,18 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.Count = 0;
                 bool nodesInvalidated;
-                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, refinementTargets[i] == 0 ? maximumSubtrees * 1 : maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
-                //nodes[refinementTargets.Elements[i]].RefineFlag = 0;
-
-                //for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodes.Count; ++internalNodeIndex)
-                //{
-                //    if (!visitedNodes.Add(treeletInternalNodes[internalNodeIndex]))
-                //    {
-                //        ++numberOfDuplicates;
-                //    }
-                //}
-                //for (int j = i + 1; j < refinementTargets.Count; ++j)
-                //{
-                //    if (treeletInternalNodesCopy.Contains(refinementTargets[j]))
-                //        Console.WriteLine("asdF");
-                //}
-            }
-            for (int i = 0; i < refinementTargets.Count; ++i)
-            {
                 nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+
+
             }
+            //for (int i = 0; i < refinementTargets.Count; ++i)
+            //{
+            //    nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+            //}
             //Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
             //Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
             //visitedNodes.Dispose();
@@ -412,11 +401,11 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Min(1, cacheOptimizeAggressiveness * 0.45f);
+            float cacheOptimizePortion = Math.Max(0.01f, Math.Min(1, cacheOptimizeAggressiveness * 0.75f));
             var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
 
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
-           
+
             //We could wrap around. But we could also not do that because it doesn't really matter!
             var end = Math.Min(NodeCount, startIndex + cacheOptimizeCount);
             for (int i = startIndex; i < end; ++i)
