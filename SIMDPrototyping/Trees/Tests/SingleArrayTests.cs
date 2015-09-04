@@ -131,9 +131,8 @@ namespace SIMDPrototyping.Trees.Tests
                 const int maximumSubtrees = 1024;
                 var spareNodes = new QuickList<int>(new BufferPool<int>(), 8);
                 var subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-                var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+                var treeletInternalNodes = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
                 var refinementTargets = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex((int)(tree.LeafCount / (maximumSubtrees * 0.5f))));
-                RawList<int> treeletInternalNodesCopy = new RawList<int>(maximumSubtrees);
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -271,7 +270,7 @@ namespace SIMDPrototyping.Trees.Tests
                         for (int i = startIndex; i < tree.NodeCount; i += skip)
                         {
                             subtreeReferences.Count = 0;
-                            treeletInternalNodes.FastClear();
+                            treeletInternalNodes.Count = 0;
                             //Avoid refitting any node which doesn't have enough children to warrant a full refine.
                             var node = tree.Nodes[i];
                             var leafCounts = &node.LeafCountA;
@@ -284,11 +283,11 @@ namespace SIMDPrototyping.Trees.Tests
                             if (leafCount >= Math.Min(tree.LeafCount, maximumSubtrees * 0.75f))
                             {
                                 //tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
-                                tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                                tree.BinnedRefine(i, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
                                 ++refinementCount;
-                                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodes.Count; ++internalNodeIndex)
                                 {
-                                    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
+                                    if (!visitedNodes.Add(treeletInternalNodes[internalNodeIndex]))
                                     {
                                         ++numberOfDuplicates;
                                     }

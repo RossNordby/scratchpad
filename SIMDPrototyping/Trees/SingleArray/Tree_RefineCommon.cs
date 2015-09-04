@@ -174,7 +174,7 @@ namespace SIMDPrototyping.Trees.SingleArray
     partial class Tree
     {
 
-        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, SubtreeHeapEntry* entries, ref QuickList<int> subtrees, ref QuickQueue<int> internalNodes, out float treeletCost)
+        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, SubtreeHeapEntry* entries, ref QuickList<int> subtrees, ref QuickList<int> internalNodes, out float treeletCost)
         {
 
             //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
@@ -194,7 +194,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             priorityQueue.Insert(node, nodes, ref subtrees);
 
             //The root is inserted first; the dequeue process will find the root first, guaranteeing that the root does not move.
-            internalNodes.Enqueue(nodeIndex);
+            internalNodes.Add(nodeIndex);
 
             //Note that the treelet root's cost is excluded from the treeletCost.
             //That's because the treelet root cannot change.
@@ -205,7 +205,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             while (priorityQueue.TryPop(nodes, ref remainingSubtreeSpace, ref subtrees, out highestIndex, out highestCost))
             {
                 treeletCost += highestCost;
-                internalNodes.Enqueue(highestIndex);
+                internalNodes.Add(highestIndex);
 
                 //Add all the children to the set of subtrees.
                 //This is safe because we pre-validated the number of children in the node.

@@ -50,7 +50,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var maximumSubtrees = ChildrenCapacity * ChildrenCapacity;
             var poolIndex = BufferPool<int>.GetPoolIndex(maximumSubtrees);
             var subtrees = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
-            var treeletInternalNodes = new QuickQueue<int>(BufferPools<int>.Thread, poolIndex);
+            var treeletInternalNodes = new QuickList<int>(BufferPools<int>.Thread, poolIndex);
             float originalTreeletCost;
             var entries = stackalloc SubtreeHeapEntry[maximumSubtrees];
             CollectSubtrees(nodeIndex, maximumSubtrees, entries, ref subtrees, ref treeletInternalNodes, out originalTreeletCost);
@@ -161,13 +161,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
-                var reifiedIndex = ReifyStagingNode(parent, indexInParent, stagingNodes, 0, ref subtrees, ref treeletInternalNodes, ref spareNodes, out nodesInvalidated);
+                int nextInternalNodeIndexToUse = 0;
+                var reifiedIndex = ReifyStagingNode(parent, indexInParent, stagingNodes, 0, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
                 Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
                 //If any nodes are left over, put them into the spares list for later reuse.
-                int spareNode;
-                while (treeletInternalNodes.TryDequeue(out spareNode))
+                for (int i = nextInternalNodeIndexToUse; i < treeletInternalNodes.Count; ++i)
                 {
-                    spareNodes.Add(spareNode);
+                    spareNodes.Add(treeletInternalNodes.Elements[i]);
                 }
             }
             else
@@ -280,17 +280,17 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
         unsafe int ReifyStagingNode(int parent, int indexInParent, Node* stagingNodes, int stagingNodeIndex,
-            ref QuickList<int> subtrees, ref QuickQueue<int> treeletInternalNodes, ref QuickList<int> spareNodes, out bool nodesInvalidated)
+            ref QuickList<int> subtrees, ref QuickList<int> treeletInternalNodes, ref int nextInternalNodeIndexToUse, ref QuickList<int> spareNodes, out bool nodesInvalidated)
         {
 
             nodesInvalidated = false;
             int internalNodeIndex;
-            if (treeletInternalNodes.Count > 0)
+            if (nextInternalNodeIndexToUse < treeletInternalNodes.Count)
             {
                 //There is an internal node that we can use.
                 //Note that we remove from the end to guarantee that the treelet root does not change location.
                 //The CollectSubtrees function guarantees that the treelet root is enqueued first.
-                internalNodeIndex = treeletInternalNodes.Dequeue();
+                internalNodeIndex = treeletInternalNodes.Elements[nextInternalNodeIndexToUse++];
             }
             else if (!spareNodes.TryPop(out internalNodeIndex))
             {
@@ -320,7 +320,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     bool childNodesInvalidated;
                     internalNodeChildren[i] = ReifyStagingNode(internalNodeIndex, i, stagingNodes, internalNodeChildren[i],
-                        ref subtrees, ref treeletInternalNodes, ref spareNodes, out childNodesInvalidated);
+                        ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out childNodesInvalidated);
                     if (childNodesInvalidated)
                     {
                         internalNode = nodes + internalNodeIndex;

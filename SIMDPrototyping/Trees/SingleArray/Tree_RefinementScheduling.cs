@@ -357,7 +357,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var spareNodes = new QuickList<int>(pool, 8);
             var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-            var treeletInternalNodes = new QuickQueue<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+            var treeletInternalNodes = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
@@ -365,23 +365,22 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
-            RawList<int> treeletInternalNodesCopy = new RawList<int>();
             int numberOfDuplicates = 0;
             //for (int i = refinementTargets.Count - 1; i >= 0; --i)
             for (int i = 0; i < refinementTargets.Count; ++i)
             {
                 subtreeReferences.Count = 0;
-                treeletInternalNodes.FastClear();
+                treeletInternalNodes.Count = 0;
                 bool nodesInvalidated;
-                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, refinementTargets[i] == 0 ? maximumSubtrees * 1: maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated, treeletInternalNodesCopy);
+                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, refinementTargets[i] == 0 ? maximumSubtrees * 1: maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
                 //nodes[refinementTargets.Elements[i]].RefineFlag = 0;
 
-                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
+                for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodes.Count; ++internalNodeIndex)
                 {
-                    if (!visitedNodes.Add(treeletInternalNodesCopy[internalNodeIndex]))
+                    if (!visitedNodes.Add(treeletInternalNodes[internalNodeIndex]))
                     {
                         ++numberOfDuplicates;
                     }

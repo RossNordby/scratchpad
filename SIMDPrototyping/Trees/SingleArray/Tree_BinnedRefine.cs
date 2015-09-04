@@ -620,25 +620,19 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> subtreeReferences, int maximumSubtrees, ref QuickQueue<int> treeletInternalNodes, ref QuickList<int> spareNodes,
-            ref BinnedResources resources, out bool nodesInvalidated, RawList<int> treeletInternalNodesCopy = null)
+        public unsafe void BinnedRefine(int nodeIndex, ref QuickList<int> subtreeReferences, int maximumSubtrees, ref QuickList<int> treeletInternalNodes, ref QuickList<int> spareNodes,
+            ref BinnedResources resources, out bool nodesInvalidated)
         {
             Debug.Assert(subtreeReferences.Count == 0, "The subtree references list should be empty since it's about to get filled.");
             Debug.Assert(subtreeReferences.Elements.Length >= maximumSubtrees, "Subtree references list should have a backing array large enough to hold all possible subtrees.");
-            Debug.Assert(treeletInternalNodes.Count == 0, "The treelet interanl nodes queue should be empty since it's about to get filled.");
+            Debug.Assert(treeletInternalNodes.Count == 0, "The treelet internal nodes list should be empty since it's about to get filled.");
             Debug.Assert(treeletInternalNodes.Elements.Length >= maximumSubtrees - 1, "Internal nodes queue should have a backing array large enough to hold all possible treelet internal nodes.");
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             Debug.Assert(subtreeReferences.Count <= maximumSubtrees);
 
             //CollectSubtreesDirect(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
-            if (treeletInternalNodesCopy != null)
-            {
-                if (treeletInternalNodesCopy.Capacity < treeletInternalNodes.Count)
-                    treeletInternalNodesCopy.Capacity = treeletInternalNodes.Count;
-                treeletInternalNodes.CopyTo(treeletInternalNodesCopy.Elements, 0);
-                treeletInternalNodesCopy.Count = treeletInternalNodes.Count;
-            }
+
             //Console.WriteLine($"Number of subtrees: {subtreeReferences.Count}");
 
             //Gather necessary information from nodes.
@@ -702,13 +696,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
-                var reifiedIndex = ReifyStagingNode(parent, indexInParent, resources.StagingNodes, 0, ref subtreeReferences, ref treeletInternalNodes, ref spareNodes, out nodesInvalidated);
+                int nextInternalNodeIndexToUse = 0;
+                var reifiedIndex = ReifyStagingNode(parent, indexInParent, resources.StagingNodes, 0, ref subtreeReferences, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
                 Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
                 //If any nodes are left over, put them into the spares list for later reuse.
-                int spareNode;
-                while (treeletInternalNodes.TryDequeue(out spareNode))
+                for (int i = nextInternalNodeIndexToUse; i < treeletInternalNodes.Count; ++i)
                 {
-                    spareNodes.Add(spareNode);
+                    spareNodes.Add(treeletInternalNodes.Elements[i]);
                 }
             }
             else
@@ -723,7 +717,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        private unsafe void TopDownBinnedRefine(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtreeReferences, ref QuickQueue<int> treeletInternalNodes, ref QuickList<int> spareNodes, ref BinnedResources resources)
+        private unsafe void TopDownBinnedRefine(int nodeIndex, int maximumSubtrees, ref QuickList<int> subtreeReferences, ref QuickList<int> treeletInternalNodes, ref QuickList<int> spareNodes, ref BinnedResources resources)
         {
             bool nodesInvalidated;
             //Validate();
@@ -747,7 +741,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var spareNodes = new QuickList<int>(pool, 8);
             var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-            var treeletInternalNodes = new QuickQueue<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+            var treeletInternalNodes = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
@@ -761,7 +755,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        unsafe void TryToBottomUpBinnedRefine(int[] refinementFlags, int nodeIndex, int maximumSubtrees, ref QuickList<int> subtreeReferences, ref QuickQueue<int> treeletInternalNodes, ref BinnedResources resources, ref QuickList<int> spareInternalNodes)
+        unsafe void TryToBottomUpBinnedRefine(int[] refinementFlags, int nodeIndex, int maximumSubtrees, ref QuickList<int> subtreeReferences, ref QuickList<int> treeletInternalNodes, ref BinnedResources resources, ref QuickList<int> spareInternalNodes)
         {
             if (++refinementFlags[nodeIndex] == nodes[nodeIndex].ChildCount)
             {
@@ -790,7 +784,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var spareNodes = new QuickList<int>(pool, 8);
             var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-            var treeletInternalNodes = new QuickQueue<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
+            var treeletInternalNodes = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
@@ -814,7 +808,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        unsafe void PartialRefine(int index, int depth, int offset, int skip, ref QuickList<int> subtreeReferences, ref QuickQueue<int> treeletInternalNodes, ref QuickList<int> spareNodes, int maximumSubtrees, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        unsafe void PartialRefine(int index, int depth, int offset, int skip, ref QuickList<int> subtreeReferences, ref QuickList<int> treeletInternalNodes, ref QuickList<int> spareNodes, int maximumSubtrees, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
             nodesInvalidated = false;
             var node = nodes + index;
@@ -848,14 +842,14 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
         }
-        public unsafe void PartialRefine(int offset, int skip, ref QuickList<int> spareNodes, int maximumSubtrees, ref QuickQueue<int> treeletInternalNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        public unsafe void PartialRefine(int offset, int skip, ref QuickList<int> spareNodes, int maximumSubtrees, ref QuickList<int> treeletInternalNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
             QuickList<int> subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
             PartialRefine(0, 0, offset, skip, ref subtreeReferences, ref treeletInternalNodes, ref spareNodes, maximumSubtrees, ref binnedResources, out nodesInvalidated);
             subtreeReferences.Dispose();
         }
 
-        unsafe void RecursiveRefine(int nodeIndex, int maximumSubtrees, ref int treeSizeSeed, ref QuickQueue<int> treeletInternalNodes, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        unsafe void RecursiveRefine(int nodeIndex, int maximumSubtrees, ref int treeSizeSeed, ref QuickList<int> treeletInternalNodes, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
             QuickList<int> subtreeReferences = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
 
@@ -887,7 +881,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             subtreeReferences.Dispose();
         }
 
-        public unsafe void RecursiveRefine(int maximumSubtrees, int treeSizeSeed, ref QuickQueue<int> treeletInternalNodes, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
+        public unsafe void RecursiveRefine(int maximumSubtrees, int treeSizeSeed, ref QuickList<int> treeletInternalNodes, ref QuickList<int> spareNodes, ref BinnedResources binnedResources, out bool nodesInvalidated)
         {
             RecursiveRefine(0, maximumSubtrees, ref treeSizeSeed, ref treeletInternalNodes, ref spareNodes, ref binnedResources, out nodesInvalidated);
         }
