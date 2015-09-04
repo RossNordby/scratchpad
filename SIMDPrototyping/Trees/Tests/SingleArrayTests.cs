@@ -178,11 +178,14 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.Validate();
                 //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
                 Random random = new Random(5);
-                const float maxVelocity = 100;
+                const float minVelocity = 1;
+                const float maxVelocity = 40;
+                const float velocityDistributionPower = 4;
                 const float portionOfMovingLeaves = 0.5f;
                 for (int i = 0; i < leaves.Length * portionOfMovingLeaves; ++i)
                 {
-                    leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);
+                    var velocity = (float)(minVelocity + (maxVelocity - minVelocity) * Math.Pow(random.NextDouble(), velocityDistributionPower));
+                    leaves[i].Velocity = velocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);
                 }
                 const float dt = 1f / 60f;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
@@ -341,7 +344,7 @@ namespace SIMDPrototyping.Trees.Tests
                     //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     {
 
-                        const int skip = 1024;
+                        const int skip = 4096;
                         const int intervalLength = 1024;
                         var startIndex = (t * intervalLength) % skip;
                         for (int i = startIndex; i < tree.NodeCount; i += skip)
@@ -349,7 +352,7 @@ namespace SIMDPrototyping.Trees.Tests
                             var end = Math.Min(tree.NodeCount, i + intervalLength);
                             for (int j = i; j < end; ++j)
                             {
-                                tree.IncrementalCacheOptimizeMultithreaded(j);
+                                tree.IncrementalCacheOptimizeLocking(j);
                                 //tree.IncrementalCacheOptimize(j);
                             }
                         }

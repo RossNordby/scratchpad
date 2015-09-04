@@ -303,7 +303,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
 
-            float portion = 1;// Math.Min(1, aggressiveness * 0.5f);
+            float portion = Math.Min(1, aggressiveness * 0.25f);
 
 
             //Collect the refinement candidates.
@@ -328,7 +328,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes[refinementTargets[index]].RefineFlag = 1;
             }
             refinementTargets.Count = actualRefinementTargetsCount;
-            if (!refinementTargets.Contains(0))
+            if (nodes->RefineFlag != 1)
             {
                 refinementTargets.Add(0);
                 nodes->RefineFlag = 1;
@@ -376,7 +376,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
-                nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+                //nodes[refinementTargets.Elements[i]].RefineFlag = 0;
 
                 for (int internalNodeIndex = 0; internalNodeIndex < treeletInternalNodesCopy.Count; ++internalNodeIndex)
                 {
@@ -391,10 +391,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //        Console.WriteLine("asdF");
                 //}
             }
-            //for (int i = 0; i < refinementTargets.Count; ++i)
-            //{
-            //    nodes[refinementTargets.Elements[i]].RefineFlag = 0;
-            //}
+            for (int i = 0; i < refinementTargets.Count; ++i)
+            {
+                nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+            }
             Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
             Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
             visitedNodes.Dispose();
@@ -405,6 +405,17 @@ namespace SIMDPrototyping.Trees.SingleArray
             spareNodes.Dispose();
             subtreeReferences.Dispose();
             treeletInternalNodes.Dispose();
+
+            //It's safe to use the refinementTargets' nodes because the refinements never move the treelet roots.
+            //(Note: if you moved the RefineFlag reset into the loop, this guarantee goes out the window because the root refine could destroy the guarantee.)
+            //for (int i = 0; i < refinementTargets.Count - 1; ++i) //Exclude the root. It's always the last target.
+            //{
+            //    RecursiveIncrementalCacheOptimizeLocking(refinementTargets.Elements[i]);
+            //}
+
+            //RecursiveIncrementalCacheOptimizeLocking(0, 15);
+
+
         }
 
 

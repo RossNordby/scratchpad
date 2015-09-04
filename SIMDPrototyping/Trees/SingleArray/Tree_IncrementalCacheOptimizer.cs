@@ -67,7 +67,44 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        public unsafe void IncrementalCacheOptimizeMultithreaded(int nodeIndex)
+        /// <summary>
+        /// Reorganizes the memory layout of this node and all of its descendants.
+        /// </summary>
+        /// <param name="nodeIndex">Node at which to start the optimization.</param>
+        public unsafe void RecursiveIncrementalCacheOptimizeLocking(int nodeIndex)
+        {
+            IncrementalCacheOptimizeLocking(nodeIndex);
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                    RecursiveIncrementalCacheOptimizeLocking(children[i]);
+            }
+        }
+
+        /// <summary>
+        /// Reorganizes the memory layout of this node and all of its descendants down to a maximum tree depth from this node.
+        /// </summary>
+        /// <param name="nodeIndex">Node at which to start the optimization.</param>
+        /// <param name="maximumDepth">Maximum depth from the specified node down into the tree.</param>
+        public unsafe void RecursiveIncrementalCacheOptimizeLocking(int nodeIndex, int maximumDepth)
+        {
+            IncrementalCacheOptimizeLocking(nodeIndex);
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+            var depthRemaining = maximumDepth - 1;
+            if (depthRemaining > 0)
+            {
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    if (children[i] >= 0)
+                        RecursiveIncrementalCacheOptimizeLocking(children[i], depthRemaining);
+                }
+            }
+        }
+
+        public unsafe void IncrementalCacheOptimizeLocking(int nodeIndex)
         {
             //Multithreaded cache optimization attempts to acquire a lock on every involved node.
             //If any lock fails, it just abandons the entire attempt.
