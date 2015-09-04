@@ -134,6 +134,7 @@ namespace SIMDPrototyping.Trees.Tests
                 var treeletInternalNodes = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex(maximumSubtrees));
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
+                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                 //for (int i = 0; i < 5; ++i)
@@ -167,8 +168,8 @@ namespace SIMDPrototyping.Trees.Tests
                 //**************** Dynamic Testing
                 tree.RecursiveIncrementalCacheOptimizeLocking(0);
                 Random random = new Random(5);
-                const float minVelocity = 10;
-                const float maxVelocity = 10;
+                const float minVelocity = 0;
+                const float maxVelocity = 0;
                 const float velocityDistributionPower = 4;
                 const float portionOfMovingLeaves = 1f;
                 for (int i = 0; i < leaves.Length * portionOfMovingLeaves; ++i)
@@ -206,7 +207,7 @@ namespace SIMDPrototyping.Trees.Tests
                         leaf.GetBoundingBox(out boundingBox);
                         tree.SetLeafBoundingBox(i, ref boundingBox);
                     }
-                    var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    var refineStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
 
                     var refinementCount = tree.RefitAndRefine(t);
@@ -223,14 +224,24 @@ namespace SIMDPrototyping.Trees.Tests
                     //}
                     //tree.RemoveUnusedInternalNodes(ref spareNodes);
 
-                    var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+
+                    var testStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlapsArityDedicated(ref overlaps);
+
+                    var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     if (t % 16 == 0)
                     {
-                        Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");
-                        Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
-                        Console.WriteLine($"Refine/Optimize Time: {endTimeInner - startTimeInner}");
+                        Console.WriteLine("____________________________________________");
                         Console.WriteLine($"Refinement count: {refinementCount}");
+                        Console.WriteLine($"Refine time: {refineEndTime - refineStartTime}");
+                        Console.WriteLine($"Test time: {testEndTime - testStartTime}");
+                        Console.WriteLine($"TIME: {testEndTime - refineStartTime}");
+                        Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                        Console.WriteLine($"Cache Quality {t}: {tree.MeasureCacheQuality()}");
                     }
                     tree.Validate();
                 }
@@ -278,7 +289,6 @@ namespace SIMDPrototyping.Trees.Tests
                 Array.Clear(list.Elements, 0, list.Elements.Length);
                 list.Dispose();
 
-                overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < selfTestCount; ++i)
                 {
