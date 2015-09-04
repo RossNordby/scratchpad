@@ -278,43 +278,29 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        public unsafe void RefitAndRefine(ref QuickList<int> refinementTargets, int frameIndex, float aggressivenessScale, int maximumSubtrees = 1024)
+        public unsafe int RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {
-            var levelsInRefine = Math.Log(maximumSubtrees, ChildrenCapacity);
+            //Don't proceed if the tree is empty.
+            if (leafCount == 0)
+                return 0;
+            int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 2);
+            var refinementTargets = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex((int)(leafCount / (maximumSubtrees * 0.5f))));
 
-            MarkInvariants invariants;
-            invariants.LeafCountThreshold = (int)Math.Min(leafCount, maximumSubtrees);
+            int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
 
             //ValidateRefineFlags(0);
-            var costChange = RefitAndScore2(invariants.LeafCountThreshold);
-
-
-            var aggressiveness = Math.Max(0, costChange * aggressivenessScale);
-
-            ////Higher aggressiveness->lower period.
-            ////Is the need for higher aggressiveness linear, or nonlinear? Nonlinear unbounded seems more obvious.
-            //invariants.Period = Math.Max(2, (int)(16f / (aggressiveness + .01f)) + 1);
-            //invariants.PeriodicOffset = (int)((frameIndex * 236887691L + 104395303L) % invariants.Period);
-            ////invariants.PeriodicOffset = (int)((frameIndex * 79151L) % invariants.Period);
-            //invariants.MinimumDistance = 0;// (int)(levelsInRefine * 0.25);
-            //const float minimumMultiplier = 0.1f;
-            //invariants.DistancePenaltyOffset = minimumMultiplier;
-            //invariants.DistancePenaltySlope = (float)((1 - minimumMultiplier) / (levelsInRefine * 0.65f));
-            //invariants.RefinementThreshold = 1f / (aggressiveness + 1);
-
-            //MarkForRefinement2(0, (int)(levelsInRefine), ref invariants, ref refinementTargets);
-
-            float portion = Math.Min(1, aggressiveness * 0.25f);
-
+            var costChange = RefitAndScore2(leafCountThreshold);
 
             //Collect the refinement candidates.
             int newThreshold;
-            MarkForRefinement22(0, int.MaxValue, this.leafCount, invariants.LeafCountThreshold, ref refinementTargets, out newThreshold);
+            MarkForRefinement22(0, int.MaxValue, this.leafCount, leafCountThreshold, ref refinementTargets, out newThreshold);
             //ValidateRefineFlags(0);
 
-            var targetRefinementScale = Math.Max(4, refinementTargets.Count * portion);
+            var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
+            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
+            var targetRefinementScale = Math.Max(4, refinementTargets.Count * refinePortion);
             var period = (int)(refinementTargets.Count / targetRefinementScale);
-            var offset = 0;// (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
+            var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
 
 
             int actualRefinementTargetsCount = 0;
@@ -361,7 +347,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int[] buffer;
             MemoryRegion region;
             BinnedResources resources;
-            CreateBinnedResources(pool, maximumSubtrees * 4, out buffer, out region, out resources);
+            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
 
 
             var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
@@ -372,7 +358,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.Count = 0;
                 bool nodesInvalidated;
-                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, refinementTargets[i] == 0 ? maximumSubtrees * 1: maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, refinementTargets[i] == 0 ? maximumSubtrees * 1 : maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
@@ -395,8 +381,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 nodes[refinementTargets.Elements[i]].RefineFlag = 0;
             }
-            Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
-            Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
+            //Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
+            //Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
             visitedNodes.Dispose();
 
             RemoveUnusedInternalNodes(ref spareNodes);
@@ -405,6 +391,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             spareNodes.Dispose();
             subtreeReferences.Dispose();
             treeletInternalNodes.Dispose();
+            refinementTargets.Dispose();
 
             //It's safe to use the refinementTargets' nodes because the refinements never move the treelet roots.
             //(Note: if you moved the RefineFlag reset into the loop, this guarantee goes out the window because the root refine could destroy the guarantee.)
@@ -419,7 +406,25 @@ namespace SIMDPrototyping.Trees.SingleArray
             //}
 
             //RecursiveIncrementalCacheOptimizeLocking(0, 15);
-            
+
+            //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
+            var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
+            float cacheOptimizePortion = Math.Min(1, cacheOptimizeAggressiveness * 0.45f);
+            var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
+
+            var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
+           
+            //We could wrap around. But we could also not do that because it doesn't really matter!
+            var end = Math.Min(NodeCount, startIndex + cacheOptimizeCount);
+            for (int i = startIndex; i < end; ++i)
+            {
+
+                IncrementalCacheOptimizeLocking(i);
+                //tree.IncrementalCacheOptimize(i);
+            }
+            Console.WriteLine($"Cache optimize count: {cacheOptimizeCount}, effective: {end - startIndex}");
+
+            return actualRefinementTargetsCount;
         }
 
 

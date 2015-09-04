@@ -218,6 +218,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 subtrees.Add(priorityQueue.Entries[i].Index);
             }
 
+            //Sort the internal nodes so that the depth first builder will tend to produce less cache-scrambled results.
+            Array.Sort(internalNodes.Elements, 1, internalNodes.Count - 1);
+
         }
 
 
