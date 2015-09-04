@@ -177,6 +177,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //oldTree.Dispose();
                 //tree.Validate();
                 //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                tree.RecursiveIncrementalCacheOptimizeLocking(0);
                 Random random = new Random(5);
                 const float minVelocity = 1;
                 const float maxVelocity = 40;
@@ -344,18 +345,18 @@ namespace SIMDPrototyping.Trees.Tests
                     //startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                     {
 
-                        const int skip = 4096;
-                        const int intervalLength = 1024;
-                        var startIndex = (t * intervalLength) % skip;
-                        for (int i = startIndex; i < tree.NodeCount; i += skip)
-                        {
-                            var end = Math.Min(tree.NodeCount, i + intervalLength);
-                            for (int j = i; j < end; ++j)
-                            {
-                                tree.IncrementalCacheOptimizeLocking(j);
-                                //tree.IncrementalCacheOptimize(j);
-                            }
-                        }
+                        //const int skip = 4096;
+                        //const int intervalLength = 1024;
+                        //var startIndex = (t * intervalLength) % skip;
+                        //for (int i = startIndex; i < tree.NodeCount; i += skip)
+                        //{
+                        //    var end = Math.Min(tree.NodeCount, i + intervalLength);
+                        //    for (int j = i; j < end; ++j)
+                        //    {
+                        //        tree.IncrementalCacheOptimizeLocking(j);
+                        //        //tree.IncrementalCacheOptimize(j);
+                        //    }
+                        //}
                     }
                     var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 

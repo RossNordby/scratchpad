@@ -218,12 +218,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             return ComputeMaximumDepth(nodes, 0);
         }
 
-        unsafe void MeasureCacheQuality(int nodeIndex, out int foundNodes, out float nodeScore, out int scoreableNodeCount)
+        unsafe void MeasureCacheQuality(int nodeIndex, out int foundNodes, out float nodeScore, out int scorableNodeCount)
         {
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
             nodeScore = 0;
-            scoreableNodeCount = 0;
+            scorableNodeCount = 0;
             foundNodes = 0;
             int correctlyPositionedImmediateChildren = 0;
             int immediateInternalChildren = 0;
@@ -239,12 +239,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                     int childFoundNodes;
                     float childNodeScore;
-                    int childScoreableNodes;
-                    MeasureCacheQuality(children[i], out childFoundNodes, out childNodeScore, out childScoreableNodes);
+                    int childScorableNodes;
+                    MeasureCacheQuality(children[i], out childFoundNodes, out childNodeScore, out childScorableNodes);
                     foundNodes += childFoundNodes;
                     expectedChildIndex += childFoundNodes;
                     nodeScore += childNodeScore;
-                    scoreableNodeCount += childScoreableNodes;
+                    scorableNodeCount += childScorableNodes;
                 }
 
             }
@@ -254,16 +254,26 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (immediateInternalChildren > 0)
             {
                 nodeScore += correctlyPositionedImmediateChildren / (float)immediateInternalChildren;
-                ++scoreableNodeCount;
+                ++scorableNodeCount;
             }
         }
         public unsafe float MeasureCacheQuality()
         {
             float nodeScore;
-            int foundNodes, scoreableNodeCount;
-            MeasureCacheQuality(0, out foundNodes, out nodeScore, out scoreableNodeCount);
-            return nodeScore / (float)scoreableNodeCount;
+            int foundNodes, scorableNodeCount;
+            MeasureCacheQuality(0, out foundNodes, out nodeScore, out scorableNodeCount);
+            return scorableNodeCount > 0 ? nodeScore / scorableNodeCount : 1;
 
+        }
+
+        public unsafe float MeasureCacheQuality(int nodeIndex)
+        {
+            if (nodeIndex < 0 || nodeIndex >= nodeCount)
+                throw new ArgumentException("Measurement target index must be nonnegative and less than node count.");
+            float nodeScore;
+            int foundNodes, scorableNodeCount;
+            MeasureCacheQuality(nodeIndex, out foundNodes, out nodeScore, out scorableNodeCount);
+            return scorableNodeCount > 0 ? nodeScore / scorableNodeCount : 1;
         }
 
     }

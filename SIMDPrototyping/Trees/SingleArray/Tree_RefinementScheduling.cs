@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SIMDPrototyping.Trees.SingleArray
@@ -411,11 +412,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //for (int i = 0; i < refinementTargets.Count - 1; ++i) //Exclude the root. It's always the last target.
             //{
             //    RecursiveIncrementalCacheOptimizeLocking(refinementTargets.Elements[i]);
+
+            //    int foundNodes, scorableNodeCount;
+            //    float nodeScore;
+            //    MeasureCacheQuality(refinementTargets.Elements[i], out foundNodes, out nodeScore, out scorableNodeCount);
+            //    Console.WriteLine($"CACHE QUALITY {refinementTargets[i]}: {MeasureCacheQuality(refinementTargets.Elements[i])}, NODE COUNT: {foundNodes}");
             //}
 
             //RecursiveIncrementalCacheOptimizeLocking(0, 15);
-
-
+            
         }
 
 
