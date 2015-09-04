@@ -53,52 +53,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        unsafe float RefitAndMark(int leafCountThreshold, ref QuickList<int> refinementCandidates)
-        {
-            if (nodes->ChildCount < 2)
-            {
-                Debug.Assert(nodes->ChildA < 0, "If there's only one child, it should be a leaf.");
-                //If there's only a leaf (or no children), then there's no internal nodes capable of changing in volume, so there's no relevant change in cost.
-                return 0;
-            }
-
-            var bounds = &nodes->A;
-            var children = &nodes->ChildA;
-            var leafCounts = &nodes->LeafCountA;
-            float childChange = 0;
-            BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
-            BoundingBox postmerge = premerge;
-            for (int i = 0; i < nodes->ChildCount; ++i)
-            {
-                BoundingBox.Merge(ref bounds[i], ref premerge, out premerge);
-                //Note: these conditions mean the root will never be considered a wavefront node. That's acceptable;
-                //it will be included regardless.
-                if (children[i] >= 0)
-                {
-                    if (leafCounts[i] <= leafCountThreshold)
-                    {
-                        //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
-                        //Since we don't traverse into these children, there is no need to check the parent's leaf count.
-                        refinementCandidates.Add(children[i]);
-                        childChange += RefitAndMeasure(children[i], ref bounds[i]);
-                    }
-                    else
-                    {
-                        childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
-                    }
-                }
-                BoundingBox.Merge(ref bounds[i], ref postmerge, out postmerge);
-            }
-
-            var premetric = ComputeBoundsMetric(ref premerge);
-            var postmetric = ComputeBoundsMetric(ref postmerge);
-
-            if (postmetric >= 0)
-            {
-                return (postmetric - premetric + childChange) / postmetric;
-            }
-            return 0;
-        }
+       
 
         unsafe float RefitAndMark(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates, ref BoundingBox boundingBox)
         {
@@ -170,6 +125,53 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
+        }
+
+        unsafe float RefitAndMark(int leafCountThreshold, ref QuickList<int> refinementCandidates)
+        {
+            if (nodes->ChildCount < 2)
+            {
+                Debug.Assert(nodes->ChildA < 0, "If there's only one child, it should be a leaf.");
+                //If there's only a leaf (or no children), then there's no internal nodes capable of changing in volume, so there's no relevant change in cost.
+                return 0;
+            }
+
+            var bounds = &nodes->A;
+            var children = &nodes->ChildA;
+            var leafCounts = &nodes->LeafCountA;
+            float childChange = 0;
+            BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
+            BoundingBox postmerge = premerge;
+            for (int i = 0; i < nodes->ChildCount; ++i)
+            {
+                BoundingBox.Merge(ref bounds[i], ref premerge, out premerge);
+                //Note: these conditions mean the root will never be considered a wavefront node. That's acceptable;
+                //it will be included regardless.
+                if (children[i] >= 0)
+                {
+                    if (leafCounts[i] <= leafCountThreshold)
+                    {
+                        //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
+                        //Since we don't traverse into these children, there is no need to check the parent's leaf count.
+                        refinementCandidates.Add(children[i]);
+                        childChange += RefitAndMeasure(children[i], ref bounds[i]);
+                    }
+                    else
+                    {
+                        childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
+                    }
+                }
+                BoundingBox.Merge(ref bounds[i], ref postmerge, out postmerge);
+            }
+
+            var premetric = ComputeBoundsMetric(ref premerge);
+            var postmetric = ComputeBoundsMetric(ref postmerge);
+
+            if (postmetric >= 0)
+            {
+                return (postmetric - premetric + childChange) / postmetric;
+            }
+            return 0;
         }
 
         unsafe void ValidateRefineFlags(int index)
