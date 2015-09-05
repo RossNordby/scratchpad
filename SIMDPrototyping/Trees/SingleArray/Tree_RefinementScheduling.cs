@@ -53,7 +53,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-       
+
 
         unsafe float RefitAndMark(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates, ref BoundingBox boundingBox)
         {
@@ -207,7 +207,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
             float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
-            var targetRefinementScale = Math.Max(Math.Ceiling(refinementTargets.Count * 0.03f), refinementTargets.Count * refinePortion);
+            var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementTargets.Count * 0.03f)) + refinementTargets.Count * refinePortion;
             var period = (int)(refinementTargets.Count / targetRefinementScale);
             var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
 
@@ -227,6 +227,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (nodes->RefineFlag != 1)
             {
                 refinementTargets.Add(0);
+                ++actualRefinementTargetsCount;
                 nodes->RefineFlag = 1;
             }
             //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
@@ -310,7 +311,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Max(0.01f, Math.Min(1, cacheOptimizeAggressiveness * 0.75f));
+            float cacheOptimizePortion = Math.Min(1, 0.01f + cacheOptimizeAggressiveness * 0.75f);
+            //Console.WriteLine($"PORTION: {cacheOptimizePortion}");
             var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
 
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);

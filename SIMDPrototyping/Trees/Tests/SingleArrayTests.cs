@@ -71,24 +71,24 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray arity: {Tree.ChildrenCapacity}");
                 Tree tree = new Tree(leaves.Length);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    var leafIndex = (int)((982451653L * i) % leaves.Length);
-                    BoundingBox box;
-                    leaves[leafIndex].GetBoundingBox(out box);
-                    tree.Add(leafIndex, ref box);
-                    //tree.AddGlobal(leafIndex, ref box);
-                }
-                //int[] leafIds = new int[leaves.Length];
-                //BoundingBox[] leafBounds = new BoundingBox[leaves.Length];
                 //for (int i = 0; i < leaves.Length; ++i)
                 //{
-                //    leafIds[i] = i;
-                //    leaves[i].GetBoundingBox(out leafBounds[i]);
+                //    var leafIndex = (int)((982451653L * i) % leaves.Length);
+                //    BoundingBox box;
+                //    leaves[leafIndex].GetBoundingBox(out box);
+                //    tree.Add(leafIndex, ref box);
+                //    //tree.AddGlobal(leafIndex, ref box);
                 //}
-                ////tree.BuildMedianSplit(leafIds, leafBounds);
-                ////tree.BuildVolumeHeuristic(leafIds, leafBounds);
-                //tree.SweepBuild(leafIds, leafBounds);
+                int[] leafIds = new int[leaves.Length];
+                BoundingBox[] leafBounds = new BoundingBox[leaves.Length];
+                for (int i = 0; i < leaves.Length; ++i)
+                {
+                    leafIds[i] = i;
+                    leaves[i].GetBoundingBox(out leafBounds[i]);
+                }
+                //tree.BuildMedianSplit(leafIds, leafBounds);
+                //tree.BuildVolumeHeuristic(leafIds, leafBounds);
+                tree.SweepBuild(leafIds, leafBounds);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Build Time: {endTime - startTime}, depth: {tree.ComputeMaximumDepth()}");
 
@@ -169,7 +169,7 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.RecursiveIncrementalCacheOptimizeLocking(0);
                 Random random = new Random(5);
                 const float minVelocity = 1;
-                const float maxVelocity = 10;
+                const float maxVelocity = 40;
                 const float velocityDistributionPower = 10;
                 const float portionOfMovingLeaves = 1f;
                 for (int i = 0; i < leaves.Length * portionOfMovingLeaves; ++i)
@@ -179,7 +179,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 const float dt = 1f / 60f;
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 4096; ++t)
+                for (int t = 0; t < 16384; ++t)
                 {
                     //Update the positions of objects.
                     for (int i = 0; i < tree.LeafCount; ++i)
