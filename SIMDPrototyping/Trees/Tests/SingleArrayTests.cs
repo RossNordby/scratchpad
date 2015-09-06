@@ -15,7 +15,9 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public unsafe static void TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, BoundingBox positionBounds, int queryCount, int selfTestCount, int refitCount)
+        
+        public unsafe static void TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, BoundingBox positionBounds,
+            int queryCount, int selfTestCount, int refitCount, int frameCount, float dt)
         {
             {
 
@@ -96,6 +98,7 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.MeasureNodeOccupancy(out nodeCount, out childCount);
                 Console.WriteLine($"SingleArray Occupancy: {childCount / (double)nodeCount}");
                 Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                Console.WriteLine($"Cache Quality: {tree.MeasureCacheQuality()}");
 
                 tree.Validate();
 
@@ -122,8 +125,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray SelfTree Time1: {endTime - startTime}, overlaps: {overlaps.Count}");
-
-                Console.WriteLine($"SingleArray Cache Quality Before: {tree.MeasureCacheQuality()}");
+                
 
                 int[] buffer;
                 MemoryRegion region;
@@ -135,51 +137,15 @@ namespace SIMDPrototyping.Trees.Tests
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-
-                //for (int i = 0; i < 5; ++i)
-                //{
-                //    spareNodes.Count = 0;
-
-
-                //    //tree.SweepRefine(0, ref spareNodes, out nodesInvalidated);
-                //    //tree.BinnedRefine(0, ref spareNodes, maximumSubtrees, ref resources, out nodesInvalidated);
-
-                //    tree.BottomUpBinnedRefine(maximumSubtrees);
-                //    tree.TopDownBinnedRefine(maximumSubtrees);
-                //    //tree.BottomUpSweepRefine();
-                //    //tree.TopDownSweepRefine();
-                //    //tree.BottomUpAgglomerativeRefine();
-                //    //tree.Refit();
-                //    //tree.BottomUpRefine();
-                //    //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
-                //    //tree.Validate();
-                //}
-
-
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"SingleArray Refine Time: {endTime - startTime}");
-
-                Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
-                Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
+                
 
                 var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
 
                 //**************** Dynamic Testing
-                tree.RecursiveIncrementalCacheOptimizeLocking(0);
                 Random random = new Random(5);
-                const float minVelocity = 1;
-                const float maxVelocity = 40;
-                const float velocityDistributionPower = 10;
-                const float portionOfMovingLeaves = 1f;
-                for (int i = 0; i < leaves.Length * portionOfMovingLeaves; ++i)
-                {
-                    var velocity = (float)(minVelocity + (maxVelocity - minVelocity) * Math.Pow(random.NextDouble(), velocityDistributionPower));
-                    leaves[i].Velocity = velocity * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One);
-                }
-                const float dt = 1f / 60f;
+
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 16384; ++t)
+                for (int t = 0; t < frameCount; ++t)
                 {
                     //Update the positions of objects.
                     for (int i = 0; i < tree.LeafCount; ++i)
@@ -246,7 +212,6 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 tree.Validate();
-                Console.WriteLine($"Incremental Cache Optimize Time: {endTime - startTime}");
                 Console.WriteLine($"SingleArray Cache Quality: {tree.MeasureCacheQuality()}");
                 Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
 

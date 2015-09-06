@@ -13,7 +13,8 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static void TestDH(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, ref BoundingBox positionBounds, int queryCount, int selfTestCount, int refitCount)
+        public static void TestDH(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, ref BoundingBox positionBounds, 
+            int queryCount, int selfTestCount, int refitCount, int frameCount, float dt)
         {
 
             GC.Collect();
@@ -66,15 +67,11 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"DH selftest Time: {endTime - startTime}, overlaps: {tree.Overlaps.Count}");
 
 
+                //**************** Dynamic Testing
                 Random random = new Random(5);
-                const float maxVelocity = 10;
-                for (int i = 0; i < leaves.Length; ++i)
-                {
-                    leaves[i].Velocity = maxVelocity * (new Vector3((float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f) * 2);
-                }
-                const float dt = 1f / 60f;
+               
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int t = 0; t < 16384; ++t)
+                for (int t = 0; t < frameCount; ++t)
                 {
                     //Update the positions of objects.
                     for (int i = 0; i < leaves.Length; ++i)
@@ -99,16 +96,38 @@ namespace SIMDPrototyping.Trees.Tests
                         leaf.Position += leaf.Velocity * dt;
                         leaf.UpdateBoundingBox();
                     }
-                    var startTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                    var refineStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                    tree.SingleThreadedRefitPhase();
 
-                    var endTimeInner = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                   tree.SingleThreadedRefitPhase();
+
+
+                    //tree.Refit();
+                    //for (int i = 0; i < 1; ++i)
+                    //{
+
+                    //    subtreeReferences.Count = 0;
+                    //    treeletInternalNodes.Count = 0;
+                    //    tree.BinnedRefine(0, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                    //}
+                    //tree.RemoveUnusedInternalNodes(ref spareNodes);
+
+                    var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+
+                    tree.Overlaps.Count = 0;
+                    tree.SingleThreadedOverlapPhase();
+
+                    var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+
                     if (t % 16 == 0)
                     {
-                        Console.WriteLine($"Cost metric {t}: {tree.MeasureCostMetric()}");
-                        Console.WriteLine($"Refit/Revalidate time: {endTimeInner - startTimeInner}");
-
+                        Console.WriteLine($"_________________{t}_________________");
+                        Console.WriteLine($"Refine time:      {refineEndTime - refineStartTime}");
+                        Console.WriteLine($"Test time:        {testEndTime - refineEndTime}");
+                        Console.WriteLine($"TIME:             {testEndTime - refineStartTime}");
+                        Console.WriteLine($"Cost metric:      {tree.MeasureCostMetric()}");
+                        Console.WriteLine($"Overlaps:         {tree.Overlaps.Count}");
+                        GC.Collect();
                     }
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;

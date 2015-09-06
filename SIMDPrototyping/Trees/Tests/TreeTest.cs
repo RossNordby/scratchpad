@@ -21,7 +21,16 @@ namespace SIMDPrototyping.Trees.Tests
 
     public static partial class TreeTest
     {
-        static TestCollidableBEPU[] GetRandomLeavesBEPU(int leafCount, BoundingBox bounds, Vector3 minimumSize, Vector3 maximumSize, float sizePower)
+
+        struct VelocityDescription
+        {
+            public float MinVelocity;
+            public float MaxVelocity;
+            public float VelocityDistributionPower;
+            public float PortionOfMovingLeaves;
+        }
+
+        static TestCollidableBEPU[] GetRandomLeavesBEPU(int leafCount, BoundingBox bounds, Vector3 minimumSize, Vector3 maximumSize, float sizePower, VelocityDescription velocityDescription)
         {
             var leaves = new TestCollidableBEPU[leafCount];
             Random random = new Random(5);
@@ -38,11 +47,28 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves[i].HalfSize = new BEPUutilities.Vector3(halfLeafSize.X, halfLeafSize.Y, halfLeafSize.Z);
                 leaves[i].UpdateBoundingBox();
             }
+
+            for (int i = 0; i < leaves.Length * velocityDescription.PortionOfMovingLeaves; ++i)
+            {
+                var speed = (float)(velocityDescription.MinVelocity + (velocityDescription.MaxVelocity - velocityDescription.MinVelocity) * Math.Pow(random.NextDouble(), velocityDescription.VelocityDistributionPower));
+                var direction = new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One;
+                var lengthSquared = direction.LengthSquared();
+                if (lengthSquared < 1e-9f)
+                {
+                    direction = new Vector3(0, 1, 0);
+                }
+                else
+                {
+                    direction /= (float)Math.Sqrt(lengthSquared);
+                }
+                var velocity = speed * direction;
+                leaves[i].Velocity = new BEPUutilities.Vector3(velocity.X, velocity.Y, velocity.Z);
+            }
             return leaves;
 
         }
 
-        static TestCollidable[] GetRandomLeaves(int leafCount, BoundingBox bounds, Vector3 minimumSize, Vector3 maximumSize, float sizePower)
+        static TestCollidable[] GetRandomLeaves(int leafCount, BoundingBox bounds, Vector3 minimumSize, Vector3 maximumSize, float sizePower, VelocityDescription velocityDescription)
         {
             var leaves = new TestCollidable[leafCount];
             Random random = new Random(5);
@@ -55,6 +81,22 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves[i].HalfSize = 0.5f * (minimumSize + new Vector3((float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower), (float)Math.Pow(random.NextDouble(), sizePower)) * sizeRange);
                 leaves[i].Position = bounds.Min + new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * range;
 
+            }
+
+            for (int i = 0; i < leaves.Length * velocityDescription.PortionOfMovingLeaves; ++i)
+            {
+                var speed = (float)(velocityDescription.MinVelocity + (velocityDescription.MaxVelocity - velocityDescription.MinVelocity) * Math.Pow(random.NextDouble(), velocityDescription.VelocityDistributionPower));
+                var direction = new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) * 2 - Vector3.One;
+                var lengthSquared = direction.LengthSquared();
+                if (lengthSquared < 1e-9f)
+                {
+                    direction = new Vector3(0, 1, 0);
+                }
+                else
+                {
+                    direction /= (float)Math.Sqrt(lengthSquared);
+                }
+                leaves[i].Velocity = speed * direction;
             }
             return leaves;
 
@@ -98,6 +140,7 @@ namespace SIMDPrototyping.Trees.Tests
                     }
                 }
             }
+
             return leaves;
 
 
@@ -119,6 +162,7 @@ namespace SIMDPrototyping.Trees.Tests
             return boxes;
         }
 
+
         static BEPUutilities.BoundingBox[] GetBEPUQueryLocations(int count, BoundingBox bounds, Vector3 size)
         {
             Random random = new Random(5);
@@ -137,20 +181,31 @@ namespace SIMDPrototyping.Trees.Tests
         }
         public static void Test()
         {
-            float leafMinSize = 10;
-            float leafMaxSize = 10;
+            float leafMinSize = 1;
+            float leafMaxSize = 100;
             float leafSizePower = 10;
             int queryCount = 1000000;
             int selfTestCount = 10;
             int refitCount = 100;
+            int frameCount = 1024;
+            float dt = 1 / 60f;
+
+            VelocityDescription velocityDescription = new VelocityDescription
+            {
+                MinVelocity = 0,
+                MaxVelocity = 0,
+                VelocityDistributionPower = 10,
+                PortionOfMovingLeaves = 1
+            };
 
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
 
+
 #if RANDOMLEAVES
-            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(157.5f) };
+            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(629.96f) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 4096;
+            int randomLeafCount = 65536;
 
 #else
             int leafCountX = 64;
@@ -165,33 +220,33 @@ namespace SIMDPrototyping.Trees.Tests
                 var queries = GetQueryLocations(queryLocationCount, queryBounds, querySize);
 
 #if RANDOMLEAVES
-                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
+                var leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower, velocityDescription);
 #else
                 var leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
                 //TestVectorized(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
-                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
+                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower, velocityDescription);
 #else
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
                 //TestBaseline(leaves, queries, queryCount, selfTestCount, refitCount);
 #if RANDOMLEAVES
-                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
+                leaves = GetRandomLeaves(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower, velocityDescription);
 #else
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount);
+                TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
 
             }
 
             {
 
 #if RANDOMLEAVES
-                var leaves = GetRandomLeavesBEPU(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower);
+                var leaves = GetRandomLeavesBEPU(randomLeafCount, randomLeafBounds, new Vector3(leafMinSize), new Vector3(leafMaxSize), leafSizePower, velocityDescription);
 #else
                 var leaves = GetLeavesBEPU(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
@@ -199,7 +254,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 GC.Collect();
                 //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
-                //TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount);
+                //TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
 
             }
 
