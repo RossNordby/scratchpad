@@ -1,6 +1,7 @@
 ﻿//#define OUTPUT
 //#define NODE8
 
+using BEPUutilities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -64,6 +65,26 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             return nodeCount++;
         }
+
+
+        object nodeLocker = new object();
+        int AllocateNodeLocking(out bool pointersInvalidated)
+        {
+            lock (nodeLocker)
+            {
+                if (nodeCount == NodeCapacity)
+                {
+                    NodeCapacity *= 2;
+                    pointersInvalidated = true;
+                }
+                else
+                {
+                    pointersInvalidated = false;
+                }
+                return nodeCount++;
+            }
+        }
+
 
 
         /// <summary>

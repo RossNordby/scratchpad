@@ -71,15 +71,15 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// Reorganizes the memory layout of this node and all of its descendants.
         /// </summary>
         /// <param name="nodeIndex">Node at which to start the optimization.</param>
-        public unsafe void RecursiveIncrementalCacheOptimizeLocking(int nodeIndex)
+        public unsafe void RecursiveIncrementalCacheOptimizeThreadSafe(int nodeIndex)
         {
-            IncrementalCacheOptimizeLocking(nodeIndex);
+            IncrementalCacheOptimizeThreadSafe(nodeIndex);
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 if (children[i] >= 0)
-                    RecursiveIncrementalCacheOptimizeLocking(children[i]);
+                    RecursiveIncrementalCacheOptimizeThreadSafe(children[i]);
             }
         }
 
@@ -88,9 +88,9 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// </summary>
         /// <param name="nodeIndex">Node at which to start the optimization.</param>
         /// <param name="maximumDepth">Maximum depth from the specified node down into the tree.</param>
-        public unsafe void RecursiveIncrementalCacheOptimizeLocking(int nodeIndex, int maximumDepth)
+        public unsafe void RecursiveIncrementalCacheOptimizeThreadSafe(int nodeIndex, int maximumDepth)
         {
-            IncrementalCacheOptimizeLocking(nodeIndex);
+            IncrementalCacheOptimizeThreadSafe(nodeIndex);
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
             var depthRemaining = maximumDepth - 1;
@@ -99,12 +99,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 for (int i = 0; i < node->ChildCount; ++i)
                 {
                     if (children[i] >= 0)
-                        RecursiveIncrementalCacheOptimizeLocking(children[i], depthRemaining);
+                        RecursiveIncrementalCacheOptimizeThreadSafe(children[i], depthRemaining);
                 }
             }
         }
 
-        public unsafe void IncrementalCacheOptimizeLocking(int nodeIndex)
+        public unsafe void IncrementalCacheOptimizeThreadSafe(int nodeIndex)
         {
             //Multithreaded cache optimization attempts to acquire a lock on every involved node.
             //If any lock fails, it just abandons the entire attempt.

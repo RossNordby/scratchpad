@@ -295,11 +295,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             else if (!spareNodes.TryPop(out internalNodeIndex))
             {
                 //There was no pre-existing internal node that we could use. Apparently, the tree gained some internal nodes.
-                //TODO: Multithreading issue.
                 //Watch out, calls to AllocateNode potentially invalidate all extant node pointers.
                 //Fortunately, there are no pointers to invalidate... here. Propagate it up.
+                //Note that this is a locking operation to support multithreading. In practice, n-ary trees should hit this very rarely.
+                //In binary trees, this will never get hit at all.
                 bool addCausedInvalidation;
-                internalNodeIndex = AllocateNode(out addCausedInvalidation);
+                internalNodeIndex = AllocateNodeLocking(out addCausedInvalidation);
                 if (addCausedInvalidation)
                     nodesInvalidated = true;
             }
@@ -359,15 +360,21 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             if (spareNodes.Count > 0)
             {
-                //There were some spare internal nodes left. Apparently, the tree was compressed a little bit.
-                //Remove them from the real tree.
-                //TODO: Multithreading issue.
-                //Remove highest to lowest to avoid any situation where removing could invalidate an index.
-                Array.Sort(spareNodes.Elements, 0, spareNodes.Count);
-                int nodeIndex;
-                while (spareNodes.TryPop(out nodeIndex))
+                lock (nodeLocker)
                 {
-                    RemoveNodeAt(nodeIndex);
+                    //Locked to protect against multiple threads dumping at once, and against other thread simultaneously running AllocateNodeLocking.
+                    //Both of these can occur during multithreaded refinements.
+                    //Since this only executes once, the cost doesn't really matter. And on binary trees, it will never execute.
+
+                    //There were some spare internal nodes left. Apparently, the tree was compressed a little bit.
+                    //Remove them from the real tree.
+                    //Remove highest to lowest to avoid any situation where removing could invalidate an index.
+                    Array.Sort(spareNodes.Elements, 0, spareNodes.Count);
+                    int nodeIndex;
+                    while (spareNodes.TryPop(out nodeIndex))
+                    {
+                        RemoveNodeAt(nodeIndex);
+                    }
                 }
             }
         }
