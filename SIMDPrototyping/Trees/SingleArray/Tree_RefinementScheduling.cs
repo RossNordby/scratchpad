@@ -50,11 +50,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-
-
-
-
-
         unsafe float RefitAndMark(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates, ref BoundingBox boundingBox)
         {
             Debug.Assert(leafCountThreshold > 1);
@@ -199,11 +194,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             var refinementTargets = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex((int)(leafCount / (maximumSubtrees * 0.5f))));
 
             int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
-
-            //ValidateRefineFlags(0);
+            
             //Collect the refinement candidates.
             var costChange = RefitAndMark(leafCountThreshold, ref refinementTargets);
-            //ValidateRefineFlags(0);
 
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
             float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
@@ -230,23 +223,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 ++actualRefinementTargetsCount;
                 nodes->RefineFlag = 1;
             }
-            //Console.WriteLine($"Refinement count: {refinementTargets.Count}");
 
-
-            //if (costChange > 1000)
-            //{
-            //    //Something silly is going on. The usual approach does not scale well to this level of explosive corruption.
-            //    //Just rebuild it.
-            //    maximumSubtrees = LeafCount;
-            //    refinementTargets.Add(0);
-            //    //Make sure collectsubtrees can gather all the nodes.
-            //    for (int i = 0; i < refinementTargets.Count; ++i)
-            //    {
-            //        nodes[i].RefineFlag = 0;
-            //    }
-            //    //Note: yes, this does some redundant work. But the amount of work required to do the partially redundant MarkForRefinement is absolutely nothing compared to this full rebuild.
-
-            //}
 
             //Refine all marked targets.
             var pool = BufferPools<int>.Thread;
@@ -259,10 +236,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             BinnedResources resources;
             CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
 
-
-            //var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
-            //int numberOfDuplicates = 0;
-            //for (int i = refinementTargets.Count - 1; i >= 0; --i)
             for (int i = 0; i < refinementTargets.Count; ++i)
             {
                 subtreeReferences.Count = 0;
@@ -276,13 +249,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             }
-            //for (int i = 0; i < refinementTargets.Count; ++i)
-            //{
-            //    nodes[refinementTargets.Elements[i]].RefineFlag = 0;
-            //}
-            //Console.WriteLine($"Fraction of internal nodes visited: {visitedNodes.Count / (double)NodeCount}");
-            //Console.WriteLine($"Fraction of duplicates visited: {(visitedNodes.Count > 0 ? (numberOfDuplicates / (double)visitedNodes.Count) : 0)}");
-            //visitedNodes.Dispose();
+
 
             RemoveUnusedInternalNodes(ref spareNodes);
             region.Dispose();
@@ -295,24 +262,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             refinementTargets.Count = 0;
             refinementTargets.Dispose();
 
-            //It's safe to use the refinementTargets' nodes because the refinements never move the treelet roots.
-            //(Note: if you moved the RefineFlag reset into the loop, this guarantee goes out the window because the root refine could destroy the guarantee.)
-            //for (int i = 0; i < refinementTargets.Count - 1; ++i) //Exclude the root. It's always the last target.
-            //{
-            //    RecursiveIncrementalCacheOptimizeLocking(refinementTargets.Elements[i]);
-
-            //    int foundNodes, scorableNodeCount;
-            //    float nodeScore;
-            //    MeasureCacheQuality(refinementTargets.Elements[i], out foundNodes, out nodeScore, out scorableNodeCount);
-            //    Console.WriteLine($"CACHE QUALITY {refinementTargets[i]}: {MeasureCacheQuality(refinementTargets.Elements[i])}, NODE COUNT: {foundNodes}");
-            //}
-
-            //RecursiveIncrementalCacheOptimizeLocking(0, 15);
 
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
             float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
-            //Console.WriteLine($"PORTION: {cacheOptimizePortion}");
             var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
 
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
@@ -321,11 +274,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             var end = Math.Min(NodeCount, startIndex + cacheOptimizeCount);
             for (int i = startIndex; i < end; ++i)
             {
-
-                IncrementalCacheOptimizeLocking(i);
-                //tree.IncrementalCacheOptimize(i);
+                IncrementalCacheOptimize(i);
             }
-            //Console.WriteLine($"Cache optimize count: {cacheOptimizeCount}, effective: {end - startIndex}");
 
             return actualRefinementTargetsCount;
         }
