@@ -169,6 +169,120 @@ namespace SIMDPrototyping.Trees.SingleArray
             return 0;
         }
 
+        unsafe void CollectNodesForMultithreadedRefit(int nodeIndex, int leafCountThreshold, ref QuickList<int> targets)
+        {
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+            var leafCounts = &node->LeafCountA;
+            Debug.Assert(node->RefineFlag == 0);
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    //Each node stores how many children are involved in the multithreaded refit.
+                    //This allows the postphase to climb the tree in a thread safe way.
+                    ++node->RefineFlag;
+                    if (leafCounts[i] <= leafCountThreshold)
+                    {
+                        targets.Add(children[i]);
+                    }
+                    else
+                    {
+                        CollectNodesForMultithreadedRefit(children[i], leafCountThreshold, ref targets);
+                    }
+                }
+            }
+        }
+
+
+        void CollectNodesForMultithreadedRefit(int threadCount, ref QuickList<int> targets)
+        {
+            //No point in using this if there aren't enough leaves.
+            Debug.Assert(leafCount > 2);
+            int leafCountThreshold = leafCount / (threadCount * 2);
+            CollectNodesForMultithreadedRefit(0, leafCountThreshold, ref targets);
+        }
+
+        public class RefitAndRefineMultithreadedContext
+        {
+            public Tree Tree;
+
+            public QuickList<int> RefitNodes;
+            public QuickList<float> RefitVolumeChanges;
+            public int LeafCountThreshold;
+            public Action<int> RefitAndMarkAction;
+
+            public QuickList<int> RefinementNodes;
+            public Action<int> RefineAction;
+
+            public int FrameIndex;
+            public int CacheOptimizeCount;
+            public Action<int> CacheOptimizeAction;
+
+            public RefitAndRefineMultithreadedContext(Tree tree)
+            {
+                Tree = tree;
+                RefitAndMarkAction = RefitAndMark;
+                RefineAction = Refine;
+                CacheOptimizeAction = CacheOptimize;
+            }
+
+            unsafe void RefitAndMark(int refitNodeIndex)
+            {
+                var node = Tree.nodes + RefitNodes.Elements[refitNodeIndex];
+                Debug.Assert(node->Parent >= 0, "The root should not be marked for refit.");
+                var parent = Tree.nodes + node->Parent;
+                var boundingBoxInParent = &parent->A + node->IndexInParent;
+                Debug.Assert(RefitVolumeChanges.Count == RefitNodes.Count);
+                RefitVolumeChanges.Elements[refitNodeIndex] = Tree.RefitAndMark(RefitNodes.Elements[refitNodeIndex], LeafCountThreshold, ref RefinementNodes, ref *boundingBoxInParent);
+
+                //Walk up the tree.
+                node = parent;
+                while(true)
+                {
+                   
+                    if (Interlocked.Decrement(ref node->RefineFlag) == 0)
+                    {
+                        if (node->Parent < 0)
+                        {
+                            //Found the root. Root has no bounding box to worry about.
+                            return;
+                        }
+                        //This thread is the last thread to visit this node, so it must handle this node.
+                        //Merge all the child bounding boxes into one. 
+                        parent = Tree.nodes + node->Parent;
+                        boundingBoxInParent = &parent->A + node->IndexInParent;
+                        *boundingBoxInParent = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
+                        var bounds = &node->A;
+                        for (int i = 0; i < node->ChildCount; ++i)
+                        {
+                            BoundingBox.Merge(ref bounds[i], ref *boundingBoxInParent, out *boundingBoxInParent); 
+                        }
+                        node = parent;
+                    }
+                    else
+                    {
+                        //This thread wasn't the last to visit this node, so it should die. Some other thread will handle it later.
+                        return;
+                    }
+                } 
+
+
+            }
+            
+            void Refine(int i)
+            {
+
+            }
+            
+            void CacheOptimize(int i)
+            {
+
+            }
+        }
+
+
+
         unsafe void ValidateRefineFlags(int index)
         {
             var node = nodes + index;
@@ -191,10 +305,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (leafCount == 0)
                 return 0;
             int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
-            var refinementTargets = new QuickList<int>(BufferPools<int>.Thread, BufferPool<int>.GetPoolIndex((int)(leafCount / (maximumSubtrees * 0.5f))));
+            var pool = BufferPools<int>.Locking;
+            var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex((int)(leafCount / (maximumSubtrees * 0.5f))));
 
             int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
-            
+
             //Collect the refinement candidates.
             var costChange = RefitAndMark(leafCountThreshold, ref refinementTargets);
 
@@ -226,7 +341,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             //Refine all marked targets.
-            var pool = BufferPools<int>.Thread;
 
             var spareNodes = new QuickList<int>(pool, 8);
             var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
