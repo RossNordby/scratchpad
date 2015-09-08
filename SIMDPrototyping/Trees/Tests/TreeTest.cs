@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using Tree = SIMDPrototyping.Trees.Vectorized.Tree<SIMDPrototyping.Trees.TestCollidable>;
 using BaselineTree = SIMDPrototyping.Trees.Baseline.Tree<SIMDPrototyping.Trees.TestCollidable>;
 using SIMDPrototyping.Trees.Baseline;
+using System.IO;
 
 namespace SIMDPrototyping.Trees.Tests
 {
@@ -187,13 +188,13 @@ namespace SIMDPrototyping.Trees.Tests
             int queryCount = 1000000;
             int selfTestCount = 10;
             int refitCount = 100;
-            int frameCount = 1024;
+            int frameCount = 2048;
             float dt = 1 / 60f;
 
             VelocityDescription velocityDescription = new VelocityDescription
             {
                 MinVelocity = 0,
-                MaxVelocity = 0,
+                MaxVelocity = 10,
                 VelocityDistributionPower = 10,
                 PortionOfMovingLeaves = 1
             };
@@ -205,7 +206,7 @@ namespace SIMDPrototyping.Trees.Tests
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(629.96f) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 65536;
+            int randomLeafCount = 16384;
 
 #else
             int leafCountX = 64;
@@ -239,8 +240,15 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
+                var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
 
+                using (var stream = File.Open("newTreeResults.txt", FileMode.Create))
+                {
+                    using (var textWriter = new StreamWriter(stream))
+                    {
+                        results.Save(textWriter);
+                    }
+                }
             }
 
             {
@@ -254,8 +262,14 @@ namespace SIMDPrototyping.Trees.Tests
 
                 GC.Collect();
                 //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
-                //TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
-
+                var results = TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
+                using (var stream = File.Open("oldDHResults.txt", FileMode.Create))
+                {
+                    using (var textWriter = new StreamWriter(stream))
+                    {
+                        results.Save(textWriter);
+                    }
+                }
             }
 
         }

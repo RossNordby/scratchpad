@@ -158,6 +158,7 @@
     <Compile Include="Trees\Tests\SingleArrayTests.cs" />
     <Compile Include="Trees\Tests\BaselineTests.cs" />
     <Compile Include="Trees\Tests\BEPUTests.cs" />
+    <Compile Include="Trees\Tests\TestResults.cs" />
     <Compile Include="Trees\Tests\VectorizedTests.cs" />
     <Compile Include="Trees\Vectorized\Node.cs" />
     <Compile Include="Trees\Tests\TreeTest.cs" />

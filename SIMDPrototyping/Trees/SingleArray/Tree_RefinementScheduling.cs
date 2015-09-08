@@ -311,7 +311,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Min(1, 0.01f + cacheOptimizeAggressiveness * 0.75f);
+            float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
             //Console.WriteLine($"PORTION: {cacheOptimizePortion}");
             var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
 

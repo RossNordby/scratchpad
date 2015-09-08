@@ -13,7 +13,7 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static void TestDH(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, ref BoundingBox positionBounds, 
+        public static TestResults TestDH(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, ref BoundingBox positionBounds, 
             int queryCount, int selfTestCount, int refitCount, int frameCount, float dt)
         {
 
@@ -25,10 +25,16 @@ namespace SIMDPrototyping.Trees.Tests
                 {
                     tree.Add(leaves[i]);
                 }
+
+                tree.SingleThreadedRefitPhase();
+
+                tree.SingleThreadedOverlapPhase();
+
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     tree.Remove(leaves[i]);
                 }
+
             }
             GC.Collect();
 
@@ -45,31 +51,32 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"DH Build Time: {endTime - startTime}");
                 Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
 
-                tree.SingleThreadedRefitPhase();
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < refitCount; ++i)
-                {
-                    tree.SingleThreadedRefitPhase();
-                    //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"DH Refit Time: {endTime - startTime}");
-                Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                //tree.SingleThreadedRefitPhase();
+                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //for (int i = 0; i < refitCount; ++i)
+                //{
+                //    tree.SingleThreadedRefitPhase();
+                //    //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
+                //}
+                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //Console.WriteLine($"DH Refit Time: {endTime - startTime}");
+                //Console.WriteLine($"Cost metric: {tree.MeasureCostMetric()}");
 
-                tree.SingleThreadedOverlapPhase();
-                startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                for (int i = 0; i < selfTestCount; ++i)
-                {
-                    tree.Overlaps.Clear();
-                    tree.SingleThreadedOverlapPhase();
-                }
-                endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                Console.WriteLine($"DH selftest Time: {endTime - startTime}, overlaps: {tree.Overlaps.Count}");
+                //tree.SingleThreadedOverlapPhase();
+                //startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //for (int i = 0; i < selfTestCount; ++i)
+                //{
+                //    tree.Overlaps.Clear();
+                //    tree.SingleThreadedOverlapPhase();
+                //}
+                //endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //Console.WriteLine($"DH selftest Time: {endTime - startTime}, overlaps: {tree.Overlaps.Count}");
 
 
                 //**************** Dynamic Testing
                 Random random = new Random(5);
-               
+                TestResults results = new TestResults("Old DH Dynamic", frameCount);
+
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int t = 0; t < frameCount; ++t)
                 {
@@ -119,14 +126,20 @@ namespace SIMDPrototyping.Trees.Tests
 
                     var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
+                    results.Refine[t] = 1000 * (refineEndTime - refineStartTime);
+                    results.SelfTest[t] = 1000 * (testEndTime - refineEndTime);
+                    results.Total[t] = 1000 * (testEndTime - refineStartTime);
+                    results.OverlapCounts[t] = tree.Overlaps.Count;
+                    results.TreeCosts[t] = tree.MeasureCostMetric();
+
                     if (t % 16 == 0)
                     {
                         Console.WriteLine($"_________________{t}_________________");
-                        Console.WriteLine($"Refine time:      {refineEndTime - refineStartTime}");
-                        Console.WriteLine($"Test time:        {testEndTime - refineEndTime}");
-                        Console.WriteLine($"TIME:             {testEndTime - refineStartTime}");
-                        Console.WriteLine($"Cost metric:      {tree.MeasureCostMetric()}");
-                        Console.WriteLine($"Overlaps:         {tree.Overlaps.Count}");
+                        Console.WriteLine($"Refine time:      {results.Refine[t]}");
+                        Console.WriteLine($"Test time:        {results.SelfTest[t]}");
+                        Console.WriteLine($"TIME:             {results.Total[t]}");
+                        Console.WriteLine($"Cost metric:      {results.TreeCosts[t]}");
+                        Console.WriteLine($"Overlaps:         {results.OverlapCounts[t]}");
                         GC.Collect();
                     }
                 }
@@ -144,6 +157,7 @@ namespace SIMDPrototyping.Trees.Tests
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"DH selftest Time2: {endTime - startTime}, overlaps: {tree.Overlaps.Count}");
 
+                return results;
             }
 
         }

@@ -16,7 +16,7 @@ namespace SIMDPrototyping.Trees.Tests
     partial class TreeTest
     {
         
-        public unsafe static void TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, BoundingBox positionBounds,
+        public unsafe static TestResults TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, BoundingBox positionBounds,
             int queryCount, int selfTestCount, int refitCount, int frameCount, float dt)
         {
             {
@@ -47,6 +47,7 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.TopDownAgglomerativeRefine();
                 tree.BottomUpSweepRefine();
                 tree.TopDownSweepRefine();
+                tree.RefitAndRefine(0);
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
@@ -73,24 +74,24 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray arity: {Tree.ChildrenCapacity}");
                 Tree tree = new Tree(leaves.Length);
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                //for (int i = 0; i < leaves.Length; ++i)
-                //{
-                //    var leafIndex = (int)((982451653L * i) % leaves.Length);
-                //    BoundingBox box;
-                //    leaves[leafIndex].GetBoundingBox(out box);
-                //    tree.Add(leafIndex, ref box);
-                //    //tree.AddGlobal(leafIndex, ref box);
-                //}
-                int[] leafIds = new int[leaves.Length];
-                BoundingBox[] leafBounds = new BoundingBox[leaves.Length];
                 for (int i = 0; i < leaves.Length; ++i)
                 {
-                    leafIds[i] = i;
-                    leaves[i].GetBoundingBox(out leafBounds[i]);
+                    var leafIndex = (int)((982451653L * i) % leaves.Length);
+                    BoundingBox box;
+                    leaves[leafIndex].GetBoundingBox(out box);
+                    tree.Add(leafIndex, ref box);
+                    //tree.AddGlobal(leafIndex, ref box);
                 }
-                //tree.BuildMedianSplit(leafIds, leafBounds);
-                //tree.BuildVolumeHeuristic(leafIds, leafBounds);
-                tree.SweepBuild(leafIds, leafBounds);
+                //int[] leafIds = new int[leaves.Length];
+                //BoundingBox[] leafBounds = new BoundingBox[leaves.Length];
+                //for (int i = 0; i < leaves.Length; ++i)
+                //{
+                //    leafIds[i] = i;
+                //    leaves[i].GetBoundingBox(out leafBounds[i]);
+                //}
+                ////tree.BuildMedianSplit(leafIds, leafBounds);
+                ////tree.BuildVolumeHeuristic(leafIds, leafBounds);
+                //tree.SweepBuild(leafIds, leafBounds);
                 var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray Build Time: {endTime - startTime}, depth: {tree.ComputeMaximumDepth()}");
 
@@ -143,7 +144,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 //**************** Dynamic Testing
                 Random random = new Random(5);
-
+                TestResults results = new TestResults("NewTree Dynamic", frameCount);
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int t = 0; t < frameCount; ++t)
                 {
@@ -196,15 +197,21 @@ namespace SIMDPrototyping.Trees.Tests
 
                     var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
+                    results.Refine[t] = 1000 * (refineEndTime - refineStartTime);
+                    results.SelfTest[t] = 1000 * (testEndTime - refineEndTime);
+                    results.Total[t] = 1000 * (testEndTime - refineStartTime);
+                    results.OverlapCounts[t] = overlaps.Count;
+                    results.TreeCosts[t] = tree.MeasureCostMetric();
+
                     if (t % 16 == 0)
                     {
                         Console.WriteLine($"_________________{t}_________________");
                         Console.WriteLine($"Refinement count: {refinementCount}");
-                        Console.WriteLine($"Refine time:      {refineEndTime - refineStartTime}");
-                        Console.WriteLine($"Test time:        {testEndTime - refineEndTime}");
-                        Console.WriteLine($"TIME:             {testEndTime - refineStartTime}");
-                        Console.WriteLine($"Cost metric:      {tree.MeasureCostMetric()}");
-                        Console.WriteLine($"Overlaps:         {overlaps.Count}");
+                        Console.WriteLine($"Refine time:      {results.Refine[t]}");
+                        Console.WriteLine($"Test time:        {results.SelfTest[t]}");
+                        Console.WriteLine($"TIME:             {results.Total[t]}");
+                        Console.WriteLine($"Cost metric:      {results.TreeCosts[t]}");
+                        Console.WriteLine($"Overlaps:         {results.OverlapCounts[t]}");
                         Console.WriteLine($"Cache Quality:    {tree.MeasureCacheQuality()}");
                         GC.Collect();
                     }
@@ -282,7 +289,10 @@ namespace SIMDPrototyping.Trees.Tests
                 Console.WriteLine($"SingleArray SelfQuery Time: {endTime - startTime}, overlaps: {overlaps.Count}");
 
                 tree.Dispose();
+
+                return results;
             }
+
         }
     }
 }
