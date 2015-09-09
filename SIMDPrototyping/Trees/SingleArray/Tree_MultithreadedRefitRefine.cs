@@ -66,6 +66,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             public RawList<QuickList<int>> RefinementCandidates;
             public Action<int> RefitAndMarkAction;
 
+            public int RefineIndex;
             public QuickList<int> RefinementTargets;
             public BufferPool<int> Pool;
             public int MaximumSubtrees;
@@ -84,18 +85,22 @@ namespace SIMDPrototyping.Trees.SingleArray
                 RefinementCandidates = new RawList<QuickList<int>>(Environment.ProcessorCount);
             }
 
-            public void Initialize(int workerCount, BufferPool<int> pool)
+            public void Initialize(int workerCount, int estimatedRefinementCandidates, BufferPool<int> pool)
             {
                 RefitNodeIndex = -1;
+
+                RefitNodes = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(workerCount));
+
                 if (RefinementCandidates.Capacity < workerCount)
                     RefinementCandidates.Capacity = workerCount;
-
                 RefinementCandidates.Count = workerCount;
+                var perThreadPoolIndex = BufferPool<int>.GetPoolIndex((int)Math.Ceiling(estimatedRefinementCandidates / (float)workerCount));
                 for (int i = 0; i < workerCount; ++i)
                 {
-                    RefinementCandidates.Elements[i]
+                    RefinementCandidates.Elements[i] = new QuickList<int>(pool, perThreadPoolIndex);
                 }
 
+                RefineIndex = -1;
                 RefinementTargets = new QuickList<int>(pool);
 
                 CacheOptimizeStarts = new QuickList<int>(pool);
@@ -111,6 +116,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                     RefinementCandidates.Elements[i].Dispose();
                 }
                 RefinementCandidates.Clear();
+
+                RefinementTargets.Count = 0;
+                RefinementTargets.Dispose();
 
                 CacheOptimizeStarts.Count = 0;
                 CacheOptimizeStarts.Dispose();
@@ -192,9 +200,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             unsafe void Refine(int workerIndex)
             {
-                var start = RefinementStarts.Elements[workerIndex];
-                var end = workerIndex + 1 < RefinementStarts.Count ? RefinementStarts.Elements[workerIndex + 1] : RefinementTargets.Count;
-
                 var spareNodes = new QuickList<int>(Pool, 8);
                 var subtreeReferences = new QuickList<int>(Pool, BufferPool<int>.GetPoolIndex(MaximumSubtrees));
                 var treeletInternalNodes = new QuickList<int>(Pool, BufferPool<int>.GetPoolIndex(MaximumSubtrees));
@@ -203,18 +208,17 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BinnedResources resources;
                 CreateBinnedResources(Pool, MaximumSubtrees, out buffer, out region, out resources);
 
-                for (int i = start; i < end; ++i)
+                int refineIndex;
+                while ((refineIndex = Interlocked.Increment(ref RefineIndex)) < RefinementTargets.Count)
                 {
+
                     subtreeReferences.Count = 0;
                     treeletInternalNodes.Count = 0;
                     bool nodesInvalidated;
-                    Tree.BinnedRefine(RefinementTargets.Elements[i], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                    Tree.BinnedRefine(RefinementTargets.Elements[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
                     //Allow other refines to traverse this node.
-                    Tree.nodes[RefinementTargets.Elements[i]].RefineFlag = 0;
-
-
+                    Tree.nodes[RefinementTargets.Elements[refineIndex]].RefineFlag = 0;
                 }
-
 
                 Tree.RemoveUnusedInternalNodes(ref spareNodes);
                 region.Dispose();
