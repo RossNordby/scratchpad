@@ -131,6 +131,7 @@
     <Compile Include="Trees\SingleArray\Tree_MedianSplitBuilder.cs" />
     <Compile Include="Trees\SingleArray\Tree_AgglomerativeRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_CollectSubtreesDirect.cs" />
+    <Compile Include="Trees\SingleArray\Tree_MultithreadedRefitRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_RefineCommon.cs" />
     <Compile Include="Trees\SingleArray\Tree_Arity4SelfTreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_RefinementScheduling.cs" />
