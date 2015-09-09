@@ -81,6 +81,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 RefitAndMarkAction = RefitAndMark;
                 RefineAction = Refine;
                 CacheOptimizeAction = CacheOptimize;
+                RefinementCandidates = new RawList<QuickList<int>>(Environment.ProcessorCount);
             }
 
             public void Initialize(int workerCount, BufferPool<int> pool)
@@ -88,6 +89,16 @@ namespace SIMDPrototyping.Trees.SingleArray
                 RefitNodeIndex = -1;
                 if (RefinementCandidates.Capacity < workerCount)
                     RefinementCandidates.Capacity = workerCount;
+
+                RefinementCandidates.Count = workerCount;
+                for (int i = 0; i < workerCount; ++i)
+                {
+                    RefinementCandidates.Elements[i]
+                }
+
+                RefinementTargets = new QuickList<int>(pool);
+
+                CacheOptimizeStarts = new QuickList<int>(pool);
                 Pool = pool;
             }
 
