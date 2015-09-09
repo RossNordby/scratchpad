@@ -1,5 +1,6 @@
 ﻿using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
+using BEPUutilities.Threading;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -61,7 +62,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             public int RefitNodeIndex;
             public QuickList<int> RefitNodes;
-            public float RefitVolumeChange;
+            public float RefitCostChange;
             public int LeafCountThreshold;
             public RawList<QuickList<int>> RefinementCandidates;
             public Action<int> RefitAndMarkAction;
@@ -73,7 +74,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             public Action<int> RefineAction;
 
             public QuickList<int> CacheOptimizeStarts;
-            public int CacheOptimizeCount;
+            public int PerWorkerCacheOptimizeCount;
             public Action<int> CacheOptimizeAction;
 
             public RefitAndRefineMultithreadedContext(Tree tree)
@@ -101,9 +102,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
                 RefineIndex = -1;
-                RefinementTargets = new QuickList<int>(pool);
+                //Note that refinement targets are NOT initialized here, because we don't know the size yet.
 
-                CacheOptimizeStarts = new QuickList<int>(pool);
+                CacheOptimizeStarts = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(workerCount));
                 Pool = pool;
             }
 
@@ -166,7 +167,18 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 //Don't bother including the root's change in volume.
                                 //Refinement can't change the root's bounds, so the fact that the world got bigger or smaller
                                 //doesn't really have any bearing on how much refinement should be done.
-                                RefitVolumeChange = node->LocalCostChange;
+                                //We do, however, need to divide by root volume so that we get the change in cost metric rather than volume.
+                                var merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
+                                var bounds = &node->A;
+                                for (int i = 0; i < node->ChildCount; ++i)
+                                {
+                                    BoundingBox.Merge(ref bounds[i], ref merged, out merged);
+                                }
+                                var postmetric = ComputeBoundsMetric(ref merged);
+                                if (postmetric > 1e-9f)
+                                    RefitCostChange = node->LocalCostChange / postmetric;
+                                else
+                                    RefitCostChange = 0;
                                 //Clear the root's refine flag (unioned).
                                 node->RefineFlag = 0;
                                 return;
@@ -237,7 +249,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var startIndex = CacheOptimizeStarts.Elements[workerIndex];
 
                 //We could wrap around. But we could also not do that because it doesn't really matter!
-                var end = Math.Min(Tree.nodeCount, startIndex + CacheOptimizeCount);
+                var end = Math.Min(Tree.nodeCount, startIndex + PerWorkerCacheOptimizeCount);
                 for (int i = startIndex; i < end; ++i)
                 {
                     Tree.IncrementalCacheOptimizeThreadSafe(i);
@@ -245,6 +257,109 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             }
         }
+
+
+        public unsafe int RefitAndRefine(int frameIndex, IParallelLooper looper, RefitAndRefineMultithreadedContext context, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
+        {
+            //Don't proceed if the tree is empty.
+            if (leafCount == 0)
+                return 0;
+            int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
+            var pool = BufferPools<int>.Locking;
+            var estimatedRefinementTargetCount = (leafCount * ChildrenCapacity) / maximumSubtrees;
+
+            int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
+
+            context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
+
+            //Collect the refinement candidates.
+            looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
+
+            var refinementTargetsCount = 0;
+            for (int i = 0; i < looper.ThreadCount; ++i)
+            {
+                refinementTargetsCount += context.RefinementCandidates.Elements[i].Count;
+            }
+            var refineAggressiveness = Math.Max(0, context.RefitCostChange * refineAggressivenessScale);
+            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
+
+            var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementTargetsCount * 0.03f)) + refinementTargetsCount * refinePortion;
+            var period = (int)(refinementTargetsCount / targetRefinementScale);
+            var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargetsCount);
+
+            //Condense the set of candidates into a set of targets.
+            int targetRefinementCount = (int)targetRefinementScale;
+            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+
+            int actualRefinementTargetsCount = 0;
+            var currentCandidatesIndex = 0;
+            int index = offset;
+            for (int i = 0; i < targetRefinementCount - 1; ++i)
+            {
+                index += period;
+                //Wrap around if the index doesn't fit.
+                while (index > context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
+                {
+                    index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
+                    ++currentCandidatesIndex;
+                    if (currentCandidatesIndex > context.RefinementCandidates.Count)
+                        currentCandidatesIndex -= context.RefinementCandidates.Count;
+                }
+                Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
+                var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
+                context.RefinementTargets[actualRefinementTargetsCount++] = nodeIndex;
+                nodes[nodeIndex].RefineFlag = 1;
+            }
+            context.RefinementTargets.Count = actualRefinementTargetsCount;
+            if (nodes->RefineFlag != 1)
+            {
+                context.RefinementTargets.Add(0);
+                ++actualRefinementTargetsCount;
+                nodes->RefineFlag = 1;
+            }
+
+
+            //Refine all marked targets.
+            looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
+
+
+
+            //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
+            var cacheOptimizeAggressiveness = Math.Max(0, context.RefitCostChange * cacheOptimizeAggressivenessScale);
+            float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
+            var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
+            
+            context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
+            var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
+            context.CacheOptimizeStarts.Add(startIndex);
+
+            var optimizationSpacing = nodeCount / looper.ThreadCount;
+            var optimizationSpacingWithExtra = optimizationSpacing + 1;
+            var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
+
+            for (int i = 1; i < looper.ThreadCount; ++i)
+            {
+                if (optimizationRemainder > 0)
+                {
+                    startIndex += optimizationSpacingWithExtra;
+                    --optimizationRemainder;
+                }
+                else
+                {
+                    startIndex += optimizationSpacing;
+                }
+                if (startIndex > NodeCount)
+                    startIndex -= nodeCount;
+                Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
+                context.CacheOptimizeStarts.Add(startIndex);
+            }
+
+            looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
+
+            context.CleanUp();
+            return actualRefinementTargetsCount;
+        }
+
 
     }
 }
