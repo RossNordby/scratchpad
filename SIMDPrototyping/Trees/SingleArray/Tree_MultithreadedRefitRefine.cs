@@ -19,7 +19,9 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
 
-        unsafe void CollectNodesForMultithreadedRefit(int nodeIndex, int leafCountThreshold, ref QuickList<int> targets)
+        unsafe void CollectNodesForMultithreadedRefit(int nodeIndex,
+            int multithreadingLeafCountThreshold, ref QuickList<int> refitAndMarkTargets,
+            int refinementLeafCountThreshold, ref QuickList<int> refinementCandidates)
         {
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
@@ -32,25 +34,33 @@ namespace SIMDPrototyping.Trees.SingleArray
                     //Each node stores how many children are involved in the multithreaded refit.
                     //This allows the postphase to climb the tree in a thread safe way.
                     ++node->RefineFlag;
-                    if (leafCounts[i] <= leafCountThreshold)
+                    if (leafCounts[i] <= multithreadingLeafCountThreshold)
                     {
-                        targets.Add(children[i]);
+                        if (leafCounts[i] <= refinementLeafCountThreshold)
+                        {
+                            //It's possible that a wavefront node is this high in the tree, so it has to be captured here because the postpass won't find it.
+                            refinementCandidates.Add(children[i]);
+                        }
+                        refitAndMarkTargets.Add(children[i]);
                     }
                     else
                     {
-                        CollectNodesForMultithreadedRefit(children[i], leafCountThreshold, ref targets);
+                        CollectNodesForMultithreadedRefit(children[i], multithreadingLeafCountThreshold, ref refitAndMarkTargets, refinementLeafCountThreshold, ref refinementCandidates);
                     }
                 }
             }
         }
 
 
-        void CollectNodesForMultithreadedRefit(int threadCount, ref QuickList<int> targets)
+        void CollectNodesForMultithreadedRefit(int threadCount, ref QuickList<int> targets,
+            int refinementLeafCountThreshold, ref QuickList<int> refinementCandidates)
         {
             //No point in using this if there aren't enough leaves.
             Debug.Assert(leafCount > 2);
-            int leafCountThreshold = leafCount / (threadCount * 2);
-            CollectNodesForMultithreadedRefit(0, leafCountThreshold, ref targets);
+            int multithreadingLeafCountThreshold = leafCount / (threadCount * 2);
+            if (multithreadingLeafCountThreshold < refinementLeafCountThreshold)
+                multithreadingLeafCountThreshold = refinementLeafCountThreshold;
+            CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref targets, refinementLeafCountThreshold, ref refinementCandidates);
         }
 
         /// <summary>
@@ -272,6 +282,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
 
+            CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, leafCountThreshold, ref context.RefinementCandidates.Elements[0]);
+
             //Collect the refinement candidates.
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
 
@@ -328,7 +340,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var cacheOptimizeAggressiveness = Math.Max(0, context.RefitCostChange * cacheOptimizeAggressivenessScale);
             float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
             var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
-            
+
             context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
             var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
             context.CacheOptimizeStarts.Add(startIndex);
