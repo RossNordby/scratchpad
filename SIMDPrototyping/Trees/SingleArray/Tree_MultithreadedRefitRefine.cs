@@ -149,8 +149,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                     node->LocalCostChange = Tree.RefitAndMark(RefitNodes.Elements[refitNodeIndex], LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
 
 
-                    int foundLeafCount;
-                    Tree.Validate(RefitNodes.Elements[refitNodeIndex], node->Parent, node->IndexInParent, ref *boundingBoxInParent, out foundLeafCount);
+                    //int foundLeafCount;
+                    //Tree.Validate(RefitNodes.Elements[refitNodeIndex], node->Parent, node->IndexInParent, ref *boundingBoxInParent, out foundLeafCount);
 
 
                     //Walk up the tree.
@@ -275,8 +275,27 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-   
 
+        unsafe void CheckForRefinementOverlaps(int nodeIndex, ref QuickList<int> refinementTargets)
+        {
+
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+            for (int childIndex = 0; childIndex < node->ChildCount; ++childIndex)
+            {
+                if (children[childIndex] >= 0)
+                {
+                    for (int i = 0; i < refinementTargets.Count; ++i)
+                    {
+                        if (refinementTargets.Elements[i] == children[childIndex])
+                            Console.WriteLine("Found a refinement target in the children of a refinement target.");
+                    }
+
+                    CheckForRefinementOverlaps(children[childIndex], ref refinementTargets);
+                }
+
+            }
+        }
 
         public unsafe int RefitAndRefine(int frameIndex, IParallelLooper looper, RefitAndRefineMultithreadedContext context, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {
@@ -295,52 +314,67 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Collect the refinement candidates.
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
 
-            //DEBUG
-            context.RefinementTargets = new QuickList<int>(pool);
 
-            //var refinementCandidatesCount = 0;
-            //for (int i = 0; i < looper.ThreadCount; ++i)
-            //{
-            //    refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
-            //}
+            var refinementCandidatesCount = 0;
+            for (int i = 0; i < looper.ThreadCount; ++i)
+            {
+                refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
+            }
 
-            //int targetRefinementCount, period, offset;
-            //GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
+            int targetRefinementCount, period, offset;
+            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
 
 
-            ////Condense the set of candidates into a set of targets.
-            //context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+            //Condense the set of candidates into a set of targets.
+            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
 
-            //int actualRefinementTargetsCount = 0;
-            //var currentCandidatesIndex = 0;
-            //int index = offset;
-            //for (int i = 0; i < targetRefinementCount - 1; ++i)
-            //{
-            //    index += period;
-            //    //Wrap around if the index doesn't fit.
-            //    while (index > context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
-            //    {
-            //        index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
-            //        ++currentCandidatesIndex;
-            //        if (currentCandidatesIndex >= context.RefinementCandidates.Count)
-            //            currentCandidatesIndex -= context.RefinementCandidates.Count;
-            //    }
-            //    Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
-            //    var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
-            //    context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
-            //    nodes[nodeIndex].RefineFlag = 1;
-            //}
-            //context.RefinementTargets.Count = actualRefinementTargetsCount;
-            //if (nodes->RefineFlag != 1)
-            //{
-            //    context.RefinementTargets.Add(0);
-            //    ++actualRefinementTargetsCount;
-            //    nodes->RefineFlag = 1;
-            //}
+            int actualRefinementTargetsCount = 0;
+            var currentCandidatesIndex = 0;
+            int index = offset;
+            for (int i = 0; i < targetRefinementCount - 1; ++i)
+            {
+                index += period;
+                //Wrap around if the index doesn't fit.
+                while (index >= context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
+                {
+                    index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
+                    ++currentCandidatesIndex;
+                    if (currentCandidatesIndex >= context.RefinementCandidates.Count)
+                        currentCandidatesIndex -= context.RefinementCandidates.Count;
+                }
+                Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
+                var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
+                context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
+                nodes[nodeIndex].RefineFlag = 1;
+            }
+            context.RefinementTargets.Count = actualRefinementTargetsCount;
+            if (nodes->RefineFlag != 1)
+            {
+                context.RefinementTargets.Add(0);
+                ++actualRefinementTargetsCount;
+                nodes->RefineFlag = 1;
+            }
 
+            //int actualRefinementTargetsCount = 2;
+            //context.RefinementTargets.Add(nodes->ChildA);
+            //context.RefinementTargets.Add(nodes->ChildB);
+            //nodes[nodes->ChildA].RefineFlag = 1;
+            //nodes[nodes->ChildB].RefineFlag = 1;
 
-            ////Refine all marked targets.
-            //looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
+            Console.Write("Refinement nodes: ");
+            for (int i = 0; i < context.RefinementTargets.Count; ++i)
+            {
+                Console.Write($"{context.RefinementTargets[i]}, ");
+            }
+            Console.WriteLine();
+
+            for (int i = 0; i < context.RefinementTargets.Count - 1; ++i)
+            {
+                CheckForRefinementOverlaps(context.RefinementTargets.Elements[i], ref context.RefinementTargets);
+            }
+
+            //Refine all marked targets.
+            looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
 
 
 
@@ -375,7 +409,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
 
             context.CleanUp();
-            return 0;// actualRefinementTargetsCount;
+            return actualRefinementTargetsCount;
         }
 
 

@@ -204,7 +204,7 @@ namespace SIMDPrototyping.Trees.Tests
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
 
             ParallelLooper looper = new ParallelLooper();
-            for (int i = 0; i < 1; ++i)// Environment.ProcessorCount; ++i)
+            for (int i = 0; i < Environment.ProcessorCount; ++i)
             {
                 looper.AddThread();
             }
