@@ -262,14 +262,14 @@ namespace SIMDPrototyping.Trees.Tests
 
                 GC.Collect();
                 //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
-                var results = TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
-                using (var stream = File.Open("oldDHResults.txt", FileMode.Create))
-                {
-                    using (var textWriter = new StreamWriter(stream))
-                    {
-                        results.Save(textWriter);
-                    }
-                }
+                //var results = TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
+                //using (var stream = File.Open("oldDHResults.txt", FileMode.Create))
+                //{
+                //    using (var textWriter = new StreamWriter(stream))
+                //    {
+                //        results.Save(textWriter);
+                //    }
+                //}
             }
 
         }

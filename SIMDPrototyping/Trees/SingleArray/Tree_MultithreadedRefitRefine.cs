@@ -269,16 +269,18 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
+   
+
+
         public unsafe int RefitAndRefine(int frameIndex, IParallelLooper looper, RefitAndRefineMultithreadedContext context, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {
             //Don't proceed if the tree is empty.
             if (leafCount == 0)
                 return 0;
-            int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
             var pool = BufferPools<int>.Locking;
-            var estimatedRefinementTargetCount = (leafCount * ChildrenCapacity) / maximumSubtrees;
 
-            int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
+            int maximumSubtrees, estimatedRefinementTargetCount, leafCountThreshold;
+            GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementTargetCount, out leafCountThreshold);
 
             context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
 
@@ -287,20 +289,17 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Collect the refinement candidates.
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
 
-            var refinementTargetsCount = 0;
+            var refinementCandidatesCount = 0;
             for (int i = 0; i < looper.ThreadCount; ++i)
             {
-                refinementTargetsCount += context.RefinementCandidates.Elements[i].Count;
+                refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
             }
-            var refineAggressiveness = Math.Max(0, context.RefitCostChange * refineAggressivenessScale);
-            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
 
-            var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementTargetsCount * 0.03f)) + refinementTargetsCount * refinePortion;
-            var period = (int)(refinementTargetsCount / targetRefinementScale);
-            var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargetsCount);
+            int targetRefinementCount, period, offset;
+            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
+
 
             //Condense the set of candidates into a set of targets.
-            int targetRefinementCount = (int)targetRefinementScale;
             context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
 
             int actualRefinementTargetsCount = 0;
@@ -337,9 +336,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
-            var cacheOptimizeAggressiveness = Math.Max(0, context.RefitCostChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
-            var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
+            var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
 
             context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
             var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);

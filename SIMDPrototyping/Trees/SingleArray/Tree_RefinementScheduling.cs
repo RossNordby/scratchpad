@@ -188,29 +188,53 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+        void GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementTargetCount, out int leafCountThreshold)
+        {
+            maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
+            estimatedRefinementTargetCount = (leafCount * ChildrenCapacity) / maximumSubtrees;
+
+            leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
+        }
+
+
+        void GetRefineTuning(int frameIndex, int refinementCandidatesCount, float refineAggressivenessScale, float costChange,
+            out int targetRefinementCount, out int refinementPeriod, out int refinementOffset)
+        {
+            var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
+            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
+
+            var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementCandidatesCount * 0.03f)) + refinementCandidatesCount * refinePortion;
+            refinementPeriod = (int)(refinementCandidatesCount / targetRefinementScale);
+            refinementOffset = (int)((frameIndex * 236887691L + 104395303L) % refinementCandidatesCount);
+
+            targetRefinementCount = (int)targetRefinementScale;
+        }
+
+        public int GetCacheOptimizeTuning(float costChange, float cacheOptimizeAggressivenessScale)
+        {
+            var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
+            float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
+            return (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
+        }
+
         public unsafe int RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {
             //Don't proceed if the tree is empty.
             if (leafCount == 0)
                 return 0;
-            int maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
             var pool = BufferPools<int>.Locking;
-            var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex((int)((leafCount * ChildrenCapacity) / (maximumSubtrees))));
+            int maximumSubtrees, estimatedRefinementTargetCount, leafCountThreshold;
+            GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementTargetCount, out leafCountThreshold);
 
-            int leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
+            var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementTargetCount));
 
             //Collect the refinement candidates.
             var costChange = RefitAndMark(leafCountThreshold, ref refinementTargets);
 
-            var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
-            float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
-            var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementTargets.Count * 0.03f)) + refinementTargets.Count * refinePortion;
-            var period = (int)(refinementTargets.Count / targetRefinementScale);
-            var offset = (int)((frameIndex * 236887691L + 104395303L) % refinementTargets.Count);
-
+            int targetRefinementCount, period, offset;
+            GetRefineTuning(frameIndex, refinementTargets.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
 
             int actualRefinementTargetsCount = 0;
-            int targetRefinementCount = (int)targetRefinementScale;
             for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
                 var index = i * period + offset;
@@ -265,11 +289,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             refinementTargets.Count = 0;
             refinementTargets.Dispose();
 
-
-            //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
-            var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
-            var cacheOptimizeCount = (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
+            var cacheOptimizeCount = GetCacheOptimizeTuning(costChange, cacheOptimizeAggressivenessScale);
 
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
 
