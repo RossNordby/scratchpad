@@ -148,6 +148,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                     var boundingBoxInParent = &parent->A + node->IndexInParent;
                     node->LocalCostChange = Tree.RefitAndMark(RefitNodes.Elements[refitNodeIndex], LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
 
+
+                    int foundLeafCount;
+                    Tree.Validate(RefitNodes.Elements[refitNodeIndex], node->Parent, node->IndexInParent, ref *boundingBoxInParent, out foundLeafCount);
+
+
                     //Walk up the tree.
                     node = parent;
                     while (true)
@@ -191,7 +196,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                                     RefitCostChange = 0;
                                 //Clear the root's refine flag (unioned).
                                 node->RefineFlag = 0;
-                                return;
+                                break;
                             }
                             else
                             {
@@ -212,9 +217,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                         else
                         {
                             //This thread wasn't the last to visit this node, so it should die. Some other thread will handle it later.
-                            return;
+                            break;
                         }
                     }
+
                 }
 
 
@@ -289,84 +295,87 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Collect the refinement candidates.
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
 
-            var refinementCandidatesCount = 0;
-            for (int i = 0; i < looper.ThreadCount; ++i)
-            {
-                refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
-            }
+            //DEBUG
+            context.RefinementTargets = new QuickList<int>(pool);
 
-            int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
+            //var refinementCandidatesCount = 0;
+            //for (int i = 0; i < looper.ThreadCount; ++i)
+            //{
+            //    refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
+            //}
 
-
-            //Condense the set of candidates into a set of targets.
-            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
-
-            int actualRefinementTargetsCount = 0;
-            var currentCandidatesIndex = 0;
-            int index = offset;
-            for (int i = 0; i < targetRefinementCount - 1; ++i)
-            {
-                index += period;
-                //Wrap around if the index doesn't fit.
-                while (index > context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
-                {
-                    index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
-                    ++currentCandidatesIndex;
-                    if (currentCandidatesIndex >= context.RefinementCandidates.Count)
-                        currentCandidatesIndex -= context.RefinementCandidates.Count;
-                }
-                Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
-                var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
-                context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
-                nodes[nodeIndex].RefineFlag = 1;
-            }
-            context.RefinementTargets.Count = actualRefinementTargetsCount;
-            if (nodes->RefineFlag != 1)
-            {
-                context.RefinementTargets.Add(0);
-                ++actualRefinementTargetsCount;
-                nodes->RefineFlag = 1;
-            }
+            //int targetRefinementCount, period, offset;
+            //GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
 
 
-            //Refine all marked targets.
-            looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
+            ////Condense the set of candidates into a set of targets.
+            //context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+
+            //int actualRefinementTargetsCount = 0;
+            //var currentCandidatesIndex = 0;
+            //int index = offset;
+            //for (int i = 0; i < targetRefinementCount - 1; ++i)
+            //{
+            //    index += period;
+            //    //Wrap around if the index doesn't fit.
+            //    while (index > context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
+            //    {
+            //        index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
+            //        ++currentCandidatesIndex;
+            //        if (currentCandidatesIndex >= context.RefinementCandidates.Count)
+            //            currentCandidatesIndex -= context.RefinementCandidates.Count;
+            //    }
+            //    Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
+            //    var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
+            //    context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
+            //    nodes[nodeIndex].RefineFlag = 1;
+            //}
+            //context.RefinementTargets.Count = actualRefinementTargetsCount;
+            //if (nodes->RefineFlag != 1)
+            //{
+            //    context.RefinementTargets.Add(0);
+            //    ++actualRefinementTargetsCount;
+            //    nodes->RefineFlag = 1;
+            //}
+
+
+            ////Refine all marked targets.
+            //looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
 
 
 
-            //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
-            var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
+            ////To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
+            //var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
 
-            context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
-            var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
-            context.CacheOptimizeStarts.Add(startIndex);
+            //context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
+            //var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
+            //context.CacheOptimizeStarts.Add(startIndex);
 
-            var optimizationSpacing = nodeCount / looper.ThreadCount;
-            var optimizationSpacingWithExtra = optimizationSpacing + 1;
-            var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
+            //var optimizationSpacing = nodeCount / looper.ThreadCount;
+            //var optimizationSpacingWithExtra = optimizationSpacing + 1;
+            //var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
 
-            for (int i = 1; i < looper.ThreadCount; ++i)
-            {
-                if (optimizationRemainder > 0)
-                {
-                    startIndex += optimizationSpacingWithExtra;
-                    --optimizationRemainder;
-                }
-                else
-                {
-                    startIndex += optimizationSpacing;
-                }
-                if (startIndex > NodeCount)
-                    startIndex -= nodeCount;
-                Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
-                context.CacheOptimizeStarts.Add(startIndex);
-            }
+            //for (int i = 1; i < looper.ThreadCount; ++i)
+            //{
+            //    if (optimizationRemainder > 0)
+            //    {
+            //        startIndex += optimizationSpacingWithExtra;
+            //        --optimizationRemainder;
+            //    }
+            //    else
+            //    {
+            //        startIndex += optimizationSpacing;
+            //    }
+            //    if (startIndex > NodeCount)
+            //        startIndex -= nodeCount;
+            //    Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
+            //    context.CacheOptimizeStarts.Add(startIndex);
+            //}
 
-            looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
+            //looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
 
             context.CleanUp();
-            return actualRefinementTargetsCount;
+            return 0;// actualRefinementTargetsCount;
         }
 
 
