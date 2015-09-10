@@ -156,7 +156,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 BoundingBox.Merge(ref bounds[i], ref merged, out merged);
             }
-            
+
             var postmetric = ComputeBoundsMetric(ref merged);
 
             //Note that the root's own change is not included.
@@ -190,10 +190,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        void GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementTargetCount, out int leafCountThreshold)
+        void GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementCandidateCount, out int leafCountThreshold)
         {
             maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
-            estimatedRefinementTargetCount = (leafCount * ChildrenCapacity) / maximumSubtrees;
+            estimatedRefinementCandidateCount = (leafCount * ChildrenCapacity) / maximumSubtrees;
 
             leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
         }
@@ -225,28 +225,43 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (leafCount == 0)
                 return 0;
             var pool = BufferPools<int>.Locking;
-            int maximumSubtrees, estimatedRefinementTargetCount, leafCountThreshold;
-            GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementTargetCount, out leafCountThreshold);
+            int maximumSubtrees, estimatedRefinementCandidateCount, leafCountThreshold;
+            GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementCandidateCount, out leafCountThreshold);
 
-            var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementTargetCount));
+            var refinementCandidates = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementCandidateCount));
 
             //Collect the refinement candidates.
-            var costChange = RefitAndMark(leafCountThreshold, ref refinementTargets);
+            var costChange = RefitAndMark(leafCountThreshold, ref refinementCandidates);
+            for (int i = 0; i < refinementCandidates.Count; ++i)
+            {
+                for (int j = i + 1; j < refinementCandidates.Count; ++j)
+                {
+                    if (refinementCandidates[i] == refinementCandidates[j])
+                        Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
+                }
+            }
 
             int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, refinementTargets.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
+            GetRefineTuning(frameIndex, refinementCandidates.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
+
+
+            var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
 
             int actualRefinementTargetsCount = 0;
+            int index = offset;
             for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
-                var index = i * period + offset;
-                if (index >= refinementTargets.Count)
-                    index -= refinementTargets.Count;
-                Debug.Assert(index < refinementTargets.Count && index >= 0);
-                refinementTargets[actualRefinementTargetsCount++] = refinementTargets[index];
-                nodes[refinementTargets[index]].RefineFlag = 1;
+                index += period;
+                if (index >= refinementCandidates.Count)
+                    index -= refinementCandidates.Count;
+                Debug.Assert(index < refinementCandidates.Count && index >= 0);
+
+                refinementTargets.Elements[actualRefinementTargetsCount++] = refinementCandidates.Elements[index];
+                nodes[refinementCandidates.Elements[index]].RefineFlag = 1;
             }
             refinementTargets.Count = actualRefinementTargetsCount;
+            refinementCandidates.Count = 0;
+            refinementCandidates.Dispose();
             if (nodes->RefineFlag != 1)
             {
                 refinementTargets.Add(0);
@@ -254,6 +269,14 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes->RefineFlag = 1;
             }
 
+            for (int i = 0; i < refinementTargets.Count; ++i)
+            {
+                for (int j = i + 1; j < refinementTargets.Count; ++j)
+                {
+                    if (refinementTargets[i] == refinementTargets[j])
+                        Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
+                }
+            }
 
             //Refine all marked targets.
 

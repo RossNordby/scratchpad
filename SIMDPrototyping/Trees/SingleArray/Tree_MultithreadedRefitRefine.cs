@@ -239,7 +239,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 int refineIndex;
                 while ((refineIndex = Interlocked.Increment(ref RefineIndex)) < RefinementTargets.Count)
                 {
-
                     subtreeReferences.Count = 0;
                     treeletInternalNodes.Count = 0;
                     bool nodesInvalidated;
@@ -310,45 +309,72 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
 
-            CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
+            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementTargetCount));
 
             //Collect the refinement candidates.
-            looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
-
-
-            var refinementCandidatesCount = 0;
-            for (int i = 0; i < looper.ThreadCount; ++i)
-            {
-                refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
-            }
+            var costChange = RefitAndMark(context.LeafCountThreshold, ref context.RefinementTargets);
 
             int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
-
-
-            //Condense the set of candidates into a set of targets.
-            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+            GetRefineTuning(frameIndex, context.RefinementTargets.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
 
             int actualRefinementTargetsCount = 0;
-            var currentCandidatesIndex = 0;
-            int index = offset;
             for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
-                index += period;
-                //Wrap around if the index doesn't fit.
-                while (index >= context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
-                {
-                    index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
-                    ++currentCandidatesIndex;
-                    if (currentCandidatesIndex >= context.RefinementCandidates.Count)
-                        currentCandidatesIndex -= context.RefinementCandidates.Count;
-                }
-                Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
-                var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
-                context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
-                nodes[nodeIndex].RefineFlag = 1;
+                var index = i * period + offset;
+                if (index >= context.RefinementTargets.Count)
+                    index -= context.RefinementTargets.Count;
+                Debug.Assert(index < context.RefinementTargets.Count && index >= 0);
+                context.RefinementTargets[actualRefinementTargetsCount++] = context.RefinementTargets[index];
+                nodes[context.RefinementTargets[index]].RefineFlag = 1;
             }
             context.RefinementTargets.Count = actualRefinementTargetsCount;
+            //if (nodes->RefineFlag != 1)
+            //{
+            //    context.RefinementTargets.Add(0);
+            //    ++actualRefinementTargetsCount;
+            //    nodes->RefineFlag = 1;
+            //}
+
+            //CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
+
+            ////Collect the refinement candidates.
+            //looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
+
+
+            //var refinementCandidatesCount = 0;
+            //for (int i = 0; i < looper.ThreadCount; ++i)
+            //{
+            //    refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
+            //}
+
+            //int targetRefinementCount, period, offset;
+            //GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
+
+
+            ////Condense the set of candidates into a set of targets.
+            //context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+
+
+            //int actualRefinementTargetsCount = 0;
+            //var currentCandidatesIndex = 0;
+            //int index = offset;
+            //for (int i = 0; i < targetRefinementCount - 1; ++i)
+            //{
+            //    index += period;
+            //    //Wrap around if the index doesn't fit.
+            //    while (index >= context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
+            //    {
+            //        index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
+            //        ++currentCandidatesIndex;
+            //        if (currentCandidatesIndex >= context.RefinementCandidates.Count)
+            //            currentCandidatesIndex -= context.RefinementCandidates.Count;
+            //    }
+            //    Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
+            //    var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
+            //    context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
+            //    nodes[nodeIndex].RefineFlag = 1;
+            //}
+            //context.RefinementTargets.Count = actualRefinementTargetsCount;
             //if (nodes->RefineFlag != 1)
             //{
             //    context.RefinementTargets.Add(0);
@@ -361,6 +387,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //context.RefinementTargets.Add(nodes->ChildB);
             //nodes[nodes->ChildA].RefineFlag = 1;
             //nodes[nodes->ChildB].RefineFlag = 1;
+
+            for (int i = 0; i < context.RefinementTargets.Count; ++i)
+            {
+                for (int j = i + 1; j < context.RefinementTargets.Count; ++j)
+                {
+                    if (context.RefinementTargets[i] == context.RefinementTargets[j])
+                        Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
+                }
+            }
 
             Console.Write("Refinement nodes: ");
             for (int i = 0; i < context.RefinementTargets.Count; ++i)
