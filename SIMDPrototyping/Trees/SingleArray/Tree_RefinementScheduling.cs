@@ -203,7 +203,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             out int targetRefinementCount, out int refinementPeriod, out int refinementOffset)
         {
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
-            Console.WriteLine($"Aggressivesness: {refineAggressiveness}");
             float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
 
             var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementCandidatesCount * 0.03f)) + refinementCandidatesCount * refinePortion;

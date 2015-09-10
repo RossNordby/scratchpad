@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using SIMDPrototyping.Trees.SingleArray;
 using System.Numerics;
 using System.Diagnostics;
+using BEPUutilities.Threading;
 
 namespace SIMDPrototyping.Trees.Tests
 {
@@ -17,7 +18,7 @@ namespace SIMDPrototyping.Trees.Tests
     {
         
         public unsafe static TestResults TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, BoundingBox positionBounds,
-            int queryCount, int selfTestCount, int refitCount, int frameCount, float dt)
+            int queryCount, int selfTestCount, int refitCount, int frameCount, float dt, ParallelLooper looper)
         {
             {
 
@@ -138,6 +139,8 @@ namespace SIMDPrototyping.Trees.Tests
                 Tree.CreateBinnedResources(BufferPools<int>.Thread, maximumSubtrees, out buffer, out region, out resources);
                 bool nodesInvalidated;
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
+
+                var context = new Tree.RefitAndRefineMultithreadedContext(tree);
                 
 
                 var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
@@ -177,7 +180,10 @@ namespace SIMDPrototyping.Trees.Tests
                     var refineStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
 
-                    var refinementCount = tree.RefitAndRefine(t);
+                    //var refinementCount = tree.RefitAndRefine(t);
+                    var refinementCount = tree.RefitAndRefine(t, looper, context);
+
+
 
 
                     //tree.Refit();

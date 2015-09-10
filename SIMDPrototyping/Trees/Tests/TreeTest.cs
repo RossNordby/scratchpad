@@ -16,6 +16,7 @@ using Tree = SIMDPrototyping.Trees.Vectorized.Tree<SIMDPrototyping.Trees.TestCol
 using BaselineTree = SIMDPrototyping.Trees.Baseline.Tree<SIMDPrototyping.Trees.TestCollidable>;
 using SIMDPrototyping.Trees.Baseline;
 using System.IO;
+using BEPUutilities.Threading;
 
 namespace SIMDPrototyping.Trees.Tests
 {
@@ -202,6 +203,12 @@ namespace SIMDPrototyping.Trees.Tests
             Vector3 querySize = new Vector3(20);
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
 
+            ParallelLooper looper = new ParallelLooper();
+            for (int i = 0; i < Environment.ProcessorCount; ++i)
+            {
+                looper.AddThread();
+            }
+
 
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(629.96f) };
@@ -240,7 +247,7 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
+                var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt, looper);
 
                 using (var stream = File.Open("newTreeResults.txt", FileMode.Create))
                 {

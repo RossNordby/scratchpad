@@ -279,12 +279,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 return 0;
             var pool = BufferPools<int>.Locking;
 
-            int maximumSubtrees, estimatedRefinementTargetCount, leafCountThreshold;
-            GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementTargetCount, out leafCountThreshold);
+            int estimatedRefinementTargetCount;
+            GetRefitAndMarkTuning(out context.MaximumSubtrees, out estimatedRefinementTargetCount, out context.LeafCountThreshold);
 
             context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
 
-            CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, leafCountThreshold, ref context.RefinementCandidates.Elements[0]);
+            CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
 
             //Collect the refinement candidates.
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
@@ -313,12 +313,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
                     ++currentCandidatesIndex;
-                    if (currentCandidatesIndex > context.RefinementCandidates.Count)
+                    if (currentCandidatesIndex >= context.RefinementCandidates.Count)
                         currentCandidatesIndex -= context.RefinementCandidates.Count;
                 }
                 Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
                 var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
-                context.RefinementTargets[actualRefinementTargetsCount++] = nodeIndex;
+                context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
                 nodes[nodeIndex].RefineFlag = 1;
             }
             context.RefinementTargets.Count = actualRefinementTargetsCount;
