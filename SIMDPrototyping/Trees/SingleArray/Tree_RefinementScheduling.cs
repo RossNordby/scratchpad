@@ -135,11 +135,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             var children = &nodes->ChildA;
             var leafCounts = &nodes->LeafCountA;
             float childChange = 0;
-            BoundingBox premerge = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
-            BoundingBox postmerge = premerge;
+            BoundingBox merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
             for (int i = 0; i < nodes->ChildCount; ++i)
             {
-                BoundingBox.Merge(ref bounds[i], ref premerge, out premerge);
                 //Note: these conditions mean the root will never be considered a wavefront node. That's acceptable;
                 //it will be included regardless.
                 if (children[i] >= 0)
@@ -156,15 +154,19 @@ namespace SIMDPrototyping.Trees.SingleArray
                         childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
                     }
                 }
-                BoundingBox.Merge(ref bounds[i], ref postmerge, out postmerge);
+                BoundingBox.Merge(ref bounds[i], ref merged, out merged);
             }
+            
+            var postmetric = ComputeBoundsMetric(ref merged);
 
-            var premetric = ComputeBoundsMetric(ref premerge);
-            var postmetric = ComputeBoundsMetric(ref postmerge);
-
+            //Note that the root's own change is not included.
+            //This cost change is used to determine whether or not to refine.
+            //Since refines are unable to change the volume of the root, there's
+            //no point in including it in the volume change.
+            //It does, however, normalize the child volume changes into a cost metric.
             if (postmetric >= 0)
             {
-                return (postmetric - premetric + childChange) / postmetric;
+                return childChange / postmetric;
             }
             return 0;
         }
@@ -201,6 +203,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             out int targetRefinementCount, out int refinementPeriod, out int refinementOffset)
         {
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
+            Console.WriteLine($"Aggressivesness: {refineAggressiveness}");
             float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
 
             var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementCandidatesCount * 0.03f)) + refinementCandidatesCount * refinePortion;

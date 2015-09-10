@@ -193,7 +193,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             VelocityDescription velocityDescription = new VelocityDescription
             {
-                MinVelocity = 0,
+                MinVelocity = 10,
                 MaxVelocity = 10,
                 VelocityDistributionPower = 10,
                 PortionOfMovingLeaves = 1
