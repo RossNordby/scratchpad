@@ -189,7 +189,7 @@ namespace SIMDPrototyping.Trees.Tests
             int queryCount = 1000000;
             int selfTestCount = 10;
             int refitCount = 100;
-            int frameCount = 2048;
+            int frameCount = 16384;
             float dt = 1 / 60f;
 
             VelocityDescription velocityDescription = new VelocityDescription

@@ -40,8 +40,14 @@ namespace SIMDPrototyping.Trees.SingleArray
                         {
                             //It's possible that a wavefront node is this high in the tree, so it has to be captured here because the postpass won't find it.
                             refinementCandidates.Add(children[i]);
+                            Console.WriteLine("hit@@@@@@@@@@@@@@@@@@@@");
+                            //Encoding the child index tells the thread to use RefitAndMeasure instead of RefitAndMark since this was a wavefront node.
+                            refitAndMarkTargets.Add(Encode(children[i]));
                         }
-                        refitAndMarkTargets.Add(children[i]);
+                        else
+                        {
+                            refitAndMarkTargets.Add(children[i]);
+                        }
                     }
                     else
                     {
@@ -138,15 +144,32 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             unsafe void RefitAndMark(int workerIndex)
             {
-                int refitNodeIndex;
-                while ((refitNodeIndex = Interlocked.Increment(ref RefitNodeIndex)) < RefitNodes.Count)
+                int refitIndex;
+                while ((refitIndex = Interlocked.Increment(ref RefitNodeIndex)) < RefitNodes.Count)
                 {
 
-                    var node = Tree.nodes + RefitNodes.Elements[refitNodeIndex];
+                    var nodeIndex = RefitNodes.Elements[refitIndex];
+                    bool shouldUseMark;
+                    if (nodeIndex < 0)
+                    {
+                        //Node was already marked as a wavefront. Should proceed with a RefitAndMeasure instead of RefitAndMark.
+                        nodeIndex = Tree.Encode(nodeIndex);
+                        shouldUseMark = true;
+                    }
+                    else
+                        shouldUseMark = false;
+                    var node = Tree.nodes + RefitNodes.Elements[refitIndex];
                     Debug.Assert(node->Parent >= 0, "The root should not be marked for refit.");
                     var parent = Tree.nodes + node->Parent;
                     var boundingBoxInParent = &parent->A + node->IndexInParent;
-                    node->LocalCostChange = Tree.RefitAndMark(RefitNodes.Elements[refitNodeIndex], LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
+                    if (shouldUseMark)
+                    {
+                        node->LocalCostChange = Tree.RefitAndMark(nodeIndex, LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
+                    }
+                    else
+                    {
+                        node->LocalCostChange = Tree.RefitAndMeasure(nodeIndex, ref *boundingBoxInParent);
+                    }
 
 
                     //int foundLeafCount;
@@ -312,75 +335,51 @@ namespace SIMDPrototyping.Trees.SingleArray
             context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementTargetCount));
 
             //Collect the refinement candidates.
-            var costChange = RefitAndMark(context.LeafCountThreshold, ref context.RefinementTargets);
+
+            CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
+            looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
+
+
+            var refinementCandidatesCount = 0;
+            for (int i = 0; i < looper.ThreadCount; ++i)
+            {
+                refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
+            }
 
             int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, context.RefinementTargets.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
+            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
+
+
+            //Condense the set of candidates into a set of targets.
+            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+
 
             int actualRefinementTargetsCount = 0;
+            var currentCandidatesIndex = 0;
+            int index = offset;
             for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
-                var index = i * period + offset;
-                if (index >= context.RefinementTargets.Count)
-                    index -= context.RefinementTargets.Count;
-                Debug.Assert(index < context.RefinementTargets.Count && index >= 0);
-                context.RefinementTargets[actualRefinementTargetsCount++] = context.RefinementTargets[index];
-                nodes[context.RefinementTargets[index]].RefineFlag = 1;
+                index += period;
+                //Wrap around if the index doesn't fit.
+                while (index >= context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
+                {
+                    index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
+                    ++currentCandidatesIndex;
+                    if (currentCandidatesIndex >= context.RefinementCandidates.Count)
+                        currentCandidatesIndex -= context.RefinementCandidates.Count;
+                }
+                Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
+                var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
+                context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
+                nodes[nodeIndex].RefineFlag = 1;
             }
             context.RefinementTargets.Count = actualRefinementTargetsCount;
-            //if (nodes->RefineFlag != 1)
-            //{
-            //    context.RefinementTargets.Add(0);
-            //    ++actualRefinementTargetsCount;
-            //    nodes->RefineFlag = 1;
-            //}
-
-            //CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
-
-            ////Collect the refinement candidates.
-            //looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
-
-
-            //var refinementCandidatesCount = 0;
-            //for (int i = 0; i < looper.ThreadCount; ++i)
-            //{
-            //    refinementCandidatesCount += context.RefinementCandidates.Elements[i].Count;
-            //}
-
-            //int targetRefinementCount, period, offset;
-            //GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
-
-
-            ////Condense the set of candidates into a set of targets.
-            //context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
-
-
-            //int actualRefinementTargetsCount = 0;
-            //var currentCandidatesIndex = 0;
-            //int index = offset;
-            //for (int i = 0; i < targetRefinementCount - 1; ++i)
-            //{
-            //    index += period;
-            //    //Wrap around if the index doesn't fit.
-            //    while (index >= context.RefinementCandidates.Elements[currentCandidatesIndex].Count)
-            //    {
-            //        index -= context.RefinementCandidates.Elements[currentCandidatesIndex].Count;
-            //        ++currentCandidatesIndex;
-            //        if (currentCandidatesIndex >= context.RefinementCandidates.Count)
-            //            currentCandidatesIndex -= context.RefinementCandidates.Count;
-            //    }
-            //    Debug.Assert(index < context.RefinementCandidates.Elements[currentCandidatesIndex].Count && index >= 0);
-            //    var nodeIndex = context.RefinementCandidates.Elements[currentCandidatesIndex].Elements[index];
-            //    context.RefinementTargets.Elements[actualRefinementTargetsCount++] = nodeIndex;
-            //    nodes[nodeIndex].RefineFlag = 1;
-            //}
-            //context.RefinementTargets.Count = actualRefinementTargetsCount;
-            //if (nodes->RefineFlag != 1)
-            //{
-            //    context.RefinementTargets.Add(0);
-            //    ++actualRefinementTargetsCount;
-            //    nodes->RefineFlag = 1;
-            //}
+            if (nodes->RefineFlag != 1)
+            {
+                context.RefinementTargets.Add(0);
+                ++actualRefinementTargetsCount;
+                nodes->RefineFlag = 1;
+            }
 
             //int actualRefinementTargetsCount = 2;
             //context.RefinementTargets.Add(nodes->ChildA);
@@ -404,7 +403,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             Console.WriteLine();
 
-            for (int i = 0; i < context.RefinementTargets.Count; ++i)
+            for (int i = 0; i < context.RefinementTargets.Count - 1; ++i)
             {
                 CheckForRefinementOverlaps(context.RefinementTargets.Elements[i], ref context.RefinementTargets);
             }

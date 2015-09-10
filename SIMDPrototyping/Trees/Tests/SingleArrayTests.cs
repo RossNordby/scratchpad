@@ -180,8 +180,8 @@ namespace SIMDPrototyping.Trees.Tests
                     var refineStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
 
-                    var refinementCount = tree.RefitAndRefine(t);
-                    //var refinementCount = tree.RefitAndRefine(t, looper, context);
+                    //var refinementCount = tree.RefitAndRefine(t);
+                    var refinementCount = tree.RefitAndRefine(t, looper, context);
 
 
 

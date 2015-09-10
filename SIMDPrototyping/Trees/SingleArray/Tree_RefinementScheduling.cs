@@ -232,14 +232,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //Collect the refinement candidates.
             var costChange = RefitAndMark(leafCountThreshold, ref refinementCandidates);
-            for (int i = 0; i < refinementCandidates.Count; ++i)
-            {
-                for (int j = i + 1; j < refinementCandidates.Count; ++j)
-                {
-                    if (refinementCandidates[i] == refinementCandidates[j])
-                        Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
-                }
-            }
+
 
             int targetRefinementCount, period, offset;
             GetRefineTuning(frameIndex, refinementCandidates.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
@@ -267,15 +260,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 refinementTargets.Add(0);
                 ++actualRefinementTargetsCount;
                 nodes->RefineFlag = 1;
-            }
-
-            for (int i = 0; i < refinementTargets.Count; ++i)
-            {
-                for (int j = i + 1; j < refinementTargets.Count; ++j)
-                {
-                    if (refinementTargets[i] == refinementTargets[j])
-                        Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
-                }
             }
 
             //Refine all marked targets.
