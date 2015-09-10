@@ -302,6 +302,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Don't proceed if the tree is empty.
             if (leafCount == 0)
                 return 0;
+            ValidateRefineFlags(0);
             var pool = BufferPools<int>.Locking;
 
             int estimatedRefinementTargetCount;
@@ -348,12 +349,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes[nodeIndex].RefineFlag = 1;
             }
             context.RefinementTargets.Count = actualRefinementTargetsCount;
-            if (nodes->RefineFlag != 1)
-            {
-                context.RefinementTargets.Add(0);
-                ++actualRefinementTargetsCount;
-                nodes->RefineFlag = 1;
-            }
+            //if (nodes->RefineFlag != 1)
+            //{
+            //    context.RefinementTargets.Add(0);
+            //    ++actualRefinementTargetsCount;
+            //    nodes->RefineFlag = 1;
+            //}
 
             //int actualRefinementTargetsCount = 2;
             //context.RefinementTargets.Add(nodes->ChildA);
@@ -368,7 +369,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             Console.WriteLine();
 
-            for (int i = 0; i < context.RefinementTargets.Count - 1; ++i)
+            for (int i = 0; i < context.RefinementTargets.Count; ++i)
             {
                 CheckForRefinementOverlaps(context.RefinementTargets.Elements[i], ref context.RefinementTargets);
             }
@@ -376,7 +377,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Refine all marked targets.
             looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
 
-
+            ValidateRefineFlags(0);
 
             ////To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             //var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
