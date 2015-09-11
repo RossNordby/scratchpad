@@ -40,7 +40,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         {
                             //It's possible that a wavefront node is this high in the tree, so it has to be captured here because the postpass won't find it.
                             refinementCandidates.Add(children[i]);
-                            Console.WriteLine("hit@@@@@@@@@@@@@@@@@@@@");
+                            //Console.WriteLine("hit@@@@@@@@@@@@@@@@@@@@");
                             //Encoding the child index tells the thread to use RefitAndMeasure instead of RefitAndMark since this was a wavefront node.
                             refitAndMarkTargets.Add(Encode(children[i]));
                         }
@@ -168,13 +168,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                     if (shouldUseMark)
                     {
                         var costChange = Tree.RefitAndMark(nodeIndex, LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
-                        Tree.ValidateRefineFlags(nodeIndex);
                         node->LocalCostChange = costChange;
                     }
                     else
                     {
                         var costChange = Tree.RefitAndMeasure(nodeIndex, ref *boundingBoxInParent);
-                        Tree.ValidateRefineFlags(nodeIndex);
                         node->LocalCostChange = costChange;
                     }
 
@@ -201,8 +199,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                                     node->LocalCostChange += child->LocalCostChange;
                                     //Clear the refine flag (unioned).
                                     child->RefineFlag = 0;
-
-                                    Tree.ValidateRefineFlags(children[i]);
+                                    
                                 }
                             }
 
@@ -333,7 +330,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Don't proceed if the tree is empty.
             if (leafCount == 0)
                 return 0;
-            ValidateRefineFlags(0);
             var pool = BufferPools<int>.Locking;
 
             int estimatedRefinementTargetCount;
@@ -345,8 +341,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
-
-            ValidateRefineFlags(0);
+            
 
             var refinementCandidatesCount = 0;
             for (int i = 0; i < looper.ThreadCount; ++i)
@@ -395,49 +390,48 @@ namespace SIMDPrototyping.Trees.SingleArray
             //nodes[nodes->ChildA].RefineFlag = 1;
             //nodes[nodes->ChildB].RefineFlag = 1;
 
-            for (int i = 0; i < nodeCount; ++i)
-            {
-                if (context.RefinementTargets.Contains(i))
-                {
-                    if (nodes[i].RefineFlag != 1)
-                    {
-                        Console.WriteLine("Bad");
-                    }
-                }
-                else
-                {
-                    if (nodes[i].RefineFlag != 0)
-                    {
-                        Console.WriteLine("Bad");
-                    }
-                }
-            }
+            //for (int i = 0; i < nodeCount; ++i)
+            //{
+            //    if (context.RefinementTargets.Contains(i))
+            //    {
+            //        if (nodes[i].RefineFlag != 1)
+            //        {
+            //            Console.WriteLine("Bad");
+            //        }
+            //    }
+            //    else
+            //    {
+            //        if (nodes[i].RefineFlag != 0)
+            //        {
+            //            Console.WriteLine("Bad");
+            //        }
+            //    }
+            //}
 
-            for (int i = 0; i < context.RefinementTargets.Count; ++i)
-            {
-                for (int j = i + 1; j < context.RefinementTargets.Count; ++j)
-                {
-                    if (context.RefinementTargets[i] == context.RefinementTargets[j])
-                        Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
-                }
-            }
+            //for (int i = 0; i < context.RefinementTargets.Count; ++i)
+            //{
+            //    for (int j = i + 1; j < context.RefinementTargets.Count; ++j)
+            //    {
+            //        if (context.RefinementTargets[i] == context.RefinementTargets[j])
+            //            Console.WriteLine("DUPLICATE REFINEMENT TARGET!!!");
+            //    }
+            //}
 
-            Console.Write("Refinement nodes: ");
-            for (int i = 0; i < context.RefinementTargets.Count; ++i)
-            {
-                Console.Write($"{context.RefinementTargets[i]}, ");
-            }
-            Console.WriteLine();
+            //Console.Write("Refinement nodes: ");
+            //for (int i = 0; i < context.RefinementTargets.Count; ++i)
+            //{
+            //    Console.Write($"{context.RefinementTargets[i]}, ");
+            //}
+            //Console.WriteLine();
 
-            for (int i = 0; i < context.RefinementTargets.Count; ++i)
-            {
-                CheckForRefinementOverlaps(context.RefinementTargets.Elements[i], ref context.RefinementTargets);
-            }
+            //for (int i = 0; i < context.RefinementTargets.Count; ++i)
+            //{
+            //    CheckForRefinementOverlaps(context.RefinementTargets.Elements[i], ref context.RefinementTargets);
+            //}
 
             //Refine all marked targets.
             looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
-
-            ValidateRefineFlags(0);
+            
 
             ////To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             //var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
