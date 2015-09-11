@@ -382,12 +382,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes[nodeIndex].RefineFlag = 1;
             }
             context.RefinementTargets.Count = actualRefinementTargetsCount;
-            //if (nodes->RefineFlag != 1)
-            //{
-            //    context.RefinementTargets.Add(0);
-            //    ++actualRefinementTargetsCount;
-            //    nodes->RefineFlag = 1;
-            //}
+            if (nodes->RefineFlag != 1)
+            {
+                context.RefinementTargets.Add(0);
+                ++actualRefinementTargetsCount;
+                nodes->RefineFlag = 1;
+            }
 
             //int actualRefinementTargetsCount = 2;
             //context.RefinementTargets.Add(nodes->ChildA);

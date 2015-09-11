@@ -207,7 +207,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        unsafe void FindPartitionBinned(ref BinnedResources resources, int start, int count, ref BoundingBox boundingBox,
+        unsafe void FindPartitionBinned(ref BinnedResources resources, int start, int count,
                out int splitIndex, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             //var totalStartTime = Stopwatch.GetTimestamp();
@@ -496,7 +496,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
         unsafe void SplitSubtreesIntoChildrenBinned(int depthRemaining, ref BinnedResources resources,
-            int start, int count, ref BoundingBox boundingBox,
+            int start, int count,
             int stagingNodeIndex, ref int stagingNodesCount, out float childrenTreeletsCost)
         {
             if (count > 1)
@@ -505,15 +505,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                 BoundingBox a, b;
                 int leafCountA, leafCountB;
                 int splitIndex;
-                FindPartitionBinned(ref resources, start, count, ref boundingBox, out splitIndex, out a, out b, out leafCountA, out leafCountB);
+                FindPartitionBinned(ref resources, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
 
 
                 float costA, costB;
                 if (depthRemaining > 0)
                 {
                     --depthRemaining;
-                    SplitSubtreesIntoChildrenBinned(depthRemaining, ref resources, start, splitIndex - start, ref a, stagingNodeIndex, ref stagingNodesCount, out costA);
-                    SplitSubtreesIntoChildrenBinned(depthRemaining, ref resources, splitIndex, start + count - splitIndex, ref b, stagingNodeIndex, ref stagingNodesCount, out costB);
+                    SplitSubtreesIntoChildrenBinned(depthRemaining, ref resources, start, splitIndex - start, stagingNodeIndex, ref stagingNodesCount, out costA);
+                    SplitSubtreesIntoChildrenBinned(depthRemaining, ref resources, splitIndex, start + count - splitIndex, stagingNodeIndex, ref stagingNodesCount, out costB);
                 }
                 else
                 {
@@ -537,7 +537,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     int subtreeCountB = start + count - splitIndex;
                     if (subtreeCountA > 1)
                     {
-                        stagingChildren[childIndexA] = CreateStagingNodeBinned(stagingNodeIndex, childIndexA, ref a, ref resources, start, subtreeCountA,
+                        stagingChildren[childIndexA] = CreateStagingNodeBinned(ref resources, start, subtreeCountA,
                             ref stagingNodesCount, out costA);
                         costA += ComputeBoundsMetric(ref a); //An internal node was created; measure its cost.
                     }
@@ -550,7 +550,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                     if (subtreeCountB > 1)
                     {
-                        stagingChildren[childIndexB] = CreateStagingNodeBinned(stagingNodeIndex, childIndexB, ref b, ref resources, splitIndex, subtreeCountB,
+                        stagingChildren[childIndexB] = CreateStagingNodeBinned(ref resources, splitIndex, subtreeCountB,
                             ref stagingNodesCount, out costB);
                         costB += ComputeBoundsMetric(ref b); //An internal node was created; measure its cost.
                     }
@@ -579,7 +579,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe int CreateStagingNodeBinned(int parentIndex, int indexInParent, ref BoundingBox boundingBox,
+        unsafe int CreateStagingNodeBinned(
             ref BinnedResources resources, int start, int count,
             ref int stagingNodeCount, out float childTreeletsCost)
         {
@@ -612,7 +612,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             const int recursionDepth = ChildrenCapacity == 32 ? 4 : ChildrenCapacity == 16 ? 3 : ChildrenCapacity == 8 ? 2 : ChildrenCapacity == 4 ? 1 : 0;
 
 
-            SplitSubtreesIntoChildrenBinned(recursionDepth, ref resources, start, count, ref boundingBox, stagingNodeIndex, ref stagingNodeCount, out childTreeletsCost);
+            SplitSubtreesIntoChildrenBinned(recursionDepth, ref resources, start, count, stagingNodeIndex, ref stagingNodeCount, out childTreeletsCost);
 
             return stagingNodeIndex;
 
@@ -669,23 +669,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             //If you end up making others, keep this in mind.
             int stagingNodeCount = 0;
 
-            BoundingBox treeletBoundingBox;
-            if (parent >= 0)
-            {
-                //This node is not the root, so we can look for the bounding box in the parent node.
-                treeletBoundingBox = (&nodes[parent].A)[indexInParent];
-            }
-            else
-            {
-                //This node is the root, so the bounding box must be derived.
-                treeletBoundingBox = node->A;
-                for (int i = 1; i < node->ChildCount; ++i)
-                {
-                    BoundingBox.Merge(ref treeletBoundingBox, ref (&node->A)[i], out treeletBoundingBox);
-                }
-            }
+            
             float newTreeletCost;
-            CreateStagingNodeBinned(parent, indexInParent, ref treeletBoundingBox, ref resources, 0, subtreeReferences.Count, ref stagingNodeCount, out newTreeletCost);
+            CreateStagingNodeBinned(ref resources, 0, subtreeReferences.Count, ref stagingNodeCount, out newTreeletCost);
             //Copy the refine flag over from the treelet root so that it persists.
             resources.StagingNodes[0].RefineFlag = node->RefineFlag;
 
