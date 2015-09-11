@@ -683,8 +683,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
                 int nextInternalNodeIndexToUse = 0;
-                var reifiedIndex = ReifyStagingNode(parent, indexInParent, resources.StagingNodes, 0, ref subtreeReferences, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
-                Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
+                ReifyStagingNodes(nodeIndex, resources.StagingNodes, ref subtreeReferences, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
                 //If any nodes are left over, put them into the spares list for later reuse.
                 for (int i = nextInternalNodeIndexToUse; i < treeletInternalNodes.Count; ++i)
                 {

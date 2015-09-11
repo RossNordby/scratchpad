@@ -193,8 +193,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             priorityQueue.Insert(node, nodes, ref subtrees);
 
-            //The root is inserted first; the dequeue process will find the root first, guaranteeing that the root does not move.
-            internalNodes.Add(nodeIndex);
+            //Note that the treelet root is NOT added to the internal nodes list.
 
             //Note that the treelet root's cost is excluded from the treeletCost.
             //That's because the treelet root cannot change.
@@ -219,7 +218,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
             //Sort the internal nodes so that the depth first builder will tend to produce less cache-scrambled results.
-            Array.Sort(internalNodes.Elements, 1, internalNodes.Count - 1);
+            Array.Sort(internalNodes.Elements, 0, internalNodes.Count);
 
         }
 

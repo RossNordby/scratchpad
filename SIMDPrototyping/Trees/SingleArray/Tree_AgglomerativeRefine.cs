@@ -162,8 +162,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
                 int nextInternalNodeIndexToUse = 0;
-                var reifiedIndex = ReifyStagingNode(parent, indexInParent, stagingNodes, 0, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
-                Debug.Assert(parent != -1 ? (&nodes[parent].ChildA)[indexInParent] == reifiedIndex : true, "The parent should agree with the child about the relationship.");
+                ReifyStagingNodes(nodeIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
                 //If any nodes are left over, put them into the spares list for later reuse.
                 for (int i = nextInternalNodeIndexToUse; i < treeletInternalNodes.Count; ++i)
                 {
@@ -279,41 +278,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        unsafe int ReifyStagingNode(int parent, int indexInParent, Node* stagingNodes, int stagingNodeIndex,
-            ref QuickList<int> subtrees, ref QuickList<int> treeletInternalNodes, ref int nextInternalNodeIndexToUse, ref QuickList<int> spareNodes, out bool nodesInvalidated)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void ReifyChildren(int internalNodeIndex, Node* stagingNodes, ref QuickList<int> subtrees, ref QuickList<int> treeletInternalNodes, ref int nextInternalNodeIndexToUse, ref QuickList<int> spareNodes, out bool nodesInvalidated)
         {
-
             nodesInvalidated = false;
-            int internalNodeIndex;
-            if (nextInternalNodeIndexToUse < treeletInternalNodes.Count)
-            {
-                //There is an internal node that we can use.
-                //Note that we remove from the end to guarantee that the treelet root does not change location.
-                //The CollectSubtrees function guarantees that the treelet root is enqueued first.
-                internalNodeIndex = treeletInternalNodes.Elements[nextInternalNodeIndexToUse++];
-            }
-            else if (!spareNodes.TryPop(out internalNodeIndex))
-            {
-                //There was no pre-existing internal node that we could use. Apparently, the tree gained some internal nodes.
-                //Watch out, calls to AllocateNode potentially invalidate all extant node pointers.
-                //Fortunately, there are no pointers to invalidate... here. Propagate it up.
-                //Note that this is a locking operation to support multithreading. In practice, n-ary trees should hit this very rarely.
-                //In binary trees, this will never get hit at all.
-                bool addCausedInvalidation;
-                internalNodeIndex = AllocateNodeLocking(out addCausedInvalidation);
-                if (addCausedInvalidation)
-                    nodesInvalidated = true;
-            }
-
-            //To make the staging node real, it requires an accurate parent pointer, index in parent, and child indices.
-            //Copy the staging node into the real tree.
-            //We take the staging node's child bounds, child indices, leaf counts, and child count.
-            //The parent and index in parent are provided by the caller.
-            var stagingNode = stagingNodes + stagingNodeIndex;
             var internalNode = nodes + internalNodeIndex;
-            *internalNode = *stagingNode;
-            internalNode->Parent = parent;
-            internalNode->IndexInParent = indexInParent;
             var internalNodeChildren = &internalNode->ChildA;
             for (int i = 0; i < internalNode->ChildCount; ++i)
             {
@@ -353,6 +322,69 @@ namespace SIMDPrototyping.Trees.SingleArray
                     }
                 }
             }
+        }
+
+        unsafe void ReifyStagingNodes(int treeletRootIndex, Node* stagingNodes, ref QuickList<int> subtrees, ref QuickList<int> treeletInternalNodes, ref int nextInternalNodeIndexToUse, ref QuickList<int> spareNodes, out bool nodesInvalidated)
+        {
+            nodesInvalidated = false;
+            //We take the staging node's child bounds, child indices, leaf counts, and child count.
+            //The parent and index in parent of the treelet root CANNOT BE TOUCHED.
+            //When running on multiple threads, another thread may modify the Parent and IndexInParent of the treelet root.
+            var internalNode = nodes + treeletRootIndex;
+            internalNode->ChildCount = stagingNodes->ChildCount;
+            var bounds = &internalNode->A;
+            var children = &internalNode->ChildA;
+            var leafCounts = &internalNode->LeafCountA;
+            var stagingBounds = &stagingNodes->A;
+            var stagingChildren = &stagingNodes->ChildA;
+            var stagingLeafCounts = &stagingNodes->LeafCountA;
+            for (int i = 0; i < internalNode->ChildCount; ++i)
+            {
+                bounds[i] = stagingBounds[i];
+                children[i] = stagingChildren[i];
+                leafCounts[i] = stagingLeafCounts[i];
+            }
+
+            ReifyChildren(treeletRootIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
+        }
+
+        unsafe int ReifyStagingNode(int parent, int indexInParent, Node* stagingNodes, int stagingNodeIndex,
+            ref QuickList<int> subtrees, ref QuickList<int> treeletInternalNodes, ref int nextInternalNodeIndexToUse, ref QuickList<int> spareNodes, out bool nodesInvalidated)
+        {
+
+            nodesInvalidated = false;
+            int internalNodeIndex;
+            if (nextInternalNodeIndexToUse < treeletInternalNodes.Count)
+            {
+                //There is an internal node that we can use.
+                //Note that we remove from the end to guarantee that the treelet root does not change location.
+                //The CollectSubtrees function guarantees that the treelet root is enqueued first.
+                internalNodeIndex = treeletInternalNodes.Elements[nextInternalNodeIndexToUse++];
+            }
+            else if (!spareNodes.TryPop(out internalNodeIndex))
+            {
+                //There was no pre-existing internal node that we could use. Apparently, the tree gained some internal nodes.
+                //Watch out, calls to AllocateNode potentially invalidate all extant node pointers.
+                //Fortunately, there are no pointers to invalidate... here. Propagate it up.
+                //Note that this is a locking operation to support multithreading. In practice, n-ary trees should hit this very rarely.
+                //In binary trees, this will never get hit at all.
+                bool addCausedInvalidation;
+                internalNodeIndex = AllocateNodeLocking(out addCausedInvalidation);
+                if (addCausedInvalidation)
+                    nodesInvalidated = true;
+            }
+
+            //To make the staging node real, it requires an accurate parent pointer, index in parent, and child indices.
+            //Copy the staging node into the real tree.
+            //We take the staging node's child bounds, child indices, leaf counts, and child count.
+            //The parent and index in parent are provided by the caller.
+            var stagingNode = stagingNodes + stagingNodeIndex;
+            var internalNode = nodes + internalNodeIndex;
+            *internalNode = *stagingNode;
+            internalNode->Parent = parent;
+            internalNode->IndexInParent = indexInParent;
+
+            ReifyChildren(internalNodeIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
             return internalNodeIndex;
         }
 
