@@ -169,13 +169,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         var costChange = Tree.RefitAndMark(nodeIndex, LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
                         Tree.ValidateRefineFlags(nodeIndex);
-                        //node->LocalCostChange = costChange;
+                        node->LocalCostChange = costChange;
                     }
                     else
                     {
                         var costChange = Tree.RefitAndMeasure(nodeIndex, ref *boundingBoxInParent);
                         Tree.ValidateRefineFlags(nodeIndex);
-                        //node->LocalCostChange = costChange;
+                        node->LocalCostChange = costChange;
                     }
 
 
@@ -382,18 +382,36 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes[nodeIndex].RefineFlag = 1;
             }
             context.RefinementTargets.Count = actualRefinementTargetsCount;
-            if (nodes->RefineFlag != 1)
-            {
-                context.RefinementTargets.Add(0);
-                ++actualRefinementTargetsCount;
-                nodes->RefineFlag = 1;
-            }
+            //if (nodes->RefineFlag != 1)
+            //{
+            //    context.RefinementTargets.Add(0);
+            //    ++actualRefinementTargetsCount;
+            //    nodes->RefineFlag = 1;
+            //}
 
             //int actualRefinementTargetsCount = 2;
             //context.RefinementTargets.Add(nodes->ChildA);
             //context.RefinementTargets.Add(nodes->ChildB);
             //nodes[nodes->ChildA].RefineFlag = 1;
             //nodes[nodes->ChildB].RefineFlag = 1;
+
+            for (int i = 0; i < nodeCount; ++i)
+            {
+                if (context.RefinementTargets.Contains(i))
+                {
+                    if (nodes[i].RefineFlag != 1)
+                    {
+                        Console.WriteLine("Bad");
+                    }
+                }
+                else
+                {
+                    if (nodes[i].RefineFlag != 0)
+                    {
+                        Console.WriteLine("Bad");
+                    }
+                }
+            }
 
             for (int i = 0; i < context.RefinementTargets.Count; ++i)
             {
@@ -411,7 +429,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             Console.WriteLine();
 
-            for (int i = 0; i < context.RefinementTargets.Count - 1; ++i)
+            for (int i = 0; i < context.RefinementTargets.Count; ++i)
             {
                 CheckForRefinementOverlaps(context.RefinementTargets.Elements[i], ref context.RefinementTargets);
             }
