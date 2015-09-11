@@ -58,7 +58,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        void CollectNodesForMultithreadedRefit(int threadCount, ref QuickList<int> targets,
+        void CollectNodesForMultithreadedRefit(int threadCount, ref QuickList<int> refitAndMarkTargets,
             int refinementLeafCountThreshold, ref QuickList<int> refinementCandidates)
         {
             //No point in using this if there aren't enough leaves.
@@ -66,7 +66,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int multithreadingLeafCountThreshold = leafCount / (threadCount * 2);
             if (multithreadingLeafCountThreshold < refinementLeafCountThreshold)
                 multithreadingLeafCountThreshold = refinementLeafCountThreshold;
-            CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref targets, refinementLeafCountThreshold, ref refinementCandidates);
+            CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref refitAndMarkTargets, refinementLeafCountThreshold, ref refinementCandidates);
         }
 
         /// <summary>
@@ -154,21 +154,28 @@ namespace SIMDPrototyping.Trees.SingleArray
                     {
                         //Node was already marked as a wavefront. Should proceed with a RefitAndMeasure instead of RefitAndMark.
                         nodeIndex = Tree.Encode(nodeIndex);
-                        shouldUseMark = true;
+                        shouldUseMark = false;
                     }
                     else
-                        shouldUseMark = false;
-                    var node = Tree.nodes + RefitNodes.Elements[refitIndex];
+                    {
+                        shouldUseMark = true;
+                    }
+
+                    var node = Tree.nodes + nodeIndex;
                     Debug.Assert(node->Parent >= 0, "The root should not be marked for refit.");
                     var parent = Tree.nodes + node->Parent;
                     var boundingBoxInParent = &parent->A + node->IndexInParent;
                     if (shouldUseMark)
                     {
-                        node->LocalCostChange = Tree.RefitAndMark(nodeIndex, LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
+                        var costChange = Tree.RefitAndMark(nodeIndex, LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
+                        Tree.ValidateRefineFlags(nodeIndex);
+                        //node->LocalCostChange = costChange;
                     }
                     else
                     {
-                        node->LocalCostChange = Tree.RefitAndMeasure(nodeIndex, ref *boundingBoxInParent);
+                        var costChange = Tree.RefitAndMeasure(nodeIndex, ref *boundingBoxInParent);
+                        Tree.ValidateRefineFlags(nodeIndex);
+                        //node->LocalCostChange = costChange;
                     }
 
 
@@ -194,6 +201,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                                     node->LocalCostChange += child->LocalCostChange;
                                     //Clear the refine flag (unioned).
                                     child->RefineFlag = 0;
+
+                                    Tree.ValidateRefineFlags(children[i]);
                                 }
                             }
 
@@ -331,14 +340,13 @@ namespace SIMDPrototyping.Trees.SingleArray
             GetRefitAndMarkTuning(out context.MaximumSubtrees, out estimatedRefinementTargetCount, out context.LeafCountThreshold);
 
             context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
-
-            context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementTargetCount));
-
+            
             //Collect the refinement candidates.
 
             CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
 
+            ValidateRefineFlags(0);
 
             var refinementCandidatesCount = 0;
             for (int i = 0; i < looper.ThreadCount; ++i)
