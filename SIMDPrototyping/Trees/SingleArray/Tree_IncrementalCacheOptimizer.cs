@@ -104,6 +104,138 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+
+        public unsafe void SwapNodesThreadSafe(int currentIndex, int targetIndex, int targetMin, int targetMax)
+        {
+            Debug.Assert(targetIndex >= targetMin && targetIndex < targetMax);
+            if (currentIndex < targetMin || currentIndex >= targetMax)
+            {
+                SwapNodesThreadSafe(currentIndex, targetIndex);
+            }
+        }
+
+        void Lock(int index)
+        {
+        }
+
+        void Unlock(int index)
+        {
+        }
+
+        unsafe void Attempt(int nodeIndex, ref int targetIndex, int min, int max)
+        {
+            //TWO KNOWNS:
+            //1) The parent node is in its global optimum position.
+            //2) All simultaneously executing cache optimizations target global optimums, so the parent node cannot move.
+
+            //It is possible that the children will move
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+
+            //Acquire a lock on all children that are outside of the range.
+            //DANGER: DEADLOCKS. Need to be able to prove that it can't happen, but current organization makes it very likely.
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                //If the child is already within the subtree's dedicated memory range, we know that no other thread will interfere with it.
+                // Consider:
+                //  There is only one thread operating per logical subtree.
+                //  Other threads 
+                //
+                //No lock is necessary.
+                if (children[i] < min || children[i] >= max)
+                {
+                    Lock(children[i]);
+                }
+            }
+
+            //All children are now immobile.
+        }
+
+        public unsafe void SwapNodesThreadSafe(int currentIndex, int targetIndex)
+        {
+            Debug.Assert(currentIndex != targetIndex, "Can't swap a node with itself.");
+            var current = nodes + currentIndex;
+            var target = nodes + targetIndex;
+            //We must lock:
+            //a
+            //b
+            //a->Parent
+            //b->Parent
+            //a->{Children}
+            //b->{Children}
+            //But watch out, a may be the parent of b or vice versa. Given that these locks are non-reentrant, you must avoid attempting to lock them twice.
+
+            //Note that we don't have to worry about ordering because these are not blocking locks. If one fails, all locks immediately abort.
+            //This means that we won't always end up with an optimal cache layout, but it doesn't affect correctness at all.
+            //Eventually, the node will be revisited and it will probably get fixed.
+
+            //Note that there is a small chance that the 'current' pointer does not refer to the same node here as it did when the function was called, because
+            //another swap may have moved things around.
+
+            //Maybe that's okay?
+            if (0 == Interlocked.CompareExchange(ref current->RefineFlag, 1, 0))
+            {
+                if (0 == Interlocked.CompareExchange(ref target->RefineFlag, 1, 0))
+                {
+                    var currentParent = nodes + current->Parent;
+                    if (0 == Interlocked.CompareExchange(ref currentParent->RefineFlag, 1, 0))
+                    {
+                        var targetParent = nodes + current->Parent;
+                        if (0 == Interlocked.CompareExchange(ref targetParent->RefineFlag, 1, 0))
+                        {
+                            int currentChildrenLockedCount = current->ChildCount;
+                            var currentChildren = &current->ChildA;
+                            for (int i = 0; i < current->ChildCount; ++i)
+                            {
+                                if (0 != Interlocked.CompareExchange(ref nodes[currentChildren[i]].RefineFlag, 1, 0))
+                                {
+                                    //Failed to acquire lock on all children.
+                                    currentChildrenLockedCount = i;
+                                    break;
+                                }
+                            }
+
+                            if (currentChildrenLockedCount == current->ChildCount)
+                            {
+                                int targetChildrenLockedCount = target->ChildCount;
+                                var targetChildren = &target->ChildA;
+                                for (int i = 0; i < target->ChildCount; ++i)
+                                {
+                                    if (0 != Interlocked.CompareExchange(ref nodes[targetChildren[i]].RefineFlag, 1, 0))
+                                    {
+                                        //Failed to acquire lock on all children.
+                                        targetChildrenLockedCount = i;
+                                        break;
+                                    }
+                                }
+
+                                if (targetChildrenLockedCount == target->ChildCount)
+                                {
+                                    //ALL nodes locked successfully.
+                                    SwapNodes(currentIndex, targetIndex);
+                                }
+
+                                for (int i = targetChildrenLockedCount - 1; i >= 0; --i)
+                                {
+                                    nodes[targetChildren[i]].RefineFlag = 0;
+                                }
+                            }
+                            for (int i = currentChildrenLockedCount - 1; i >= 0; --i)
+                            {
+                                nodes[currentChildren[i]].RefineFlag = 0;
+                            }
+
+                            targetParent->RefineFlag = 0;
+                        }
+                        currentParent->RefineFlag = 0;
+                    }
+                    target->RefineFlag = 0;
+                }
+                current->RefineFlag = 0;
+            }
+        }
+
+
         public unsafe void IncrementalCacheOptimizeThreadSafe(int nodeIndex)
         {
             //Multithreaded cache optimization attempts to acquire a lock on every involved node.
@@ -272,6 +404,38 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
+        /// <summary>
+        /// Begins a cache optimization at the given node and proceeds all the way to the bottom of the tree.
+        /// Requires that the targeted node is already at the global optimum position.
+        /// </summary>
+        /// <param name="nodeIndex">Node to begin the optimization process at.</param>
+        public unsafe void CacheOptimize(int nodeIndex)
+        {
+            var targetIndex = nodeIndex + 1;
+
+            CacheOptimize(nodeIndex, ref targetIndex);
+        }
+
+
+        unsafe void CacheOptimize(int nodeIndex, ref int nextIndex)
+        {
+            ++nextIndex;
+
+            var node = nodes + nodeIndex;
+            var children = &node->ChildA;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                {
+                    Debug.Assert(nextIndex >= 0 && nextIndex < nodeCount, "Swap target should be within the node set. If it's not, the initial node was probably not in global optimum position.");
+
+                    if (children[i] != nextIndex)
+                        SwapNodes(nodeIndex, nextIndex);
+                    ++nextIndex;
+                    CacheOptimize(children[i], ref nextIndex);
+                }
+            }
+        }
     }
 
 }
