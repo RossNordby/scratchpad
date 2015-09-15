@@ -124,10 +124,11 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        public unsafe bool TryLockNode(ref int nodeIndex, int avoidIndex, int avoidParentIndex)
+        public unsafe bool TryLockSwapTarget(ref int swapTargetIndex, int swapperIndex, int swapperParentIndex)
         {
-            Debug.Assert(nodes[avoidIndex].RefineFlag == 1, "The index to avoid should be locked.");
-            Debug.Assert(nodes[avoidParentIndex].RefineFlag == 1, "The parent index to avoid should be locked.");
+            Debug.Assert(nodes[swapperIndex].RefineFlag == 1, "The swapper should be locked.");
+            Debug.Assert(nodes[swapperParentIndex].RefineFlag == 1, "The swapper parent should be locked.");
+            Debug.Assert(swapTargetIndex != swapperIndex, "If the swapper is already at the swap target, this should not be called."); //safe to compare since if equal, it's locked.
             //We must make sure that the node, its parent, and its children are locked.
             //But watch out for parent or grandparent relationships between the nodes. Those lower the number of locks required.
 
@@ -146,20 +147,36 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Note the use of an iterating TryLock. It accepts the fact that the reference memory could be changed at any time before a lock is acquired.
             //It explicitly checks to ensure that it actually grabs a lock on the correct node.
 
-            bool success = false;
-            if (TryLock(ref nodeIndex))
-            {
-                var node = nodes + nodeIndex;
+            //Don't lock swapTarget if:
+            //1) swapTargetIndex == swapperParentIndex, because swapperParentIndex is already locked
+            //2) nodes[swapTargetIndex].Parent == swapperIndex, because swapper's children are already locked 
 
-                var parentAvoidedLock = node->Parent == bIndex;
-                if (parentAvoidedLock || TryLock(ref node->Parent))
+            //Note that the above comparison between a potentially unlocked nodes[swapTargetIndex].Parent and swapperIndex is safe because
+            //if it evaluates true, then it was actually locked. In the event that it evaluates to false, they aren't the same node- which random node it might be doesn't matter.
+            //Similar logic applies to the similar lock elisions below.
+
+            bool success = false;
+            var needSwapTargetLock = swapTargetIndex != swapperParentIndex && nodes[swapTargetIndex].Parent != swapperIndex;
+            if (!needSwapTargetLock || TryLock(ref swapTargetIndex))
+            {
+                var swapTarget = nodes + swapTargetIndex;
+
+                //Don't lock swapTarget->Parent if:
+                //1) swapTarget->Parent == swapperIndex, because swapper is already locked.
+                //2) nodes[swapTarget->Parent].Parent == swapperIndex, because swapper's children are already locked.
+
+                var needSwapTargetParentLock = swapTarget->Parent != swapperIndex && nodes[swapTarget->Parent].Parent != swapperIndex;
+                if (!needSwapTargetParentLock || TryLock(ref swapTarget->Parent))
                 {
 
-                    int childrenLockedCount = node->ChildCount;
-                    var children = &node->ChildA;
-                    for (int i = 0; i < node->ChildCount; ++i)
+                    int childrenLockedCount = swapTarget->ChildCount;
+                    var children = &swapTarget->ChildA;
+                    for (int i = 0; i < swapTarget->ChildCount; ++i)
                     {
-                        if (children[i] != bIndex && children[i] != b->Parent && !TryLock(ref children[i]))
+                        //Don't lock children[i] if:
+                        //1) children[i] == swapperIndex, because the swapper is already locked 
+                        //2) children[i] == swapperParentIndex, because the swapperParent is already locked
+                        if (children[i] != swapperIndex && children[i] != swapperParentIndex && !TryLock(ref children[i]))
                         {
                             //Failed to acquire lock on all children.
                             childrenLockedCount = i;
@@ -167,21 +184,22 @@ namespace SIMDPrototyping.Trees.SingleArray
                         }
                     }
 
-                    if (childrenLockedCount == node->ChildCount)
+                    if (childrenLockedCount == swapTarget->ChildCount)
                     {
                         //Nodes locked successfully.
                         success = true;
                     }
                     for (int i = childrenLockedCount - 1; i >= 0; --i)
                     {
-                        if (children[i] != bIndex && children[i] != b->Parent) //Do not yet unlock this child; it's one of the nodes to avoid.
+                        if (children[i] != swapperIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
                             nodes[children[i]].RefineFlag = 0;
                     }
 
-                    if (!parentAvoidedLock)
-                        nodes[node->Parent].RefineFlag = 0;
+                    if (needSwapTargetParentLock)
+                        nodes[swapTarget->Parent].RefineFlag = 0;
                 }
-                node->RefineFlag = 0;
+                if (needSwapTargetLock)
+                    swapTarget->RefineFlag = 0;
             }
             return success;
         }
