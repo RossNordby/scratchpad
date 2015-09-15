@@ -305,15 +305,25 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-
-        public unsafe void IncrementalCacheOptimizeThreadSafe(int nodeIndex)
+        /// <summary>
+        /// Moves the children if the specified node into the correct relative position in memory.
+        /// Takes care to avoid contested moves in multithreaded contexts. May not successfully
+        /// complete all desired moves if contested.
+        /// </summary>
+        /// <param name="nodeIndex">Node whose children should be optimized.</param>
+        /// <returns>True if no other threads contested the optimization, otherwise false.
+        /// Will return true even if not all nodes are optimized if the reason was a target index outside of the node list bounds.</returns>
+        public unsafe bool IncrementalCacheOptimizeThreadSafe(int nodeIndex)
         {
             //Multithreaded cache optimization attempts to acquire a lock on every involved node.
             //If any lock fails, it just abandons the entire attempt.
             //That's acceptable- the incremental optimization only cares about eventual success.
+
+            //TODO: could attempt to compare child pointers without locks. Unsafe, but acceptable as an optimization prepass. Would avoid some interlocks.
+            //It's a PERFORMANCE question, though, so make sure you measure it.
             var node = nodes + nodeIndex;
-            bool nodeLock = 0 == Interlocked.CompareExchange(ref node->RefineFlag, 1, 0);
-            if (nodeLock)
+            bool success = true;
+            if (0 == Interlocked.CompareExchange(ref node->RefineFlag, 1, 0))
             {
                 var children = &node->ChildA;
 
@@ -343,23 +353,53 @@ namespace SIMDPrototyping.Trees.SingleArray
                     if (children[i] >= 0)
                     {
                         //Lock before comparing the children to stop the children from changing.
-                        if (0 == Interlocked.CompareExchange(ref nodes[children[i]].RefineFlag, 1, 0))
+                        if (TryLock(ref children[i]))
                         {
-                            if (children[i] != targetIndex)
+                            var originalChildIndex = children[i];
+                            //While we checked if children[i] != targetIndex earlier as an early-out, it must be done post-lock for correctness because children[i] could have changed.
+                            //Attempting a swap between an index and itself is invalid.
+                            if (originalChildIndex != targetIndex)
                             {
-                                var originalChildIndex = children[i];
-                                if (0 == Interlocked.CompareExchange(ref nodes[targetIndex].RefineFlag, 1, 0))
+                                //Now lock all of this child's children.
+                                var child = nodes + originalChildIndex;
+                                var grandchildren = &child->ChildA;
+                                int lockedChildrenCount = child->ChildCount;
+                                for (int grandchildIndex = 0; grandchildIndex < child->ChildCount; ++grandchildIndex)
                                 {
-                                    SwapNodes(originalChildIndex, targetIndex);
-                                    //Unlock.
-                                    //The refined node was swapped into the child's old position. Clear its flag.
-                                    nodes[originalChildIndex].RefineFlag = 0;
-                                    //break;
+                                    if (!TryLock(ref grandchildren[grandchildIndex]))
+                                    {
+                                        lockedChildrenCount = grandchildIndex;
+                                        break;
+                                    }
                                 }
+                                if (lockedChildrenCount == child->ChildCount)
+                                {
+                                    if (!TrySwapNodeWithTargetThreadSafe(originalChildIndex, targetIndex))
+                                    {
+                                        //Failed target lock.
+                                        success = false;
+                                    }
+                                }
+                                else
+                                {
+                                    //Failed child lock.
+                                    success = false;
+                                }
+
+                                //Unlock all children.
+                                for (int grandchildIndex = lockedChildrenCount - 1; grandchildIndex >= 0; --grandchildIndex)
+                                {
+                                    nodes[grandchildren[grandchildIndex]].RefineFlag = 0;
+                                }
+                                
                             }
                             //Unlock. children[i] is either the targetIndex, if a swap went through, or it's the original child index if it didn't.
                             //Those are the proper targets.
                             nodes[children[i]].RefineFlag = 0;
+                        }
+                        else
+                        {
+                            success = false;
                         }
                         //Leafcounts cannot change due to other threads.
                         targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
@@ -370,6 +410,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Unlock the node.
                 node->RefineFlag = 0;
             }
+            else
+            {
+                success = false;
+            }
+            return success;
         }
 
         public unsafe void IncrementalCacheOptimize(int nodeIndex)
