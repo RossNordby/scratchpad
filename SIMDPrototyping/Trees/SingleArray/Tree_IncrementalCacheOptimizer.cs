@@ -123,6 +123,69 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
+
+        public unsafe bool TryLockNode(ref int nodeIndex, int avoidIndex, int avoidParentIndex)
+        {
+            Debug.Assert(nodes[avoidIndex].RefineFlag == 1, "The index to avoid should be locked.");
+            Debug.Assert(nodes[avoidParentIndex].RefineFlag == 1, "The parent index to avoid should be locked.");
+            //We must make sure that the node, its parent, and its children are locked.
+            //But watch out for parent or grandparent relationships between the nodes. Those lower the number of locks required.
+
+            //The possible cases are as follows:
+            //0) The swap target is the swapper's grandparent. Don't lock the swap target's child that == swapper's parent.
+            //1) The swap target is the swapper's parent. Don't lock the swap target, AND don't lock the swap target's child == swapper.
+            //2) The swap target is the swapper's position (do nothing, you're done).
+            //3) The swap target is one of the swapper's children. Don't lock the swap target, AND don't lock swap target's parent.
+            //4) The swap target is one of the swapper's grandchildren. Don't lock the swap target's parent.
+            //5) The swap target is unrelated to the swapper.
+
+            //Note that we don't have to worry about reordering/deadlocks because these are not blocking locks. If one fails, all locks immediately abort.
+            //This means that we won't always end up with an optimal cache layout, but it doesn't affect correctness at all.
+            //Eventually, the node will be revisited and it will probably get fixed.
+
+            //Note the use of an iterating TryLock. It accepts the fact that the reference memory could be changed at any time before a lock is acquired.
+            //It explicitly checks to ensure that it actually grabs a lock on the correct node.
+
+            bool success = false;
+            if (TryLock(ref nodeIndex))
+            {
+                var node = nodes + nodeIndex;
+
+                var parentAvoidedLock = node->Parent == bIndex;
+                if (parentAvoidedLock || TryLock(ref node->Parent))
+                {
+
+                    int childrenLockedCount = node->ChildCount;
+                    var children = &node->ChildA;
+                    for (int i = 0; i < node->ChildCount; ++i)
+                    {
+                        if (children[i] != bIndex && children[i] != b->Parent && !TryLock(ref children[i]))
+                        {
+                            //Failed to acquire lock on all children.
+                            childrenLockedCount = i;
+                            break;
+                        }
+                    }
+
+                    if (childrenLockedCount == node->ChildCount)
+                    {
+                        //Nodes locked successfully.
+                        success = true;
+                    }
+                    for (int i = childrenLockedCount - 1; i >= 0; --i)
+                    {
+                        if (children[i] != bIndex && children[i] != b->Parent) //Do not yet unlock this child; it's one of the nodes to avoid.
+                            nodes[children[i]].RefineFlag = 0;
+                    }
+
+                    if (!parentAvoidedLock)
+                        nodes[node->Parent].RefineFlag = 0;
+                }
+                node->RefineFlag = 0;
+            }
+            return success;
+        }
+
         /// <summary>
         /// Attempts to swap two nodes. Aborts without changing memory if the swap is contested by another thread.
         /// </summary>
@@ -222,6 +285,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             return success;
         }
+
 
 
         public unsafe void IncrementalCacheOptimizeThreadSafe(int nodeIndex)
