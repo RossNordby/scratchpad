@@ -122,7 +122,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
         }
-        
+
         /// <summary>
         /// Attempts to swap two nodes. Aborts without changing memory if the swap is contested by another thread.
         /// </summary>
@@ -141,9 +141,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             //b->Parent
             //a->{Children}
             //b->{Children}
-            //But watch out, a may be the parent of b or vice versa. Given that these locks are non-reentrant, you must avoid attempting to lock them twice.
+            //But watch out for parent or grandparent relationships between the nodes. Those lower the number of locks required.
 
-            //Note that we don't have to worry about ordering because these are not blocking locks. If one fails, all locks immediately abort.
+            //Note that we don't have to worry about reordering/deadlocks because these are not blocking locks. If one fails, all locks immediately abort.
             //This means that we won't always end up with an optimal cache layout, but it doesn't affect correctness at all.
             //Eventually, the node will be revisited and it will probably get fixed.
 
@@ -156,59 +156,65 @@ namespace SIMDPrototyping.Trees.SingleArray
                 var a = nodes + aIndex;
                 if (TryLock(ref bIndex))
                 {
+                    //Now, we know that aIndex and bIndex will not change.
                     var b = nodes + bIndex;
-                    if (TryLock(ref a->Parent))
+
+                    var aParentAvoidedLock = a->Parent == bIndex;
+                    if (aParentAvoidedLock || TryLock(ref a->Parent))
                     {
-                       
-                        if (TryLock(ref b->Parent))
+                        var bParentAvoidedLock = b->Parent == aIndex;
+                        if (bParentAvoidedLock || TryLock(ref b->Parent))
                         {
 
-                            int currentChildrenLockedCount = a->ChildCount;
-                            var currentChildren = &a->ChildA;
+                            int aChildrenLockedCount = a->ChildCount;
+                            var aChildren = &a->ChildA;
                             for (int i = 0; i < a->ChildCount; ++i)
                             {
-                                if (!TryLock(ref currentChildren[i]))
+                                if (aChildren[i] != bIndex && aChildren[i] != b->Parent && !TryLock(ref aChildren[i]))
                                 {
                                     //Failed to acquire lock on all children.
-                                    currentChildrenLockedCount = i;
+                                    aChildrenLockedCount = i;
                                     break;
                                 }
                             }
 
-                            if (currentChildrenLockedCount == a->ChildCount)
+                            if (aChildrenLockedCount == a->ChildCount)
                             {
-                                int targetChildrenLockedCount = b->ChildCount;
-                                var targetChildren = &b->ChildA;
+                                int bChildrenLockedCount = b->ChildCount;
+                                var bChildren = &b->ChildA;
                                 for (int i = 0; i < b->ChildCount; ++i)
                                 {
-                                    if (!TryLock(ref targetChildren[i]))
+                                    if (bChildren[i] != aIndex && bChildren[i] != a->Parent && !TryLock(ref bChildren[i]))
                                     {
                                         //Failed to acquire lock on all children.
-                                        targetChildrenLockedCount = i;
+                                        bChildrenLockedCount = i;
                                         break;
                                     }
                                 }
 
-                                if (targetChildrenLockedCount == b->ChildCount)
+                                if (bChildrenLockedCount == b->ChildCount)
                                 {
                                     //ALL nodes locked successfully.
                                     SwapNodes(aIndex, bIndex);
                                     success = true;
                                 }
 
-                                for (int i = targetChildrenLockedCount - 1; i >= 0; --i)
+                                for (int i = bChildrenLockedCount - 1; i >= 0; --i)
                                 {
-                                    nodes[targetChildren[i]].RefineFlag = 0;
+                                    if (bChildren[i] != aIndex && bChildren[i] != a->Parent) //Do not yet unlock a or its parent.
+                                        nodes[bChildren[i]].RefineFlag = 0;
                                 }
                             }
-                            for (int i = currentChildrenLockedCount - 1; i >= 0; --i)
+                            for (int i = aChildrenLockedCount - 1; i >= 0; --i)
                             {
-                                nodes[currentChildren[i]].RefineFlag = 0;
+                                if (aChildren[i] != bIndex && aChildren[i] != b->Parent) //Do not yet unlock b or its parent.
+                                    nodes[aChildren[i]].RefineFlag = 0;
                             }
-
-                            nodes[b->Parent].RefineFlag = 0;
+                            if (!bParentAvoidedLock)
+                                nodes[b->Parent].RefineFlag = 0;
                         }
-                        nodes[a->Parent].RefineFlag = 0;
+                        if (!aParentAvoidedLock)
+                            nodes[a->Parent].RefineFlag = 0;
                     }
                     b->RefineFlag = 0;
                 }
