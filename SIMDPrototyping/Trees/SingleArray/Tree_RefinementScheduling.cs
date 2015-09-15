@@ -286,6 +286,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 ++actualRefinementTargetsCount;
             }
 
+
+            //TODO: WHen you delete these, you can undo the i/count setting of refineflags.
             //var optimalTargetPositions = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
             //for (int refinementTargetIndex = 0; refinementTargetIndex < refinementTargets.Count; ++refinementTargetIndex)
             //{

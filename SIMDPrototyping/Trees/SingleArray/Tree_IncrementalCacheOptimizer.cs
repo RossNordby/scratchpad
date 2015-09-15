@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,61 +68,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        /// <summary>
-        /// Reorganizes the memory layout of this node and all of its descendants.
-        /// </summary>
-        /// <param name="nodeIndex">Node at which to start the optimization.</param>
-        public unsafe void RecursiveIncrementalCacheOptimizeThreadSafe(int nodeIndex)
-        {
-            IncrementalCacheOptimizeThreadSafe(nodeIndex);
-            var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (children[i] >= 0)
-                    RecursiveIncrementalCacheOptimizeThreadSafe(children[i]);
-            }
-        }
-
-        /// <summary>
-        /// Reorganizes the memory layout of this node and all of its descendants down to a maximum tree depth from this node.
-        /// </summary>
-        /// <param name="nodeIndex">Node at which to start the optimization.</param>
-        /// <param name="maximumDepth">Maximum depth from the specified node down into the tree.</param>
-        public unsafe void RecursiveIncrementalCacheOptimizeThreadSafe(int nodeIndex, int maximumDepth)
-        {
-            IncrementalCacheOptimizeThreadSafe(nodeIndex);
-            var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-            var depthRemaining = maximumDepth - 1;
-            if (depthRemaining > 0)
-            {
-                for (int i = 0; i < node->ChildCount; ++i)
-                {
-                    if (children[i] >= 0)
-                        RecursiveIncrementalCacheOptimizeThreadSafe(children[i], depthRemaining);
-                }
-            }
-        }
-
-
-        public unsafe void SwapNodesThreadSafe(int currentIndex, int targetIndex, int targetMin, int targetMax)
-        {
-            Debug.Assert(targetIndex >= targetMin && targetIndex < targetMax);
-            if (currentIndex < targetMin || currentIndex >= targetMax)
-            {
-                SwapNodesThreadSafe(currentIndex, targetIndex);
-            }
-        }
-
-        void Lock(int index)
-        {
-        }
-
-        void Unlock(int index)
-        {
-        }
-
         unsafe void Attempt(int nodeIndex, ref int targetIndex, int min, int max)
         {
             //TWO KNOWNS:
@@ -144,18 +90,50 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //No lock is necessary.
                 if (children[i] < min || children[i] >= max)
                 {
-                    Lock(children[i]);
+                    //Lock(children[i]);
                 }
             }
 
             //All children are now immobile.
         }
 
-        public unsafe void SwapNodesThreadSafe(int currentIndex, int targetIndex)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe bool TryLock(ref int nodeIndex)
         {
-            Debug.Assert(currentIndex != targetIndex, "Can't swap a node with itself.");
-            var current = nodes + currentIndex;
-            var target = nodes + targetIndex;
+            //Node index may change during the execution of this function.
+            int lockedIndex;
+            while (true)
+            {
+                lockedIndex = nodeIndex;
+                if (0 != Interlocked.CompareExchange(ref nodes[lockedIndex].RefineFlag, 1, 0))
+                {
+                    //Abort.
+                    return false;
+                }
+                if (lockedIndex != nodeIndex) //Compare exchange inserts memory barrier.
+                {
+                    //Locked the wrong node, let go.
+                    nodes[lockedIndex].RefineFlag = 0;
+                }
+                else
+                {
+                    // If lockedIndex == nodeIndex and we have the lock on lockedIndex, nodeIndex can't move and we're done.
+                    return true;
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Attempts to swap two nodes. Aborts without changing memory if the swap is contested by another thread.
+        /// </summary>
+        /// <remarks>Uses Node.RefineFlag as a lock-keeping mechanism. All refine flags should be cleared to 0 before a multithreaded processing stage that performs swaps.</remarks>
+        /// <param name="aIndex">First node of the swap pair.</param>
+        /// <param name="bIndex">Second node of the swap pair.</param>
+        /// <returns>True if the nodes were swapped, false if the swap was contested.</returns>
+        public unsafe bool TrySwapNodesThreadSafe(ref int aIndex, ref int bIndex)
+        {
+            Debug.Assert(aIndex != bIndex, "Can't swap a node with itself.");
+
             //We must lock:
             //a
             //b
@@ -169,25 +147,27 @@ namespace SIMDPrototyping.Trees.SingleArray
             //This means that we won't always end up with an optimal cache layout, but it doesn't affect correctness at all.
             //Eventually, the node will be revisited and it will probably get fixed.
 
-            //Note that there is a small chance that the 'current' pointer does not refer to the same node here as it did when the function was called, because
-            //another swap may have moved things around.
+            //Note the use of an iterating TryLock. It accepts the fact that the reference memory could be changed at any time before a lock is acquired.
+            //It explicitly checks to ensure that it actually grabs a lock on the correct node.
 
-            //Maybe that's okay?
-            if (0 == Interlocked.CompareExchange(ref current->RefineFlag, 1, 0))
+            bool success = false;
+            if (TryLock(ref aIndex))
             {
-                if (0 == Interlocked.CompareExchange(ref target->RefineFlag, 1, 0))
+                var a = nodes + aIndex;
+                if (TryLock(ref bIndex))
                 {
-                    var currentParent = nodes + current->Parent;
-                    if (0 == Interlocked.CompareExchange(ref currentParent->RefineFlag, 1, 0))
+                    var b = nodes + bIndex;
+                    if (TryLock(ref a->Parent))
                     {
-                        var targetParent = nodes + current->Parent;
-                        if (0 == Interlocked.CompareExchange(ref targetParent->RefineFlag, 1, 0))
+                       
+                        if (TryLock(ref b->Parent))
                         {
-                            int currentChildrenLockedCount = current->ChildCount;
-                            var currentChildren = &current->ChildA;
-                            for (int i = 0; i < current->ChildCount; ++i)
+
+                            int currentChildrenLockedCount = a->ChildCount;
+                            var currentChildren = &a->ChildA;
+                            for (int i = 0; i < a->ChildCount; ++i)
                             {
-                                if (0 != Interlocked.CompareExchange(ref nodes[currentChildren[i]].RefineFlag, 1, 0))
+                                if (!TryLock(ref currentChildren[i]))
                                 {
                                     //Failed to acquire lock on all children.
                                     currentChildrenLockedCount = i;
@@ -195,13 +175,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 }
                             }
 
-                            if (currentChildrenLockedCount == current->ChildCount)
+                            if (currentChildrenLockedCount == a->ChildCount)
                             {
-                                int targetChildrenLockedCount = target->ChildCount;
-                                var targetChildren = &target->ChildA;
-                                for (int i = 0; i < target->ChildCount; ++i)
+                                int targetChildrenLockedCount = b->ChildCount;
+                                var targetChildren = &b->ChildA;
+                                for (int i = 0; i < b->ChildCount; ++i)
                                 {
-                                    if (0 != Interlocked.CompareExchange(ref nodes[targetChildren[i]].RefineFlag, 1, 0))
+                                    if (!TryLock(ref targetChildren[i]))
                                     {
                                         //Failed to acquire lock on all children.
                                         targetChildrenLockedCount = i;
@@ -209,10 +189,11 @@ namespace SIMDPrototyping.Trees.SingleArray
                                     }
                                 }
 
-                                if (targetChildrenLockedCount == target->ChildCount)
+                                if (targetChildrenLockedCount == b->ChildCount)
                                 {
                                     //ALL nodes locked successfully.
-                                    SwapNodes(currentIndex, targetIndex);
+                                    SwapNodes(aIndex, bIndex);
+                                    success = true;
                                 }
 
                                 for (int i = targetChildrenLockedCount - 1; i >= 0; --i)
@@ -225,14 +206,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 nodes[currentChildren[i]].RefineFlag = 0;
                             }
 
-                            targetParent->RefineFlag = 0;
+                            nodes[b->Parent].RefineFlag = 0;
                         }
-                        currentParent->RefineFlag = 0;
+                        nodes[a->Parent].RefineFlag = 0;
                     }
-                    target->RefineFlag = 0;
+                    b->RefineFlag = 0;
                 }
-                current->RefineFlag = 0;
+                a->RefineFlag = 0;
             }
+            return success;
         }
 
 
