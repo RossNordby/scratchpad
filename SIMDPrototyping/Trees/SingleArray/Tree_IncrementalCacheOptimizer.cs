@@ -419,8 +419,6 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         unsafe void CacheOptimize(int nodeIndex, ref int nextIndex)
         {
-            ++nextIndex;
-
             var node = nodes + nodeIndex;
             var children = &node->ChildA;
             for (int i = 0; i < node->ChildCount; ++i)
@@ -428,9 +426,12 @@ namespace SIMDPrototyping.Trees.SingleArray
                 if (children[i] >= 0)
                 {
                     Debug.Assert(nextIndex >= 0 && nextIndex < nodeCount, "Swap target should be within the node set. If it's not, the initial node was probably not in global optimum position.");
-
+                    //if (nextIndex < 0 || nextIndex >= nodeCount)
+                    //    continue;
                     if (children[i] != nextIndex)
-                        SwapNodes(nodeIndex, nextIndex);
+                        SwapNodes(children[i], nextIndex);
+                    if (children[i] != nextIndex)
+                        Console.WriteLine("That's impossible");
                     ++nextIndex;
                     CacheOptimize(children[i], ref nextIndex);
                 }

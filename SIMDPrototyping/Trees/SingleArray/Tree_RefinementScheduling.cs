@@ -219,6 +219,30 @@ namespace SIMDPrototyping.Trees.SingleArray
             return (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
         }
 
+
+        unsafe void ValidateOptimalPositions(ref QuickList<int> optimalPositions)
+        {
+            int nodeCount = 0;
+            ValidateOptimalPositions(0, ref optimalPositions, ref nodeCount);
+        }
+        unsafe void ValidateOptimalPositions(int nodeIndex, ref QuickList<int> optimalPositions, ref int nodeCount)
+        {
+            var node = nodes + nodeIndex;
+            if (node->RefineFlag > 0)
+            {
+                optimalPositions[node->RefineFlag - 1] = nodeCount;
+                //if (optimalPositions[node->RefineFlag - 1] != nodeCount)
+                //    Console.WriteLine("BAD");
+            }
+            ++nodeCount;
+            var children = &node->ChildA;
+            for (int i = 0; i < node->ChildCount; ++i)
+            {
+                if (children[i] >= 0)
+                    ValidateOptimalPositions(children[i], ref optimalPositions, ref nodeCount);
+            }
+        }
+
         public unsafe int RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {
             //Don't proceed if the tree is empty.
@@ -250,17 +274,83 @@ namespace SIMDPrototyping.Trees.SingleArray
                 Debug.Assert(index < refinementCandidates.Count && index >= 0);
 
                 refinementTargets.Elements[actualRefinementTargetsCount++] = refinementCandidates.Elements[index];
-                nodes[refinementCandidates.Elements[index]].RefineFlag = 1;
+                nodes[refinementCandidates.Elements[index]].RefineFlag = i + 1;
             }
             refinementTargets.Count = actualRefinementTargetsCount;
             refinementCandidates.Count = 0;
             refinementCandidates.Dispose();
-            if (nodes->RefineFlag != 1)
+            if (nodes->RefineFlag == 0)
             {
                 refinementTargets.Add(0);
+                nodes->RefineFlag = refinementTargets.Count;
                 ++actualRefinementTargetsCount;
-                nodes->RefineFlag = 1;
             }
+
+            //var optimalTargetPositions = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
+            //for (int refinementTargetIndex = 0; refinementTargetIndex < refinementTargets.Count; ++refinementTargetIndex)
+            //{
+            //    var node = nodes + refinementTargets.Elements[refinementTargetIndex];
+            //    int optimumIndex = 0;
+            //    while (node->Parent >= 0)
+            //    {
+            //        //Each node on the path to the root must be counted.
+            //        //++optimumIndex;
+            //        var childIndex = node->IndexInParent;
+            //        node = nodes + node->Parent;
+            //        var children = &node->ChildA;
+            //        var leafCounts = &node->LeafCountA;
+            //        for (int i = 0; i < childIndex; ++i)
+            //        {
+            //            //The number of nodes in a binary tree needed to support n leaves is n - 1.
+            //            //So, the index of the node immediately following a subtree of n nodes is exactly n.
+            //            optimumIndex += leafCounts[i];
+            //        }
+            //    }
+            //    optimalTargetPositions.Add(optimumIndex);
+
+            //}
+
+            //ValidateOptimalPositions(ref optimalTargetPositions);
+
+            ////Swap all refinement targets into their global optimum locations.
+
+            //for (int i = 0; i < refinementTargets.Count; ++i)
+            //{
+            //    if (refinementTargets.Elements[i] != optimalTargetPositions.Elements[i])
+            //    {
+            //        //Need to perform a swap.
+            //        //Check to see if the swap target is also a refinement target.
+            //        var refineIndex = nodes[optimalTargetPositions.Elements[i]].RefineFlag - 1;
+            //        if (refineIndex >= 0)
+            //        {
+            //            //The swap target is in the refinement target set. This should be very rare, but it must be handled carefully.
+            //            //The swap target will come to inhabit the current refinement target's position.
+            //            refinementTargets.Elements[refineIndex] = refinementTargets.Elements[i];
+            //        }
+            //        SwapNodes(refinementTargets.Elements[i], optimalTargetPositions.Elements[i]);
+            //        //Update the targets list.
+            //        //TODO: could avoid this set by just using the optimal target positions at the end instead.
+            //        refinementTargets.Elements[i] = optimalTargetPositions.Elements[i];
+            //    }
+            //}
+            //for (int i = 0; i < refinementTargets.Count; ++i)
+            //{
+            //    if (nodes[optimalTargetPositions[i]].RefineFlag != i + 1)
+            //    {
+            //        Console.WriteLine("bad");
+            //    }
+            //}
+            //optimalTargetPositions.Count = 0;
+            //optimalTargetPositions.Dispose();
+
+            ////Cache optimize the complete subtrees of all non-root refinement targets.
+            //for (int i = 0; i < refinementTargets.Count; ++i)
+            //{
+            //    if (refinementTargets.Elements[i] != 0)
+            //    {
+            //        CacheOptimize(refinementTargets.Elements[i]);
+            //    }
+            //}
 
             //Refine all marked targets.
 
