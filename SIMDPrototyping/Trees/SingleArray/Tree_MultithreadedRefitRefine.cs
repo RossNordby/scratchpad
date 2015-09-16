@@ -390,16 +390,26 @@ namespace SIMDPrototyping.Trees.SingleArray
             looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
 
 
-            ////To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
-            //var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
+            //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
+            var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
 
-            //context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
-            //var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
-            //context.CacheOptimizeStarts.Add(startIndex);
+            context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
+            var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
+            context.CacheOptimizeStarts.Add(startIndex);
 
-            //var optimizationSpacing = nodeCount / looper.ThreadCount;
-            //var optimizationSpacingWithExtra = optimizationSpacing + 1;
-            //var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
+            var optimizationSpacing = nodeCount / looper.ThreadCount;
+            var optimizationSpacingWithExtra = optimizationSpacing + 1;
+            var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
+
+            for (int i = 0; i < looper.ThreadCount; ++i)
+            {
+                var start = context.CacheOptimizeStarts[i];
+                var end = Math.Min(start + context.PerWorkerCacheOptimizeCount, NodeCount);
+                for (int j = start; j < end; ++j)
+                {
+                    IncrementalCacheOptimizeThreadSafe(j);
+                }
+            }
 
             //for (int i = 1; i < looper.ThreadCount; ++i)
             //{
@@ -425,7 +435,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //Validate();
 
-          
+
 
 
             context.CleanUp();
