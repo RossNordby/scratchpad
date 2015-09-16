@@ -549,28 +549,28 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //Failed parent lock.
                 success = false;
             }
-            {
-                //TEMP DEBUG. broken in multithread.
-                Debug.Assert(node->RefineFlag == 0);
-                var children = &node->ChildA;
+            //{
+            //    //TEMP DEBUG. broken in multithread.
+            //    Debug.Assert(node->RefineFlag == 0);
+            //    var children = &node->ChildA;
 
-                for (int i = 0; i < node->ChildCount; ++i)
-                {
-                    if (children[i] >= 0)
-                    {
-                        Debug.Assert(nodes[children[i]].RefineFlag == 0);
-                        var child = nodes + children[i];
-                        var grandchildren = &child->ChildA;
-                        for (int j = 0; j < child->ChildCount; ++j)
-                        {
-                            if (grandchildren[j] >= 0)
-                            {
-                                Debug.Assert(nodes[grandchildren[j]].RefineFlag == 0);
-                            }
-                        }
-                    }
-                }
-            }
+            //    for (int i = 0; i < node->ChildCount; ++i)
+            //    {
+            //        if (children[i] >= 0)
+            //        {
+            //            Debug.Assert(nodes[children[i]].RefineFlag == 0);
+            //            var child = nodes + children[i];
+            //            var grandchildren = &child->ChildA;
+            //            for (int j = 0; j < child->ChildCount; ++j)
+            //            {
+            //                if (grandchildren[j] >= 0)
+            //                {
+            //                    Debug.Assert(nodes[grandchildren[j]].RefineFlag == 0);
+            //                }
+            //            }
+            //        }
+            //    }
+            //}
             return success;
         }
 

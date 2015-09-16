@@ -412,29 +412,29 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     startIndex += optimizationSpacing;
                 }
-                if (startIndex > NodeCount)
+                if (startIndex >= nodeCount)
                     startIndex -= nodeCount;
                 Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
                 context.CacheOptimizeStarts.Add(startIndex);
             }
 
-            for (int i = 0; i < looper.ThreadCount; ++i)
-            {
-                var start = context.CacheOptimizeStarts[i];
-                var end = Math.Min(start + context.PerWorkerCacheOptimizeCount, NodeCount);
-                for (int j = start; j < end; ++j)
-                {
-                    ValidateRefineFlags(0);
-                    IncrementalCacheOptimizeThreadSafe(j);
-                    ValidateRefineFlags(0);
-                }
-            }
+            //for (int i = 0; i < looper.ThreadCount; ++i)
+            //{
+            //    var start = context.CacheOptimizeStarts[i];
+            //    var end = Math.Min(start + context.PerWorkerCacheOptimizeCount, NodeCount);
+            //    for (int j = start; j < end; ++j)
+            //    {
+            //        //ValidateRefineFlags(0);
+            //        IncrementalCacheOptimizeThreadSafe(j);
+            //        //ValidateRefineFlags(0);
+            //    }
+            //}
 
-          
+
             //Validate();
             //ValidateRefineFlags(0);
 
-            //looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
+            looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
             //ValidateRefineFlags(0);
 
             //Validate();
