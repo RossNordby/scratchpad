@@ -175,7 +175,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                         //Don't lock children[i] if:
                         //1) children[i] == swapperIndex, because the swapper is already locked 
                         //2) children[i] == swapperParentIndex, because the swapperParent is already locked
-                        if (children[i] != swapperIndex && children[i] != swapperParentIndex && !TryLock(ref children[i]))
+                        if (children[i] >= 0 && children[i] != swapperIndex && children[i] != swapperParentIndex && !TryLock(ref children[i]))
                         {
                             //Failed to acquire lock on all children.
                             childrenLockedCount = i;
@@ -188,18 +188,55 @@ namespace SIMDPrototyping.Trees.SingleArray
                         //Nodes locked successfully.
                         SwapNodes(swapperIndex, swapTargetIndex);
                         success = true;
+
+                        //Unlock children of the original swap target, *which now lives in the swapperIndex*.
+                        children = &nodes[swapperIndex].ChildA;
+                        for (int i = childrenLockedCount - 1; i >= 0; --i)
+                        {
+                            //Again, note use of swapTargetIndex instead of swapperIndex.
+                            if (children[i] >= 0 && children[i] != swapTargetIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
+                                nodes[children[i]].RefineFlag = 0;
+                        }
                     }
-                    for (int i = childrenLockedCount - 1; i >= 0; --i)
+                    else
                     {
-                        if (children[i] != swapperIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
-                            nodes[children[i]].RefineFlag = 0;
+                        //No swap occurred. Can still use the swapTarget->ChildA pointer.
+                        for (int i = childrenLockedCount - 1; i >= 0; --i)
+                        {
+                            if (children[i] >= 0 && children[i] != swapperIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
+                                nodes[children[i]].RefineFlag = 0;
+                        }
                     }
 
+
                     if (needSwapTargetParentLock)
-                        nodes[swapTarget->Parent].RefineFlag = 0;
+                    {
+                        if (success)
+                        {
+                            //Note that swapTarget pointer is no longer used, since the node was swapped.
+                            //The old swap target is now in the swapper index slot!
+                            nodes[nodes[swapperIndex].Parent].RefineFlag = 0;
+                        }
+                        else
+                        {
+                            //No swap occurred, 
+                            nodes[swapTarget->Parent].RefineFlag = 0;
+                        }
+                    }
                 }
+
                 if (needSwapTargetLock)
-                    swapTarget->RefineFlag = 0;
+                {
+                    if (success)
+                    {
+                        //Once again, the original swapTarget now lives in swapperIndex.
+                        nodes[swapperIndex].RefineFlag = 0;
+                    }
+                    else
+                    {
+                        swapTarget->RefineFlag = 0;
+                    }
+                }
             }
             return success;
         }
@@ -449,7 +486,9 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 int lockedChildrenCount = child->ChildCount;
                                 for (int grandchildIndex = 0; grandchildIndex < child->ChildCount; ++grandchildIndex)
                                 {
-                                    if (!TryLock(ref grandchildren[grandchildIndex]))
+                                    //It is very possible that this grandchild pointer could swap between now and the compare exchange read. 
+                                    //However, a child pointer will not turn from an internal node (positive) to a leaf node (negative), and that's all that matters.
+                                    if (grandchildren[grandchildIndex] >= 0 && !TryLock(ref grandchildren[grandchildIndex]))
                                     {
                                         lockedChildrenCount = grandchildIndex;
                                         break;
@@ -458,12 +497,19 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 if (lockedChildrenCount == child->ChildCount)
                                 {
                                     Debug.Assert(node->RefineFlag == 1);
+                                    var preaabb = node->A;
                                     if (!TrySwapNodeWithTargetThreadSafe(originalChildIndex, nodeIndex, targetIndex))
                                     {
                                         //Failed target lock.
                                         success = false;
                                     }
-                                    Debug.Assert(node->RefineFlag == 1); CANT REFERENCE NODE AFTER A SWAP HAS OCCURRED!!!
+                                    var postaabbb = node->A;
+                                    if (preaabb.Min != postaabbb.Min || preaabb.Max != postaabbb.Max)
+                                    {
+                                        Console.WriteLine("asdF");
+                                    }
+                                    Debug.Assert(node->RefineFlag == 1);
+
                                 }
                                 else
                                 {
@@ -472,11 +518,15 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 }
 
                                 //Unlock all grandchildren.
+                                //Note that we can't use the old grandchildren pointer. If the swap went through, it's pointing to the *target's* children.
+                                //So update the pointer.
+                                grandchildren = &nodes[children[i]].ChildA;
                                 for (int grandchildIndex = lockedChildrenCount - 1; grandchildIndex >= 0; --grandchildIndex)
                                 {
-                                    nodes[grandchildren[grandchildIndex]].RefineFlag = 0;
+                                    if (grandchildren[grandchildIndex] >= 0)
+                                        nodes[grandchildren[grandchildIndex]].RefineFlag = 0;
                                 }
-                                
+
                             }
                             //Unlock. children[i] is either the targetIndex, if a swap went through, or it's the original child index if it didn't.
                             //Those are the proper targets.
@@ -498,6 +548,28 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 //Failed parent lock.
                 success = false;
+            }
+            {
+                //TEMP DEBUG. broken in multithread.
+                Debug.Assert(node->RefineFlag == 0);
+                var children = &node->ChildA;
+
+                for (int i = 0; i < node->ChildCount; ++i)
+                {
+                    if (children[i] >= 0)
+                    {
+                        Debug.Assert(nodes[children[i]].RefineFlag == 0);
+                        var child = nodes + children[i];
+                        var grandchildren = &child->ChildA;
+                        for (int j = 0; j < child->ChildCount; ++j)
+                        {
+                            if (grandchildren[j] >= 0)
+                            {
+                                Debug.Assert(nodes[grandchildren[j]].RefineFlag == 0);
+                            }
+                        }
+                    }
+                }
             }
             return success;
         }

@@ -401,32 +401,36 @@ namespace SIMDPrototyping.Trees.SingleArray
             var optimizationSpacingWithExtra = optimizationSpacing + 1;
             var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
 
+            for (int i = 1; i < looper.ThreadCount; ++i)
+            {
+                if (optimizationRemainder > 0)
+                {
+                    startIndex += optimizationSpacingWithExtra;
+                    --optimizationRemainder;
+                }
+                else
+                {
+                    startIndex += optimizationSpacing;
+                }
+                if (startIndex > NodeCount)
+                    startIndex -= nodeCount;
+                Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
+                context.CacheOptimizeStarts.Add(startIndex);
+            }
+
             for (int i = 0; i < looper.ThreadCount; ++i)
             {
                 var start = context.CacheOptimizeStarts[i];
                 var end = Math.Min(start + context.PerWorkerCacheOptimizeCount, NodeCount);
                 for (int j = start; j < end; ++j)
                 {
+                    ValidateRefineFlags(0);
                     IncrementalCacheOptimizeThreadSafe(j);
+                    ValidateRefineFlags(0);
                 }
             }
 
-            //for (int i = 1; i < looper.ThreadCount; ++i)
-            //{
-            //    if (optimizationRemainder > 0)
-            //    {
-            //        startIndex += optimizationSpacingWithExtra;
-            //        --optimizationRemainder;
-            //    }
-            //    else
-            //    {
-            //        startIndex += optimizationSpacing;
-            //    }
-            //    if (startIndex > NodeCount)
-            //        startIndex -= nodeCount;
-            //    Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
-            //    context.CacheOptimizeStarts.Add(startIndex);
-            //}
+          
             //Validate();
             //ValidateRefineFlags(0);
 
