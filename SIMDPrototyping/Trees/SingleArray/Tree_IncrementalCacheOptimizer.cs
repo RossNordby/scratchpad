@@ -429,7 +429,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         /// complete all desired moves if contested.
         /// </summary>
         /// <param name="nodeIndex">Node whose children should be optimized.</param>
-        /// <returns>True if no other threads contested the optimization, otherwise false.
+        /// <returns>True if no other threads contested the optimization or if the node is already optimized, otherwise false.
         /// Will return true even if not all nodes are optimized if the reason was a target index outside of the node list bounds.</returns>
         public unsafe bool IncrementalCacheOptimizeThreadSafe(int nodeIndex)
         {
@@ -441,14 +441,28 @@ namespace SIMDPrototyping.Trees.SingleArray
             //It's a PERFORMANCE question, though, so make sure you measure it.
             var node = nodes + nodeIndex;
             bool success = true;
+            //var children = &node->ChildA;
+            //var leafCounts = &node->LeafCountA;
+            //var targetIndex = nodeIndex + 1;
+            //bool requiresOptimization = false;
+            //for (int i = 0; i < node->ChildCount; ++i)
+            //{
+            //    if (children[i] >= 0 && children[i] != targetIndex)
+            //    {
+            //        requiresOptimization = true;
+            //        break;
+            //    }
+            //    targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
+            //}
+            //if (!requiresOptimization)
+            //    return true;
             if (0 == Interlocked.CompareExchange(ref node->RefineFlag, 1, 0))
             {
                 var children = &node->ChildA;
 
                 var leafCounts = &node->LeafCountA;
                 var targetIndex = nodeIndex + 1;
-
-                Debug.Assert(node->RefineFlag == 1);
+                
 
 
                 //Note that we pull all children up to their final positions relative to the current node index.
@@ -497,16 +511,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                                 if (lockedChildrenCount == child->ChildCount)
                                 {
                                     Debug.Assert(node->RefineFlag == 1);
-                                    var preaabb = node->A;
                                     if (!TrySwapNodeWithTargetThreadSafe(originalChildIndex, nodeIndex, targetIndex))
                                     {
                                         //Failed target lock.
                                         success = false;
-                                    }
-                                    var postaabbb = node->A;
-                                    if (preaabb.Min != postaabbb.Min || preaabb.Max != postaabbb.Max)
-                                    {
-                                        Console.WriteLine("asdF");
                                     }
                                     Debug.Assert(node->RefineFlag == 1);
 

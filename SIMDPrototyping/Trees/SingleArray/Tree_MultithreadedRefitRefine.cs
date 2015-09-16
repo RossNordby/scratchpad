@@ -431,14 +431,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //}
 
 
+            var start = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             //Validate();
             //ValidateRefineFlags(0);
-
             looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
             //ValidateRefineFlags(0);
+            var end = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
             //Validate();
-
+            Console.WriteLine($"Cache optimize time: {end - start}");
 
 
 
