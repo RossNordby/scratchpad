@@ -16,7 +16,7 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        
+
         public unsafe static TestResults TestSingleArray(TestCollidable[] leaves, BoundingBox[] queries, BoundingBox positionBounds,
             int queryCount, int selfTestCount, int refitCount, int frameCount, float dt, ParallelLooper looper)
         {
@@ -48,7 +48,10 @@ namespace SIMDPrototyping.Trees.Tests
                 //tree.TopDownAgglomerativeRefine();
                 tree.BottomUpSweepRefine();
                 tree.TopDownSweepRefine();
+
                 tree.RefitAndRefine(0);
+                var context = new Tree.RefitAndRefineMultithreadedContext(tree);
+                tree.RefitAndRefine(0, looper, context);
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
@@ -127,7 +130,7 @@ namespace SIMDPrototyping.Trees.Tests
                 }
                 endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 Console.WriteLine($"SingleArray SelfTree Time1: {endTime - startTime}, overlaps: {overlaps.Count}");
-                
+
 
                 int[] buffer;
                 MemoryRegion region;
@@ -141,7 +144,7 @@ namespace SIMDPrototyping.Trees.Tests
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
 
                 var context = new Tree.RefitAndRefineMultithreadedContext(tree);
-                
+
 
                 var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
 

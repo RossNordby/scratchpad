@@ -199,15 +199,20 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        void GetRefineTuning(int frameIndex, int refinementCandidatesCount, float refineAggressivenessScale, float costChange,
+        void GetRefineTuning(int frameIndex, int refinementCandidatesCount, float refineAggressivenessScale, float costChange, int threadCount,
             out int targetRefinementCount, out int refinementPeriod, out int refinementOffset)
         {
             var refineAggressiveness = Math.Max(0, costChange * refineAggressivenessScale);
             float refinePortion = Math.Min(1, refineAggressiveness * 0.25f);
 
+
+
             var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementCandidatesCount * 0.03f)) + refinementCandidatesCount * refinePortion;
+            //Round up to the next multiple of the thread count to keep all threads fed.
+            targetRefinementScale = Math.Min((float)Math.Ceiling(targetRefinementScale / threadCount) * threadCount, refinementCandidatesCount);
             refinementPeriod = (int)(refinementCandidatesCount / targetRefinementScale);
             refinementOffset = (int)((frameIndex * 236887691L + 104395303L) % refinementCandidatesCount);
+
 
             targetRefinementCount = (int)targetRefinementScale;
         }
@@ -259,7 +264,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, refinementCandidates.Count, refineAggressivenessScale, costChange, out targetRefinementCount, out period, out offset);
+            GetRefineTuning(frameIndex, refinementCandidates.Count, refineAggressivenessScale, costChange, 1, out targetRefinementCount, out period, out offset);
 
 
             var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));

@@ -350,8 +350,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
 
             int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, out targetRefinementCount, out period, out offset);
+            GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, looper.ThreadCount, out targetRefinementCount, out period, out offset);
 
+            
 
             //Condense the set of candidates into a set of targets.
             context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
@@ -432,15 +433,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             //}
 
 
-            var start = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+            //var start = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             //Validate();
             //ValidateRefineFlags(0);
             looper.ForLoop(0, cacheOptimizationTasks, context.CacheOptimizeAction);
             //ValidateRefineFlags(0);
-            var end = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+            //var end = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
             //Validate();
-            Console.WriteLine($"Cache optimize time: {end - start}");
+            //Console.WriteLine($"Cache optimize time: {end - start}");
 
 
 
