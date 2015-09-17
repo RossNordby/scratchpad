@@ -143,14 +143,15 @@ namespace SIMDPrototyping.Trees.Tests
                 bool nodesInvalidated;
                 overlaps = new QuickList<Overlap>(new BufferPool<Overlap>());
 
-                var context = new Tree.RefitAndRefineMultithreadedContext(tree);
+                var refineContext = new Tree.RefitAndRefineMultithreadedContext(tree);
+                var selfTestContext = new Tree.SelfTestMultithreadedContext(looper.ThreadCount, BufferPools<Overlap>.Locking);
 
 
                 var visitedNodes = new QuickSet<int>(BufferPools<int>.Thread, BufferPools<int>.Thread);
 
                 //**************** Dynamic Testing
                 Random random = new Random(5);
-                TestResults results = new TestResults("NewTree Dynamic", frameCount);
+                TestResults results = new TestResults("MT", frameCount);
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int t = 0; t < frameCount; ++t)
                 {
@@ -184,7 +185,7 @@ namespace SIMDPrototyping.Trees.Tests
 
 
                     //var refinementCount = tree.RefitAndRefine(t);
-                    var refinementCount = tree.RefitAndRefine(t, looper, context);
+                    var refinementCount = tree.RefitAndRefine(t, looper, refineContext);
 
 
 
@@ -201,15 +202,23 @@ namespace SIMDPrototyping.Trees.Tests
 
                     var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                    overlaps.Count = 0;
-                    tree.GetSelfOverlapsArityDedicated(ref overlaps);
+                    //overlaps.Count = 0;
+                    //tree.GetSelfOverlapsArityDedicated(ref overlaps);
+                    //var overlapsCount = overlaps.Count;
+
+                    tree.GetSelfOverlaps(looper, selfTestContext);
+                    var overlapsCount = 0;
+                    for (int i = 0; i < selfTestContext.WorkerOverlaps.Length; ++i)
+                    {
+                        overlapsCount += selfTestContext.WorkerOverlaps[i].Count;
+                    }
 
                     var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     results.Refine[t] = 1000 * (refineEndTime - refineStartTime);
                     results.SelfTest[t] = 1000 * (testEndTime - refineEndTime);
                     results.Total[t] = 1000 * (testEndTime - refineStartTime);
-                    results.OverlapCounts[t] = overlaps.Count;
+                    results.OverlapCounts[t] = overlapsCount;
                     results.TreeCosts[t] = tree.MeasureCostMetric();
 
                     if (t % 16 == 0)

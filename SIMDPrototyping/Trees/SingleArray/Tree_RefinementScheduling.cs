@@ -380,14 +380,14 @@ namespace SIMDPrototyping.Trees.SingleArray
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
 
             //We could wrap around. But we could also not do that because it doesn't really matter!
-            var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+            //var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             var end = Math.Min(NodeCount, startIndex + cacheOptimizeCount);
             for (int i = startIndex; i < end; ++i)
             {
                 IncrementalCacheOptimize(i);
             }
-            var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-            Console.WriteLine($"Cache optimize time: {endTime - startTime}");
+            //var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+            //Console.WriteLine($"Cache optimize time: {endTime - startTime}");
 
             return actualRefinementTargetsCount;
         }

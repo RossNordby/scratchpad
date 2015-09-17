@@ -340,6 +340,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Collect the refinement candidates.
 
             CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
+            //Console.WriteLine($"Refit subtree count: {context.RefitNodes.Count}");
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
 
 
