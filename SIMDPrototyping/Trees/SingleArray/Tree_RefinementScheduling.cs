@@ -209,6 +209,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             var targetRefinementScale = Math.Max(2, (float)Math.Ceiling(refinementCandidatesCount * 0.03f)) + refinementCandidatesCount * refinePortion;
             //Round up to the next multiple of the thread count to keep all threads fed.
+            //Note that the refinementCandidatesCount is used as a maximum instead of refinementCandidates + 1 for simplicity, since there's a chance
+            //that the root would already be a refinementCandidate. Doesn't really have a significant effect either way.
             targetRefinementScale = Math.Min((float)Math.Ceiling(targetRefinementScale / threadCount) * threadCount, refinementCandidatesCount);
             refinementPeriod = (int)(refinementCandidatesCount / targetRefinementScale);
             refinementOffset = (int)((frameIndex * 236887691L + 104395303L) % refinementCandidatesCount);
@@ -225,28 +227,6 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
 
-        unsafe void ValidateOptimalPositions(ref QuickList<int> optimalPositions)
-        {
-            int nodeCount = 0;
-            ValidateOptimalPositions(0, ref optimalPositions, ref nodeCount);
-        }
-        unsafe void ValidateOptimalPositions(int nodeIndex, ref QuickList<int> optimalPositions, ref int nodeCount)
-        {
-            var node = nodes + nodeIndex;
-            if (node->RefineFlag > 0)
-            {
-                optimalPositions[node->RefineFlag - 1] = nodeCount;
-                //if (optimalPositions[node->RefineFlag - 1] != nodeCount)
-                //    Console.WriteLine("BAD");
-            }
-            ++nodeCount;
-            var children = &node->ChildA;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (children[i] >= 0)
-                    ValidateOptimalPositions(children[i], ref optimalPositions, ref nodeCount);
-            }
-        }
 
         public unsafe int RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {

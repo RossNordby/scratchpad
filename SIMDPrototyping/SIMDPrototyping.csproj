@@ -122,7 +122,8 @@
     <Compile Include="MicroFiddling.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
     <Compile Include="Trees\SingleArray\Tree.cs" />
-    <Compile Include="Trees\SingleArray\Tree_AritySelfTreeQueries.cs" />
+    <Compile Include="Trees\SingleArray\Tree_Arity2SelfTreeQueriesMT.cs" />
+    <Compile Include="Trees\SingleArray\Tree_Arity2SelfTreeQueries.cs" />
     <Compile Include="Trees\SingleArray\Tree_BinnedRefine.cs" />
     <Compile Include="Trees\SingleArray\Tree_CacheOptimizer.cs" />
     <Compile Include="Trees\SingleArray\Tree_Diagnostics.cs" />
