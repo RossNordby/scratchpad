@@ -215,7 +215,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         public int GetCacheOptimizeTuning(float costChange, float cacheOptimizeAggressivenessScale)
         {
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Min(1, 0.02f + cacheOptimizeAggressiveness * 0.75f);
+            float cacheOptimizePortion = Math.Min(1, 0.03f + cacheOptimizeAggressiveness * 0.5f);
             return (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
         }
 

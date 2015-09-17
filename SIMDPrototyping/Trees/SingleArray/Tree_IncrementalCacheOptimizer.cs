@@ -437,25 +437,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             //If any lock fails, it just abandons the entire attempt.
             //That's acceptable- the incremental optimization only cares about eventual success.
 
-            //TODO: could attempt to compare child pointers without locks. Unsafe, but acceptable as an optimization prepass. Would avoid some interlocks.
-            //It's a PERFORMANCE question, though, so make sure you measure it.
+            //TODO: if you know the tree in question has a ton of coherence, could attempt to compare child pointers without locks ahead of time.
+            //Unsafe, but acceptable as an optimization prepass. Would avoid some interlocks. Doesn't seem to help for trees undergoing any significant motion.
             var node = nodes + nodeIndex;
             bool success = true;
-            //var children = &node->ChildA;
-            //var leafCounts = &node->LeafCountA;
-            //var targetIndex = nodeIndex + 1;
-            //bool requiresOptimization = false;
-            //for (int i = 0; i < node->ChildCount; ++i)
-            //{
-            //    if (children[i] >= 0 && children[i] != targetIndex)
-            //    {
-            //        requiresOptimization = true;
-            //        break;
-            //    }
-            //    targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
-            //}
-            //if (!requiresOptimization)
-            //    return true;
+
             if (0 == Interlocked.CompareExchange(ref node->RefineFlag, 1, 0))
             {
                 var children = &node->ChildA;

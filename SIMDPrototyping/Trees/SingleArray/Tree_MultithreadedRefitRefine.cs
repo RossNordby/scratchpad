@@ -393,7 +393,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
             var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
 
-            context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / looper.ThreadCount;
+            var cacheOptimizationTasks = looper.ThreadCount * 2;
+            context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / cacheOptimizationTasks;
             var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
             context.CacheOptimizeStarts.Add(startIndex);
 
@@ -401,7 +402,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var optimizationSpacingWithExtra = optimizationSpacing + 1;
             var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
 
-            for (int i = 1; i < looper.ThreadCount; ++i)
+            for (int i = 1; i < cacheOptimizationTasks; ++i)
             {
                 if (optimizationRemainder > 0)
                 {
@@ -434,7 +435,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var start = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             //Validate();
             //ValidateRefineFlags(0);
-            looper.ForLoop(0, looper.ThreadCount, context.CacheOptimizeAction);
+            looper.ForLoop(0, cacheOptimizationTasks, context.CacheOptimizeAction);
             //ValidateRefineFlags(0);
             var end = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
