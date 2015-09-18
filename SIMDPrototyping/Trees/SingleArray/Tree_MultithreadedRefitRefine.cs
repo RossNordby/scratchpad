@@ -67,6 +67,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             if (multithreadingLeafCountThreshold < refinementLeafCountThreshold)
                 multithreadingLeafCountThreshold = refinementLeafCountThreshold;
             CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref refitAndMarkTargets, refinementLeafCountThreshold, ref refinementCandidates);
+            //Console.WriteLine($"count:  {refitAndMarkTargets.Count}");
         }
 
         /// <summary>
@@ -338,11 +339,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             context.Initialize(looper.ThreadCount, estimatedRefinementTargetCount, pool);
 
             //Collect the refinement candidates.
-
             CollectNodesForMultithreadedRefit(looper.ThreadCount, ref context.RefitNodes, context.LeafCountThreshold, ref context.RefinementCandidates.Elements[0]);
             //Console.WriteLine($"Refit subtree count: {context.RefitNodes.Count}");
             looper.ForLoop(0, looper.ThreadCount, context.RefitAndMarkAction);
-
+            
 
             var refinementCandidatesCount = 0;
             for (int i = 0; i < looper.ThreadCount; ++i)
@@ -353,7 +353,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             int targetRefinementCount, period, offset;
             GetRefineTuning(frameIndex, refinementCandidatesCount, refineAggressivenessScale, context.RefitCostChange, looper.ThreadCount, out targetRefinementCount, out period, out offset);
 
-            
+
 
             //Condense the set of candidates into a set of targets.
             context.RefinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));

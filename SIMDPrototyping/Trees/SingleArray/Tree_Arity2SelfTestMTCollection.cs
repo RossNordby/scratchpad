@@ -29,13 +29,18 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void PushSame(int index, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
             queue.Insert(pairsToTest.Count, (float)(Math.Log(leafCount) * leafCount));
+            //queue.Insert(pairsToTest.Count, leafCount);
+            //queue.Insert(pairsToTest.Count, leafCount);
             pairsToTest.Add(new TestPair2 { A = index, Type = PairType.SameNode });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void PushDifferent(int a, int b, int leafCountA, int leafCountB, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
-            queue.Insert(pairsToTest.Count, (float)(Math.Log(leafCountA) * leafCountA + Math.Log(leafCountB) * leafCountB));
+            //queue.Insert(pairsToTest.Count, (float)(Math.Log(leafCountA) * leafCountA + Math.Log(leafCountB) * leafCountB));
+            var max = Math.Max(leafCountA, leafCountB);
+            queue.Insert(pairsToTest.Count, (float)(Math.Log(max) * max));
+            //queue.Insert(pairsToTest.Count, Math.Max(leafCountA, leafCountB));
             pairsToTest.Add(new TestPair2 { A = a, B = b, Type = PairType.InternalInternal });
         }
 
@@ -43,6 +48,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         unsafe void PushLeafInternal(int internalIndex, int leafCount, BoundingBox* leafBounds, int encodedLeafIndex, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
             queue.Insert(pairsToTest.Count, (float)Math.Log(leafCount));
+            //queue.Insert(pairsToTest.Count, leafCount);
             pairsToTest.Add(new TestPair2 { A = internalIndex, LeafBounds = leafBounds, B = encodedLeafIndex, Type = PairType.LeafInternal });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
