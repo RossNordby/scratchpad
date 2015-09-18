@@ -157,7 +157,8 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             else
             {
-                if (Math.Sqrt(nodeLeafCount) <= collisionTestThreshold)
+                //if (Math.Log(nodeLeafCount) <= collisionTestThreshold)
+                if (nodeLeafCount <= collisionTestThreshold)
                 {
                     nodePairsToTest.Add(new Overlap { A = Encode(leafIndex), B = nodeIndex });
                 }
@@ -195,7 +196,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             {
                 if (childB >= 0)
                 {
-                    if (leafCountA + leafCountB <= collisionTestThreshold)
+                    if (Math.Max(leafCountA, leafCountB) <= collisionTestThreshold)
                     {
                         nodePairsToTest.Add(new Overlap { A = childA, B = childB });
                     }
@@ -285,7 +286,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             context.Prepare(this);
 
-            int collisionTestThreshold = 2 * leafCount / looper.ThreadCount;
+            int collisionTestThreshold = leafCount / (2 * looper.ThreadCount);
 
 
             CollectNodePairs(collisionTestThreshold, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
