@@ -74,12 +74,12 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        public unsafe void CollectTestPairs<TResultList>(int targetPairCount, ref QuickList<Overlap> testPairs, ref TResultList results) where TResultList : IList<Overlap>
+        public unsafe void CollectNodePairs2<TResultList>(int targetPairCount, ref QuickList<Overlap> testPairs, ref TResultList results) where TResultList : IList<Overlap>
         {
-            PriorityQueue.Entry* entries = stackalloc PriorityQueue.Entry[targetPairCount];
+            PriorityQueue.Entry* entries = stackalloc PriorityQueue.Entry[targetPairCount + 3];
             PriorityQueue queue = new PriorityQueue(entries);
 
-
+           
             QuickList<TestPair2> pairsToTest = new QuickList<TestPair2>(BufferPools<TestPair2>.Locking, BufferPool<TestPair2>.GetPoolIndex(targetPairCount * 2));
             PushSame(0, leafCount, ref queue, ref pairsToTest);
             while (queue.Count < targetPairCount && queue.Count > 0)
@@ -189,7 +189,17 @@ namespace SIMDPrototyping.Trees.SingleArray
             for (int i = 0; i < queue.Count; ++i)
             {
                 var pair = pairsToTest[queue.Entries[i].Id];
-                testPairs.Add(new Overlap { A = pair.A, B = pair.B });
+                switch (pair.Type)
+                {
+                    case PairType.SameNode:
+                        testPairs.Add(new Overlap { A = pair.A, B = pair.A });
+                        break;
+                    case PairType.InternalInternal:
+                    case PairType.LeafInternal:
+                        testPairs.Add(new Overlap { A = pair.A, B = pair.B });
+                        break;
+
+                }
             }
 
             pairsToTest.Count = 0;
