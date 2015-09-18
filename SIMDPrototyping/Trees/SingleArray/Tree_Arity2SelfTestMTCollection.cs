@@ -28,14 +28,14 @@ namespace SIMDPrototyping.Trees.SingleArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void PushSame(int index, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
-            queue.Insert(pairsToTest.Count, leafCount);
+            queue.Insert(pairsToTest.Count, (float)(Math.Log(leafCount) * leafCount));
             pairsToTest.Add(new TestPair2 { A = index, Type = PairType.SameNode });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void PushDifferent(int a, int b, int leafCountA, int leafCountB, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
-            queue.Insert(pairsToTest.Count, Math.Max(leafCountA, leafCountB));
+            queue.Insert(pairsToTest.Count, (float)(Math.Log(leafCountA) * leafCountA + Math.Log(leafCountB) * leafCountB));
             pairsToTest.Add(new TestPair2 { A = a, B = b, Type = PairType.InternalInternal });
         }
 
@@ -76,10 +76,12 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         public unsafe void CollectNodePairs2<TResultList>(int targetPairCount, ref QuickList<Overlap> testPairs, ref TResultList results) where TResultList : IList<Overlap>
         {
-            PriorityQueue.Entry* entries = stackalloc PriorityQueue.Entry[targetPairCount + 3];
+            //For a 2-ary tree, the maximum number of added node pairs is 4.
+            //That will only potentially occur if the tree is not yet at the target pair count (i.e. max of targetPairCount - 1), and popping a node will reduce it one further.
+            PriorityQueue.Entry* entries = stackalloc PriorityQueue.Entry[targetPairCount + 2];
             PriorityQueue queue = new PriorityQueue(entries);
 
-           
+
             QuickList<TestPair2> pairsToTest = new QuickList<TestPair2>(BufferPools<TestPair2>.Locking, BufferPool<TestPair2>.GetPoolIndex(targetPairCount * 2));
             PushSame(0, leafCount, ref queue, ref pairsToTest);
             while (queue.Count < targetPairCount && queue.Count > 0)

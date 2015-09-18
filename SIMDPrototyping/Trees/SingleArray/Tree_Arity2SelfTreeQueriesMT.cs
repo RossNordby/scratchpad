@@ -288,7 +288,7 @@ namespace SIMDPrototyping.Trees.SingleArray
 
             //int collisionTestThreshold = leafCount / (2 * looper.ThreadCount);
             //CollectNodePairs(collisionTestThreshold, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
-            CollectNodePairs2(looper.ThreadCount * 8, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
+            CollectNodePairs2(looper.ThreadCount * 16, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
 
             //Console.WriteLine($"number of pairs to test: {context.NodePairsToTest.Count}");
             looper.ForLoop(0, looper.ThreadCount, context.PairTestAction);
