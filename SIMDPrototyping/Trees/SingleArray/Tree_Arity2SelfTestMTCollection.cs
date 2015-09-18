@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,103 +12,60 @@ namespace SIMDPrototyping.Trees.SingleArray
 {
     partial class Tree
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void PushDifferent(int a, int b, TestPair* stack, ref int count)
+        [StructLayout(LayoutKind.Explicit)]
+        unsafe struct TestPair2
         {
-            var element = stack + count++;
-            element->A = nodes + a;
-            element->B = nodes + b;
-            element->Type = PairType.InternalInternal;
+            [FieldOffset(0)]
+            public int A;
+            [FieldOffset(4)]
+            public int B;
+            [FieldOffset(8)]
+            public BoundingBox* LeafBounds;
+            [FieldOffset(16)]
+            public PairType Type;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void PushLeafInternal(int internalNode, BoundingBox* leafBounds, int encodedLeafIndex, TestPair* stack, ref int count)
-        {
-            var element = stack + count++;
-            element->A = nodes + internalNode;
-            element->LeafBounds = leafBounds;
-            element->EncodedLeafIndex = encodedLeafIndex;
-            element->Type = PairType.LeafInternal;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void PushSame(int node, TestPair* stack, ref int count)
-        {
-            var element = stack + count++;
-            element->A = nodes + node;
-            element->Type = PairType.SameNode;
-        }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void TestDifferentNodes<TResultList>(int a, int b, BoundingBox* aBounds, BoundingBox* bBounds, TestPair* stack, ref int nextToVisit, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            if (a >= 0)
-            {
-                if (b >= 0)
-                {
-                    //both internal nodes
-                    PushDifferent(a, b, stack, ref nextToVisit);
-                }
-                else
-                {
-                    //leaf and internal
-                    PushLeafInternal(a, bBounds, b, stack, ref nextToVisit);
-                }
-            }
-            else if (b >= 0)
-            {
-                //leaf and internal
-                PushLeafInternal(b, aBounds, a, stack, ref nextToVisit);
-            }
-            else
-            {
-                //two leaves
-                results.Add(new Overlap { A = Encode(a), B = Encode(b) });
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void PushSame(int index, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair> pairsToTest)
+        unsafe void PushSame(int index, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
             queue.Insert(pairsToTest.Count, leafCount);
-            pairsToTest.Add(new TestPair { A = nodes + index, Type = PairType.SameNode });
+            pairsToTest.Add(new TestPair2 { A = index, Type = PairType.SameNode });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void PushDifferent(int a, int b, int leafCountA, int leafCountB, ref PriorityQueue queue, ref QuickList<TestPair> pairsToTest)
+        unsafe void PushDifferent(int a, int b, int leafCountA, int leafCountB, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
             queue.Insert(pairsToTest.Count, Math.Max(leafCountA, leafCountB));
-            pairsToTest.Add(new TestPair { A = nodes + a, B = nodes + b, Type = PairType.InternalInternal });
+            pairsToTest.Add(new TestPair2 { A = a, B = b, Type = PairType.InternalInternal });
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void PushInternalLeaf(int encodedLeafIndex, BoundingBox* leafBounds, int internalIndex, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair> pairsToTest)
+        unsafe void PushLeafInternal(int internalIndex, int leafCount, BoundingBox* leafBounds, int encodedLeafIndex, ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest)
         {
             queue.Insert(pairsToTest.Count, (float)Math.Log(leafCount));
-            pairsToTest.Add(new TestPair { A = nodes + internalIndex, LeafBounds = leafBounds, EncodedLeafIndex = encodedLeafIndex, Type = PairType.LeafInternal });
+            pairsToTest.Add(new TestPair2 { A = internalIndex, LeafBounds = leafBounds, B = encodedLeafIndex, Type = PairType.LeafInternal });
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void TestDifferentNodes<TResultList>(int childA, int childB, BoundingBox* a, BoundingBox* b,
-            PairToTest* stack, ref int nextToVisit,
+        unsafe void TestDifferentNodes<TResultList>(BoundingBox* a, BoundingBox* b, int childA, int childB, int leafCountA, int leafCountB,
+             ref PriorityQueue queue, ref QuickList<TestPair2> pairsToTest,
             ref TResultList results) where TResultList : IList<Overlap>
         {
             if (childA >= 0)
             {
                 if (childB >= 0)
                 {
-                    PushPair(childA, childB, stack, ref nextToVisit);
+                    PushDifferent(childA, childB, leafCountA, leafCountB, ref queue, ref pairsToTest);
                 }
                 else
                 {
                     //leaf B versus node A.
-                    PushPair(childB, b, childA, stack, ref nextToVisit);
+                    PushLeafInternal(childA, leafCountA, b, childB, ref queue, ref pairsToTest);
                 }
             }
             else if (childB >= 0)
             {
                 //leaf A versus node B.
-                PushPair(childA, a, childB, stack, ref nextToVisit);
+                PushLeafInternal(childB, leafCountB, a, childA, ref queue, ref pairsToTest);
             }
             else
             {
@@ -122,9 +80,9 @@ namespace SIMDPrototyping.Trees.SingleArray
             PriorityQueue queue = new PriorityQueue(entries);
 
 
-            QuickList<TestPair> pairsToTest = new QuickList<TestPair>(BufferPools<TestPair>.Locking, BufferPool<TestPair>.GetPoolIndex(targetPairCount * 2));
+            QuickList<TestPair2> pairsToTest = new QuickList<TestPair2>(BufferPools<TestPair2>.Locking, BufferPool<TestPair2>.GetPoolIndex(targetPairCount * 2));
             PushSame(0, leafCount, ref queue, ref pairsToTest);
-            while (queue.Count < targetPairCount)
+            while (queue.Count < targetPairCount && queue.Count > 0)
             {
                 PriorityQueue.Entry entry;
                 queue.PopMax(out entry);
@@ -133,69 +91,93 @@ namespace SIMDPrototyping.Trees.SingleArray
                 {
                     case PairType.SameNode:
                         {
-                            var ab = BoundingBox.Intersects(ref pairToTest.A->A, ref pairToTest.A->B);
+                            var node = nodes + pairToTest.A;
+                            var ab = BoundingBox.Intersects(ref node->A, ref node->B);
 
                             //TODO: note the shared conditions for childA internalness and the shared pointer arithmetic.
-                            if (pairToTest.A->ChildA >= 0)
-                                PushSame(pairToTest.A->ChildA, stack, ref count);
-                            if (pairToTest.A->ChildB >= 0)
-                                PushSame(pairToTest.A->ChildB, stack, ref count);
+                            if (node->ChildA >= 0)
+                                PushSame(node->ChildA, node->LeafCountA, ref queue, ref pairsToTest);
+                            if (node->ChildB >= 0)
+                                PushSame(node->ChildB, node->LeafCountB, ref queue, ref pairsToTest);
 
                             if (ab)
                             {
-                                TestDifferentNodes(pairToTest.A->ChildA, pairToTest.A->ChildB, &pairToTest.A->A, &pairToTest.A->B, stack, ref count, ref results);
+                                TestDifferentNodes(
+                                    &node->A, &node->B,
+                                    node->ChildA, node->ChildB,
+                                    node->LeafCountA, node->LeafCountB,
+                                    ref queue, ref pairsToTest, ref results);
                             }
                         }
                         break;
                     case PairType.InternalInternal:
                         {
-                            var aa = BoundingBox.Intersects(ref pairToTest.A->A, ref pairToTest.B->A);
-                            var ab = BoundingBox.Intersects(ref pairToTest.A->A, ref pairToTest.B->B);
-                            var ba = BoundingBox.Intersects(ref pairToTest.A->B, ref pairToTest.B->A);
-                            var bb = BoundingBox.Intersects(ref pairToTest.A->B, ref pairToTest.B->B);
+                            var a = nodes + pairToTest.A;
+                            var b = nodes + pairToTest.B;
+                            var aa = BoundingBox.Intersects(ref a->A, ref b->A);
+                            var ab = BoundingBox.Intersects(ref a->A, ref b->B);
+                            var ba = BoundingBox.Intersects(ref a->B, ref b->A);
+                            var bb = BoundingBox.Intersects(ref a->B, ref b->B);
 
                             if (aa)
                             {
-                                TestDifferentNodes(pairToTest.A->ChildA, pairToTest.B->ChildA, &pairToTest.A->A, &pairToTest.B->A, stack, ref count, ref results);
+                                TestDifferentNodes(
+                                    &a->A, &b->A,
+                                    a->ChildA, b->ChildA,
+                                    a->LeafCountA, b->LeafCountA,
+                                    ref queue, ref pairsToTest, ref results);
                             }
                             if (ab)
                             {
-                                TestDifferentNodes(pairToTest.A->ChildA, pairToTest.B->ChildB, &pairToTest.A->A, &pairToTest.B->B, stack, ref count, ref results);
+                                TestDifferentNodes(
+                                    &a->A, &b->B,
+                                    a->ChildA, b->ChildB,
+                                    a->LeafCountA, b->LeafCountB,
+                                    ref queue, ref pairsToTest, ref results);
                             }
                             if (ba)
                             {
-                                TestDifferentNodes(pairToTest.A->ChildB, pairToTest.B->ChildA, &pairToTest.A->B, &pairToTest.B->A, stack, ref count, ref results);
+                                TestDifferentNodes(
+                                    &a->B, &b->A,
+                                    a->ChildB, b->ChildA,
+                                    a->LeafCountB, b->LeafCountA,
+                                    ref queue, ref pairsToTest, ref results);
                             }
                             if (bb)
                             {
-                                TestDifferentNodes(pairToTest.A->ChildB, pairToTest.B->ChildB, &pairToTest.A->B, &pairToTest.B->B, stack, ref count, ref results);
+                                TestDifferentNodes(
+                                    &a->B, &b->B,
+                                    a->ChildB, b->ChildB,
+                                    a->LeafCountB, b->LeafCountB,
+                                    ref queue, ref pairsToTest, ref results);
                             }
                         }
                         break;
                     case PairType.LeafInternal:
                         {
-                            var a = BoundingBox.Intersects(ref *pairToTest.LeafBounds, ref pairToTest.A->A);
-                            var b = BoundingBox.Intersects(ref *pairToTest.LeafBounds, ref pairToTest.A->B);
+                            var internalNode = nodes + pairToTest.A;
+                            var a = BoundingBox.Intersects(ref *pairToTest.LeafBounds, ref internalNode->A);
+                            var b = BoundingBox.Intersects(ref *pairToTest.LeafBounds, ref internalNode->B);
                             if (a)
                             {
-                                if (pairToTest.A->ChildA >= 0)
+                                if (internalNode->ChildA >= 0)
                                 {
-                                    PushLeafInternal(pairToTest.A->ChildA, pairToTest.LeafBounds, pairToTest.EncodedLeafIndex, stack, ref count);
+                                    PushLeafInternal(internalNode->ChildA, internalNode->LeafCountA, pairToTest.LeafBounds, pairToTest.B, ref queue, ref pairsToTest);
                                 }
                                 else
                                 {
-                                    results.Add(new Overlap { A = Encode(pairToTest.EncodedLeafIndex), B = Encode(pairToTest.A->ChildA) });
+                                    results.Add(new Overlap { A = Encode(pairToTest.B), B = Encode(internalNode->ChildA) });
                                 }
                             }
                             if (b)
                             {
-                                if (pairToTest.A->ChildB >= 0)
+                                if (internalNode->ChildB >= 0)
                                 {
-                                    PushLeafInternal(pairToTest.A->ChildB, pairToTest.LeafBounds, pairToTest.EncodedLeafIndex, stack, ref count);
+                                    PushLeafInternal(internalNode->ChildB, internalNode->LeafCountB, pairToTest.LeafBounds, pairToTest.B, ref queue, ref pairsToTest);
                                 }
                                 else
                                 {
-                                    results.Add(new Overlap { A = Encode(pairToTest.EncodedLeafIndex), B = Encode(pairToTest.A->ChildB) });
+                                    results.Add(new Overlap { A = Encode(pairToTest.B), B = Encode(internalNode->ChildB) });
                                 }
                             }
                         }
@@ -203,6 +185,13 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
             }
+
+            for (int i = 0; i < queue.Count; ++i)
+            {
+                var pair = pairsToTest[queue.Entries[i].Id];
+                testPairs.Add(new Overlap { A = pair.A, B = pair.B });
+            }
+
             pairsToTest.Count = 0;
             pairsToTest.Dispose();
         }
