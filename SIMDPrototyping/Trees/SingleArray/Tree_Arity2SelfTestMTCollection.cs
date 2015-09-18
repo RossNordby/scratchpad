@@ -1,4 +1,6 @@
-﻿using System;
+﻿using BEPUutilities.DataStructures;
+using BEPUutilities.ResourceManagement;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -65,17 +67,68 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
         }
 
-        public unsafe void CollectTestPairs<TResultList>(ref TResultList results) where TResultList : IList<Overlap>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void PushSame(int index, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair> pairsToTest)
         {
-            var stack = stackalloc TestPair[32];
+            queue.Insert(pairsToTest.Count, leafCount);
+            pairsToTest.Add(new TestPair { A = nodes + index, Type = PairType.SameNode });
+        }
 
-            stack->A = nodes;
-            stack->Type = PairType.SameNode;
-            int count = 1;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void PushDifferent(int a, int b, int leafCountA, int leafCountB, ref PriorityQueue queue, ref QuickList<TestPair> pairsToTest)
+        {
+            queue.Insert(pairsToTest.Count, Math.Max(leafCountA, leafCountB));
+            pairsToTest.Add(new TestPair { A = nodes + a, B = nodes + b, Type = PairType.InternalInternal });
+        }
 
-            while (count > 0)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void PushInternalLeaf(int encodedLeafIndex, BoundingBox* leafBounds, int internalIndex, int leafCount, ref PriorityQueue queue, ref QuickList<TestPair> pairsToTest)
+        {
+            queue.Insert(pairsToTest.Count, (float)Math.Log(leafCount));
+            pairsToTest.Add(new TestPair { A = nodes + internalIndex, LeafBounds = leafBounds, EncodedLeafIndex = encodedLeafIndex, Type = PairType.LeafInternal });
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void TestDifferentNodes<TResultList>(int childA, int childB, BoundingBox* a, BoundingBox* b,
+            PairToTest* stack, ref int nextToVisit,
+            ref TResultList results) where TResultList : IList<Overlap>
+        {
+            if (childA >= 0)
             {
-                var pairToTest = stack[--count];
+                if (childB >= 0)
+                {
+                    PushPair(childA, childB, stack, ref nextToVisit);
+                }
+                else
+                {
+                    //leaf B versus node A.
+                    PushPair(childB, b, childA, stack, ref nextToVisit);
+                }
+            }
+            else if (childB >= 0)
+            {
+                //leaf A versus node B.
+                PushPair(childA, a, childB, stack, ref nextToVisit);
+            }
+            else
+            {
+                //Two leaves.
+                results.Add(new Overlap { A = Encode(childA), B = Encode(childB) });
+            }
+        }
+
+        public unsafe void CollectTestPairs<TResultList>(int targetPairCount, ref QuickList<Overlap> testPairs, ref TResultList results) where TResultList : IList<Overlap>
+        {
+            PriorityQueue.Entry* entries = stackalloc PriorityQueue.Entry[targetPairCount];
+            PriorityQueue queue = new PriorityQueue(entries);
+
+
+            QuickList<TestPair> pairsToTest = new QuickList<TestPair>(BufferPools<TestPair>.Locking, BufferPool<TestPair>.GetPoolIndex(targetPairCount * 2));
+            PushSame(0, leafCount, ref queue, ref pairsToTest);
+            while (queue.Count < targetPairCount)
+            {
+                PriorityQueue.Entry entry;
+                queue.PopMax(out entry);
+                var pairToTest = pairsToTest[entry.Id];
                 switch (pairToTest.Type)
                 {
                     case PairType.SameNode:
@@ -150,6 +203,8 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
 
             }
+            pairsToTest.Count = 0;
+            pairsToTest.Dispose();
         }
     }
 }

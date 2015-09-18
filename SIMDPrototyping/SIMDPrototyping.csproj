@@ -121,6 +121,7 @@
     <Compile Include="Matrix3x3.cs" />
     <Compile Include="MicroFiddling.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
+    <Compile Include="Trees\SingleArray\PriorityQueue.cs" />
     <Compile Include="Trees\SingleArray\Tree.cs" />
     <Compile Include="Trees\SingleArray\Tree_Arity2SelfTestMTCollection.cs" />
     <Compile Include="Trees\SingleArray\Tree_Arity2SelfTreeQueriesMT.cs" />
@@ -204,6 +205,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
