@@ -93,6 +93,10 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //To minimize the number of worker overlap lists, perform direct load balancing by manually grabbing the next indices.
                 while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < NodePairsToTest.Count)
                 {
+                    if (NodePairsToTest.Count == 1)
+                    {
+                        Console.WriteLine("asdf");
+                    }
                     var overlap = NodePairsToTest[nextNodePairIndex];
                     if (overlap.A >= 0)
                     {
@@ -282,11 +286,17 @@ namespace SIMDPrototyping.Trees.SingleArray
 
         }
 
-        public void GetSelfOverlaps(IParallelLooper looper, SelfTestMultithreadedContext context)
-        {
+        public unsafe void GetSelfOverlaps(IParallelLooper looper, SelfTestMultithreadedContext context)
+        {            
+            //If there are not multiple children, there's no need to recurse.
+            //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
+            if (nodes->ChildCount < 2)
+                return;
+
             context.Prepare(this);
 
             //int collisionTestThreshold = (int)(2.25f * leafCount / (looper.ThreadCount));
+
             int collisionTestThreshold = (int)(leafCount / (1.5f * looper.ThreadCount));
             CollectNodePairs(collisionTestThreshold, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
             //CollectNodePairs2(looper.ThreadCount * 16, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);

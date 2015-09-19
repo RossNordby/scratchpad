@@ -344,7 +344,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 children[i] = stagingChildren[i];
                 leafCounts[i] = stagingLeafCounts[i];
             }
-
+            
             ReifyChildren(treeletRootIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
         }
 
@@ -381,8 +381,10 @@ namespace SIMDPrototyping.Trees.SingleArray
             var stagingNode = stagingNodes + stagingNodeIndex;
             var internalNode = nodes + internalNodeIndex;
             *internalNode = *stagingNode;
+            internalNode->RefineFlag = 0; //The staging node could have contained arbitrary refine flag data.
             internalNode->Parent = parent;
             internalNode->IndexInParent = indexInParent;
+           
 
             ReifyChildren(internalNodeIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes, out nodesInvalidated);
             return internalNodeIndex;

@@ -630,7 +630,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             float originalTreeletCost;
             CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
             Debug.Assert(subtreeReferences.Count <= maximumSubtrees);
-
+            
             //CollectSubtreesDirect(nodeIndex, maximumSubtrees, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
 
             //Console.WriteLine($"Number of subtrees: {subtreeReferences.Count}");
@@ -638,8 +638,6 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Gather necessary information from nodes.
             for (int i = 0; i < subtreeReferences.Count; ++i)
             {
-                //TODO: remember to revert to pointer arith
-                //var boundingBox = boundingBoxes + i;
                 resources.IndexMap[i] = i;
                 if (subtreeReferences.Elements[i] >= 0)
                 {

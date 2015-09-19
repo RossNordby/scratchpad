@@ -46,12 +46,15 @@ namespace SIMDPrototyping.Trees.Tests
                 tree.Refit();
                 //tree.BottomUpAgglomerativeRefine();
                 //tree.TopDownAgglomerativeRefine();
-                tree.BottomUpSweepRefine();
-                tree.TopDownSweepRefine();
+                //tree.BottomUpSweepRefine();
+                //tree.TopDownSweepRefine();
 
-                tree.RefitAndRefine(0);
-                var context = new Tree.RefitAndRefineMultithreadedContext(tree);
-                tree.RefitAndRefine(0, looper, context);
+                //tree.RefitAndRefine(0);
+                //var context = new Tree.RefitAndRefineMultithreadedContext(tree);
+                //tree.RefitAndRefine(0, looper, context);
+
+                var selfTestContext = new Tree.SelfTestMultithreadedContext(looper.ThreadCount, BufferPools<Overlap>.Locking);
+                tree.GetSelfOverlaps(looper, selfTestContext);
 
                 var list = new QuickList<int>(new BufferPool<int>());
                 BoundingBox aabb = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(1, 1, 1) };
@@ -76,7 +79,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             {
                 Console.WriteLine($"SingleArray arity: {Tree.ChildrenCapacity}");
-                Tree tree = new Tree(leaves.Length);
+                Tree tree = new Tree(Math.Max(1, leaves.Length));
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -186,19 +189,6 @@ namespace SIMDPrototyping.Trees.Tests
 
                     //var refinementCount = tree.RefitAndRefine(t);
                     var refinementCount = tree.RefitAndRefine(t, looper, refineContext);
-
-
-
-
-                    //tree.Refit();
-                    //for (int i = 0; i < 1; ++i)
-                    //{
-
-                    //    subtreeReferences.Count = 0;
-                    //    treeletInternalNodes.Count = 0;
-                    //    tree.BinnedRefine(0, ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
-                    //}
-                    //tree.RemoveUnusedInternalNodes(ref spareNodes);
 
                     var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 

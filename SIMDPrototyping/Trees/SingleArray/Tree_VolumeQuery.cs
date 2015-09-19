@@ -48,7 +48,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var stackCapacity = (ChildrenCapacity - 1) * maximumDepth + 1;
             var stack = stackalloc int[stackCapacity];
             int count = 0;
-            
+
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             Test(stack, ref count, ref boundingBox, nodes, ref results);
 
@@ -118,7 +118,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 TestRecursivePrecache(internalNodeIndices[i], ref query, ref results);
             }
         }
-        
+
 
 #if NODE4
 
@@ -864,7 +864,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
             }
 
-            
+
         }
 
 
@@ -877,6 +877,11 @@ namespace SIMDPrototyping.Trees.SingleArray
             var stack = stackalloc int[stackCapacity];
             int count = 0;
 
+            if (nodes->ChildCount == 0)
+            {
+                //No collisions possible.
+                return;
+            }
             if (nodes->ChildCount < 2)
             {
                 Debug.Assert(nodes->ChildA < 0, "If the root only has one child, it should be a leaf node, otherwise the build process produced a very poor tree.");
@@ -886,7 +891,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 }
                 return;
             }
-            
+
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             Test(stack, ref count, ref boundingBox, nodes, ref results);
 
@@ -905,6 +910,11 @@ namespace SIMDPrototyping.Trees.SingleArray
         public unsafe void QueryRecursive<TResultList>(ref BoundingBox boundingBox, ref TResultList results) where TResultList : IList<int>
         {
             //Assumption: root is always zero.
+            if (nodes->ChildCount == 0)
+            {
+                //No collisions possible.
+                return;
+            }
             if (nodes->ChildCount == 1)
             {
                 Debug.Assert(nodes->ChildA < 0, "If the root only has one child, it must be a leaf.");
