@@ -187,21 +187,21 @@ namespace SIMDPrototyping.Trees.Tests
                     var refineStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
 
-                    //var refinementCount = tree.RefitAndRefine(t);
-                    var refinementCount = tree.RefitAndRefine(t, looper, refineContext);
+                    var refinementCount = tree.RefitAndRefine(t);
+                    //var refinementCount = tree.RefitAndRefine(t, looper, refineContext);
 
                     var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-                    //overlaps.Count = 0;
-                    //tree.GetSelfOverlapsArityDedicated(ref overlaps);
-                    //var overlapsCount = overlaps.Count;
+                    overlaps.Count = 0;
+                    tree.GetSelfOverlapsArityDedicated(ref overlaps);
+                    var overlapsCount = overlaps.Count;
 
-                    tree.GetSelfOverlaps(looper, selfTestContext);
-                    var overlapsCount = 0;
-                    for (int i = 0; i < selfTestContext.WorkerOverlaps.Length; ++i)
-                    {
-                        overlapsCount += selfTestContext.WorkerOverlaps[i].Count;
-                    }
+                    //tree.GetSelfOverlaps(looper, selfTestContext);
+                    //var overlapsCount = 0;
+                    //for (int i = 0; i < selfTestContext.WorkerOverlaps.Length; ++i)
+                    //{
+                    //    overlapsCount += selfTestContext.WorkerOverlaps[i].Count;
+                    //}
 
                     var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 

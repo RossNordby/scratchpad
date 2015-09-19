@@ -178,7 +178,7 @@ namespace SIMDPrototyping.Trees.SingleArray
         {
             var node = nodes + index;
             if (node->RefineFlag != 0)
-                Console.WriteLine("BAD");
+                Console.WriteLine("Bad refine flag");
 
             var children = &node->ChildA;
             for (int i = 0; i < node->ChildCount; ++i)
@@ -220,22 +220,15 @@ namespace SIMDPrototyping.Trees.SingleArray
             targetRefinementCount = (int)targetRefinementScale;
         }
 
-        public int GetCacheOptimizeTuning(float costChange, float cacheOptimizeAggressivenessScale)
+        public int GetCacheOptimizeTuning(int maximumSubtrees, float costChange, float cacheOptimizeAggressivenessScale)
         {
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
-            float cacheOptimizePortion = Math.Min(1, 0.03f + cacheOptimizeAggressiveness * 0.5f);
+            float cacheOptimizePortion = Math.Min(1, 0.03f + 85f * (maximumSubtrees / (float)leafCount) * cacheOptimizeAggressiveness);
+            //float cacheOptimizePortion = Math.Min(1, 0.03f + cacheOptimizeAggressiveness * 0.5f);
+            //Console.WriteLine($"cache optimization portion: {cacheOptimizePortion}");
             return (int)Math.Ceiling(cacheOptimizePortion * nodeCount);
         }
 
-
-        //unsafe void ValidateRefinementFlags2()
-        //{
-        //    for (int i = 0; i < NodeCount; ++i)
-        //    {
-        //        if (nodes[i].RefineFlag != 0 && nodes[i].RefineFlag != 1)
-        //            Console.WriteLine("Something odd!");
-        //    }
-        //}
 
 
         public unsafe int RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
@@ -250,9 +243,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             var refinementCandidates = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementCandidateCount));
 
             //Collect the refinement candidates.
-            ValidateRefineFlags(0);
             var costChange = RefitAndMark(leafCountThreshold, ref refinementCandidates);
-            ValidateRefineFlags(0);
 
 
             int targetRefinementCount, period, offset;
@@ -307,8 +298,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 nodes[refinementTargets.Elements[i]].RefineFlag = 0;
                 
             }
-
-            ValidateRefineFlags(0);
+            
 
             RemoveUnusedInternalNodes(ref spareNodes);
             region.Dispose();
@@ -321,7 +311,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             refinementTargets.Count = 0;
             refinementTargets.Dispose();
 
-            var cacheOptimizeCount = GetCacheOptimizeTuning(costChange, cacheOptimizeAggressivenessScale);
+            var cacheOptimizeCount = GetCacheOptimizeTuning(maximumSubtrees, costChange, cacheOptimizeAggressivenessScale);
 
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
 
@@ -334,8 +324,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             }
             //var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             //Console.WriteLine($"Cache optimize time: {endTime - startTime}");
-
-            ValidateRefineFlags(0);
+            
             return actualRefinementTargetsCount;
         }
 

@@ -399,7 +399,8 @@ namespace SIMDPrototyping.Trees.SingleArray
 
 
             //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
-            var cacheOptimizeCount = GetCacheOptimizeTuning(context.RefitCostChange, cacheOptimizeAggressivenessScale);
+            //Note that more cache optimization is required with more threads, since spreading it out more slightly lessens its effectiveness.
+            var cacheOptimizeCount = GetCacheOptimizeTuning(context.MaximumSubtrees, context.RefitCostChange, (Math.Max(1, looper.ThreadCount * 0.25f)) * cacheOptimizeAggressivenessScale);
 
             var cacheOptimizationTasks = looper.ThreadCount * 2;
             context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / cacheOptimizationTasks;

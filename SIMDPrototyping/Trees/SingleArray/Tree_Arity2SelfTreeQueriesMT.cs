@@ -290,9 +290,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 return;
 
             context.Prepare(this);
-
-            //int collisionTestThreshold = (int)(2.25f * leafCount / (looper.ThreadCount));
-
+            
             int collisionTestThreshold = (int)(leafCount / (1.5f * looper.ThreadCount));
             CollectNodePairs(collisionTestThreshold, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
             //CollectNodePairs2(looper.ThreadCount * 16, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);

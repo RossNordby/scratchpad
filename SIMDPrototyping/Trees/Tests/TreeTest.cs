@@ -211,9 +211,9 @@ namespace SIMDPrototyping.Trees.Tests
 
 
 #if RANDOMLEAVES
-            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(10) };
+            BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(629.96f) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 256;
+            int randomLeafCount = 65536;
 
 #else
             int leafCountX = 64;
