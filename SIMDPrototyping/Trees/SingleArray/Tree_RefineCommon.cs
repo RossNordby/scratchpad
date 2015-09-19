@@ -200,7 +200,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             treeletCost = 0;
             int highestIndex;
             float highestCost;
-            int remainingSubtreeSpace = maximumSubtrees - priorityQueue.Count;
+            int remainingSubtreeSpace = maximumSubtrees - priorityQueue.Count - subtrees.Count;
             while (priorityQueue.TryPop(nodes, ref remainingSubtreeSpace, ref subtrees, out highestIndex, out highestCost))
             {
                 treeletCost += highestCost;

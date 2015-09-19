@@ -189,7 +189,7 @@ namespace SIMDPrototyping.Trees.Tests
             int queryCount = 1000000;
             int selfTestCount = 10;
             int refitCount = 100;
-            int frameCount = 16384;
+            int frameCount = 2048;
             float dt = 1 / 60f;
 
             VelocityDescription velocityDescription = new VelocityDescription
@@ -213,7 +213,7 @@ namespace SIMDPrototyping.Trees.Tests
 #if RANDOMLEAVES
             BoundingBox randomLeafBounds = new BoundingBox { Min = new Vector3(0, 0, 0), Max = new Vector3(10) };
             BoundingBox queryBounds = randomLeafBounds;
-            int randomLeafCount = 16;
+            int randomLeafCount = 256;
 
 #else
             int leafCountX = 64;

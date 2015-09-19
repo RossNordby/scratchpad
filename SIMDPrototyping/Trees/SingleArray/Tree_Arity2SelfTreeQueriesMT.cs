@@ -93,10 +93,6 @@ namespace SIMDPrototyping.Trees.SingleArray
                 //To minimize the number of worker overlap lists, perform direct load balancing by manually grabbing the next indices.
                 while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < NodePairsToTest.Count)
                 {
-                    if (NodePairsToTest.Count == 1)
-                    {
-                        Console.WriteLine("asdf");
-                    }
                     var overlap = NodePairsToTest[nextNodePairIndex];
                     if (overlap.A >= 0)
                     {
