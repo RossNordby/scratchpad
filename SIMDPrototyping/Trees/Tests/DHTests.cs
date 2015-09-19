@@ -83,7 +83,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 //**************** Dynamic Testing
                 Random random = new Random(5);
-                TestResults results = new TestResults("Old DH Dynamic", frameCount);
+                TestResults results = new TestResults("Old", frameCount);
 
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int t = 0; t < frameCount; ++t)

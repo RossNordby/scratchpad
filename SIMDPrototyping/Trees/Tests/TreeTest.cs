@@ -187,8 +187,8 @@ namespace SIMDPrototyping.Trees.Tests
             float leafMaxSize = 100;
             float leafSizePower = 10;
             int queryCount = 1000000;
-            int selfTestCount = 10;
-            int refitCount = 100;
+            int selfTestCount = 1;
+            int refitCount = 1;
             int frameCount = 2048;
             float dt = 1 / 60f;
 
@@ -204,7 +204,7 @@ namespace SIMDPrototyping.Trees.Tests
             int queryLocationCount = 16384; //<-- POWER OF TWO!!! REMEMBER!
 
             ParallelLooper looper = new ParallelLooper();
-            for (int i = 0; i < 8; ++i)// Environment.ProcessorCount; ++i)
+            for (int i = 0; i < Environment.ProcessorCount; ++i)
             {
                 looper.AddThread();
             }
@@ -247,15 +247,15 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                //var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt, looper);
+                var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt, looper);
 
-                //using (var stream = File.Open("newTreeResults.txt", FileMode.Create))
-                //{
-                //    using (var textWriter = new StreamWriter(stream))
-                //    {
-                //        results.Save(textWriter);
-                //    }
-                //}
+                using (var stream = File.Open("newTreeResults.txt", FileMode.Create))
+                {
+                    using (var textWriter = new StreamWriter(stream))
+                    {
+                        results.Save(textWriter);
+                    }
+                }
             }
 
             {

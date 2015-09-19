@@ -154,7 +154,7 @@ namespace SIMDPrototyping.Trees.Tests
 
                 //**************** Dynamic Testing
                 Random random = new Random(5);
-                TestResults results = new TestResults("MT", frameCount);
+                TestResults results = new TestResults("New", frameCount);
                 startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
                 for (int t = 0; t < frameCount; ++t)
                 {
