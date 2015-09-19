@@ -194,7 +194,7 @@ namespace SIMDPrototyping.Trees.Tests
 
             VelocityDescription velocityDescription = new VelocityDescription
             {
-                MinVelocity = 10,
+                MinVelocity = 0,
                 MaxVelocity = 10,
                 VelocityDistributionPower = 10,
                 PortionOfMovingLeaves = 1
@@ -247,15 +247,15 @@ namespace SIMDPrototyping.Trees.Tests
                 leaves = GetLeaves(leafCountX, leafCountY, leafCountZ, leafSize, leafGap);
 #endif
                 GC.Collect();
-                var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt, looper);
+                //var results = TestSingleArray(leaves, queries, randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt, looper);
 
-                using (var stream = File.Open("newTreeResults.txt", FileMode.Create))
-                {
-                    using (var textWriter = new StreamWriter(stream))
-                    {
-                        results.Save(textWriter);
-                    }
-                }
+                //using (var stream = File.Open("newTreeResults.txt", FileMode.Create))
+                //{
+                //    using (var textWriter = new StreamWriter(stream))
+                //    {
+                //        results.Save(textWriter);
+                //    }
+                //}
             }
 
             {
@@ -269,14 +269,14 @@ namespace SIMDPrototyping.Trees.Tests
 
                 GC.Collect();
                 //TestBEPU(leaves, queries, queryCount, selfTestCount, refitCount);
-                //var results = TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt);
-                //using (var stream = File.Open("oldDHResults.txt", FileMode.Create))
-                //{
-                //    using (var textWriter = new StreamWriter(stream))
-                //    {
-                //        results.Save(textWriter);
-                //    }
-                //}
+                var results = TestDH(leaves, queries, ref randomLeafBounds, queryCount, selfTestCount, refitCount, frameCount, dt, looper);
+                using (var stream = File.Open("oldDHResults.txt", FileMode.Create))
+                {
+                    using (var textWriter = new StreamWriter(stream))
+                    {
+                        results.Save(textWriter);
+                    }
+                }
             }
 
         }

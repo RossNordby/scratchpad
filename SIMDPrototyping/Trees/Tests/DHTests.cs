@@ -2,6 +2,7 @@
 using BEPUphysics.DataStructures;
 using BEPUutilities;
 using BEPUutilities.DataStructures;
+using BEPUutilities.Threading;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -13,22 +14,29 @@ namespace SIMDPrototyping.Trees.Tests
 {
     partial class TreeTest
     {
-        public static TestResults TestDH(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, ref BoundingBox positionBounds, 
-            int queryCount, int selfTestCount, int refitCount, int frameCount, float dt)
+        public static TestResults TestDH(TestCollidableBEPU[] leaves, BEPUutilities.BoundingBox[] queries, ref BoundingBox positionBounds,
+            int queryCount, int selfTestCount, int refitCount, int frameCount, float dt, IParallelLooper looper)
         {
 
             GC.Collect();
             {
 
-                DynamicHierarchy tree = new DynamicHierarchy();
+                DynamicHierarchy tree = new DynamicHierarchy(looper);
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     tree.Add(leaves[i]);
                 }
 
-                tree.SingleThreadedRefitPhase();
-
-                tree.SingleThreadedOverlapPhase();
+                if (looper.ThreadCount > 1)
+                    tree.MultithreadedRefitPhase(tree.GetSplitDepth());
+                else
+                    tree.SingleThreadedRefitPhase();
+                
+                tree.Overlaps.Count = 0;
+                if (looper.ThreadCount > 1)
+                    tree.MultithreadedOverlapPhase(tree.GetSplitDepth());
+                else
+                    tree.SingleThreadedOverlapPhase();
 
                 for (int i = 0; i < leaves.Length; ++i)
                 {
@@ -41,7 +49,7 @@ namespace SIMDPrototyping.Trees.Tests
             {
 
                 var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-                DynamicHierarchy tree = new DynamicHierarchy();
+                DynamicHierarchy tree = new DynamicHierarchy(looper);
                 for (int i = 0; i < leaves.Length; ++i)
                 {
                     tree.Add(leaves[i]);
@@ -105,8 +113,10 @@ namespace SIMDPrototyping.Trees.Tests
                     }
                     var refineStartTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-
-                   tree.SingleThreadedRefitPhase();
+                    if (looper.ThreadCount > 1)
+                        tree.MultithreadedRefitPhase(tree.GetSplitDepth());
+                    else
+                        tree.SingleThreadedRefitPhase();
 
 
                     //tree.Refit();
@@ -122,7 +132,10 @@ namespace SIMDPrototyping.Trees.Tests
                     var refineEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
                     tree.Overlaps.Count = 0;
-                    tree.SingleThreadedOverlapPhase();
+                    if (looper.ThreadCount > 1)
+                        tree.MultithreadedOverlapPhase(tree.GetSplitDepth());
+                    else
+                        tree.SingleThreadedOverlapPhase();
 
                     var testEndTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
