@@ -1,6 +1,6 @@
 # scratchpad
 
-The main object of interest in this repo right now is the prototype tree implementation under Trees/SingleArray. The application is currently configured to compare the performance of the old BEPUphysics broad phase with this tree.
+The main object of interest in this repo right now is the prototype tree implementation under SIMDPrototyping/Trees/SingleArray. The application is currently configured to compare the performance of the old BEPUphysics broad phase with this tree.
 
 There are also a few worse tree implementations and some SIMD solver fiddling.
 
