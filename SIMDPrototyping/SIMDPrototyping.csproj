@@ -100,11 +100,19 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="BEPUphysics, Version=1.4.0.0, Culture=neutral, PublicKeyToken=31f6a8732a21de19, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Dependencies\BEPUphysics.dll</HintPath>
+    </Reference>
+    <Reference Include="BEPUutilities, Version=1.4.0.0, Culture=neutral, PublicKeyToken=31f6a8732a21de19, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Dependencies\BEPUutilities.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Numerics.Vectors">
-      <HintPath>..\..\corefx\bin\Windows_NT.AnyCPU.Release\System.Numerics.Vectors\System.Numerics.Vectors.dll</HintPath>
+      <HintPath>..\Dependencies\System.Numerics.Vectors.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -192,16 +200,6 @@
       <ProductName>.NET Framework 3.5 SP1</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\..\Visual Studio 2010\Projects\BEPUphysics Dependency Free\BEPUphysics\BEPUphysics.csproj">
-      <Project>{c0d52c9f-14b8-4008-8ddc-109c27561a5c}</Project>
-      <Name>BEPUphysics</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\..\Visual Studio 2010\Projects\BEPUphysics Dependency Free\BEPUutilities\BEPUutilities.csproj">
-      <Project>{34853dea-43a6-4f2f-a379-d1ee04d256d2}</Project>
-      <Name>BEPUutilities</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
