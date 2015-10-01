@@ -1,0 +1,111 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>BEPUutilities</RootNamespace>
+    <AssemblyName>BEPUutilities</AssemblyName>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;FORCEINLINE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject />
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="packages.config">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AffineTransform.cs" />
+    <Compile Include="BoundingBox.cs" />
+    <Compile Include="BoundingSphere.cs" />
+    <Compile Include="ContainmentType.cs" />
+    <Compile Include="ConvexHullHelper.cs" />
+    <Compile Include="ConvexHullHelper.Pruning.cs" />
+    <Compile Include="DataStructures\ConcurrentDeque.cs" />
+    <Compile Include="DataStructures\ObservableDictionary.cs" />
+    <Compile Include="DataStructures\ObservableList.cs" />
+    <Compile Include="DataStructures\QuickDictionary.cs" />
+    <Compile Include="DataStructures\QuickList.cs" />
+    <Compile Include="DataStructures\QuickQueue.cs" />
+    <Compile Include="DataStructures\QuickSet.cs" />
+    <Compile Include="DataStructures\RawList.cs" />
+    <Compile Include="DataStructures\RawValueList.cs" />
+    <Compile Include="DataStructures\ReadOnlyDictionary.cs" />
+    <Compile Include="DataStructures\ReadOnlyEnumerable.cs" />
+    <Compile Include="DataStructures\ReadOnlyList.cs" />
+    <Compile Include="DataStructures\TinyList.cs" />
+    <Compile Include="DataStructures\TinyStructList.cs" />
+    <Compile Include="Int2.cs" />
+    <Compile Include="MathChecker.cs" />
+    <Compile Include="MathHelper.cs" />
+    <Compile Include="Matrix.cs" />
+    <Compile Include="Matrix2x2.cs" />
+    <Compile Include="Matrix2x3.cs" />
+    <Compile Include="Matrix3x2.cs" />
+    <Compile Include="Matrix3x3.cs" />
+    <Compile Include="PermutationMapper.cs" />
+    <Compile Include="Plane.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Quaternion.cs" />
+    <Compile Include="Ray.cs" />
+    <Compile Include="RayHit.cs" />
+    <Compile Include="ResourceManagement\LockingBufferPool.cs" />
+    <Compile Include="ResourceManagement\UnsafeBufferPool.cs" />
+    <Compile Include="ResourceManagement\BufferPool.cs" />
+    <Compile Include="ResourceManagement\BufferPools.cs" />
+    <Compile Include="ResourceManagement\Pool.cs" />
+    <Compile Include="RigidTransform.cs" />
+    <Compile Include="SpinLock.cs" />
+    <Compile Include="Threading\IParallelLooper.cs" />
+    <Compile Include="Threading\ParallelLooper.cs" />
+    <Compile Include="Threading\ParallelLoopWorker.cs" />
+    <Compile Include="Toolbox.cs" />
+    <Compile Include="TriangleSidedness.cs" />
+    <Compile Include="VoronoiRegion.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.1.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
