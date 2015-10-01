@@ -8,7 +8,7 @@ namespace BEPUutilities.ResourceManagement
     /// <summary>
     /// Contains static helpers for use with buffer pools, avoiding unnecessary type parameters.
     /// </summary>
-    public static class BufferPool
+    public abstract class BufferPool
     {
         /// <summary>
         /// Defines the maximum buffer size. Maximum length of a pool is 2^MaximumPoolIndex.
@@ -53,6 +53,21 @@ namespace BEPUutilities.ResourceManagement
             }
             return log;
         }
+
+        /// <summary>
+        /// Gets the number of buffers for a pool index.
+        /// Not thread safe.
+        /// </summary>
+        /// <param name="poolIndex">Index of the pool to count.</param>
+        public abstract int GetBufferCount(int poolIndex);
+
+        /// <summary>
+        /// Drops all buffer references.
+        /// Does not affect outstanding references.
+        /// Not thread safe.
+        /// </summary>
+        public abstract void Clear();
+        
     }
 
     /// <summary>
@@ -61,9 +76,9 @@ namespace BEPUutilities.ResourceManagement
     /// <typeparam name="T">Type of resource contained in the buffers.</typeparam>
     /// <remarks>This is designed for use with unsafe code. It often sacrifices safety for performance or simplicity.
     /// Running with DEBUG defined will catch some misuse, but otherwise many invalid usages will be allowed.</remarks>
-    public abstract class BufferPool<T>
+    public abstract class BufferPool<T> : BufferPool
     {
-        private Stack<T[]>[] pools = new Stack<T[]>[BufferPool.MaximumPoolIndex + 1];
+        private Stack<T[]>[] pools = new Stack<T[]>[MaximumPoolIndex + 1];
 #if DEBUG
         private HashSet<T[]> outstandingResources = new HashSet<T[]>();
 #endif
@@ -84,7 +99,7 @@ namespace BEPUutilities.ResourceManagement
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected T[] TakeFromPoolIndexInternal(int poolIndex)
         {
-            Debug.Assert(poolIndex >= 0 && poolIndex <= BufferPool.MaximumPoolIndex, "Pool index should be from 0 to " + BufferPool.MaximumPoolIndex + " inclusive.");
+            Debug.Assert(poolIndex >= 0 && poolIndex <= MaximumPoolIndex, "Pool index should be from 0 to " + MaximumPoolIndex + " inclusive.");
             T[] toReturn;
             if (pools[poolIndex].Count > 0)
             {
@@ -113,7 +128,7 @@ namespace BEPUutilities.ResourceManagement
         /// <returns>Buffer of sufficient size to hold the given number of elements.</returns>
         public T[] Take(int minimumSize)
         {
-            return TakeFromPoolIndex(BufferPool.GetPoolIndex(minimumSize));
+            return TakeFromPoolIndex(GetPoolIndex(minimumSize));
         }
 
 
@@ -147,7 +162,7 @@ namespace BEPUutilities.ResourceManagement
         /// <param name="buffer">Buffer to return to the pool.</param>
         public void Return(T[] buffer)
         {
-            Return(buffer, BufferPool.GetPoolIndex(buffer.Length));
+            Return(buffer, GetPoolIndex(buffer.Length));
         }
 
         /// <summary>
@@ -163,12 +178,23 @@ namespace BEPUutilities.ResourceManagement
         }
 
         /// <summary>
-        /// Drops all references held by the pool.
+        /// Gets the number of buffers for a pool index.
         /// Not thread safe.
         /// </summary>
-        public void Clear()
+        /// <param name="poolIndex">Index of the pool to count.</param>
+        public override int GetBufferCount(int poolIndex)
         {
-            for (int i = 0; i <= BufferPool.MaximumPoolIndex; ++i)
+            return pools[poolIndex].Count;
+        }
+
+        /// <summary>
+        /// Drops all buffer references.
+        /// Does not affect outstanding references.
+        /// Not thread safe.
+        /// </summary>
+        public override void Clear()
+        {
+            for (int i = 0; i <= MaximumPoolIndex; ++i)
             {
                 pools[i].Clear();
             }

@@ -117,14 +117,25 @@ namespace BEPUutilities.DataStructures
 
         private void Resize(int newObjectPoolIndex, int newTablePoolIndex)
         {
+            Debug.Assert(count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
             //Just double the size of the set.
-            var oldSet = this;
+            var oldDictionary = this;
             this = new QuickDictionary<TKey, TValue>(keyPool, valuePool, tablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
-            for (int i = oldSet.count - 1; i >= 0; --i)
+            for (int i = oldDictionary.count - 1; i >= 0; --i)
             {
-                Add(oldSet.Keys[i], oldSet.Values[i]);
+                Add(oldDictionary.Keys[i], oldDictionary.Values[i]);
             }
-            oldSet.Dispose();
+
+            //The keys and values arrays may contain reference types.
+            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
+            //Clear it before disposal to avoid leaking references.
+            //Note that only the elements array is cleared; the table array contains only primitives and does not need to be cleared.
+            //(TODO: This clear could be narrowed to arrays of managed types.)
+            if (!typeof(TKey).IsPrimitive)
+                Array.Clear(oldDictionary.Keys, 0, oldDictionary.count);
+            if (!typeof(TValue).IsPrimitive)
+                Array.Clear(oldDictionary.Values, 0, oldDictionary.count);
+            oldDictionary.Dispose();
         }
 
         /// <summary>
@@ -440,18 +451,10 @@ namespace BEPUutilities.DataStructures
         }
 
         /// <summary>
-        /// Clears and returns the set's buffers to the pools.
+        /// Returns the dictionary's buffers to the pools. Does not clear the buffers.
         /// </summary>
         public void Dispose()
         {
-            //We must clean out the table before returning it to the pool in case the array contains reference types which would otherwise leak.
-            //The user may have already manually cleared it. To avoid doing redundant work, check the count first.
-            //The user may have chosen to leave reference types in the list if they did a fast clear, but that's not for us to worry about.
-            if (count > 0)
-            {
-                Clear();
-            }
-
             tablePool.Return(table, tablePoolIndex);
             keyPool.Return(Keys, pairPoolIndex);
             valuePool.Return(Values, pairPoolIndex);

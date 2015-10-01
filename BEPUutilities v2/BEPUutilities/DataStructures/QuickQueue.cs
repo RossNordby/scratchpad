@@ -111,18 +111,33 @@ namespace BEPUutilities.DataStructures
 
         private void Resize(int newPoolIndex)
         {
-            Debug.Assert(count <= (1 << newPoolIndex), "New pool index must contain all elements in the queue.");
+            Debug.Assert(count <= (1 << newPoolIndex), "New pool index must contain all elements.");
             var oldQueue = this;
             this = new QuickQueue<T>(pool, newPoolIndex);
             count = oldQueue.Count;
-            //Copy the old first-end to the first part of the new array.
-            Array.Copy(oldQueue.Elements, oldQueue.firstIndex, Elements, 0, oldQueue.Elements.Length - oldQueue.firstIndex);
-            //Copy the old begin-first to the second part of the new array.
-            Array.Copy(oldQueue.Elements, 0, Elements, oldQueue.Elements.Length - oldQueue.firstIndex, oldQueue.firstIndex);
+            //There is no guarantee that the count is equal to Elements.Length, so both cases must be covered.
+            if (lastIndex >= firstIndex)
+            {
+                Array.Copy(oldQueue.Elements, firstIndex, Elements, 0, count);
+            }
+            else if (count > 0)
+            {
+                var firstToEnd = Elements.Length - firstIndex;
+                Array.Copy(oldQueue.Elements, firstIndex, Elements, 0, firstToEnd);
+                Array.Copy(oldQueue.Elements, 0, Elements, firstToEnd, lastIndex + 1);
+            }
 
             firstIndex = 0;
             lastIndex = count - 1;
 
+            //The array may contain reference types.
+            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
+            //Clear it before disposal to avoid leaking references.
+            //(TODO: This clear could be narrowed to arrays of managed types.)
+            if (!typeof(T).IsPrimitive)
+            {
+                oldQueue.Clear();
+            }
             oldQueue.Dispose();
         }
 
@@ -351,11 +366,10 @@ namespace BEPUutilities.DataStructures
         }
 
         /// <summary>
-        /// Clears and returns the queue's buffers.
+        /// Returns the queue's buffer. Does not clear the buffer.
         /// </summary>
         public void Dispose()
         {
-            Clear();
             pool.Return(Elements, poolIndex);
 #if DEBUG
             pool = null;

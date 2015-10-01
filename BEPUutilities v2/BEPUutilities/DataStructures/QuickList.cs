@@ -109,6 +109,15 @@ namespace BEPUutilities.DataStructures
             this = new QuickList<T>(pool, newPoolIndex);
             Count = oldList.Count;
             Array.Copy(oldList.Elements, Elements, Count);
+
+            //The array may contain reference types.
+            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
+            //Clear it before disposal to avoid leaking references.
+            //(TODO: This clear could be narrowed to arrays of managed types.)
+            if (!typeof(T).IsPrimitive)
+            {
+                oldList.Clear();
+            }
             oldList.Dispose();
         }
 
@@ -481,11 +490,10 @@ namespace BEPUutilities.DataStructures
         }
 
         /// <summary>
-        /// Clears and returns the list's buffers.
+        /// Returns the list's buffer. Does not clear the buffer.
         /// </summary>
         public void Dispose()
         {
-            Clear();
             pool.Return(Elements, poolIndex);
 #if DEBUG
             pool = null;
