@@ -98,7 +98,7 @@ namespace BEPUutilities.DataStructures
         {
             if (count > Elements.Length)
             {
-                Resize(BufferPool<T>.GetPoolIndex(count));
+                Resize(BufferPool.GetPoolIndex(count));
             }
         }
 
@@ -475,7 +475,7 @@ namespace BEPUutilities.DataStructures
         public void Compact()
         {
             Validate();
-            var newPoolIndex = BufferPool<T>.GetPoolIndex(Count);
+            var newPoolIndex = BufferPool.GetPoolIndex(Count);
             if (newPoolIndex != poolIndex)
                 Resize(newPoolIndex);
         }

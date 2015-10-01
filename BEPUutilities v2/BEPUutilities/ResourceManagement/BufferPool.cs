@@ -6,32 +6,14 @@ using System.Runtime.CompilerServices;
 namespace BEPUutilities.ResourceManagement
 {
     /// <summary>
-    /// Provides storage for reusable arrays with power-of-2 lengths.
+    /// Contains static helpers for use with buffer pools, avoiding unnecessary type parameters.
     /// </summary>
-    /// <typeparam name="T">Type of resource contained in the buffers.</typeparam>
-    /// <remarks>This is designed for use with unsafe code. It often sacrifices safety for performance or simplicity.
-    /// Running with DEBUG defined will catch some misuse, but otherwise many invalid usages will be allowed.</remarks>
-    public abstract class BufferPool<T>
+    public static class BufferPool
     {
         /// <summary>
-        /// Defines the maximum buffer size. Maximum length is 2^MaximumPoolIndex.
+        /// Defines the maximum buffer size. Maximum length of a pool is 2^MaximumPoolIndex.
         /// </summary>
-        private const int MaximumPoolIndex = 30;
-        private Stack<T[]>[] pools = new Stack<T[]>[MaximumPoolIndex + 1];
-#if DEBUG
-        private HashSet<T[]> outstandingResources = new HashSet<T[]>();
-#endif
-
-        /// <summary>
-        /// Constructs a new resource buffer pool.
-        /// </summary>
-        protected BufferPool()
-        {
-            for (int i = 0; i < pools.Length; ++i)
-            {
-                pools[i] = new Stack<T[]>();
-            }
-        }
+        public const int MaximumPoolIndex = 30;
 
         /// <summary>
         /// Gets the exponent associated with the buffer pool which would hold the given count of elements.
@@ -71,11 +53,38 @@ namespace BEPUutilities.ResourceManagement
             }
             return log;
         }
+    }
+
+    /// <summary>
+    /// Provides storage for reusable arrays with power-of-2 lengths.
+    /// </summary>
+    /// <typeparam name="T">Type of resource contained in the buffers.</typeparam>
+    /// <remarks>This is designed for use with unsafe code. It often sacrifices safety for performance or simplicity.
+    /// Running with DEBUG defined will catch some misuse, but otherwise many invalid usages will be allowed.</remarks>
+    public abstract class BufferPool<T>
+    {
+        private Stack<T[]>[] pools = new Stack<T[]>[BufferPool.MaximumPoolIndex + 1];
+#if DEBUG
+        private HashSet<T[]> outstandingResources = new HashSet<T[]>();
+#endif
+
+        /// <summary>
+        /// Constructs a new resource buffer pool.
+        /// </summary>
+        protected BufferPool()
+        {
+            for (int i = 0; i < pools.Length; ++i)
+            {
+                pools[i] = new Stack<T[]>();
+            }
+        }
+
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected T[] TakeFromPoolIndexInternal(int poolIndex)
         {
-            Debug.Assert(poolIndex >= 0 && poolIndex <= MaximumPoolIndex, "Pool index should be from 0 to " + MaximumPoolIndex + " inclusive.");
+            Debug.Assert(poolIndex >= 0 && poolIndex <= BufferPool.MaximumPoolIndex, "Pool index should be from 0 to " + BufferPool.MaximumPoolIndex + " inclusive.");
             T[] toReturn;
             if (pools[poolIndex].Count > 0)
             {
@@ -88,14 +97,14 @@ namespace BEPUutilities.ResourceManagement
 #endif
             return toReturn;
         }
-        
+
         /// <summary>
         /// Takes a buffer from the given pool index.
         /// </summary>
         /// <param name="poolIndex">Pool to grab a buffer from.</param>
         /// <returns>Pool of the requested size.</returns>
         public abstract T[] TakeFromPoolIndex(int poolIndex);
-        
+
 
         /// <summary>
         /// Grabs a buffer of sufficient size to hold the given number of elements.
@@ -104,7 +113,7 @@ namespace BEPUutilities.ResourceManagement
         /// <returns>Buffer of sufficient size to hold the given number of elements.</returns>
         public T[] Take(int minimumSize)
         {
-            return TakeFromPoolIndex(GetPoolIndex(minimumSize));
+            return TakeFromPoolIndex(BufferPool.GetPoolIndex(minimumSize));
         }
 
 
@@ -138,7 +147,7 @@ namespace BEPUutilities.ResourceManagement
         /// <param name="buffer">Buffer to return to the pool.</param>
         public void Return(T[] buffer)
         {
-            Return(buffer, GetPoolIndex(buffer.Length));
+            Return(buffer, BufferPool.GetPoolIndex(buffer.Length));
         }
 
         /// <summary>
@@ -159,7 +168,7 @@ namespace BEPUutilities.ResourceManagement
         /// </summary>
         public void Clear()
         {
-            for (int i = 0; i <= MaximumPoolIndex; ++i)
+            for (int i = 0; i <= BufferPool.MaximumPoolIndex; ++i)
             {
                 pools[i].Clear();
             }

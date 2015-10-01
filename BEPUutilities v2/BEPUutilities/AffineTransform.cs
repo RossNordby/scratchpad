@@ -150,7 +150,7 @@ namespace BEPUutilities
         public static void Transform(ref Vector3 position, ref AffineTransform transform, out Vector3 transformed)
         {
             Matrix3x3.Transform(ref position, ref transform.LinearTransform, out transformed);
-            Vector3.Add(ref transformed, ref transform.Translation, out transformed);
+            transformed += transform.Translation;
         }
 
         ///<summary>
@@ -161,7 +161,7 @@ namespace BEPUutilities
         ///<param name="transformed">Transformed position.</param>
         public static void TransformInverse(ref Vector3 position, ref AffineTransform transform, out Vector3 transformed)
         {
-            Vector3.Subtract(ref position, ref transform.Translation, out transformed);
+            transformed = position - transform.Translation;
             Matrix3x3 inverse;
             Matrix3x3.Invert(ref transform.LinearTransform, out inverse);
             Matrix3x3.TransformTranspose(ref transformed, ref inverse, out transformed);
@@ -176,7 +176,7 @@ namespace BEPUutilities
         {
             Matrix3x3.Invert(ref transform.LinearTransform, out inverse.LinearTransform);
             Matrix3x3.Transform(ref transform.Translation, ref inverse.LinearTransform, out inverse.Translation);
-            Vector3.Negate(ref inverse.Translation, out inverse.Translation);
+            inverse.Translation = -inverse.Translation;
         }
 
         /// <summary>
@@ -191,7 +191,7 @@ namespace BEPUutilities
             Matrix3x3.Multiply(ref a.LinearTransform, ref b.LinearTransform, out linearTransform);
             Vector3 translation;
             Matrix3x3.Transform(ref a.Translation, ref b.LinearTransform, out translation);
-            Vector3.Add(ref translation, ref b.Translation, out transform.Translation);
+            transform.Translation = b.Translation + translation;
             transform.LinearTransform = linearTransform;
         }
 
@@ -208,7 +208,7 @@ namespace BEPUutilities
             Matrix3x3.Multiply(ref linearTransform, ref b.LinearTransform, out linearTransform);
             Vector3 translation;
             Matrix3x3.Transform(ref a.Position, ref b.LinearTransform, out translation);
-            Vector3.Add(ref translation, ref b.Translation, out transform.Translation);
+            transform.Translation = translation + b.Translation;
             transform.LinearTransform = linearTransform;
         }
 

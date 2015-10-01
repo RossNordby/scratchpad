@@ -311,7 +311,7 @@ namespace BEPUutilities.DataStructures
         public void Compact()
         {
             Validate();
-            var minimumRequiredPoolIndex = BufferPool<T>.GetPoolIndex(count);
+            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(count);
             if (minimumRequiredPoolIndex != elementPoolIndex)
                 Resize(minimumRequiredPoolIndex, minimumRequiredPoolIndex + (tablePoolIndex - elementPoolIndex));
         }

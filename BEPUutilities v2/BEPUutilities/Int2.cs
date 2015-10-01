@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities
 {
@@ -21,29 +22,34 @@ namespace BEPUutilities
             return Equals((Int2)obj);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Int2 other)
         {
             return X == other.X && Y == other.Y;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator ==(Int2 lhs, Int2 rhs)
         {
             return lhs.X == rhs.X && lhs.Y == rhs.Y;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator !=(Int2 lhs, Int2 rhs)
         {
             return lhs.X != rhs.X || lhs.Y != rhs.Y;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
             return (X * 533000401) ^ (Y * 920419813);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override string ToString()
         {
-            return "{" + X + ", " + Y + "}";
+            return $"{{{X}, {Y}}}";
         }
 
 

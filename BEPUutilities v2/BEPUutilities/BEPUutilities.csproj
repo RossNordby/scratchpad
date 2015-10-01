@@ -64,6 +64,7 @@
     <Compile Include="DataStructures\ReadOnlyList.cs" />
     <Compile Include="DataStructures\TinyList.cs" />
     <Compile Include="DataStructures\TinyStructList.cs" />
+    <Compile Include="Int3.cs" />
     <Compile Include="Int2.cs" />
     <Compile Include="MathChecker.cs" />
     <Compile Include="MathHelper.cs" />
@@ -90,6 +91,7 @@
     <Compile Include="Threading\ParallelLoopWorker.cs" />
     <Compile Include="Toolbox.cs" />
     <Compile Include="TriangleSidedness.cs" />
+    <Compile Include="Vector3x.cs" />
     <Compile Include="VoronoiRegion.cs" />
   </ItemGroup>
   <ItemGroup>

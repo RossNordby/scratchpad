@@ -132,15 +132,13 @@ namespace BEPUutilities
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
         public bool Intersects(ref Plane plane, out float t)
         {
-            float velocity;
-            Vector3.Dot(ref Direction, ref plane.Normal, out velocity);
+            float velocity = Vector3.Dot(Direction, plane.Normal);
             if (Math.Abs(velocity) < Toolbox.Epsilon)
             {
                 t = 0;
                 return false;
             }
-            float distanceAlongNormal;
-            Vector3.Dot(ref Position, ref plane.Normal, out distanceAlongNormal);
+            float distanceAlongNormal = Vector3.Dot(Position, plane.Normal);
             distanceAlongNormal += plane.D;
             t = -distanceAlongNormal / velocity;
             return t >= -Toolbox.Epsilon;
@@ -164,8 +162,7 @@ namespace BEPUutilities
         /// <param name="v">Point along the ray at the given location.</param>
         public void GetPointOnRay(float t, out Vector3 v)
         {
-            Vector3.Multiply(ref Direction, t, out v);
-            Vector3.Add(ref v, ref Position, out v);
+            v = Position + t * Direction;
         }
     }
 }

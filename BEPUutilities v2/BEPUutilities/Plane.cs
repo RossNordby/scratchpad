@@ -24,9 +24,7 @@ namespace BEPUutilities
         /// <param name="normal">The normal of the plane.</param>
         public Plane(ref Vector3 position, ref Vector3 normal)
         {
-            float d;
-            Vector3.Dot(ref position, ref normal, out d);
-            D = -d;
+            D = -Vector3.Dot(position, normal);
             Normal = normal;
         }
 

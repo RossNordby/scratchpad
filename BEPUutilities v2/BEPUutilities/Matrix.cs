@@ -1151,8 +1151,7 @@ namespace BEPUutilities
         /// <param name="viewMatrix">Look at matrix.</param>
         public static void CreateLookAtRH(ref Vector3 position, ref Vector3 target, ref Vector3 upVector, out Matrix viewMatrix)
         {
-            Vector3 forward;
-            Vector3.Subtract(ref target, ref position, out forward);
+            Vector3 forward = target - position;
             CreateViewRH(ref position, ref forward, ref upVector, out viewMatrix);
         }
 
@@ -1166,8 +1165,7 @@ namespace BEPUutilities
         public static Matrix CreateLookAtRH(Vector3 position, Vector3 target, Vector3 upVector)
         {
             Matrix lookAt;
-            Vector3 forward;
-            Vector3.Subtract(ref target, ref position, out forward);
+            Vector3 forward = target - position;
             CreateViewRH(ref position, ref forward, ref upVector, out lookAt);
             return lookAt;
         }
@@ -1183,13 +1181,12 @@ namespace BEPUutilities
         public static void CreateViewRH(ref Vector3 position, ref Vector3 forward, ref Vector3 upVector, out Matrix viewMatrix)
         {
             Vector3 z;
-            float length = forward.Length();
-            Vector3.Divide(ref forward, -length, out z);
+            z = forward / -forward.Length();
             Vector3 x;
-            Vector3.Cross(ref upVector, ref z, out x);
-            x.Normalize();
+            Vector3x.Cross(ref upVector, ref z, out x);
+            x = Vector3.Normalize(x);
             Vector3 y;
-            Vector3.Cross(ref z, ref x, out y);
+            Vector3x.Cross(ref z, ref x, out y);
 
             viewMatrix.M11 = x.X;
             viewMatrix.M12 = y.X;
@@ -1203,9 +1200,9 @@ namespace BEPUutilities
             viewMatrix.M32 = y.Z;
             viewMatrix.M33 = z.Z;
             viewMatrix.M34 = 0f;
-            Vector3.Dot(ref x, ref position, out viewMatrix.M41);
-            Vector3.Dot(ref y, ref position, out viewMatrix.M42);
-            Vector3.Dot(ref z, ref position, out viewMatrix.M43);
+            viewMatrix.M41 = Vector3.Dot(x, position);
+            viewMatrix.M42 = Vector3.Dot(y, position);
+            viewMatrix.M43 = Vector3.Dot(z, position);
             viewMatrix.M41 = -viewMatrix.M41;
             viewMatrix.M42 = -viewMatrix.M42;
             viewMatrix.M43 = -viewMatrix.M43;
@@ -1239,13 +1236,12 @@ namespace BEPUutilities
         public static void CreateWorldRH(ref Vector3 position, ref Vector3 forward, ref Vector3 upVector, out Matrix worldMatrix)
         {
             Vector3 z;
-            float length = forward.Length();
-            Vector3.Divide(ref forward, -length, out z);
+            z = forward / -forward.Length();
             Vector3 x;
-            Vector3.Cross(ref upVector, ref z, out x);
-            x.Normalize();
+            Vector3x.Cross(ref upVector, ref z, out x);
+            x = Vector3.Normalize(x);
             Vector3 y;
-            Vector3.Cross(ref z, ref x, out y);
+            Vector3x.Cross(ref z, ref x, out y);
 
             worldMatrix.M11 = x.X;
             worldMatrix.M12 = x.Y;
@@ -1323,12 +1319,12 @@ namespace BEPUutilities
         public static void CreateScale(ref Vector3 scale, out Matrix scaleMatrix)
         {
             scaleMatrix = new Matrix
-                {
-                    M11 = scale.X,
-                    M22 = scale.Y,
-                    M33 = scale.Z,
-                    M44 = 1
-                };
+            {
+                M11 = scale.X,
+                M22 = scale.Y,
+                M33 = scale.Z,
+                M44 = 1
+            };
         }
 
         /// <summary>

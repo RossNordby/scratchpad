@@ -4,6 +4,7 @@ using BEPUutilities;
 using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities
 {
@@ -21,8 +22,8 @@ namespace BEPUutilities
         /// Each group of 3 indices represents a triangle on the surface of the hull.</param>
         public static void GetConvexHull(IList<Vector3> points, IList<int> outputTriangleIndices)
         {
-            var rawPoints = new QuickList<Vector3>(BufferPools<Vector3>.Locking, BufferPool<Vector3>.GetPoolIndex(points.Count));
-            var rawIndices = new QuickList<int>(BufferPools<int>.Locking, BufferPool<int>.GetPoolIndex(points.Count * 3));
+            var rawPoints = new QuickList<Vector3>(BufferPools<Vector3>.Locking, BufferPool.GetPoolIndex(points.Count));
+            var rawIndices = new QuickList<int>(BufferPools<int>.Locking, BufferPool.GetPoolIndex(points.Count * 3));
             rawPoints.AddRange(points);
             GetConvexHull(rawPoints, rawIndices);
             rawPoints.Dispose();
@@ -40,7 +41,7 @@ namespace BEPUutilities
         /// <param name="outputSurfacePoints">Unique points on the surface of the convex hull.</param>
         public static void GetConvexHull(IList<Vector3> points, IList<Vector3> outputSurfacePoints)
         {
-            var rawPoints = new QuickList<Vector3>(BufferPools<Vector3>.Locking, BufferPool<Vector3>.GetPoolIndex(points.Count));
+            var rawPoints = new QuickList<Vector3>(BufferPools<Vector3>.Locking, BufferPool.GetPoolIndex(points.Count));
             rawPoints.AddRange(points);
             GetConvexHull(ref rawPoints, outputSurfacePoints);
             rawPoints.Dispose();
@@ -53,7 +54,7 @@ namespace BEPUutilities
         /// <param name="outputSurfacePoints">Unique points on the surface of the convex hull.</param>
         public static void GetConvexHull(ref QuickList<Vector3> points, IList<Vector3> outputSurfacePoints)
         {
-            var indices = new QuickList<int>(BufferPools<int>.Locking, BufferPool<int>.GetPoolIndex(points.Count * 3));
+            var indices = new QuickList<int>(BufferPools<int>.Locking, BufferPool.GetPoolIndex(points.Count * 3));
             GetConvexHull(ref points, ref indices, outputSurfacePoints);
             indices.Dispose();
         }
@@ -67,8 +68,8 @@ namespace BEPUutilities
         /// <param name="outputSurfacePoints">Unique points on the surface of the convex hull.</param>
         public static void GetConvexHull(IList<Vector3> points, IList<int> outputTriangleIndices, IList<Vector3> outputSurfacePoints)
         {
-            var rawPoints = new QuickList<Vector3>(BufferPools<Vector3>.Locking, BufferPool<Vector3>.GetPoolIndex(points.Count));
-            var rawIndices = new QuickList<int>(BufferPools<int>.Locking, BufferPool<int>.GetPoolIndex(points.Count * 3));
+            var rawPoints = new QuickList<Vector3>(BufferPools<Vector3>.Locking, BufferPool.GetPoolIndex(points.Count));
+            var rawIndices = new QuickList<int>(BufferPools<int>.Locking, BufferPool.GetPoolIndex(points.Count * 3));
             rawPoints.AddRange(points);
             GetConvexHull(ref rawPoints, ref rawIndices, outputSurfacePoints);
             rawPoints.Dispose();
@@ -89,7 +90,7 @@ namespace BEPUutilities
         public static void GetConvexHull(ref QuickList<Vector3> points, ref QuickList<int> outputTriangleIndices, IList<Vector3> outputSurfacePoints)
         {
             GetConvexHull(ref points, ref outputTriangleIndices);
-            
+
             var alreadyContainedIndices = new QuickSet<int>(BufferPools<int>.Locking, BufferPools<int>.Locking);
 
             for (int i = outputTriangleIndices.Count - 1; i >= 0; i--)
@@ -117,7 +118,7 @@ namespace BEPUutilities
             {
                 throw new ArgumentException("Point set must have volume.");
             }
-            var outsidePoints = new QuickList<int>(BufferPools<int>.Locking, BufferPool<int>.GetPoolIndex(points.Count - 4));
+            var outsidePoints = new QuickList<int>(BufferPools<int>.Locking, BufferPool.GetPoolIndex(points.Count - 4));
 
             //Build the initial tetrahedron.
             //It will also give us the location of a point which is guaranteed to be within the
@@ -150,10 +151,8 @@ namespace BEPUutilities
                     Vector3 maximum = points.Elements[maxIndex];
 
                     //If the point is beyond the current triangle, continue.
-                    Vector3 offset;
-                    Vector3.Subtract(ref maximum, ref points.Elements[outputTriangleIndices.Elements[k]], out offset);
-                    float dot;
-                    Vector3.Dot(ref normal, ref offset, out dot);
+                    Vector3 offset = maximum - points.Elements[outputTriangleIndices.Elements[k]];
+                    float dot = Vector3.Dot(normal, offset);
                     if (dot > 0)
                     {
                         //It's been picked! Remove the maximum point from the outside.
@@ -240,8 +239,7 @@ namespace BEPUutilities
             int extremeIndex = 0;
             for (int i = 0; i < outsidePoints.Count; ++i)
             {
-                float dot;
-                Vector3.Dot(ref points.Elements[outsidePoints[i]], ref direction, out dot);
+                float dot = Vector3.Dot(points.Elements[outsidePoints[i]], direction);
                 if (dot > maximumDot)
                 {
                     maximumDot = dot;
@@ -256,13 +254,12 @@ namespace BEPUutilities
             maximumIndex = 0;
             minimumIndex = 0;
 
-            float dot;
-            Vector3.Dot(ref points.Elements[0], ref direction, out dot);
+            float dot = Vector3.Dot(points.Elements[0], direction);
             minimumDot = dot;
             maximumDot = dot;
             for (int i = 1; i < points.Count; ++i)
             {
-                Vector3.Dot(ref points.Elements[i], ref direction, out dot);
+                dot = Vector3.Dot(points.Elements[i], direction);
                 if (dot > maximumDot)
                 {
                     maximumDot = dot;
@@ -306,17 +303,15 @@ namespace BEPUutilities
                 throw new ArgumentException("Point set is degenerate; convex hulls must have volume.");
 
             //Now, use a second axis perpendicular to the two points we found.
-            Vector3 ab;
-            Vector3.Subtract(ref points.Elements[b], ref points.Elements[a], out ab);
-            Vector3.Cross(ref ab, ref Toolbox.UpVector, out direction);
+            Vector3 ab = points.Elements[b] - points.Elements[a];
+            Vector3x.Cross(ref ab, ref Toolbox.UpVector, out direction);
             if (direction.LengthSquared() < Toolbox.Epsilon)
-                Vector3.Cross(ref ab, ref Toolbox.RightVector, out direction);
+                Vector3x.Cross(ref ab, ref Toolbox.RightVector, out direction);
             float minimumDot, maximumDot;
             int minimumIndex, maximumIndex;
-            GetExtremePoints(ref direction, points, out maximumDot, out minimumDot, out maximumIndex, out minimumIndex);
+            GetExtremePoints(ref direction, ref points, out maximumDot, out minimumDot, out maximumIndex, out minimumIndex);
             //Compare the location of the extreme points to the location of the axis.
-            float dot;
-            Vector3.Dot(ref direction, ref points.Elements[a], out dot);
+            float dot = Vector3.Dot(direction, points.Elements[a]);
             //Use the point further from the axis.
             if (Math.Abs(dot - minimumDot) > Math.Abs(dot - maximumDot))
             {
@@ -334,13 +329,12 @@ namespace BEPUutilities
                 throw new ArgumentException("Point set is degenerate; convex hulls must have volume.");
 
             //Use a third axis perpendicular to the plane defined by the three unique points a, b, and c.
-            Vector3 ac;
-            Vector3.Subtract(ref points.Elements[c], ref points.Elements[a], out ac);
-            Vector3.Cross(ref ab, ref ac, out direction);
+            Vector3 ac = points.Elements[c] - points.Elements[a];
+            Vector3x.Cross(ref ab, ref ac, out direction);
 
-            GetExtremePoints(ref direction, points, out maximumDot, out minimumDot, out maximumIndex, out minimumIndex);
+            GetExtremePoints(ref direction, ref points, out maximumDot, out minimumDot, out maximumIndex, out minimumIndex);
             //Compare the location of the extreme points to the location of the plane.
-            Vector3.Dot(ref direction, ref points.Elements[a], out dot);
+            dot = Vector3.Dot(direction, points.Elements[a]);
             //Use the point further from the plane. 
             if (Math.Abs(dot - minimumDot) > Math.Abs(dot - maximumDot))
             {
@@ -375,10 +369,7 @@ namespace BEPUutilities
             triangleIndices.Add(d);
 
             //The centroid is guaranteed to be within the convex hull.  It will be used to verify the windings of triangles throughout the hull process.
-            Vector3.Add(ref points.Elements[a], ref points.Elements[b], out centroid);
-            Vector3.Add(ref centroid, ref points.Elements[c], out centroid);
-            Vector3.Add(ref centroid, ref points.Elements[d], out centroid);
-            Vector3.Multiply(ref centroid, 0.25f, out centroid);
+            centroid = (points.Elements[a] + points.Elements[b] + points.Elements[c] + points.Elements[d]) * 0.25f;
 
             for (int i = 0; i < triangleIndices.Count; i += 3)
             {
@@ -388,13 +379,11 @@ namespace BEPUutilities
 
                 //Check the signed volume of a parallelepiped with the edges of this triangle and the centroid.
                 Vector3 cross;
-                Vector3.Subtract(ref vB, ref vA, out ab);
-                Vector3.Subtract(ref vC, ref vA, out ac);
-                Vector3.Cross(ref ac, ref ab, out cross);
-                Vector3 offset;
-                Vector3.Subtract(ref vA, ref centroid, out offset);
-                float volume;
-                Vector3.Dot(ref offset, ref cross, out volume);
+                ab = vB - vA;
+                ac = vC - vA;
+                Vector3x.Cross(ref ac, ref ab, out cross);
+                Vector3 offset = vA - centroid;
+                float volume = Vector3.Dot(offset, cross);
                 //This volume/cross product could also be used to check for degeneracy, but we already tested for that.
                 if (Math.Abs(volume) < Toolbox.BigEpsilon)
                 {
@@ -452,10 +441,8 @@ namespace BEPUutilities
                 {
                     //Offset from the triangle to the current point, tested against the normal, determines if the current point is visible
                     //from the triangle face.
-                    Vector3 offset;
-                    Vector3.Subtract(ref points.Elements[insidePoints.Elements[j]], ref p, out offset);
-                    float dot;
-                    Vector3.Dot(ref offset, ref normal, out dot);
+                    Vector3 offset = points.Elements[insidePoints.Elements[j]] - p;
+                    float dot = Vector3.Dot(offset, normal);
                     //If it's visible, then it's outside!
                     if (dot > 0)
                     {
@@ -468,30 +455,27 @@ namespace BEPUutilities
             insidePoints.Dispose();
         }
 
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void FindNormal(ref QuickList<int> indices, ref QuickList<Vector3> points, int triangleIndex, out Vector3 normal)
         {
             var a = points.Elements[indices.Elements[triangleIndex]];
-            Vector3 ab, ac;
-            Vector3.Subtract(ref points.Elements[indices.Elements[triangleIndex + 1]], ref a, out ab);
-            Vector3.Subtract(ref points.Elements[indices.Elements[triangleIndex + 2]], ref a, out ac);
-            Vector3.Cross(ref ac, ref ab, out normal);
+            Vector3 ab = points.Elements[indices.Elements[triangleIndex + 1]] - a;
+            Vector3 ac = points.Elements[indices.Elements[triangleIndex + 2]] - a;
+            Vector3x.Cross(ref ac, ref ab, out normal);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsTriangleVisibleFromPoint(ref QuickList<int> indices, ref QuickList<Vector3> points, int triangleIndex, ref Vector3 point)
         {
             //Compute the normal of the triangle.
             var a = points.Elements[indices.Elements[triangleIndex]];
-            Vector3 ab, ac;
-            Vector3.Subtract(ref points.Elements[indices.Elements[triangleIndex + 1]], ref a, out ab);
-            Vector3.Subtract(ref points.Elements[indices.Elements[triangleIndex + 2]], ref a, out ac);
+            Vector3 ab = points.Elements[indices.Elements[triangleIndex + 1]] - a;
+            Vector3 ac = points.Elements[indices.Elements[triangleIndex + 2]] - a;
             Vector3 normal;
-            Vector3.Cross(ref ac, ref ab, out normal);
+            Vector3x.Cross(ref ac, ref ab, out normal);
             //Assume a consistent winding.  Check to see if the normal points at the point.
-            Vector3 offset;
-            Vector3.Subtract(ref point, ref a, out offset);
-            float dot;
-            Vector3.Dot(ref offset, ref normal, out dot);
+            Vector3 offset = point - a;
+            float dot = Vector3.Dot(offset, normal);
             return dot >= 0;
         }
 
@@ -502,7 +486,7 @@ namespace BEPUutilities
             {
                 //Check if the triangle faces away or towards the centroid.
 
-                if (IsTriangleVisibleFromPoint(newIndices, points, k, ref centroid))
+                if (IsTriangleVisibleFromPoint(ref newIndices, ref points, k, ref centroid))
                 {
                     //If it's towards, flip the winding.
                     int temp = newIndices[k + 1];

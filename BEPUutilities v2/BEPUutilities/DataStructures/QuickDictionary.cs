@@ -349,7 +349,7 @@ namespace BEPUutilities.DataStructures
         public void Compact()
         {
             Validate();
-            var minimumRequiredPoolIndex = BufferPool<TKey>.GetPoolIndex(count);
+            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(count);
             if (minimumRequiredPoolIndex != pairPoolIndex)
                 Resize(minimumRequiredPoolIndex, minimumRequiredPoolIndex + (tablePoolIndex - pairPoolIndex));
         }

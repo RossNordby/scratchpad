@@ -785,7 +785,7 @@ namespace BEPUutilities
             float lengthSquared = axis.LengthSquared();
             if (lengthSquared > 1e-14f)
             {
-                Vector3.Divide(ref axis, (float)Math.Sqrt(lengthSquared), out axis);
+                axis /= (float)Math.Sqrt(lengthSquared);
                 angle = 2 * (float)Math.Acos(MathHelper.Clamp(qw, -1, 1));
             }
             else
@@ -803,8 +803,7 @@ namespace BEPUutilities
         /// <param name="q">Quaternion representing the rotation from v1 to v2.</param>
         public static void GetQuaternionBetweenNormalizedVectors(ref Vector3 v1, ref Vector3 v2, out Quaternion q)
         {
-            float dot;
-            Vector3.Dot(ref v1, ref v2, out dot);
+            float dot = Vector3.Dot(v1, v2);
             //For non-normal vectors, the multiplying the axes length squared would be necessary:
             //float w = dot + (float)Math.Sqrt(v1.LengthSquared() * v2.LengthSquared());
             if (dot < -0.9999f) //parallel, opposing direction
@@ -827,7 +826,7 @@ namespace BEPUutilities
             else
             {
                 Vector3 axis;
-                Vector3.Cross(ref v1, ref v2, out axis);
+                Vector3x.Cross(ref v1, ref v2, out axis);
                 q = new Quaternion(axis.X, axis.Y, axis.Z, dot + 1);
             }
             q.Normalize();
