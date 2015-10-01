@@ -6,9 +6,8 @@ namespace BEPUutilities
 {
     /// <summary>
     /// Synchronizes using a busy wait.  Take care when using this; if the critical section is long or there's any doubt about the use of a busy wait, consider using Monitor locks or other approaches instead.
-    /// Replaces the .NET SpinLock on PC and provides its functionality on the Xbox360.
     /// </summary>
-    public class SpinLock
+    public class SpinLock //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy through any properties. Check for that.
     {
         private const int MaximumSpinWait = 15;
         private const int SleepInterval = 10;

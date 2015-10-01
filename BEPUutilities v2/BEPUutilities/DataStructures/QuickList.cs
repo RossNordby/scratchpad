@@ -88,7 +88,7 @@ namespace BEPUutilities.DataStructures
         }
 
         /// <summary>
-        /// Ensures that the quick list has enough room to hold the specified number of elements.
+        /// Ensures that the list has enough room to hold the specified number of elements.
         /// </summary>
         /// <param name="count">Number of elements to hold.</param>
 #if FORCEINLINE

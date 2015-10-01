@@ -12,6 +12,16 @@ namespace BEPUutilities.ResourceManagement
     {
         Stack<T> stack = new Stack<T>();
         SpinLock spinLock = new SpinLock();
+        /// <summary>
+        /// Gets the locker used by LockingTake and LockingReturn.
+        /// </summary>
+        public SpinLock Locker //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy.
+        {
+            get
+            {
+                return spinLock;
+            }
+        }
 
         /// <summary>
         /// Gets or sets the function used to create new objects when the pool has no existing objects available.
@@ -77,7 +87,7 @@ namespace BEPUutilities.ResourceManagement
 #endif
             return item;
         }
-        
+
 
         /// <summary>
         /// Returns the specified item to the pool. If a cleaner delegate is set, the item is cleaned.

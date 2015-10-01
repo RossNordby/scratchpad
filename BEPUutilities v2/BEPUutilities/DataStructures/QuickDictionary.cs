@@ -115,6 +115,22 @@ namespace BEPUutilities.DataStructures
 
         }
 
+        /// <summary>
+        /// Ensures that the dictionary has enough room to hold the specified number of elements.
+        /// </summary>
+        /// <param name="count">Number of elements to hold.</param>
+#if FORCEINLINE
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+        public void EnsureCapacity(int count)
+        {
+            if (count > Keys.Length)
+            {
+                var newPoolIndex = BufferPool.GetPoolIndex(count);
+                Resize(newPoolIndex, tablePoolIndex - pairPoolIndex + newPoolIndex);
+            }
+        }
+
         private void Resize(int newObjectPoolIndex, int newTablePoolIndex)
         {
             Debug.Assert(count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");

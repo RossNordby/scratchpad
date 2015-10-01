@@ -15,6 +15,16 @@ namespace BEPUutilities.ResourceManagement
     {
 
         SpinLock locker = new SpinLock();
+        /// <summary>
+        /// Gets the locker used by TakeFromPoolIndex and Return.
+        /// </summary>
+        public SpinLock Locker //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy.
+        {
+            get
+            {
+                return locker;
+            }
+        }
 
         /// <summary>
         /// Takes a buffer from the given pool index.

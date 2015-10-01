@@ -109,6 +109,21 @@ namespace BEPUutilities.DataStructures
 
         }
 
+        /// <summary>
+        /// Ensures that the queue has enough room to hold the specified number of elements.
+        /// </summary>
+        /// <param name="count">Number of elements to hold.</param>
+#if FORCEINLINE
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
+        public void EnsureCapacity(int count)
+        {
+            if (count > Elements.Length)
+            {
+                Resize(BufferPool.GetPoolIndex(count));
+            }
+        }
+
         private void Resize(int newPoolIndex)
         {
             Debug.Assert(count <= (1 << newPoolIndex), "New pool index must contain all elements.");
@@ -116,15 +131,15 @@ namespace BEPUutilities.DataStructures
             this = new QuickQueue<T>(pool, newPoolIndex);
             count = oldQueue.Count;
             //There is no guarantee that the count is equal to Elements.Length, so both cases must be covered.
-            if (lastIndex >= firstIndex)
+            if (oldQueue.lastIndex >= oldQueue.firstIndex)
             {
-                Array.Copy(oldQueue.Elements, firstIndex, Elements, 0, count);
+                Array.Copy(oldQueue.Elements, oldQueue.firstIndex, Elements, 0, oldQueue.count);
             }
-            else if (count > 0)
+            else if (oldQueue.count > 0)
             {
-                var firstToEnd = Elements.Length - firstIndex;
-                Array.Copy(oldQueue.Elements, firstIndex, Elements, 0, firstToEnd);
-                Array.Copy(oldQueue.Elements, 0, Elements, firstToEnd, lastIndex + 1);
+                var firstToEnd = oldQueue.Elements.Length - oldQueue.firstIndex;
+                Array.Copy(oldQueue.Elements, oldQueue.firstIndex, Elements, 0, firstToEnd);
+                Array.Copy(oldQueue.Elements, 0, Elements, firstToEnd, oldQueue.lastIndex + 1);
             }
 
             firstIndex = 0;
