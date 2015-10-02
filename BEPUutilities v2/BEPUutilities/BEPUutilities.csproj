@@ -68,6 +68,7 @@
     <Compile Include="Int2.cs" />
     <Compile Include="MathChecker.cs" />
     <Compile Include="MathHelper.cs" />
+    <Compile Include="MatrixSIMD.cs" />
     <Compile Include="Matrix.cs" />
     <Compile Include="Matrix2x2.cs" />
     <Compile Include="Matrix2x3.cs" />
