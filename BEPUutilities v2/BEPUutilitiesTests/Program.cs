@@ -12,6 +12,7 @@ namespace BEPUutilitiesTests
 
         static void Main(string[] args)
         {
+            Vector3Tests.Test(); 
             Matrix4x4Tests.Test();
         }
     }
