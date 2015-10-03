@@ -170,10 +170,13 @@ namespace BEPUutilitiesTests
             return accumulator;
         }
 
+
+
         public unsafe static void TestMultiplyCorrectness()
         {
+            const int iterationCount = 100000;
             Random random = new Random(5);
-            for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
+            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
                 MatrixSIMD simdA, simdB;
                 Matrix4x4 systemA, systemB;
@@ -186,8 +189,8 @@ namespace BEPUutilitiesTests
                 var systemPointerB = (float*)&systemB;
                 for (int i = 0; i < 16; ++i)
                 {
-                    scalarPointerA[i] = systemPointerA[i] = simdPointerA[i] = (float)(random.NextDouble() * 20 - 10);
-                    scalarPointerB[i] = systemPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 20 - 10);
+                    scalarPointerA[i] = systemPointerA[i] = simdPointerA[i] = (float)(random.NextDouble() * 4 - 2);
+                    scalarPointerB[i] = systemPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 4 - 2);
                 }
 
                 MatrixSIMD simdResult;
@@ -201,9 +204,111 @@ namespace BEPUutilitiesTests
 
                 for (int i = 0; i < 16; ++i)
                 {
-                    const float threshold = 0;
+                    const float threshold = 1e-5f;
                     var simdScalarError = Math.Abs(simdPointerResult[i] - scalarPointerResult[i]);
                     var simdSystemError = Math.Abs(simdPointerResult[i] - systemPointerResult[i]);
+                    if (simdScalarError > threshold ||
+                        simdSystemError > threshold)
+                    {
+                        Console.WriteLine($"Excess error for {i}");
+                    }
+                }
+            }
+
+            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+            {
+                MatrixSIMD simdA, simdB;
+                Matrix4x4 systemA, systemB;
+                Matrix scalarA, scalarB;
+                var simdPointerA = (float*)&simdA;
+                var systemPointerA = (float*)&systemA;
+                var scalarPointerA = (float*)&scalarA;
+                var simdPointerB = (float*)&simdB;
+                var scalarPointerB = (float*)&scalarB;
+                var systemPointerB = (float*)&systemB;
+                for (int i = 0; i < 16; ++i)
+                {
+                    scalarPointerA[i] = systemPointerA[i] = simdPointerA[i] = (float)(random.NextDouble() * 4 - 2);
+                    scalarPointerB[i] = systemPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 4 - 2);
+                }
+                
+                MatrixSIMD.Multiply(ref simdA, ref simdB, out simdA);
+                systemA = Matrix4x4.Multiply(systemA, systemB);
+                Matrix.Multiply(ref scalarA, ref scalarB, out scalarA);
+
+
+                for (int i = 0; i < 16; ++i)
+                {
+                    const float threshold = 1e-5f;
+                    var simdScalarError = Math.Abs(simdPointerA[i] - scalarPointerA[i]);
+                    var simdSystemError = Math.Abs(simdPointerA[i] - systemPointerA[i]);
+                    if (simdScalarError > threshold ||
+                        simdSystemError > threshold)
+                    {
+                        Console.WriteLine($"Excess error for {i}");
+                    }
+                }
+            }
+
+            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+            {
+                MatrixSIMD simdA, simdB;
+                Matrix4x4 systemA, systemB;
+                Matrix scalarA, scalarB;
+                var simdPointerA = (float*)&simdA;
+                var systemPointerA = (float*)&systemA;
+                var scalarPointerA = (float*)&scalarA;
+                var simdPointerB = (float*)&simdB;
+                var scalarPointerB = (float*)&scalarB;
+                var systemPointerB = (float*)&systemB;
+                for (int i = 0; i < 16; ++i)
+                {
+                    scalarPointerA[i] = systemPointerA[i] = simdPointerA[i] = (float)(random.NextDouble() * 4 - 2);
+                    scalarPointerB[i] = systemPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 4 - 2);
+                }
+
+                //MatrixSIMD.Multiply(ref simdA, ref simdB);
+                MatrixSIMD.Multiply(ref simdA, ref simdB, out simdB);
+                systemB = Matrix4x4.Multiply(systemA, systemB);
+                Matrix.Multiply(ref scalarA, ref scalarB, out scalarB);
+
+
+                for (int i = 0; i < 16; ++i)
+                {
+                    const float threshold = 1e-5f;
+                    var simdScalarError = Math.Abs(simdPointerB[i] - scalarPointerB[i]);
+                    var simdSystemError = Math.Abs(simdPointerB[i] - systemPointerB[i]);
+                    if (simdScalarError > threshold ||
+                        simdSystemError > threshold)
+                    {
+                        Console.WriteLine($"Excess error for {i}");
+                    }
+                }
+            }
+
+
+            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+            {
+                MatrixSIMD simd;
+                Matrix4x4 system;
+                Matrix scalar;
+                var simdPointer = (float*)&simd;
+                var systemPointer = (float*)&system;
+                var scalarPointer = (float*)&scalar;
+                for (int i = 0; i < 16; ++i)
+                {
+                    scalarPointer[i] = systemPointer[i] = simdPointer[i] = (float)(random.NextDouble() * 4 - 2);
+                }
+
+                MatrixSIMD.Multiply(ref simd, ref simd, out simd);
+                system = Matrix4x4.Multiply(system, system);
+                Matrix.Multiply(ref scalar, ref scalar, out scalar);
+
+                for (int i = 0; i < 16; ++i)
+                {
+                    const float threshold = 1e-5f;
+                    var simdScalarError = Math.Abs(simdPointer[i] - scalarPointer[i]);
+                    var simdSystemError = Math.Abs(simdPointer[i] - systemPointer[i]);
                     if (simdScalarError > threshold ||
                         simdSystemError > threshold)
                     {
@@ -216,15 +321,17 @@ namespace BEPUutilitiesTests
         public static void Test()
         {
             TestMultiplyCorrectness();
-            const int iterationCount = 1000000;
-            Helper.Test("Transform Scalar", Matrix4x4Tests.TestTransformScalar, iterationCount);
-            Helper.Test("Transform System", Matrix4x4Tests.TestTransformSystem, iterationCount);
-            Helper.Test("Transform SIMD", Matrix4x4Tests.TestSIMDTransform, iterationCount);
-            Helper.Test("TransformTranspose SIMD", Matrix4x4Tests.TestSIMDTransformTranspose, iterationCount);
+            const int iterationCount = 10000000;
 
-            Helper.Test("Multiply System", Matrix4x4Tests.TestSystemMultiply, iterationCount);
-            Helper.Test("Multiply Scalar", Matrix4x4Tests.TestScalarMultiply, iterationCount);
-            Helper.Test("Multiply SIMD", Matrix4x4Tests.TestSIMDMultiply, iterationCount);
+            Helper.Test("Multiply SIMD", TestSIMDMultiply, iterationCount);
+            Helper.Test("Multiply Scalar", TestScalarMultiply, iterationCount);
+            Helper.Test("Multiply System", TestSystemMultiply, iterationCount);
+
+            Helper.Test("Transform SIMD", TestSIMDTransform, iterationCount);
+            Helper.Test("TransformTranspose SIMD", TestSIMDTransformTranspose, iterationCount);
+            Helper.Test("Transform Scalar", TestTransformScalar, iterationCount);
+            Helper.Test("Transform System", TestTransformSystem, iterationCount);
+
         }
     }
 }
