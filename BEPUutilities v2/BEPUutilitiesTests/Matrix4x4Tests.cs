@@ -318,10 +318,106 @@ namespace BEPUutilitiesTests
             }
         }
 
+        public static float TestSIMDTranspose(int iterationCount)
+        {
+            MatrixSIMD m = MatrixSIMD.Identity;
+            float accumulator = 0;
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                MatrixSIMD r0, r1;
+                MatrixSIMD.Transpose(ref m, out r0);
+                MatrixSIMD.Transpose(ref r0, out r1);
+                MatrixSIMD.Transpose(ref r1, out r0);
+                MatrixSIMD.Transpose(ref r0, out r1);
+                MatrixSIMD.Transpose(ref r1, out r0);
+                MatrixSIMD.Transpose(ref r0, out r1);
+                MatrixSIMD.Transpose(ref r1, out r0);
+                MatrixSIMD.Transpose(ref r0, out r1);
+                MatrixSIMD.Transpose(ref r1, out r0);
+                MatrixSIMD.Transpose(ref r0, out r1);
+                accumulator += r1.X.X;
+
+            }
+            return accumulator;
+        }
+
+        public unsafe static float TestSIMDScalarPointerTranspose(int iterationCount)
+        {
+            MatrixSIMD m = MatrixSIMD.Identity;
+            float accumulator = 0;
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                MatrixSIMD r0, r1;
+                MatrixSIMD.Transpose(&m, &r0);
+                MatrixSIMD.Transpose(&r0, &r1);
+                MatrixSIMD.Transpose(&r1, &r0);
+                MatrixSIMD.Transpose(&r0, &r1);
+                MatrixSIMD.Transpose(&r1, &r0);
+                MatrixSIMD.Transpose(&r0, &r1);
+                MatrixSIMD.Transpose(&r1, &r0);
+                MatrixSIMD.Transpose(&r0, &r1);
+                MatrixSIMD.Transpose(&r1, &r0);
+                MatrixSIMD.Transpose(&r0, &r1);
+                accumulator += r1.X.X;
+
+            }
+            return accumulator;
+        }
+
+        public static float TestScalarTranspose(int iterationCount)
+        {
+            Matrix m = Matrix.Identity;
+            float accumulator = 0;
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                Matrix r0, r1;
+                Matrix.Transpose(ref m, out r0);
+                Matrix.Transpose(ref r0, out r1);
+                Matrix.Transpose(ref r1, out r0);
+                Matrix.Transpose(ref r0, out r1);
+                Matrix.Transpose(ref r1, out r0);
+                Matrix.Transpose(ref r0, out r1);
+                Matrix.Transpose(ref r1, out r0);
+                Matrix.Transpose(ref r0, out r1);
+                Matrix.Transpose(ref r1, out r0);
+                Matrix.Transpose(ref r0, out r1);
+                accumulator += r1.M11;
+
+            }
+            return accumulator;
+        }
+
+        public static float TestSystemTranspose(int iterationCount)
+        {
+            Matrix4x4 m = Matrix4x4.Identity;
+            float accumulator = 0;
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                Matrix4x4 r0, r1;
+                r0 = Matrix4x4.Transpose(m);
+                r1 = Matrix4x4.Transpose(r0);
+                r0 = Matrix4x4.Transpose(r1);
+                r1 = Matrix4x4.Transpose(r0);
+                r0 = Matrix4x4.Transpose(r1);
+                r1 = Matrix4x4.Transpose(r0);
+                r0 = Matrix4x4.Transpose(r1);
+                r1 = Matrix4x4.Transpose(r0);
+                r0 = Matrix4x4.Transpose(r1);
+                r1 = Matrix4x4.Transpose(r0);
+                accumulator += r1.M11;
+
+            }
+            return accumulator;
+        }
+
         public static void Test()
         {
             TestMultiplyCorrectness();
             const int iterationCount = 10000000;
+            Helper.Test("Transpose SIMD", TestSIMDTranspose, iterationCount);
+            Helper.Test("Transpose SIMDscalarpointer", TestSIMDScalarPointerTranspose, iterationCount);
+            Helper.Test("Transpose Scalar", TestScalarTranspose, iterationCount);
+            Helper.Test("Transpose System", TestSystemTranspose, iterationCount);
 
             Helper.Test("Multiply SIMD", TestSIMDMultiply, iterationCount);
             Helper.Test("Multiply Scalar", TestScalarMultiply, iterationCount);

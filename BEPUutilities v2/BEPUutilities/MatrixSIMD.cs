@@ -42,12 +42,188 @@ namespace BEPUutilities
             }
         }
 
+        struct M
+        {
+            public float M11, M12, M13, M14;
+            public float M21, M22, M23, M24;
+            public float M31, M32, M33, M34;
+            public float M41, M42, M43, M44;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe static void Transpose(M* m, M* transposed)
+        {
+            //A weird function! Why?
+            //1) Missing some helpful instructions for actual SIMD accelerated transposition.
+            //2) Difficult to get SIMD types to generate competitive codegen due to lots of componentwise access.
+
+
+            //float intermediate = m->M12;
+            //transposed->M12 = m->M21;
+            //transposed->M21 = intermediate;
+
+            //intermediate = m->M13;
+            //transposed->M13 = m->M31;
+            //transposed->M31 = intermediate;
+
+            //intermediate = m->M14;
+            //transposed->M14 = m->M41;
+            //transposed->M41 = intermediate;
+
+            //intermediate = m->M23;
+            //transposed->M23 = m->M32;
+            //transposed->M32 = intermediate;
+
+            //intermediate = m->M24;
+            //transposed->M24 = m->M42;
+            //transposed->M42 = intermediate;
+
+            //intermediate = m->M34;
+            //transposed->M34 = m->M43;
+            //transposed->M43 = intermediate;
+
+            //transposed->M11 = m->M11;
+            //transposed->M22 = m->M22;
+            //transposed->M33 = m->M33;
+            //transposed->M44 = m->M44;
+
+            float m12 = m->M12;
+            float m13 = m->M13;
+            float m14 = m->M14;
+            float m23 = m->M23;
+            float m24 = m->M24;
+            float m34 = m->M34;
+            transposed->M11 = m->M11;
+            transposed->M12 = m->M21;
+            transposed->M13 = m->M31;
+            transposed->M14 = m->M41;
+
+            transposed->M21 = m12;
+            transposed->M22 = m->M22;
+            transposed->M23 = m->M32;
+            transposed->M24 = m->M42;
+
+            transposed->M31 = m13;
+            transposed->M32 = m23;
+            transposed->M33 = m->M33;
+            transposed->M34 = m->M43;
+
+            transposed->M41 = m14;
+            transposed->M42 = m24;
+            transposed->M43 = m34;
+            transposed->M44 = m->M44;
+
+            //float m12 = m->M12;
+            //float m13 = m->M13;
+            //float m14 = m->M14;
+            //float m23 = m->M23;
+            //float m24 = m->M24;
+            //float m34 = m->M34;
+            //transposed.X = new Vector4(m->M11, m->M21, m->M31, m->M41);
+            //transposed.Y = new Vector4(m12, m->M22, m->M32, m->M42);
+            //transposed.Z = new Vector4(m13, m23, m->M33, m->M43);
+            //transposed.W = new Vector4(m14, m24, m34, m->M44);
+
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe static void Transpose(MatrixSIMD* m, MatrixSIMD* transposed)
+        {
+            Transpose((M*)m, (M*)transposed);
+            //Transpose((M*)m, out *transposed);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Transpose(ref MatrixSIMD m, out MatrixSIMD transposed)
         {
+            //Not an ideal implementation. Shuffles would be handy.
+
+            //NOTE: this version will not work when m is the same reference as transposed.
+            //transposed.X = new Vector4(m.X.X, m.Y.X, m.Z.X, m.W.X);
+            //transposed.Y = new Vector4(m.X.Y, m.Y.Y, m.Z.Y, m.W.Y);
+            //transposed.Z = new Vector4(m.X.Z, m.Y.Z, m.Z.Z, m.W.Z);
+            //transposed.W = new Vector4(m.X.W, m.Y.W, m.Z.W, m.W.W);
+
+            //var yx = m.X.Y;
+            //var zx = m.X.Z;
+            //var wx = m.X.W;
+            //var zy = m.Y.Z;
+            //var wy = m.Y.W;
+            //var wz = m.Z.W;
+
+            //transposed.X = new Vector4(m.X.X, yx, zx, wx);
+            //transposed.Y = new Vector4(m.X.Y, m.Y.Y, zy, wy);
+            //transposed.Z = new Vector4(m.X.Z, m.Y.Z, m.Z.Z, wz);
+            //transposed.W = new Vector4(m.X.W, m.Y.W, m.Z.W, m.W.W);
+
+            var xy = m.X.Y;
+            var xz = m.X.Z;
+            var xw = m.X.W;
+            var yz = m.Y.Z;
+            var yw = m.Y.W;
+            var zw = m.Z.W;
             transposed.X = new Vector4(m.X.X, m.Y.X, m.Z.X, m.W.X);
-            transposed.Y = new Vector4(m.X.Y, m.Y.Y, m.Z.Y, m.W.Y);
-            transposed.Z = new Vector4(m.X.Z, m.Y.Z, m.Z.Z, m.W.Z);
-            transposed.W = new Vector4(m.X.W, m.Y.W, m.Z.W, m.W.W);
+            transposed.Y = new Vector4(xy, m.Y.Y, m.Z.Y, m.W.Y);
+            transposed.Z = new Vector4(xz, yz, m.Z.Z, m.W.Z);
+            transposed.W = new Vector4(xw, yw, zw, m.W.W);
+
+            //var xy = m.X.Y;
+            //var xz = m.X.Z;
+            //var xw = m.X.W;
+            //var yz = m.Y.Z;
+            //var yw = m.Y.W;
+            //var zw = m.Z.W;
+            //transposed.X.Y = m.Y.X;
+            //transposed.X.Z = m.Z.X;
+            //transposed.X.W = m.W.X;
+            //transposed.Y.Z = m.Z.Y;
+            //transposed.Y.W = m.W.Y;
+            //transposed.Z.W = m.W.Z;
+
+            //transposed.Y.X = xy;
+            //transposed.Z.X = xz;
+            //transposed.W.Y = xw;
+            //transposed.Z.Y = yz;
+            //transposed.W.Y = yw;
+            //transposed.W.Z = zw;
+
+
+
+            //transposed.X.X = m.X.X;
+            //transposed.Y.Y = m.Y.Y;
+            //transposed.Z.Z = m.Z.Z;
+            //transposed.W.W = m.W.W;
+
+
+            //float intermediate = m.M12;
+            //transposed.M12 = m.M21;
+            //transposed.M21 = intermediate;
+
+            //intermediate = m.M13;
+            //transposed.M13 = m.M31;
+            //transposed.M31 = intermediate;
+
+            //intermediate = m.M14;
+            //transposed.M14 = m.M41;
+            //transposed.M41 = intermediate;
+
+            //intermediate = m.M23;
+            //transposed.M23 = m.M32;
+            //transposed.M32 = intermediate;
+
+            //intermediate = m.M24;
+            //transposed.M24 = m.M42;
+            //transposed.M42 = intermediate;
+
+            //intermediate = m.M34;
+            //transposed.M34 = m.M43;
+            //transposed.M43 = intermediate;
+
+            //transposed.M11 = m.M11;
+            //transposed.M22 = m.M22;
+            //transposed.M33 = m.M33;
+            //transposed.M44 = m.M44;
         }
 
         /// <summary>
@@ -82,7 +258,7 @@ namespace BEPUutilities
             result = m.X * x + m.Y * y + m.Z * z + m.W * w;
         }
 
-        
+
 
         /// <summary>
         /// Multiplies a matrix by another matrix.
@@ -93,41 +269,6 @@ namespace BEPUutilities
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Multiply(ref MatrixSIMD a, ref MatrixSIMD b, out MatrixSIMD result)
         {
-            //Compensating for the possibility that b is actually the same variable as result worsens the runtime of the function.
-            //Instead, trust the user to use the other multiply function when necessary.
-
-            //{
-            //    var x = new Vector4(a.X.X);
-            //    var y = new Vector4(a.X.Y);
-            //    var z = new Vector4(a.X.Z);
-            //    var w = new Vector4(a.X.W);
-            //    result.X = (x * b.X + y * b.Y) + (z * b.Z + w * b.W);
-            //}
-
-            //{
-            //    var x = new Vector4(a.Y.X);
-            //    var y = new Vector4(a.Y.Y);
-            //    var z = new Vector4(a.Y.Z);
-            //    var w = new Vector4(a.Y.W);
-            //    result.Y = (x * b.X + y * b.Y) + (z * b.Z + w * b.W);
-            //}
-
-            //{
-            //    var x = new Vector4(a.Z.X);
-            //    var y = new Vector4(a.Z.Y);
-            //    var z = new Vector4(a.Z.Z);
-            //    var w = new Vector4(a.Z.W);
-            //    result.Z = (x * b.X + y * b.Y) + (z * b.Z + w * b.W);
-            //}
-
-            //{
-            //    var x = new Vector4(a.W.X);
-            //    var y = new Vector4(a.W.Y);
-            //    var z = new Vector4(a.W.Z);
-            //    var w = new Vector4(a.W.W);
-            //    result.W = (x * b.X + y * b.Y) + (z * b.Z + w * b.W);
-            //}
-
             var bX = b.X;
             var bY = b.Y;
             var bZ = b.Z;
@@ -162,136 +303,6 @@ namespace BEPUutilities
                 var w = new Vector4(a.W.W);
                 result.W = (x * bX + y * bY) + (z * bZ + w * b.W);
             }
-
-            //{
-            //    var x = new Vector4(a.X.X);
-            //    var y = new Vector4(a.X.Y);
-            //    result.X = x * b.X + y * b.Y;
-            //    var z = new Vector4(a.X.Z);
-            //    var w = new Vector4(a.X.W);
-            //    result.X += z * b.Z + w * b.W;
-            //}
-
-            //{
-            //    var x = new Vector4(a.Y.X);
-            //    var y = new Vector4(a.Y.Y);
-            //    result.Y = x * b.X + y * b.Y;
-            //    var z = new Vector4(a.Y.Z);
-            //    var w = new Vector4(a.Y.W);
-            //    result.Y += z * b.Z + w * b.W;
-            //}
-
-            //{
-            //    var x = new Vector4(a.Z.X);
-            //    var y = new Vector4(a.Z.Y);
-            //    result.Z = x * b.X + y * b.Y;
-            //    var z = new Vector4(a.Z.Z);
-            //    var w = new Vector4(a.Z.W);
-            //    result.Z += z * b.Z + w * b.W;
-            //}
-
-            //{
-            //    var x = new Vector4(a.W.X);
-            //    var y = new Vector4(a.W.Y);
-            //    result.W = x * b.X + y * b.Y;
-            //    var z = new Vector4(a.W.Z);
-            //    var w = new Vector4(a.W.W);
-            //    result.W += z * b.Z + w * b.W;
-            //}
-
-            //result.X = (new Vector4(a.X.X) * b.X + new Vector4(a.X.Y) * b.Y) + (new Vector4(a.X.Z) * b.Z + new Vector4(a.X.W) * b.W);
-            //result.Y = (new Vector4(a.Y.X) * b.X + new Vector4(a.Y.Y) * b.Y) + (new Vector4(a.Y.Z) * b.Z + new Vector4(a.Y.W) * b.W);
-            //result.Z = (new Vector4(a.Z.X) * b.X + new Vector4(a.Z.Y) * b.Y) + (new Vector4(a.Z.Z) * b.Z + new Vector4(a.Z.W) * b.W);
-            //result.W = (new Vector4(a.W.X) * b.X + new Vector4(a.W.Y) * b.Y) + (new Vector4(a.W.Z) * b.Z + new Vector4(a.W.W) * b.W);
-
-            //{
-            //    var x = new Vector4(a.X.X);
-            //    var y = new Vector4(a.X.Y);
-            //    var z = new Vector4(a.X.Z);
-            //    var w = new Vector4(a.X.W);
-            //    result.X = x * b.X + y * b.Y + z * b.Z + w * b.W;
-            //}
-
-            //{
-            //    var x = new Vector4(a.Y.X);
-            //    var y = new Vector4(a.Y.Y);
-            //    var z = new Vector4(a.Y.Z);
-            //    var w = new Vector4(a.Y.W);
-            //    result.Y = x * b.X + y * b.Y + z * b.Z + w * b.W;
-            //}
-
-            //{
-            //    var x = new Vector4(a.Z.X);
-            //    var y = new Vector4(a.Z.Y);
-            //    var z = new Vector4(a.Z.Z);
-            //    var w = new Vector4(a.Z.W);
-            //    result.Z = x * b.X + y * b.Y + z * b.Z + w * b.W;
-            //}
-
-            //{
-            //    var x = new Vector4(a.W.X);
-            //    var y = new Vector4(a.W.Y);
-            //    var z = new Vector4(a.W.Z);
-            //    var w = new Vector4(a.W.W);
-            //    result.W = x * b.X + y * b.Y + z * b.Z + w * b.W;
-            //}
-
-
-            //{
-            //    var x = new Vector4(a.X.X);
-            //    var y = new Vector4(a.X.Y);
-            //    var z = new Vector4(a.X.Z);
-            //    var w = new Vector4(a.X.W);
-            //    var intermediateX = x * b.X;
-            //    var intermediateY = y * b.Y;
-            //    var intermediateXY = intermediateX + intermediateY;
-            //    var intermediateZ = z * b.Z;
-            //    var intermediateW = w * b.W;
-            //    var intermediateZW = intermediateZ + intermediateW;
-            //    result.X = intermediateXY + intermediateZW;
-            //}
-
-            //{
-            //    var x = new Vector4(a.Y.X);
-            //    var y = new Vector4(a.Y.Y);
-            //    var z = new Vector4(a.Y.Z);
-            //    var w = new Vector4(a.Y.W);
-            //    var intermediateX = x * b.X;
-            //    var intermediateY = y * b.Y;
-            //    var intermediateXY = intermediateX + intermediateY;
-            //    var intermediateZ = z * b.Z;
-            //    var intermediateW = w * b.W;
-            //    var intermediateZW = intermediateZ + intermediateW;
-            //    result.Y = intermediateXY + intermediateZW;
-            //}
-
-            //{
-            //    var x = new Vector4(a.Z.X);
-            //    var y = new Vector4(a.Z.Y);
-            //    var z = new Vector4(a.Z.Z);
-            //    var w = new Vector4(a.Z.W);
-            //    var intermediateX = x * b.X;
-            //    var intermediateY = y * b.Y;
-            //    var intermediateXY = intermediateX + intermediateY;
-            //    var intermediateZ = z * b.Z;
-            //    var intermediateW = w * b.W;
-            //    var intermediateZW = intermediateZ + intermediateW;
-            //    result.Z = intermediateXY + intermediateZW;
-            //}
-
-            //{
-            //    var x = new Vector4(a.W.X);
-            //    var y = new Vector4(a.W.Y);
-            //    var z = new Vector4(a.W.Z);
-            //    var w = new Vector4(a.W.W);
-            //    var intermediateX = x * b.X;
-            //    var intermediateY = y * b.Y;
-            //    var intermediateXY = intermediateX + intermediateY;
-            //    var intermediateZ = z * b.Z;
-            //    var intermediateW = w * b.W;
-            //    var intermediateZW = intermediateZ + intermediateW;
-            //    result.W = intermediateXY + intermediateZW;
-            //}
         }
 
     }
