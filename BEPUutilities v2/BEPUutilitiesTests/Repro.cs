@@ -2,8 +2,9 @@
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
-namespace BEPUutilitiesTests
+namespace Repro
 {
     class Repro
     {
@@ -25,13 +26,17 @@ namespace BEPUutilitiesTests
             }
         }
 
+        [StructLayout(LayoutKind.Explicit, Size = 48)]
         public struct Matrix3
         {
+            [FieldOffset(0)]
             public Vector3 X;
+            [FieldOffset(16)]
             public Vector3 Y;
+            [FieldOffset(32)]
             public Vector3 Z;
 
-            //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void Transform(ref Vector3 v, ref Matrix3 m, out Vector3 result)
             {
                 var x = new Vector3(v.X);
@@ -85,7 +90,7 @@ namespace BEPUutilitiesTests
             //MATRIX3x3
             {
                 var v = new Vector3(1, 2, 3);
-                var m = new Matrix3
+                var m = new Matrix3 
                 {
                     X = new Vector3(1, 0, 0),
                     Y = new Vector3(0, 1, 0),
