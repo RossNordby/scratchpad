@@ -29,7 +29,7 @@ namespace BEPUutilitiesTests
                 Matrix.Transform(ref r0, ref m, out r1);
                 Matrix.Transform(ref r1, ref m, out r0);
                 Matrix.Transform(ref r0, ref m, out r1);
-                accumulator += 0.000001f * r1.LengthSquared();
+                accumulator += 0.000001f * r1.X;
             }
             return accumulator;
         }
@@ -51,7 +51,7 @@ namespace BEPUutilitiesTests
                 r1 = Vector4.Transform(r0, m);
                 r0 = Vector4.Transform(r1, m);
                 r1 = Vector4.Transform(r0, m);
-                accumulator += 0.000001f * r1.LengthSquared();
+                accumulator += 0.000001f * r1.X;
             }
             return accumulator;
         }
@@ -73,7 +73,7 @@ namespace BEPUutilitiesTests
                 MatrixSIMD.TransformTranspose(ref r0, ref m, out r1);
                 MatrixSIMD.TransformTranspose(ref r1, ref m, out r0);
                 MatrixSIMD.TransformTranspose(ref r0, ref m, out r1);
-                accumulator += 0.000001f * r1.LengthSquared();
+                accumulator += 0.000001f * r1.X;
             }
             return accumulator;
         }
@@ -96,7 +96,7 @@ namespace BEPUutilitiesTests
                 MatrixSIMD.Transform(ref r0, ref m, out r1);
                 MatrixSIMD.Transform(ref r1, ref m, out r0);
                 MatrixSIMD.Transform(ref r0, ref m, out r1);
-                accumulator += 0.000001f * r1.LengthSquared();
+                accumulator += 0.000001f * r1.X;
             }
             return accumulator;
         }
@@ -412,6 +412,7 @@ namespace BEPUutilitiesTests
 
         public static void Test()
         {
+            Console.WriteLine("MATRIX4x4 RESULTS:");
             TestMultiplyCorrectness();
             const int iterationCount = 10000000;
             Helper.Test("Transpose SIMD", TestSIMDTranspose, iterationCount);

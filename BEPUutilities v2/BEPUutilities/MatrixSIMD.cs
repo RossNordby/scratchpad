@@ -31,6 +31,7 @@ namespace BEPUutilities
 
         public static MatrixSIMD Identity
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
                 MatrixSIMD result;
@@ -57,36 +58,6 @@ namespace BEPUutilities
             //1) Missing some helpful instructions for actual SIMD accelerated transposition.
             //2) Difficult to get SIMD types to generate competitive codegen due to lots of componentwise access.
 
-
-            //float intermediate = m->M12;
-            //transposed->M12 = m->M21;
-            //transposed->M21 = intermediate;
-
-            //intermediate = m->M13;
-            //transposed->M13 = m->M31;
-            //transposed->M31 = intermediate;
-
-            //intermediate = m->M14;
-            //transposed->M14 = m->M41;
-            //transposed->M41 = intermediate;
-
-            //intermediate = m->M23;
-            //transposed->M23 = m->M32;
-            //transposed->M32 = intermediate;
-
-            //intermediate = m->M24;
-            //transposed->M24 = m->M42;
-            //transposed->M42 = intermediate;
-
-            //intermediate = m->M34;
-            //transposed->M34 = m->M43;
-            //transposed->M43 = intermediate;
-
-            //transposed->M11 = m->M11;
-            //transposed->M22 = m->M22;
-            //transposed->M33 = m->M33;
-            //transposed->M44 = m->M44;
-
             float m12 = m->M12;
             float m13 = m->M13;
             float m14 = m->M14;
@@ -112,18 +83,7 @@ namespace BEPUutilities
             transposed->M42 = m24;
             transposed->M43 = m34;
             transposed->M44 = m->M44;
-
-            //float m12 = m->M12;
-            //float m13 = m->M13;
-            //float m14 = m->M14;
-            //float m23 = m->M23;
-            //float m24 = m->M24;
-            //float m34 = m->M34;
-            //transposed.X = new Vector4(m->M11, m->M21, m->M31, m->M41);
-            //transposed.Y = new Vector4(m12, m->M22, m->M32, m->M42);
-            //transposed.Z = new Vector4(m13, m23, m->M33, m->M43);
-            //transposed.W = new Vector4(m14, m24, m34, m->M44);
-
+            
         }
 
 
@@ -131,32 +91,13 @@ namespace BEPUutilities
         public unsafe static void Transpose(MatrixSIMD* m, MatrixSIMD* transposed)
         {
             Transpose((M*)m, (M*)transposed);
-            //Transpose((M*)m, out *transposed);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Transpose(ref MatrixSIMD m, out MatrixSIMD transposed)
         {
             //Not an ideal implementation. Shuffles would be handy.
-
-            //NOTE: this version will not work when m is the same reference as transposed.
-            //transposed.X = new Vector4(m.X.X, m.Y.X, m.Z.X, m.W.X);
-            //transposed.Y = new Vector4(m.X.Y, m.Y.Y, m.Z.Y, m.W.Y);
-            //transposed.Z = new Vector4(m.X.Z, m.Y.Z, m.Z.Z, m.W.Z);
-            //transposed.W = new Vector4(m.X.W, m.Y.W, m.Z.W, m.W.W);
-
-            //var yx = m.X.Y;
-            //var zx = m.X.Z;
-            //var wx = m.X.W;
-            //var zy = m.Y.Z;
-            //var wy = m.Y.W;
-            //var wz = m.Z.W;
-
-            //transposed.X = new Vector4(m.X.X, yx, zx, wx);
-            //transposed.Y = new Vector4(m.X.Y, m.Y.Y, zy, wy);
-            //transposed.Z = new Vector4(m.X.Z, m.Y.Z, m.Z.Z, wz);
-            //transposed.W = new Vector4(m.X.W, m.Y.W, m.Z.W, m.W.W);
-
+            
             var xy = m.X.Y;
             var xz = m.X.Z;
             var xw = m.X.W;
@@ -167,63 +108,6 @@ namespace BEPUutilities
             transposed.Y = new Vector4(xy, m.Y.Y, m.Z.Y, m.W.Y);
             transposed.Z = new Vector4(xz, yz, m.Z.Z, m.W.Z);
             transposed.W = new Vector4(xw, yw, zw, m.W.W);
-
-            //var xy = m.X.Y;
-            //var xz = m.X.Z;
-            //var xw = m.X.W;
-            //var yz = m.Y.Z;
-            //var yw = m.Y.W;
-            //var zw = m.Z.W;
-            //transposed.X.Y = m.Y.X;
-            //transposed.X.Z = m.Z.X;
-            //transposed.X.W = m.W.X;
-            //transposed.Y.Z = m.Z.Y;
-            //transposed.Y.W = m.W.Y;
-            //transposed.Z.W = m.W.Z;
-
-            //transposed.Y.X = xy;
-            //transposed.Z.X = xz;
-            //transposed.W.Y = xw;
-            //transposed.Z.Y = yz;
-            //transposed.W.Y = yw;
-            //transposed.W.Z = zw;
-
-
-
-            //transposed.X.X = m.X.X;
-            //transposed.Y.Y = m.Y.Y;
-            //transposed.Z.Z = m.Z.Z;
-            //transposed.W.W = m.W.W;
-
-
-            //float intermediate = m.M12;
-            //transposed.M12 = m.M21;
-            //transposed.M21 = intermediate;
-
-            //intermediate = m.M13;
-            //transposed.M13 = m.M31;
-            //transposed.M31 = intermediate;
-
-            //intermediate = m.M14;
-            //transposed.M14 = m.M41;
-            //transposed.M41 = intermediate;
-
-            //intermediate = m.M23;
-            //transposed.M23 = m.M32;
-            //transposed.M32 = intermediate;
-
-            //intermediate = m.M24;
-            //transposed.M24 = m.M42;
-            //transposed.M42 = intermediate;
-
-            //intermediate = m.M34;
-            //transposed.M34 = m.M43;
-            //transposed.M43 = intermediate;
-
-            //transposed.M11 = m.M11;
-            //transposed.M22 = m.M22;
-            //transposed.M33 = m.M33;
-            //transposed.M44 = m.M44;
         }
 
         /// <summary>

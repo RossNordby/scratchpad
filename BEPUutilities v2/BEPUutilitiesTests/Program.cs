@@ -8,12 +8,15 @@ namespace BEPUutilitiesTests
 {
     class Program
     {
-       
+        //static void Main(string[] args)
+        //{
+        //    Vector3Tests.Test();
+        //    Console.WriteLine();
+        //    Matrix3x3Tests.Test();
+        //    Console.WriteLine();
+        //    Matrix4x4Tests.Test();
 
-        static void Main(string[] args)
-        {
-            Vector3Tests.Test(); 
-            Matrix4x4Tests.Test();
-        }
+        //}
+
     }
 }
