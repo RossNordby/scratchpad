@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace BEPUutilities.Threading
+namespace BEPUutilities2.Threading
 {
     /// <summary>
     /// Manages parallel for loops.

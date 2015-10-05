@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// Extra functionality for the Vector3 struct.

@@ -3,7 +3,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     ///<summary>
     /// A transformation composed of a linear transformation and a translation.

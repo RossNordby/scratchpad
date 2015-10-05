@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace BEPUutilities.DataStructures
+namespace BEPUutilities2.DataStructures
 {
     //THIS SHOULD ONLY BE USED ON VALUE TYPES WHICH HAVE NO REFERENCES TO HEAP OBJECTS.
     ///<summary>

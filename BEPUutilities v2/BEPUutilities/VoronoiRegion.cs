@@ -1,4 +1,4 @@
-﻿namespace BEPUutilities
+﻿namespace BEPUutilities2
 {
     public enum VoronoiRegion
     {

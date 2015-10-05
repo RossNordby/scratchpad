@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Numerics;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// Contains conditional extensions to check for bad values in various structures.
@@ -45,48 +45,6 @@ namespace BEPUutilities
             }
         }
 
-        /// <summary>
-        /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.
-        /// This is only run when the CHECKMATH symbol is defined.
-        /// </summary>
-        [Conditional("CHECKMATH")]
-        public static void Validate(this Matrix2x2 m)
-        {
-            if (IsInvalid(m.M11) || IsInvalid(m.M12) ||
-                IsInvalid(m.M21) || IsInvalid(m.M22))
-            {
-                throw new NotFiniteNumberException("Invalid value.");
-            }
-        }
-
-        /// <summary>
-        /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.
-        /// This is only run when the CHECKMATH symbol is defined.
-        /// </summary>
-        [Conditional("CHECKMATH")]
-        public static void Validate(this Matrix3x2 m)
-        {
-            if (IsInvalid(m.M11) || IsInvalid(m.M12) ||
-                IsInvalid(m.M21) || IsInvalid(m.M22) ||
-                IsInvalid(m.M31) || IsInvalid(m.M32))
-            {
-                throw new NotFiniteNumberException("Invalid value.");
-            }
-        }
-
-        /// <summary>
-        /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.
-        /// This is only run when the CHECKMATH symbol is defined.
-        /// </summary>
-        [Conditional("CHECKMATH")]
-        public static void Validate(this Matrix2x3 m)
-        {
-            if (IsInvalid(m.M11) || IsInvalid(m.M12) || IsInvalid(m.M13) ||
-                IsInvalid(m.M21) || IsInvalid(m.M22) || IsInvalid(m.M23))
-            {
-                throw new NotFiniteNumberException("Invalid value.");
-            }
-        }
 
         /// <summary>
         /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.

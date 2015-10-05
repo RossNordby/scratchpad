@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// Contains helper math methods.

@@ -1,6 +1,6 @@
 using System;
 
-namespace BEPUutilities.Threading
+namespace BEPUutilities2.Threading
 {
 
     /// <summary>

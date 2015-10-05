@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     ///<summary>
     /// Contains ray hit data.

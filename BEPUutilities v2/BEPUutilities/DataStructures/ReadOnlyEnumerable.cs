@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 
-namespace BEPUutilities.DataStructures
+namespace BEPUutilities2.DataStructures
 {
     ///<summary>
     /// Wraps an enumerable in a temporary enumeration struct.

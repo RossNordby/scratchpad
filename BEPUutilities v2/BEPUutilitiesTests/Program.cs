@@ -1,5 +1,5 @@
-﻿using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
+﻿using BEPUutilities2.DataStructures;
+using BEPUutilities2.ResourceManagement;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;

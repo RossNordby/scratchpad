@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
+using BEPUutilities2.DataStructures;
+using BEPUutilities2.ResourceManagement;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     //TODO: It would be nice to split and improve this monolith into individually superior, organized components.
 

@@ -1,4 +1,4 @@
-﻿namespace BEPUutilities
+﻿namespace BEPUutilities2
 {
     ///<summary>
     /// Sidedness of a triangle or mesh.

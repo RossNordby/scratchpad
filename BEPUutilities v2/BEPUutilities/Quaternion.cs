@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// Provides XNA-like quaternion support.

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace BEPUutilities.DataStructures
+namespace BEPUutilities2.DataStructures
 {
     ///<summary>
     /// Dictionary that provides events when the inner dictionary is changed.

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Runtime.CompilerServices;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// A set of 3 integers, useful for spatial hashing.

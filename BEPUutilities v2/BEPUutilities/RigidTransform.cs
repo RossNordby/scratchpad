@@ -2,7 +2,7 @@
 
 using System.Numerics;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     ///<summary>
     /// Transform composed of a rotation and translation.

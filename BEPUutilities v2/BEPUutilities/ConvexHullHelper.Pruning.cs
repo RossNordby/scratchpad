@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
+using BEPUutilities2.DataStructures;
+using BEPUutilities2.ResourceManagement;
 using System.Numerics;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     public static partial class ConvexHullHelper
     {

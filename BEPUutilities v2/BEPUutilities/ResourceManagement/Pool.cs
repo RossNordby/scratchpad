@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace BEPUutilities.ResourceManagement
+namespace BEPUutilities2.ResourceManagement
 {
     /// <summary>
     /// Manages a cache of a type of resource.

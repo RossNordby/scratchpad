@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using BEPUutilities;
-using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
+using BEPUutilities2;
+using BEPUutilities2.DataStructures;
+using BEPUutilities2.ResourceManagement;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// Processes vertex data into convex hulls.

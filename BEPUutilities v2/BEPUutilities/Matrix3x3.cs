@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Numerics;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// 3 row, 3 column matrix.

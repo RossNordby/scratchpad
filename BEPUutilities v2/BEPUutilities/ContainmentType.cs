@@ -1,4 +1,4 @@
-﻿namespace BEPUutilities
+﻿namespace BEPUutilities2
 {
     /// <summary>
     /// The current containment state of two objects.

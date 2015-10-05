@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace BEPUutilities.ResourceManagement
+namespace BEPUutilities2.ResourceManagement
 {
     /// <summary>
     /// Provides storage for reusable arrays with power-of-2 lengths. Does not do any locking at all.

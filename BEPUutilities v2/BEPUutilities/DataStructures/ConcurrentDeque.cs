@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace BEPUutilities.DataStructures
+namespace BEPUutilities2.DataStructures
 {
     /// <summary>
     /// Locked queue supporting dequeues from both ends.

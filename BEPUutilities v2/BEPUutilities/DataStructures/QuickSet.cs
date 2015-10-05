@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using BEPUutilities.ResourceManagement;
+using BEPUutilities2.ResourceManagement;
 #if FORCEINLINE
 using System.Runtime.CompilerServices;
 #endif
 
-namespace BEPUutilities.DataStructures
+namespace BEPUutilities2.DataStructures
 {
     /// <summary>
     /// Container supporting constant time adds and removes while preserving fast iteration times.

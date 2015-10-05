@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {
     /// <summary>
     /// Maps indices to permuted versions of the indices.

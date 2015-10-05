@@ -4,7 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 
-namespace BEPUutilities
+namespace BEPUutilities2
 {    
     /// <summary>
     /// Provides XNA-like bounding sphere functionality.

@@ -1,10 +1,10 @@
-﻿using BEPUutilities.DataStructures;
+﻿using BEPUutilities2.DataStructures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace BEPUutilities.ResourceManagement
+namespace BEPUutilities2.ResourceManagement
 {
     /// <summary>
     /// Contains references to all buffer pools created by BufferPools{T}.

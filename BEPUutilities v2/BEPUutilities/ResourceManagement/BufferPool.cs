@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace BEPUutilities.ResourceManagement
+namespace BEPUutilities2.ResourceManagement
 {
     /// <summary>
     /// Contains static helpers for use with buffer pools, avoiding unnecessary type parameters.
