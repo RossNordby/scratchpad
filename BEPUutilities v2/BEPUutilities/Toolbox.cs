@@ -64,12 +64,7 @@ namespace BEPUutilities2
         /// Reference for a vector with dimensions (0,1,0).
         /// </summary>
         public static Vector3 UpVector = new Vector3(0, 1, 0);
-
-        /// <summary>
-        /// Matrix containing zeroes for every element.
-        /// </summary>
-        public static Matrix ZeroMatrix = new Matrix(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
+        
         /// <summary>
         /// Reference for a vector with dimensions (0,0,0).
         /// </summary>

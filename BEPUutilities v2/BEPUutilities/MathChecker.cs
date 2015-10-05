@@ -45,17 +45,30 @@ namespace BEPUutilities2
             }
         }
 
+        /// <summary>
+        /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.
+        /// This is only run when the CHECKMATH symbol is defined.
+        /// </summary>
+        [Conditional("CHECKMATH")]
+        public static void Validate(this Vector4 v)
+        {
+            if (IsInvalid(v.LengthSquared()))
+            {
+                throw new NotFiniteNumberException("Invalid value.");
+            }
+        }
+
 
         /// <summary>
         /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.
         /// This is only run when the CHECKMATH symbol is defined.
         /// </summary>
         [Conditional("CHECKMATH")]
-        public static void Validate(this Matrix3x3 m)
+        public static void Validate(this Matrix3x3SIMD m)
         {
-            m.Right.Validate();
-            m.Up.Validate();
-            m.Backward.Validate();
+            m.X.Validate();
+            m.Y.Validate();
+            m.Z.Validate();
         }
 
         /// <summary>
@@ -63,16 +76,12 @@ namespace BEPUutilities2
         /// This is only run when the CHECKMATH symbol is defined.
         /// </summary>
         [Conditional("CHECKMATH")]
-        public static void Validate(this Matrix m)
+        public static void Validate(this MatrixSIMD m)
         {
-            m.Right.Validate();
-            m.Up.Validate();
-            m.Backward.Validate();
-            m.Translation.Validate();
-            if (IsInvalid(m.M14) || IsInvalid(m.M24) || IsInvalid(m.M34) || IsInvalid(m.M44))
-            {
-                throw new NotFiniteNumberException("Invalid value.");
-            }
+            m.X.Validate();
+            m.Y.Validate();
+            m.Z.Validate();
+            m.W.Validate();
         }
 
         /// <summary>
@@ -104,7 +113,7 @@ namespace BEPUutilities2
         /// This is only run when the CHECKMATH symbol is defined.
         /// </summary>
         [Conditional("CHECKMATH")]
-        public static void Validate(this AffineTransform a)
+        public static void Validate(this AffineTransformSIMD a)
         {
             a.LinearTransform.Validate();
             a.Translation.Validate();

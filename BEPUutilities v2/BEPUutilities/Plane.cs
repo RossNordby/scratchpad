@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
 {
@@ -22,6 +23,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="position">A point on the plane.</param>
         /// <param name="normal">The normal of the plane.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Plane(ref Vector3 position, ref Vector3 normal)
         {
             D = -Vector3.Dot(position, normal);
@@ -34,6 +36,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="position">A point on the plane.</param>
         /// <param name="normal">The normal of the plane.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Plane(Vector3 position, Vector3 normal)
             : this(ref position, ref normal)
         {
@@ -46,6 +49,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="normal">Normal of the plane.</param>
         /// <param name="d">Negative distance to the plane from the origin along the normal.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Plane(Vector3 normal, float d)
             : this(ref normal, d)
         {
@@ -56,6 +60,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="normal">Normal of the plane.</param>
         /// <param name="d">Negative distance to the plane from the origin along the normal.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Plane(ref Vector3 normal, float d)
         {
             this.Normal = normal;
@@ -66,10 +71,11 @@ namespace BEPUutilities2
         /// Gets the dot product of the position offset from the plane along the plane's normal.
         /// </summary>
         /// <param name="v">Position to compute the dot product of.</param>
-        /// <param name="dot">Dot product.</param>
-        public void DotCoordinate(ref Vector3 v, out float dot)
+        /// <returns>Dot product.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public float DotCoordinate(ref Vector3 v)
         {
-            dot = Normal.X * v.X + Normal.Y * v.Y + Normal.Z * v.Z + D;
+            return Vector3.Dot(Normal, v) + D;
         }
     }
 }

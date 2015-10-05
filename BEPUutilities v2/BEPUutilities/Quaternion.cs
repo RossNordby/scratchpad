@@ -150,9 +150,9 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="r">Rotation matrix to create the quaternion from.</param>
         /// <param name="q">Quaternion based on the rotation matrix.</param>
-        public static void CreateFromRotationMatrix(ref Matrix3x3 r, out Quaternion q)
+        public static void CreateFromRotationMatrix(ref Matrix3x3SIMD r, out Quaternion q)
         {
-            float trace = r.M11 + r.M22 + r.M33;
+            float trace = r.X.X + r.Y.Y + r.Z.Z;
 #if !WINDOWS
             q = new Quaternion();
 #endif
@@ -161,35 +161,35 @@ namespace BEPUutilities2
                 var S = (float)Math.Sqrt(trace + 1.0) * 2; // S=4*qw 
                 var inverseS = 1 / S;
                 q.W = 0.25f * S;
-                q.X = (r.M23 - r.M32) * inverseS;
-                q.Y = (r.M31 - r.M13) * inverseS;
-                q.Z = (r.M12 - r.M21) * inverseS;
+                q.X = (r.Y.Z - r.Z.Y) * inverseS;
+                q.Y = (r.Z.X - r.X.Z) * inverseS;
+                q.Z = (r.X.Y - r.Y.X) * inverseS;
             }
-            else if ((r.M11 > r.M22) & (r.M11 > r.M33))
+            else if ((r.X.X > r.Y.Y) & (r.X.X > r.Z.Z))
             {
-                var S = (float)Math.Sqrt(1.0 + r.M11 - r.M22 - r.M33) * 2; // S=4*qx 
+                var S = (float)Math.Sqrt(1.0 + r.X.X - r.Y.Y - r.Z.Z) * 2; // S=4*qx 
                 var inverseS = 1 / S;
-                q.W = (r.M23 - r.M32) * inverseS;
+                q.W = (r.Y.Z - r.Z.Y) * inverseS;
                 q.X = 0.25f * S;
-                q.Y = (r.M21 + r.M12) * inverseS;
-                q.Z = (r.M31 + r.M13) * inverseS;
+                q.Y = (r.Y.X + r.X.Y) * inverseS;
+                q.Z = (r.Z.X + r.X.Z) * inverseS;
             }
-            else if (r.M22 > r.M33)
+            else if (r.Y.Y > r.Z.Z)
             {
-                var S = (float)Math.Sqrt(1.0 + r.M22 - r.M11 - r.M33) * 2; // S=4*qy
+                var S = (float)Math.Sqrt(1.0 + r.Y.Y - r.X.X - r.Z.Z) * 2; // S=4*qy
                 var inverseS = 1 / S;
-                q.W = (r.M31 - r.M13) * inverseS;
-                q.X = (r.M21 + r.M12) * inverseS;
+                q.W = (r.Z.X - r.X.Z) * inverseS;
+                q.X = (r.Y.X + r.X.Y) * inverseS;
                 q.Y = 0.25f * S;
-                q.Z = (r.M32 + r.M23) * inverseS;
+                q.Z = (r.Z.Y + r.Y.Z) * inverseS;
             }
             else
             {
-                var S = (float)Math.Sqrt(1.0 + r.M33 - r.M11 - r.M22) * 2; // S=4*qz
+                var S = (float)Math.Sqrt(1.0 + r.Z.Z - r.X.X - r.Y.Y) * 2; // S=4*qz
                 var inverseS = 1 / S;
-                q.W = (r.M12 - r.M21) * inverseS;
-                q.X = (r.M31 + r.M13) * inverseS;
-                q.Y = (r.M32 + r.M23) * inverseS;
+                q.W = (r.X.Y - r.Y.X) * inverseS;
+                q.X = (r.Z.X + r.X.Z) * inverseS;
+                q.Y = (r.Z.Y + r.Y.Z) * inverseS;
                 q.Z = 0.25f * S;
             }
         }
@@ -199,49 +199,13 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="r">Rotation matrix used to create a new quaternion.</param>
         /// <returns>Quaternion representing the same rotation as the matrix.</returns>
-        public static Quaternion CreateFromRotationMatrix(Matrix3x3 r)
+        public static Quaternion CreateFromRotationMatrix(Matrix3x3SIMD r)
         {
             Quaternion toReturn;
             CreateFromRotationMatrix(ref r, out toReturn);
             return toReturn;
         }
-
-        /// <summary>
-        /// Constructs a quaternion from a rotation matrix.
-        /// </summary>
-        /// <param name="r">Rotation matrix to create the quaternion from.</param>
-        /// <param name="q">Quaternion based on the rotation matrix.</param>
-        public static void CreateFromRotationMatrix(ref Matrix r, out Quaternion q)
-        {
-            Matrix3x3 downsizedMatrix;
-            Matrix3x3.CreateFromMatrix(ref r, out downsizedMatrix);
-            CreateFromRotationMatrix(ref downsizedMatrix, out q);
-        }
-
-        /// <summary>
-        /// Creates a quaternion from a rotation matrix.
-        /// </summary>
-        /// <param name="r">Rotation matrix used to create a new quaternion.</param>
-        /// <returns>Quaternion representing the same rotation as the matrix.</returns>
-        public static Quaternion CreateFromRotationMatrix(Matrix r)
-        {
-            Quaternion toReturn;
-            CreateFromRotationMatrix(ref r, out toReturn);
-            return toReturn;
-        }
-
-
-        /// <summary>
-        /// Ensures the quaternion has unit length.
-        /// </summary>
-        /// <param name="quaternion">Quaternion to normalize.</param>
-        /// <returns>Normalized quaternion.</returns>
-        public static Quaternion Normalize(Quaternion quaternion)
-        {
-            Quaternion toReturn;
-            Normalize(ref quaternion, out toReturn);
-            return toReturn;
-        }
+        
 
         /// <summary>
         /// Ensures the quaternion has unit length.

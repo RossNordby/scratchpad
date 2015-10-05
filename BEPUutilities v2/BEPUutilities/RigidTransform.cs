@@ -49,33 +49,7 @@ namespace BEPUutilities2
             Orientation = orienation;
         }
 
-        /// <summary>
-        /// Gets the orientation matrix created from the orientation of the rigid transform.
-        /// </summary>
-        public Matrix OrientationMatrix
-        {
-            get
-            {
-                Matrix toReturn;
-                Matrix.CreateFromQuaternion(ref Orientation, out toReturn);
-                return toReturn;
-            }
-        }
-        ///<summary>
-        /// Gets the 4x4 matrix created from the rigid transform.
-        ///</summary>
-        public Matrix Matrix
-        {
-            get
-            {
-                Matrix toReturn;
-                Matrix.CreateFromQuaternion(ref Orientation, out toReturn);
-                toReturn.Translation = Position;
-                return toReturn;
-            }
-        }
-
-      
+    
 
         ///<summary>
         /// Gets the identity rigid transform.

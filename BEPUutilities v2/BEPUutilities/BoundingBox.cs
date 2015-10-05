@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace BEPUutilities2
@@ -26,108 +27,67 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="min">Location with the lowest X, Y, and Z coordinates contained by the axis-aligned bounding box.</param>
         /// <param name="max">Location with the highest X, Y, and Z coordinates contained by the axis-aligned bounding box.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public BoundingBox(Vector3 min, Vector3 max)
         {
             this.Min = min;
             this.Max = max;
         }
 
-        /// <summary>
-        /// Gets an array of locations corresponding to the 8 corners of the bounding box.
-        /// </summary>
-        /// <returns>Corners of the bounding box.</returns>
-        public Vector3[] GetCorners()
-        {
-            var toReturn = new Vector3[8];
-            toReturn[0] = new Vector3(Min.X, Max.Y, Max.Z);
-            toReturn[1] = Max;
-            toReturn[2] = new Vector3(Max.X, Min.Y, Max.Z);
-            toReturn[3] = new Vector3(Min.X, Min.Y, Max.Z);
-            toReturn[4] = new Vector3(Min.X, Max.Y, Min.Z);
-            toReturn[5] = new Vector3(Max.X, Max.Y, Min.Z);
-            toReturn[6] = new Vector3(Max.X, Min.Y, Min.Z);
-            toReturn[7] = Min;
-            return toReturn;
-        }
-
 
         /// <summary>
         /// Determines if a bounding box intersects another bounding box.
         /// </summary>
-        /// <param name="boundingBox">Bounding box to test against.</param>
+        /// <param name="a">First bounding box to test.</param>
+        /// <param name="b">Second bounding box to test.</param>
         /// <returns>Whether the bounding boxes intersected.</returns>
-        public bool Intersects(BoundingBox boundingBox)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Intersects(ref BoundingBox a, ref BoundingBox b)
         {
-            if (boundingBox.Min.X > Max.X || boundingBox.Min.Y > Max.Y || boundingBox.Min.Z > Max.Z)
-                return false;
-            if (Min.X > boundingBox.Max.X || Min.Y > boundingBox.Max.Y || Min.Z > boundingBox.Max.Z)
-                return false;
-            return true;
+            return a.Max.X >= b.Min.X & a.Max.Y >= b.Min.Y & a.Max.Z >= b.Min.Z &
+                   b.Max.X >= a.Min.X & b.Max.Y >= a.Min.Y & b.Max.Z >= a.Min.Z;
+        }
 
+
+        /// <summary>
+        /// Computes the volume of the bounding box.
+        /// </summary>
+        /// <param name="box">Bounding box to measure.</param>
+        /// <returns>Volume of the bounding box.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe float ComputeVolume(ref BoundingBox box)
+        {
+            var diagonal = (box.Max - box.Min);
+            return diagonal.X * diagonal.Y * diagonal.Z;
         }
 
         /// <summary>
-        /// Determines if a bounding box intersects another bounding box.
+        /// Computes a bounding box which contains two other bounding boxes.
         /// </summary>
-        /// <param name="boundingBox">Bounding box to test against.</param>
-        /// <param name="intersects">Whether the bounding boxes intersect.</param>
-        public void Intersects(ref BoundingBox boundingBox, out bool intersects)
+        /// <param name="a">First bounding box to contain.</param>
+        /// <param name="b">Second bounding box to contain.</param>
+        /// <param name="merged">Bounding box to contain both input boxes.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateMerged(ref BoundingBox a, ref BoundingBox b, out BoundingBox merged)
         {
-            if (boundingBox.Min.X > Max.X || boundingBox.Min.Y > Max.Y || boundingBox.Min.Z > Max.Z)
-            {
-                intersects = false;
-                return;
-            }
-            if (Min.X > boundingBox.Max.X || Min.Y > boundingBox.Max.Y || Min.Z > boundingBox.Max.Z)
-            {
-                intersects = false;
-                return;
-            }
-            intersects = true;
+            merged.Min = Vector3.Min(a.Min, b.Min);
+            merged.Max = Vector3.Max(a.Max, b.Max);
         }
 
         /// <summary>
         /// Determines if a bounding box intersects a bounding sphere.
         /// </summary>
         /// <param name="boundingSphere">Sphere to test for intersection.</param>
-        /// <param name="intersects">Whether the bounding shapes intersect.</param>
-        public void Intersects(ref BoundingSphere boundingSphere, out bool intersects)
+        /// <returns>Whether the bounding shapes intersect.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Intersects(ref BoundingSphere boundingSphere)
         {
-            Vector3 clampedLocation;
-            if (boundingSphere.Center.X > Max.X)
-                clampedLocation.X = Max.X;
-            else if (boundingSphere.Center.X < Min.X)
-                clampedLocation.X = Min.X;
-            else
-                clampedLocation.X = boundingSphere.Center.X;
-
-            if (boundingSphere.Center.Y > Max.Y)
-                clampedLocation.Y = Max.Y;
-            else if (boundingSphere.Center.Y < Min.Y)
-                clampedLocation.Y = Min.Y;
-            else
-                clampedLocation.Y = boundingSphere.Center.Y;
-
-            if (boundingSphere.Center.Z > Max.Z)
-                clampedLocation.Z = Max.Z;
-            else if (boundingSphere.Center.Z < Min.Z)
-                clampedLocation.Z = Min.Z;
-            else
-                clampedLocation.Z = boundingSphere.Center.Z;
-
-            var offset = boundingSphere.Center - clampedLocation;
-            float distanceSquared = Vector3.Dot(offset, offset);
-            intersects = distanceSquared <= boundingSphere.Radius * boundingSphere.Radius;
+            var offset = boundingSphere.Center - Vector3.Min(Vector3.Max(boundingSphere.Center, Min), Max);
+            return Vector3.Dot(offset, offset) <= boundingSphere.Radius * boundingSphere.Radius;
 
         }
 
-        //public bool Intersects(BoundingFrustum frustum)
-        //{
-        //    bool intersects;
-        //    frustum.Intersects(ref this, out intersects);
-        //    return intersects;
-        //}
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ContainmentType Contains(ref BoundingBox boundingBox)
         {
             if (Max.X < boundingBox.Min.X || Min.X > boundingBox.Max.X ||
@@ -158,61 +118,13 @@ namespace BEPUutilities2
             aabb.Max = aabb.Min;
             for (int i = points.Count - 1; i >= 1; i--)
             {
-                Vector3 v = points[i];
-                if (v.X < aabb.Min.X)
-                    aabb.Min.X = v.X;
-                else if (v.X > aabb.Max.X)
-                    aabb.Max.X = v.X;
-
-                if (v.Y < aabb.Min.Y)
-                    aabb.Min.Y = v.Y;
-                else if (v.Y > aabb.Max.Y)
-                    aabb.Max.Y = v.Y;
-
-                if (v.Z < aabb.Min.Z)
-                    aabb.Min.Z = v.Z;
-                else if (v.Z > aabb.Max.Z)
-                    aabb.Max.Z = v.Z;
+                aabb.Min = Vector3.Min(points[i], aabb.Min);
+                aabb.Max = Vector3.Max(points[i], aabb.Max);
             }
             return aabb;
         }
 
 
-
-        /// <summary>
-        /// Creates the smallest bounding box which contains two other bounding boxes.
-        /// </summary>
-        /// <param name="a">First bounding box to be contained.</param>
-        /// <param name="b">Second bounding box to be contained.</param>
-        /// <param name="merged">Smallest bounding box which contains the two input bounding boxes.</param>
-        public static void CreateMerged(ref BoundingBox a, ref BoundingBox b, out BoundingBox merged)
-        {
-            if (a.Min.X < b.Min.X)
-                merged.Min.X = a.Min.X;
-            else
-                merged.Min.X = b.Min.X;
-            if (a.Min.Y < b.Min.Y)
-                merged.Min.Y = a.Min.Y;
-            else
-                merged.Min.Y = b.Min.Y;
-            if (a.Min.Z < b.Min.Z)
-                merged.Min.Z = a.Min.Z;
-            else
-                merged.Min.Z = b.Min.Z;
-
-            if (a.Max.X > b.Max.X)
-                merged.Max.X = a.Max.X;
-            else
-                merged.Max.X = b.Max.X;
-            if (a.Max.Y > b.Max.Y)
-                merged.Max.Y = a.Max.Y;
-            else
-                merged.Max.Y = b.Max.Y;
-            if (a.Max.Z > b.Max.Z)
-                merged.Max.Z = a.Max.Z;
-            else
-                merged.Max.Z = b.Max.Z;
-        }
 
 
         /// <summary>
@@ -220,15 +132,21 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="boundingSphere">Bounding sphere to be used to create the bounding box.</param>
         /// <param name="boundingBox">Bounding box created from the bounding sphere.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CreateFromSphere(ref BoundingSphere boundingSphere, out BoundingBox boundingBox)
         {
-            boundingBox.Min.X = boundingSphere.Center.X - boundingSphere.Radius;
-            boundingBox.Min.Y = boundingSphere.Center.Y - boundingSphere.Radius;
-            boundingBox.Min.Z = boundingSphere.Center.Z - boundingSphere.Radius;
+            var radius = new Vector3(boundingSphere.Radius);
+            boundingBox.Min = boundingSphere.Center - radius;
+            boundingBox.Max = boundingSphere.Center + radius;
+        }
 
-            boundingBox.Max.X = boundingSphere.Center.X + boundingSphere.Radius;
-            boundingBox.Max.Y = boundingSphere.Center.Y + boundingSphere.Radius;
-            boundingBox.Max.Z = boundingSphere.Center.Z + boundingSphere.Radius;
+        /// <summary>
+        /// Creates a string representation of the bounding box.
+        /// </summary>
+        /// <returns>String representation of the bounding box.</returns>
+        public override string ToString()
+        {
+            return $"({Min.ToString()}, {Max.ToString()})";
         }
 
     }
