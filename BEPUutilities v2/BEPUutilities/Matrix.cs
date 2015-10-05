@@ -10,7 +10,7 @@ namespace BEPUutilities2
     /// <remarks>
     /// All functions assume row vectors.
     /// </remarks>
-    public struct MatrixSIMD
+    public struct Matrix
     {
         /// <summary>
         /// Row 1 of the matrix.
@@ -29,12 +29,12 @@ namespace BEPUutilities2
         /// </summary>
         public Vector4 W;
 
-        public static MatrixSIMD Identity
+        public static Matrix Identity
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                MatrixSIMD result;
+                Matrix result;
                 result.X = new Vector4(1, 0, 0, 0);
                 result.Y = new Vector4(0, 1, 0, 0);
                 result.Z = new Vector4(0, 0, 1, 0);
@@ -88,13 +88,13 @@ namespace BEPUutilities2
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe static void Transpose(MatrixSIMD* m, MatrixSIMD* transposed)
+        public unsafe static void Transpose(Matrix* m, Matrix* transposed)
         {
             Transpose((M*)m, (M*)transposed);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Transpose(ref MatrixSIMD m, out MatrixSIMD transposed)
+        public static void Transpose(ref Matrix m, out Matrix transposed)
         {
             //Not an ideal implementation. Shuffles would be handy.
             
@@ -117,7 +117,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix whose transpose will be applied to the vector.</param>
         /// <param name="result">Transformed vector.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void TransformTranspose(ref Vector4 v, ref MatrixSIMD m, out Vector4 result)
+        public static void TransformTranspose(ref Vector4 v, ref Matrix m, out Vector4 result)
         {
             result = new Vector4(
                 Vector4.Dot(v, m.X),
@@ -133,7 +133,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix to apply to the vector.</param>
         /// <param name="result">Transformed vector.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Transform(ref Vector4 v, ref MatrixSIMD m, out Vector4 result)
+        public static void Transform(ref Vector4 v, ref Matrix m, out Vector4 result)
         {
             var x = new Vector4(v.X);
             var y = new Vector4(v.Y);
@@ -151,7 +151,7 @@ namespace BEPUutilities2
         /// <param name="b">Second matrix.</param>
         /// <param name="result">Result of the matrix multiplication.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Multiply(ref MatrixSIMD a, ref MatrixSIMD b, out MatrixSIMD result)
+        public static void Multiply(ref Matrix a, ref Matrix b, out Matrix result)
         {
             var bX = b.X;
             var bY = b.Y;

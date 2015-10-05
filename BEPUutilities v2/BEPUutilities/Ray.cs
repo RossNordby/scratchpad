@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
 {
@@ -23,6 +24,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="position">Starting position of the ray.</param>
         /// <param name="direction">Direction in which the ray points.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Ray(Vector3 position, Vector3 direction)
         {
             this.Position = position;
@@ -37,6 +39,7 @@ namespace BEPUutilities2
         /// <param name="boundingBox">Bounding box to test against.</param>
         /// <param name="t">The length along the ray to the impact, if any impact occurs.</param>
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(ref BoundingBox boundingBox, out float t)
         {
             if (Math.Abs(Direction.X) < Toolbox.Epsilon && (Position.X < boundingBox.Min.X || Position.X > boundingBox.Max.X))
@@ -119,6 +122,7 @@ namespace BEPUutilities2
         /// <param name="boundingBox">Bounding box to test against.</param>
         /// <param name="t">The length along the ray to the impact, if any impact occurs.</param>
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(BoundingBox boundingBox, out float t)
         {
             return Intersects(ref boundingBox, out t);
@@ -130,6 +134,7 @@ namespace BEPUutilities2
         /// <param name="plane">Plane to test against.</param>
         /// <param name="t">The length along the ray to the impact, if any impact occurs.</param>
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(ref Plane plane, out float t)
         {
             float velocity = Vector3.Dot(Direction, plane.Normal);
@@ -150,6 +155,7 @@ namespace BEPUutilities2
         /// <param name="plane">Plane to test against.</param>
         /// <param name="t">The length along the ray to the impact, if any impact occurs.</param>
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Intersects(Plane plane, out float t)
         {
             return Intersects(ref plane, out t);
@@ -160,6 +166,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="t">Length along the ray from the ray position in terms of the ray's direction.</param>
         /// <param name="v">Point along the ray at the given location.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void GetPointOnRay(float t, out Vector3 v)
         {
             v = Position + t * Direction;

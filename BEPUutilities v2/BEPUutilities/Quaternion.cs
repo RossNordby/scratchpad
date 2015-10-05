@@ -150,7 +150,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="r">Rotation matrix to create the quaternion from.</param>
         /// <param name="q">Quaternion based on the rotation matrix.</param>
-        public static void CreateFromRotationMatrix(ref Matrix3x3SIMD r, out Quaternion q)
+        public static void CreateFromRotationMatrix(ref Matrix3x3 r, out Quaternion q)
         {
             float trace = r.X.X + r.Y.Y + r.Z.Z;
 #if !WINDOWS
@@ -199,7 +199,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="r">Rotation matrix used to create a new quaternion.</param>
         /// <returns>Quaternion representing the same rotation as the matrix.</returns>
-        public static Quaternion CreateFromRotationMatrix(Matrix3x3SIMD r)
+        public static Quaternion CreateFromRotationMatrix(Matrix3x3 r)
         {
             Quaternion toReturn;
             CreateFromRotationMatrix(ref r, out toReturn);

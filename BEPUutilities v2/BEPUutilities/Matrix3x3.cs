@@ -7,7 +7,7 @@ namespace BEPUutilities2
     /// <summary>
     /// 3 row, 3 column matrix.
     /// </summary>
-    public struct Matrix3x3SIMD
+    public struct Matrix3x3
     {
         public Vector3 X;
         public Vector3 Y;
@@ -17,12 +17,12 @@ namespace BEPUutilities2
         /// <summary>
         /// Gets the 3x3 identity matrix.
         /// </summary>
-        public static Matrix3x3SIMD Identity
+        public static Matrix3x3 Identity
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                Matrix3x3SIMD toReturn;
+                Matrix3x3 toReturn;
                 toReturn.X = new Vector3(1, 0, 0);
                 toReturn.Y = new Vector3(0, 1, 0);
                 toReturn.Z = new Vector3(0, 0, 1);
@@ -57,7 +57,7 @@ namespace BEPUutilities2
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe static void Transpose(Matrix3x3SIMD* m, Matrix3x3SIMD* transposed)
+        public unsafe static void Transpose(Matrix3x3* m, Matrix3x3* transposed)
         {
             Transpose((M*)m, (M*)transposed);
         }
@@ -69,7 +69,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix to transpose.</param>                                                             
         /// <param name="transposed">Transposed matrix.</param>                                                      
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Transpose(ref Matrix3x3SIMD m, out Matrix3x3SIMD transposed)
+        public static void Transpose(ref Matrix3x3 m, out Matrix3x3 transposed)
         {
             var xy = m.X.Y;
             var xz = m.X.Z;
@@ -99,7 +99,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix to be inverted.</param>
         /// <param name="inverse">Inverted matrix.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Invert(ref Matrix3x3SIMD m, out Matrix3x3SIMD inverse)
+        public static void Invert(ref Matrix3x3 m, out Matrix3x3 inverse)
         {
             //Current implementation of cross far from optimal without shuffles, and even then this has some room for improvement.
             //Inverts should be really rare, so it's not too concerning. Use the scalar version when possible until ryujit improves (and we improve this implementation).
@@ -120,7 +120,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix to be inverted.</param>
         /// <param name="inverse">Inverted matrix.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe static void Invert(Matrix3x3SIMD* m, Matrix3x3SIMD* inverse)
+        public unsafe static void Invert(Matrix3x3* m, Matrix3x3* inverse)
         {
             var mScalar = (M*)m;
             var inverseScalar = (M*)inverse;
@@ -161,7 +161,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix to use as the transformation.</param>
         /// <param name="result">Product of the transformation.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Transform(ref Vector3 v, ref Matrix3x3SIMD m, out Vector3 result)
+        public static void Transform(ref Vector3 v, ref Matrix3x3 m, out Vector3 result)
         {
             var x = new Vector3(v.X);
             var y = new Vector3(v.Y);
@@ -176,7 +176,7 @@ namespace BEPUutilities2
         /// <param name="m">Matrix to use as the transformation transpose.</param>
         /// <param name="result">Product of the transformation.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void TransformTranspose(ref Vector3 v, ref Matrix3x3SIMD m, out Vector3 result)
+        public static void TransformTranspose(ref Vector3 v, ref Matrix3x3 m, out Vector3 result)
         {
             result = new Vector3(
                 Vector3.Dot(v, m.X),
@@ -198,7 +198,7 @@ namespace BEPUutilities2
         /// <param name="b">Second matrix to multiply.</param>
         /// <param name="result">Product of the multiplication.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Multiply(ref Matrix3x3SIMD a, ref Matrix3x3SIMD b, out Matrix3x3SIMD result)
+        public static void Multiply(ref Matrix3x3 a, ref Matrix3x3 b, out Matrix3x3 result)
         {
             var bX = b.X;
             var bY = b.Y;

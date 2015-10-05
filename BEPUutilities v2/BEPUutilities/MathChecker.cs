@@ -64,7 +64,7 @@ namespace BEPUutilities2
         /// This is only run when the CHECKMATH symbol is defined.
         /// </summary>
         [Conditional("CHECKMATH")]
-        public static void Validate(this Matrix3x3SIMD m)
+        public static void Validate(this Matrix3x3 m)
         {
             m.X.Validate();
             m.Y.Validate();
@@ -76,7 +76,7 @@ namespace BEPUutilities2
         /// This is only run when the CHECKMATH symbol is defined.
         /// </summary>
         [Conditional("CHECKMATH")]
-        public static void Validate(this MatrixSIMD m)
+        public static void Validate(this Matrix m)
         {
             m.X.Validate();
             m.Y.Validate();
@@ -113,7 +113,7 @@ namespace BEPUutilities2
         /// This is only run when the CHECKMATH symbol is defined.
         /// </summary>
         [Conditional("CHECKMATH")]
-        public static void Validate(this AffineTransformSIMD a)
+        public static void Validate(this AffineTransform a)
         {
             a.LinearTransform.Validate();
             a.Translation.Validate();

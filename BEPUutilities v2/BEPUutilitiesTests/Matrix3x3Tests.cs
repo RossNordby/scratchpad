@@ -40,21 +40,21 @@ namespace BEPUutilitiesTests
         public static float TestSIMDTransformTranspose(int iterationCount)
         {
             Vector3 v = new Vector3(1, 2, 3);
-            Matrix3x3SIMD m = Matrix3x3SIMD.Identity;
+            Matrix3x3 m = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
                 Vector3 r0, r1;
-                Matrix3x3SIMD.TransformTranspose(ref v, ref m, out r0);
-                Matrix3x3SIMD.TransformTranspose(ref r0, ref m, out r1);
-                Matrix3x3SIMD.TransformTranspose(ref r1, ref m, out r0);
-                Matrix3x3SIMD.TransformTranspose(ref r0, ref m, out r1);
-                Matrix3x3SIMD.TransformTranspose(ref r1, ref m, out r0);
-                Matrix3x3SIMD.TransformTranspose(ref r0, ref m, out r1);
-                Matrix3x3SIMD.TransformTranspose(ref r1, ref m, out r0);
-                Matrix3x3SIMD.TransformTranspose(ref r0, ref m, out r1);
-                Matrix3x3SIMD.TransformTranspose(ref r1, ref m, out r0);
-                Matrix3x3SIMD.TransformTranspose(ref r0, ref m, out r1);
+                Matrix3x3.TransformTranspose(ref v, ref m, out r0);
+                Matrix3x3.TransformTranspose(ref r0, ref m, out r1);
+                Matrix3x3.TransformTranspose(ref r1, ref m, out r0);
+                Matrix3x3.TransformTranspose(ref r0, ref m, out r1);
+                Matrix3x3.TransformTranspose(ref r1, ref m, out r0);
+                Matrix3x3.TransformTranspose(ref r0, ref m, out r1);
+                Matrix3x3.TransformTranspose(ref r1, ref m, out r0);
+                Matrix3x3.TransformTranspose(ref r0, ref m, out r1);
+                Matrix3x3.TransformTranspose(ref r1, ref m, out r0);
+                Matrix3x3.TransformTranspose(ref r0, ref m, out r1);
                 accumulator += 0.000001f * r1.X;
             }
             return accumulator;
@@ -63,21 +63,21 @@ namespace BEPUutilitiesTests
         public static float TestSIMDTransform(int iterationCount)
         {
             Vector3 v = new Vector3(1, 2, 3);
-            Matrix3x3SIMD m = Matrix3x3SIMD.Identity;
+            Matrix3x3 m = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
                 Vector3 r0, r1;
-                Matrix3x3SIMD.Transform(ref v, ref m, out r0);
-                Matrix3x3SIMD.Transform(ref r0, ref m, out r1);
-                Matrix3x3SIMD.Transform(ref r1, ref m, out r0);
-                Matrix3x3SIMD.Transform(ref r0, ref m, out r1);
-                Matrix3x3SIMD.Transform(ref r1, ref m, out r0);
-                Matrix3x3SIMD.Transform(ref r0, ref m, out r1);
-                Matrix3x3SIMD.Transform(ref r1, ref m, out r0);
-                Matrix3x3SIMD.Transform(ref r0, ref m, out r1);
-                Matrix3x3SIMD.Transform(ref r1, ref m, out r0);
-                Matrix3x3SIMD.Transform(ref r0, ref m, out r1);
+                Matrix3x3.Transform(ref v, ref m, out r0);
+                Matrix3x3.Transform(ref r0, ref m, out r1);
+                Matrix3x3.Transform(ref r1, ref m, out r0);
+                Matrix3x3.Transform(ref r0, ref m, out r1);
+                Matrix3x3.Transform(ref r1, ref m, out r0);
+                Matrix3x3.Transform(ref r0, ref m, out r1);
+                Matrix3x3.Transform(ref r1, ref m, out r0);
+                Matrix3x3.Transform(ref r0, ref m, out r1);
+                Matrix3x3.Transform(ref r1, ref m, out r0);
+                Matrix3x3.Transform(ref r0, ref m, out r1);
                 accumulator += 0.000001f * r1.X;
             }
             return accumulator;
@@ -108,22 +108,22 @@ namespace BEPUutilitiesTests
 
         public static float TestSIMDMultiply(int iterationCount)
         {
-            Matrix3x3SIMD m1 = Matrix3x3SIMD.Identity;
-            Matrix3x3SIMD m2 = Matrix3x3SIMD.Identity;
+            Matrix3x3 m1 = Matrix3x3.Identity;
+            Matrix3x3 m2 = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
-                Matrix3x3SIMD r0, r1;
-                Matrix3x3SIMD.Multiply(ref m1, ref m2, out r0);
-                Matrix3x3SIMD.Multiply(ref r0, ref m2, out r1);
-                Matrix3x3SIMD.Multiply(ref r1, ref m2, out r0);
-                Matrix3x3SIMD.Multiply(ref r0, ref m2, out r1);
-                Matrix3x3SIMD.Multiply(ref r1, ref m2, out r0);
-                Matrix3x3SIMD.Multiply(ref r0, ref m2, out r1);
-                Matrix3x3SIMD.Multiply(ref r1, ref m2, out r0);
-                Matrix3x3SIMD.Multiply(ref r0, ref m2, out r1);
-                Matrix3x3SIMD.Multiply(ref r1, ref m2, out r0);
-                Matrix3x3SIMD.Multiply(ref r0, ref m2, out r1);
+                Matrix3x3 r0, r1;
+                Matrix3x3.Multiply(ref m1, ref m2, out r0);
+                Matrix3x3.Multiply(ref r0, ref m2, out r1);
+                Matrix3x3.Multiply(ref r1, ref m2, out r0);
+                Matrix3x3.Multiply(ref r0, ref m2, out r1);
+                Matrix3x3.Multiply(ref r1, ref m2, out r0);
+                Matrix3x3.Multiply(ref r0, ref m2, out r1);
+                Matrix3x3.Multiply(ref r1, ref m2, out r0);
+                Matrix3x3.Multiply(ref r0, ref m2, out r1);
+                Matrix3x3.Multiply(ref r1, ref m2, out r0);
+                Matrix3x3.Multiply(ref r0, ref m2, out r1);
                 accumulator += 0.000001f * r1.X.X;
             }
             return accumulator;
@@ -137,7 +137,7 @@ namespace BEPUutilitiesTests
             Random random = new Random(5);
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
-                Matrix3x3SIMD simdA, simdB;
+                Matrix3x3 simdA, simdB;
                 bMatrix3x3 scalarA, scalarB;
                 var simdPointerA = (float*)&simdA;
                 var scalarPointerA = (float*)&scalarA;
@@ -149,8 +149,8 @@ namespace BEPUutilitiesTests
                     scalarPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 4 - 2);
                 }
 
-                Matrix3x3SIMD simdResult;
-                Matrix3x3SIMD.Multiply(ref simdA, ref simdB, out simdResult);
+                Matrix3x3 simdResult;
+                Matrix3x3.Multiply(ref simdA, ref simdB, out simdResult);
                 bMatrix3x3 scalarResult;
                 bMatrix3x3.Multiply(ref scalarA, ref scalarB, out scalarResult);
                 var simdPointerResult = (float*)&simdResult;
@@ -169,7 +169,7 @@ namespace BEPUutilitiesTests
 
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
-                Matrix3x3SIMD simdA, simdB;
+                Matrix3x3 simdA, simdB;
                 bMatrix3x3 scalarA, scalarB;
                 var simdPointerA = (float*)&simdA;
                 var scalarPointerA = (float*)&scalarA;
@@ -181,7 +181,7 @@ namespace BEPUutilitiesTests
                     scalarPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 4 - 2);
                 }
 
-                Matrix3x3SIMD.Multiply(ref simdA, ref simdB, out simdA);
+                Matrix3x3.Multiply(ref simdA, ref simdB, out simdA);
                 bMatrix3x3.Multiply(ref scalarA, ref scalarB, out scalarA);
 
 
@@ -198,7 +198,7 @@ namespace BEPUutilitiesTests
 
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
-                Matrix3x3SIMD simdA, simdB;
+                Matrix3x3 simdA, simdB;
                 bMatrix3x3 scalarA, scalarB;
                 var simdPointerA = (float*)&simdA;
                 var scalarPointerA = (float*)&scalarA;
@@ -210,7 +210,7 @@ namespace BEPUutilitiesTests
                     scalarPointerB[i] = simdPointerB[i] = (float)(random.NextDouble() * 4 - 2);
                 }
 
-                Matrix3x3SIMD.Multiply(ref simdA, ref simdB, out simdB);
+                Matrix3x3.Multiply(ref simdA, ref simdB, out simdB);
                 bMatrix3x3.Multiply(ref scalarA, ref scalarB, out scalarB);
 
 
@@ -228,7 +228,7 @@ namespace BEPUutilitiesTests
 
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
-                Matrix3x3SIMD simd;
+                Matrix3x3 simd;
                 bMatrix3x3 scalar;
                 var simdPointer = (float*)&simd;
                 var scalarPointer = (float*)&scalar;
@@ -237,7 +237,7 @@ namespace BEPUutilitiesTests
                     scalarPointer[i] = simdPointer[i] = (float)(random.NextDouble() * 4 - 2);
                 }
 
-                Matrix3x3SIMD.Multiply(ref simd, ref simd, out simd);
+                Matrix3x3.Multiply(ref simd, ref simd, out simd);
                 bMatrix3x3.Multiply(ref scalar, ref scalar, out scalar);
 
                 for (int i = 0; i < 9; ++i)
@@ -254,21 +254,21 @@ namespace BEPUutilitiesTests
 
         public static float TestSIMDTranspose(int iterationCount)
         {
-            Matrix3x3SIMD m = Matrix3x3SIMD.Identity;
+            Matrix3x3 m = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
-                Matrix3x3SIMD r0, r1;
-                Matrix3x3SIMD.Transpose(ref m, out r0);
-                Matrix3x3SIMD.Transpose(ref r0, out r1);
-                Matrix3x3SIMD.Transpose(ref r1, out r0);
-                Matrix3x3SIMD.Transpose(ref r0, out r1);
-                Matrix3x3SIMD.Transpose(ref r1, out r0);
-                Matrix3x3SIMD.Transpose(ref r0, out r1);
-                Matrix3x3SIMD.Transpose(ref r1, out r0);
-                Matrix3x3SIMD.Transpose(ref r0, out r1);
-                Matrix3x3SIMD.Transpose(ref r1, out r0);
-                Matrix3x3SIMD.Transpose(ref r0, out r1);
+                Matrix3x3 r0, r1;
+                Matrix3x3.Transpose(ref m, out r0);
+                Matrix3x3.Transpose(ref r0, out r1);
+                Matrix3x3.Transpose(ref r1, out r0);
+                Matrix3x3.Transpose(ref r0, out r1);
+                Matrix3x3.Transpose(ref r1, out r0);
+                Matrix3x3.Transpose(ref r0, out r1);
+                Matrix3x3.Transpose(ref r1, out r0);
+                Matrix3x3.Transpose(ref r0, out r1);
+                Matrix3x3.Transpose(ref r1, out r0);
+                Matrix3x3.Transpose(ref r0, out r1);
                 accumulator += r1.X.X;
 
             }
@@ -277,21 +277,21 @@ namespace BEPUutilitiesTests
 
         public unsafe static float TestSIMDScalarPointerTranspose(int iterationCount)
         {
-            Matrix3x3SIMD m = Matrix3x3SIMD.Identity;
+            Matrix3x3 m = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
-                Matrix3x3SIMD r0, r1;
-                Matrix3x3SIMD.Transpose(&m, &r0);
-                Matrix3x3SIMD.Transpose(&r0, &r1);
-                Matrix3x3SIMD.Transpose(&r1, &r0);
-                Matrix3x3SIMD.Transpose(&r0, &r1);
-                Matrix3x3SIMD.Transpose(&r1, &r0);
-                Matrix3x3SIMD.Transpose(&r0, &r1);
-                Matrix3x3SIMD.Transpose(&r1, &r0);
-                Matrix3x3SIMD.Transpose(&r0, &r1);
-                Matrix3x3SIMD.Transpose(&r1, &r0);
-                Matrix3x3SIMD.Transpose(&r0, &r1);
+                Matrix3x3 r0, r1;
+                Matrix3x3.Transpose(&m, &r0);
+                Matrix3x3.Transpose(&r0, &r1);
+                Matrix3x3.Transpose(&r1, &r0);
+                Matrix3x3.Transpose(&r0, &r1);
+                Matrix3x3.Transpose(&r1, &r0);
+                Matrix3x3.Transpose(&r0, &r1);
+                Matrix3x3.Transpose(&r1, &r0);
+                Matrix3x3.Transpose(&r0, &r1);
+                Matrix3x3.Transpose(&r1, &r0);
+                Matrix3x3.Transpose(&r0, &r1);
                 accumulator += r1.X.X;
 
             }
@@ -346,21 +346,21 @@ namespace BEPUutilitiesTests
         }
         public static float TestSIMDInvert(int iterationCount)
         {
-            Matrix3x3SIMD m = Matrix3x3SIMD.Identity;
+            Matrix3x3 m = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
-                Matrix3x3SIMD r0, r1;
-                Matrix3x3SIMD.Invert(ref m, out r0);
-                Matrix3x3SIMD.Invert(ref r0, out r1);
-                Matrix3x3SIMD.Invert(ref r1, out r0);
-                Matrix3x3SIMD.Invert(ref r0, out r1);
-                Matrix3x3SIMD.Invert(ref r1, out r0);
-                Matrix3x3SIMD.Invert(ref r0, out r1);
-                Matrix3x3SIMD.Invert(ref r1, out r0);
-                Matrix3x3SIMD.Invert(ref r0, out r1);
-                Matrix3x3SIMD.Invert(ref r1, out r0);
-                Matrix3x3SIMD.Invert(ref r0, out r1);
+                Matrix3x3 r0, r1;
+                Matrix3x3.Invert(ref m, out r0);
+                Matrix3x3.Invert(ref r0, out r1);
+                Matrix3x3.Invert(ref r1, out r0);
+                Matrix3x3.Invert(ref r0, out r1);
+                Matrix3x3.Invert(ref r1, out r0);
+                Matrix3x3.Invert(ref r0, out r1);
+                Matrix3x3.Invert(ref r1, out r0);
+                Matrix3x3.Invert(ref r0, out r1);
+                Matrix3x3.Invert(ref r1, out r0);
+                Matrix3x3.Invert(ref r0, out r1);
                 accumulator += r1.X.X;
 
             }
@@ -368,21 +368,21 @@ namespace BEPUutilitiesTests
         }
         public unsafe static float TestSIMDScalarInvert(int iterationCount)
         {
-            Matrix3x3SIMD m = Matrix3x3SIMD.Identity;
+            Matrix3x3 m = Matrix3x3.Identity;
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
-                Matrix3x3SIMD r0, r1;
-                Matrix3x3SIMD.Invert(&m, &r0);
-                Matrix3x3SIMD.Invert(&r0, &r1);
-                Matrix3x3SIMD.Invert(&r1, &r0);
-                Matrix3x3SIMD.Invert(&r0, &r1);
-                Matrix3x3SIMD.Invert(&r1, &r0);
-                Matrix3x3SIMD.Invert(&r0, &r1);
-                Matrix3x3SIMD.Invert(&r1, &r0);
-                Matrix3x3SIMD.Invert(&r0, &r1);
-                Matrix3x3SIMD.Invert(&r1, &r0);
-                Matrix3x3SIMD.Invert(&r0, &r1);
+                Matrix3x3 r0, r1;
+                Matrix3x3.Invert(&m, &r0);
+                Matrix3x3.Invert(&r0, &r1);
+                Matrix3x3.Invert(&r1, &r0);
+                Matrix3x3.Invert(&r0, &r1);
+                Matrix3x3.Invert(&r1, &r0);
+                Matrix3x3.Invert(&r0, &r1);
+                Matrix3x3.Invert(&r1, &r0);
+                Matrix3x3.Invert(&r0, &r1);
+                Matrix3x3.Invert(&r1, &r0);
+                Matrix3x3.Invert(&r0, &r1);
                 accumulator += r1.X.X;
 
             }
@@ -395,8 +395,8 @@ namespace BEPUutilitiesTests
             for (int iterationIndex = 0; iterationIndex < 1000; ++iterationIndex)
             {
                 bMatrix3x3 scalar;
-                Matrix3x3SIMD simd;
-                Matrix3x3SIMD simdScalar;
+                Matrix3x3 simd;
+                Matrix3x3 simdScalar;
                 var scalarPointer = (float*)&scalar;
                 var simdPointer = (float*)&simd;
                 var simdScalarPointer = (float*)&simdScalar;
@@ -416,8 +416,8 @@ namespace BEPUutilitiesTests
 
 
                 bMatrix3x3.Invert(ref scalar, out scalar);
-                Matrix3x3SIMD.Invert(ref simd, out simd);
-                Matrix3x3SIMD.Invert(&simdScalar, &simdScalar);
+                Matrix3x3.Invert(ref simd, out simd);
+                Matrix3x3.Invert(&simdScalar, &simdScalar);
 
                 for (int i = 0; i < 9; ++i)
                 {
@@ -433,7 +433,7 @@ namespace BEPUutilitiesTests
         public unsafe static void Test()
         {
             Console.WriteLine("MATRIX3x3 RESULTS:");
-            Console.WriteLine($"Size: {sizeof(Matrix3x3SIMD)}");
+            Console.WriteLine($"Size: {sizeof(Matrix3x3)}");
             TestMultiplyCorrectness();
             TestInversionCorrectness();
             const int iterationCount = 10000000;
