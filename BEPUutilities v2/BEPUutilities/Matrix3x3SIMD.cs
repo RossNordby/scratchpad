@@ -113,11 +113,6 @@ namespace BEPUutilities
             inverse.Z = xy * inverseDeterminant;
             Transpose(ref inverse, out inverse);
         }
-        struct V
-        {
-            public float X, Y, Z;
-        }
-
 
         /// <summary>
         /// Inverts the given matix.
@@ -127,100 +122,6 @@ namespace BEPUutilities
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe static void Invert(Matrix3x3SIMD* m, Matrix3x3SIMD* inverse)
         {
-            //var mScalar = (M*)m;
-            //var inverseScalar = (M*)inverse;
-            //Vector3 yz = new Vector3(
-            //    mScalar->M22 * mScalar->M33 - mScalar->M32 * mScalar->M23,
-            //    mScalar->M23 * mScalar->M31 - mScalar->M33 * mScalar->M21,
-            //    mScalar->M21 * mScalar->M32 - mScalar->M31 * mScalar->M22);
-            //var determinantInverse = new Vector3(1f / Vector3.Dot(m->X, yz));
-            //inverse->X = yz * determinantInverse;
-
-            //Vector3 zx = new Vector3(
-            //    mScalar->M32 * mScalar->M13 - mScalar->M12 * mScalar->M33,
-            //    mScalar->M33 * mScalar->M11 - mScalar->M13 * mScalar->M31,
-            //    mScalar->M31 * mScalar->M12 - mScalar->M11 * mScalar->M32);
-            //inverse->Y = zx * determinantInverse;
-
-            //Vector3 xy = new Vector3(
-            //    mScalar->M12 * mScalar->M23 - mScalar->M22 * mScalar->M13,
-            //    mScalar->M13 * mScalar->M21 - mScalar->M23 * mScalar->M11,
-            //    mScalar->M11 * mScalar->M22 - mScalar->M21 * mScalar->M12);
-            //inverse->Z = xy * determinantInverse;
-
-            //var m12 = inverseScalar->M12;
-            //var m13 = inverseScalar->M13;
-            //var m23 = inverseScalar->M23;
-            //inverseScalar->M12 = inverseScalar->M21;
-            //inverseScalar->M13 = inverseScalar->M31;
-            //inverseScalar->M23 = inverseScalar->M32;
-            //inverseScalar->M21 = m12;
-            //inverseScalar->M31 = m13;
-            //inverseScalar->M32 = m23;
-
-
-            //var mScalar = (M*)m;
-            //var inverseScalar = (M*)inverse;
-            //Vector3 yz;
-            //var yzPointer = (V*)&yz;
-            //yzPointer->X = mScalar->M22 * mScalar->M33 - mScalar->M32 * mScalar->M23;
-            //yzPointer->Y = mScalar->M23 * mScalar->M31 - mScalar->M33 * mScalar->M21;
-            //yzPointer->Z = mScalar->M21 * mScalar->M32 - mScalar->M31 * mScalar->M22;
-            //var determinantInverse = new Vector3(1f / Vector3.Dot(((Matrix3x3SIMD*)mScalar)->X, yz));
-            //inverse->X = yz * determinantInverse;
-
-            //Vector3 zx = new Vector3(
-            //    mScalar->M32 * mScalar->M13 - mScalar->M12 * mScalar->M33,
-            //    mScalar->M33 * mScalar->M11 - mScalar->M13 * mScalar->M31,
-            //    mScalar->M31 * mScalar->M12 - mScalar->M11 * mScalar->M32);
-            //inverse->Y = zx * determinantInverse;
-
-            //Vector3 xy = new Vector3(
-            //    mScalar->M12 * mScalar->M23 - mScalar->M22 * mScalar->M13,
-            //    mScalar->M13 * mScalar->M21 - mScalar->M23 * mScalar->M11,
-            //    mScalar->M11 * mScalar->M22 - mScalar->M21 * mScalar->M12);
-            //inverse->Z = xy * determinantInverse;
-
-            //var m12 = inverseScalar->M12;
-            //var m13 = inverseScalar->M13;
-            //var m23 = inverseScalar->M23;
-            //inverseScalar->M12 = inverseScalar->M21;
-            //inverseScalar->M13 = inverseScalar->M31;
-            //inverseScalar->M23 = inverseScalar->M32;
-            //inverseScalar->M21 = m12;
-            //inverseScalar->M31 = m13;
-            //inverseScalar->M32 = m23;
-
-            //var mScalar = (M*)m;
-            //var inverseScalar = (M*)inverse;
-            //V c1;
-            //c1.X = mScalar->M22 * mScalar->M33 - mScalar->M32 * mScalar->M23;
-            //c1.Y = mScalar->M23 * mScalar->M31 - mScalar->M33 * mScalar->M21;
-            //c1.Z = mScalar->M21 * mScalar->M32 - mScalar->M31 * mScalar->M22;
-            //var determinantInverse = 1f / (c1.X * mScalar->M11 + c1.Y * mScalar->M12 + c1.Z * mScalar->M13);
-
-            //V c2;
-            //c2.X = mScalar->M32 * mScalar->M13 - mScalar->M12 * mScalar->M33;
-            //c2.Y = mScalar->M33 * mScalar->M11 - mScalar->M13 * mScalar->M31;
-            //c2.Z = mScalar->M31 * mScalar->M12 - mScalar->M11 * mScalar->M32;
-
-            //V c3;
-            //c3.X = mScalar->M12 * mScalar->M23 - mScalar->M22 * mScalar->M13;
-            //c3.Y = mScalar->M13 * mScalar->M21 - mScalar->M23 * mScalar->M11;
-            //c3.Z = mScalar->M11 * mScalar->M22 - mScalar->M21 * mScalar->M12;
-
-            //inverseScalar->M11 = c1.X * determinantInverse;
-            //inverseScalar->M21 = c1.Y * determinantInverse;
-            //inverseScalar->M31 = c1.Z * determinantInverse;
-
-            //inverseScalar->M12 = c2.X * determinantInverse;
-            //inverseScalar->M22 = c2.Y * determinantInverse;
-            //inverseScalar->M32 = c2.Z * determinantInverse;
-
-            //inverseScalar->M13 = c3.X * determinantInverse;
-            //inverseScalar->M23 = c3.Y * determinantInverse;
-            //inverseScalar->M33 = c3.Z * determinantInverse;
-
             var mScalar = (M*)m;
             var inverseScalar = (M*)inverse;
 
