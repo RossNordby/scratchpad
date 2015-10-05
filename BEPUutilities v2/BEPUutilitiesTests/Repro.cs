@@ -46,7 +46,7 @@ namespace Repro
             }
         }
 
-        static void Main(string[] args)
+        static void Main2(string[] args)
         {
             const int iterationCount = 10000000;
 
