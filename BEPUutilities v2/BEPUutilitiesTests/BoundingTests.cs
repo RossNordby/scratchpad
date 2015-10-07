@@ -80,7 +80,7 @@ namespace BEPUutilitiesTests
         {
             Random random = new Random(5);
             int intersectionCount = 0;
-            for (int i = 0; i < 100000; ++i)
+            for (int i = 0; i < 10000000; ++i)
             {
                 Ray simdRay;
                 BoundingBox simdBox;
@@ -96,10 +96,10 @@ namespace BEPUutilitiesTests
                 simdBox.Min = boxPosition - width;
                 simdBox.Max = boxPosition + width;
 
-                simdRay.Position = new Vector3(1.5f, 1.5f, 0);
+                simdRay.Position = new Vector3(0, 0, 0);
                 simdRay.Direction = new Vector3(1, 0, 0);
-                simdBox.Min = new Vector3(1);
-                simdBox.Max = new Vector3(2);
+                simdBox.Min = new Vector3(0);
+                simdBox.Max = new Vector3(1);
 
                 scalarRay.Position = Convert(simdRay.Position);
                 scalarRay.Direction = Convert(simdRay.Direction);
@@ -111,11 +111,13 @@ namespace BEPUutilitiesTests
 
                 float scalarT;
                 var scalarIntersects = scalarRay.Intersects(ref scalarBox, out scalarT);
+                //Console.WriteLine($"Simd says: {simdIntersects}, scalar says {scalarIntersects}");
                 Assert.IsTrue(simdIntersects == scalarIntersects);
                 if (simdIntersects)
                 {
                     var error = Math.Abs(simdT - scalarT);
-                    Assert.IsTrue(error <= 1e-7f);
+
+                    Assert.IsTrue(error <= 1e-5f);
                     intersectionCount++;
                 }
                 //Just treat T as undefined if it's not intersecting. No need to check it.
@@ -123,13 +125,51 @@ namespace BEPUutilitiesTests
             Console.WriteLine($"intersectionCount: {intersectionCount}");
         }
 
+
+        public static void Repro()
+        {
+            Vector3 boundingMin = new Vector3(0);
+            Vector3 boundingMax = new Vector3(1);
+            Vector3 rayPosition = new Vector3(0);
+            Vector3 rayDirection = new Vector3(1, 0, 0);
+
+            var positionMin = boundingMin - rayPosition;
+            var positionMax = boundingMax - rayPosition;
+
+            Vector3 tMin, tMax;
+            tMin = positionMin / rayDirection;
+            tMax = positionMax / rayDirection;
+
+            var positiveFilter = new Vector3(float.MaxValue);
+            var negativeFilter = new Vector3(float.MinValue);
+            //Careful! parameter order matters here- this is designed to deal with NaNs.
+            tMin = Vector3.Max(Vector3.Min(positiveFilter, tMin), negativeFilter);
+            tMax = Vector3.Max(Vector3.Min(positiveFilter, tMax), negativeFilter);
+
+
+            Vector3 tEarly = Vector3.Min(tMin, tMax);
+            Vector3 tLate = Vector3.Max(tMin, tMax);
+
+            //All intervals from tEarly to tLate must overlap for there to exist an intersection.
+            //This would benefit from some more instructions...
+            float t = Math.Max(0, Math.Max(Math.Max(tEarly.X, tEarly.Y), tEarly.Z));
+            var earliestLate = Math.Min(Math.Min(tLate.X, tLate.Y), tLate.Z);
+
+            //Console.WriteLine($"tMin: {tMin}, tMax: {tMax}");
+            Console.WriteLine($"tEarly: {tEarly}, tLate: {tLate}");
+            //Console.WriteLine($"t: {t}, earliestLate: {earliestLate}");
+            Assert.IsTrue(t <= earliestLate);
+
+        }
+
         public static void Test()
         {
-            TestBoxRayCorrectness();
+            Repro();
+            //TestBoxRayCorrectness();
 
-            const int iterations = 1000000;
-            Helper.Test("Box-Ray SIMD", TestBoxRaySIMD, iterations);
-            Helper.Test("Box-Ray Scalar", TestBoxRayScalar, iterations);
+            //const int iterations = 1000000;
+            //Helper.Test("Box-Ray SIMD", TestBoxRaySIMD, iterations);
+            //Helper.Test("Box-Ray Scalar", TestBoxRayScalar, iterations);
         }
     }
 }

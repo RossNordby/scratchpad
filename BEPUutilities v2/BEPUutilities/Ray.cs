@@ -40,35 +40,30 @@ namespace BEPUutilities2
         /// <param name="boundingBox">Bounding box to test against.</param>
         /// <param name="t">The length along the ray to the impact, if any impact occurs.</param>
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Intersects(ref Ray ray, ref BoundingBox boundingBox, out float t)
         {
             //Make sure the ray is pointing toward the box.
             //This could be done in a more SIMD-friendly way.
-            //var absDirection = Vector3.Abs(ray.Direction);
             var positionMin = boundingBox.Min - ray.Position;
             var positionMax = boundingBox.Max - ray.Position;
-            //if ((absDirection.X < 1e-7f & (positionMin.X < 0 | positionMax.X > 0)) |
-            //    (absDirection.Y < 1e-7f & (positionMin.Y < 0 | positionMax.Y > 0)) |
-            //    (absDirection.Z < 1e-7f & (positionMin.Z < 0 | positionMax.Z > 0)))
-            //{
-            //    t = 0;
-            //    return false;
-            //}
-
-
-            //Vector3 inverseDirection = Vector3.One / ray.Direction;
-
-
-
 
             Vector3 tMin, tMax;
             tMin = positionMin / ray.Direction;
             tMax = positionMax / ray.Direction;
 
-            tMin = Vector3.Max(Vector3.Min(new Vector3(float.MaxValue), tMin), new Vector3(float.MinValue));
-            tMax = Vector3.Max(Vector3.Min(new Vector3(float.MaxValue), tMax), new Vector3(float.MinValue));
-         
+            var positiveFilter = new Vector3(float.MaxValue);
+            var negativeFilter = new Vector3(float.MinValue);
+            //Careful! parameter order matters here- this is designed to deal with NaNs.
+            tMin = Vector3.Min(positiveFilter, tMin);
+            tMin = Vector3.Max(tMin, negativeFilter);
+            //tMin = Vector3.Max(Vector3.Min(positiveFilter, tMin), negativeFilter);
+
+            tMax = Vector3.Min(positiveFilter, tMax);
+            tMax = Vector3.Max(tMax, negativeFilter);
+            //tMax = Vector3.Max(Vector3.Min(positiveFilter, tMax), negativeFilter);
+
+
             Vector3 tEarly = Vector3.Min(tMin, tMax);
             Vector3 tLate = Vector3.Max(tMin, tMax);
 
@@ -77,6 +72,9 @@ namespace BEPUutilities2
             t = Math.Max(0, Math.Max(Math.Max(tEarly.X, tEarly.Y), tEarly.Z));
             var earliestLate = Math.Min(Math.Min(tLate.X, tLate.Y), tLate.Z);
 
+            Console.WriteLine($"tMin: {tMin}, tMax: {tMax}");
+            Console.WriteLine($"tEarly: {tEarly}, tLate: {tLate}");
+            //Console.WriteLine($"t: {t}, earliestLate: {earliestLate}");
             return t <= earliestLate;
 
 
