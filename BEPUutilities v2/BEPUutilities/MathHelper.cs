@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
 {
@@ -32,6 +33,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="angle">Angle to wrap.</param>
         /// <returns>Wrapped angle.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float WrapAngle(float angle)
         {
             angle = (float)System.Math.IEEERemainder(angle, TwoPi);
@@ -55,6 +57,7 @@ namespace BEPUutilities2
         /// <param name="min">Minimum value.  If the value is less than this, the minimum is returned instead.</param>
         /// <param name="max">Maximum value.  If the value is more than this, the maximum is returned instead.</param>
         /// <returns>Clamped value.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Clamp(float value, float min, float max)
         {
             if (value < min)
@@ -71,6 +74,7 @@ namespace BEPUutilities2
         /// <param name="a">First value.</param>
         /// <param name="b">Second value.</param>
         /// <returns>Higher value of the two parameters.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Max(float a, float b)
         {
             return a > b ? a : b;
@@ -82,6 +86,7 @@ namespace BEPUutilities2
         /// <param name="a">First value.</param>
         /// <param name="b">Second value.</param>
         /// <returns>Lower value of the two parameters.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float Min(float a, float b)
         {
             return a < b ? a : b;
@@ -92,6 +97,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="degrees">Degrees to convert.</param>
         /// <returns>Radians equivalent to the input degrees.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float ToRadians(float degrees)
         {
             return degrees * (Pi / 180f);
@@ -102,6 +108,7 @@ namespace BEPUutilities2
         /// </summary>
         /// <param name="radians">Radians to convert.</param>
         /// <returns>Degrees equivalent to the input radians.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float ToDegrees(float radians)
         {
             return radians * (180f / Pi);

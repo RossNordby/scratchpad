@@ -10,6 +10,7 @@ using bRay = BEPUutilities.Ray;
 using bBoundingBox = BEPUutilities.BoundingBox;
 using BEPUutilities2;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilitiesTests
 {
@@ -75,17 +76,42 @@ namespace BEPUutilitiesTests
             return new bVector3(v.X, v.Y, v.Z);
         }
 
+        public static void TestIntersection(Ray simdRay, BoundingBox simdBox, ref int intersectionCount)
+        {
+            bRay scalarRay;
+            bBoundingBox scalarBox;
+
+            scalarRay.Position = Convert(simdRay.Position);
+            scalarRay.Direction = Convert(simdRay.Direction);
+            scalarBox.Min = Convert(simdBox.Min);
+            scalarBox.Max = Convert(simdBox.Max);
+
+            float simdT;
+            var simdIntersects = Ray.Intersects(ref simdRay, ref simdBox, out simdT);
+
+            float scalarT;
+            var scalarIntersects = scalarRay.Intersects(ref scalarBox, out scalarT);
+            //Console.WriteLine($"Simd says: {simdIntersects}, scalar says {scalarIntersects}");
+            Assert.IsTrue(simdIntersects == scalarIntersects);
+            if (simdIntersects)
+            {
+                var error = Math.Abs(simdT - scalarT);
+                Assert.IsTrue(error <= 1e-5f);
+                intersectionCount++;
+            }
+            //Just treat T as undefined if it's not intersecting. No need to check it.
+        }
+
         [TestMethod]
         public unsafe static void TestBoxRayCorrectness()
         {
+            //Test random rays.
             Random random = new Random(5);
             int intersectionCount = 0;
-            for (int i = 0; i < 10000000; ++i)
+            for (int i = 0; i < 1000000; ++i)
             {
                 Ray simdRay;
                 BoundingBox simdBox;
-                bRay scalarRay;
-                bBoundingBox scalarBox;
 
                 simdRay.Position = 20 * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) - new Vector3(0.5f));
                 var boxPosition = 5 * (new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble()) - new Vector3(0.5f));
@@ -95,81 +121,123 @@ namespace BEPUutilitiesTests
                 var width = new Vector3(3 * (float)random.NextDouble());
                 simdBox.Min = boxPosition - width;
                 simdBox.Max = boxPosition + width;
+                
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
 
-                simdRay.Position = new Vector3(0, 0, 0);
-                simdRay.Direction = new Vector3(1, 0, 0);
+              
+            }
+
+            //Test corner cases.
+            {
+                Ray simdRay;
+                BoundingBox simdBox;
                 simdBox.Min = new Vector3(0);
                 simdBox.Max = new Vector3(1);
 
-                scalarRay.Position = Convert(simdRay.Position);
-                scalarRay.Direction = Convert(simdRay.Direction);
-                scalarBox.Min = Convert(simdBox.Min);
-                scalarBox.Max = Convert(simdBox.Max);
+                //Inside
+                simdRay.Position = new Vector3(0.5f);
+                simdRay.Direction = new Vector3(1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
 
-                float simdT;
-                var simdIntersects = Ray.Intersects(ref simdRay, ref simdBox, out simdT);
+                simdRay.Position = new Vector3(0.5f);
+                simdRay.Direction = new Vector3(-1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
 
-                float scalarT;
-                var scalarIntersects = scalarRay.Intersects(ref scalarBox, out scalarT);
-                //Console.WriteLine($"Simd says: {simdIntersects}, scalar says {scalarIntersects}");
-                Assert.IsTrue(simdIntersects == scalarIntersects);
-                if (simdIntersects)
-                {
-                    var error = Math.Abs(simdT - scalarT);
+                //Perpendicular to surface
+                simdRay.Position = new Vector3(0.5f, 0.5f, 0);
+                simdRay.Direction = new Vector3(-1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
 
-                    Assert.IsTrue(error <= 1e-5f);
-                    intersectionCount++;
-                }
-                //Just treat T as undefined if it's not intersecting. No need to check it.
+                simdRay.Position = new Vector3(0.5f, 0.5f, 1);
+                simdRay.Direction = new Vector3(1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+
+                //Corner and edge
+                simdRay.Position = new Vector3(0);
+                simdRay.Direction = new Vector3(1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+                
+                simdRay.Position = new Vector3(-1, 0, 0);
+                simdRay.Direction = new Vector3(1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+
+                simdRay.Position = new Vector3(0, 0.5f, 0);
+                simdRay.Direction = new Vector3(1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+
+                simdRay.Position = new Vector3(0, 0.5f, 0.5f);
+                simdRay.Direction = new Vector3(1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+
+                //Reversed
+                simdRay.Position = new Vector3(1);
+                simdRay.Direction = new Vector3(-1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+                
+                simdRay.Position = new Vector3(2, 0, 0);
+                simdRay.Direction = new Vector3(-1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+
+                simdRay.Position = new Vector3(1, 0.5f, 0);
+                simdRay.Direction = new Vector3(-1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+                
+                simdRay.Position = new Vector3(1, 0.5f, 0.5f);
+                simdRay.Direction = new Vector3(-1, 0, 0);
+                TestIntersection(simdRay, simdBox, ref intersectionCount);
+
+
+
             }
             Console.WriteLine($"intersectionCount: {intersectionCount}");
         }
 
-
-        public static void Repro()
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Print(float t)
         {
-            Vector3 boundingMin = new Vector3(0);
-            Vector3 boundingMax = new Vector3(1);
-            Vector3 rayPosition = new Vector3(0);
-            Vector3 rayDirection = new Vector3(1, 0, 0);
+            Console.WriteLine(t);
+        }
 
-            var positionMin = boundingMin - rayPosition;
-            var positionMax = boundingMax - rayPosition;
-
-            Vector3 tMin, tMax;
-            tMin = positionMin / rayDirection;
-            tMax = positionMax / rayDirection;
+        public static float Repro(out Vector3 test)
+        {
+            Vector3 tMin = new Vector3(0, float.NaN, float.NaN);
+            Vector3 tMax = new Vector3(float.NaN);
 
             var positiveFilter = new Vector3(float.MaxValue);
             var negativeFilter = new Vector3(float.MinValue);
-            //Careful! parameter order matters here- this is designed to deal with NaNs.
-            tMin = Vector3.Max(Vector3.Min(positiveFilter, tMin), negativeFilter);
-            tMax = Vector3.Max(Vector3.Min(positiveFilter, tMax), negativeFilter);
 
-
+            tMin = Vector3.Max(Vector3.Min(tMin, positiveFilter), negativeFilter);
+            tMax = Vector3.Max(Vector3.Min(tMax, positiveFilter), negativeFilter);
+            
             Vector3 tEarly = Vector3.Min(tMin, tMax);
-            Vector3 tLate = Vector3.Max(tMin, tMax);
+            //float t = Math.Max(Math.Max(tEarly.X, tEarly.Y), tEarly.Z);
 
-            //All intervals from tEarly to tLate must overlap for there to exist an intersection.
-            //This would benefit from some more instructions...
-            float t = Math.Max(0, Math.Max(Math.Max(tEarly.X, tEarly.Y), tEarly.Z));
-            var earliestLate = Math.Min(Math.Min(tLate.X, tLate.Y), tLate.Z);
+            float t;
+            var x = tEarly.X;
+            var y = tEarly.Y;
+            var z = tEarly.Z;
+            if (x > y)
+            {
+                t = x > z ? x : z;
+            }
+            else
+            {
+                t = y > z ? y : z;
+            }
 
-            //Console.WriteLine($"tMin: {tMin}, tMax: {tMax}");
-            Console.WriteLine($"tEarly: {tEarly}, tLate: {tLate}");
-            //Console.WriteLine($"t: {t}, earliestLate: {earliestLate}");
-            Assert.IsTrue(t <= earliestLate);
-
+            test = tMin;
+            return t;
         }
 
         public static void Test()
         {
-            Repro();
-            //TestBoxRayCorrectness();
+            //Vector3 test;
+            //Console.WriteLine($"{Repro(out test)}, {test}");
+            TestBoxRayCorrectness();
 
-            //const int iterations = 1000000;
-            //Helper.Test("Box-Ray SIMD", TestBoxRaySIMD, iterations);
-            //Helper.Test("Box-Ray Scalar", TestBoxRayScalar, iterations);
+            const int iterations = 1000000;
+            Helper.Test("Box-Ray SIMD", TestBoxRaySIMD, iterations);
+            Helper.Test("Box-Ray Scalar", TestBoxRayScalar, iterations);
         }
     }
 }

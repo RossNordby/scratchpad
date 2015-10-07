@@ -32,7 +32,6 @@ namespace BEPUutilities2
         }
 
 
-
         /// <summary>
         /// Determines if and when a ray intersects the bounding box.
         /// </summary>
@@ -40,45 +39,40 @@ namespace BEPUutilities2
         /// <param name="boundingBox">Bounding box to test against.</param>
         /// <param name="t">The length along the ray to the impact, if any impact occurs.</param>
         /// <returns>True if the ray intersects the target, false otherwise.</returns>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Intersects(ref Ray ray, ref BoundingBox boundingBox, out float t)
         {
-            //Make sure the ray is pointing toward the box.
-            //This could be done in a more SIMD-friendly way.
             var positionMin = boundingBox.Min - ray.Position;
             var positionMax = boundingBox.Max - ray.Position;
 
+            var inverseDirection = Vector3.One / ray.Direction;
+
             Vector3 tMin, tMax;
-            tMin = positionMin / ray.Direction;
-            tMax = positionMax / ray.Direction;
+            tMin = positionMin * inverseDirection;
+            tMax = positionMax * inverseDirection;
 
             var positiveFilter = new Vector3(float.MaxValue);
             var negativeFilter = new Vector3(float.MinValue);
+
             //Careful! parameter order matters here- this is designed to deal with NaNs.
-            tMin = Vector3.Min(positiveFilter, tMin);
-            tMin = Vector3.Max(tMin, negativeFilter);
-            //tMin = Vector3.Max(Vector3.Min(positiveFilter, tMin), negativeFilter);
-
-            tMax = Vector3.Min(positiveFilter, tMax);
-            tMax = Vector3.Max(tMax, negativeFilter);
-            //tMax = Vector3.Max(Vector3.Min(positiveFilter, tMax), negativeFilter);
-
+            //NaNs become float.MaxValue in tMax, and float.MinValue in tMin.
+            //This ensures that any NaNs are used to expand the intervals.
+            tMin = Vector3.Min(Vector3.Max(tMin, negativeFilter), positiveFilter);
+            tMax = Vector3.Max(Vector3.Min(tMax, positiveFilter), negativeFilter);
 
             Vector3 tEarly = Vector3.Min(tMin, tMax);
             Vector3 tLate = Vector3.Max(tMin, tMax);
 
             //All intervals from tEarly to tLate must overlap for there to exist an intersection.
             //This would benefit from some more instructions...
-            t = Math.Max(0, Math.Max(Math.Max(tEarly.X, tEarly.Y), tEarly.Z));
-            var earliestLate = Math.Min(Math.Min(tLate.X, tLate.Y), tLate.Z);
+            t = MathHelper.Max(0, MathHelper.Max(MathHelper.Max(tEarly.X, tEarly.Y), tEarly.Z));
+            var earliestLate = MathHelper.Min(MathHelper.Min(tLate.X, tLate.Y), tLate.Z);
 
-            Console.WriteLine($"tMin: {tMin}, tMax: {tMax}");
-            Console.WriteLine($"tEarly: {tEarly}, tLate: {tLate}");
-            //Console.WriteLine($"t: {t}, earliestLate: {earliestLate}");
             return t <= earliestLate;
 
 
         }
+
 
         /// <summary>
         /// Determines if and when a ray intersects the plane.
