@@ -25,6 +25,8 @@ namespace BEPUutilitiesTests
             BoundingBox box;
             box.Min = new Vector3(-1);
             box.Max = new Vector3(1);
+
+            
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
@@ -46,12 +48,15 @@ namespace BEPUutilitiesTests
 
         public static float TestBoxRayScalar(int iterationCount)
         {
+
             bRay ray;
             ray.Direction = new bVector3(1, 1, 1);
             ray.Position = new bVector3(-3, -3, -3);
             bBoundingBox box;
             box.Min = new bVector3(-1, -1, -1);
             box.Max = new bVector3(1, 1, 1);
+
+            
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
@@ -121,10 +126,11 @@ namespace BEPUutilitiesTests
                 var width = new Vector3(3 * (float)random.NextDouble());
                 simdBox.Min = boxPosition - width;
                 simdBox.Max = boxPosition + width;
-                
+
+
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
 
-              
+
             }
 
             //Test corner cases.
@@ -156,7 +162,7 @@ namespace BEPUutilitiesTests
                 simdRay.Position = new Vector3(0);
                 simdRay.Direction = new Vector3(1, 0, 0);
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
-                
+
                 simdRay.Position = new Vector3(-1, 0, 0);
                 simdRay.Direction = new Vector3(1, 0, 0);
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
@@ -173,7 +179,7 @@ namespace BEPUutilitiesTests
                 simdRay.Position = new Vector3(1);
                 simdRay.Direction = new Vector3(-1, 0, 0);
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
-                
+
                 simdRay.Position = new Vector3(2, 0, 0);
                 simdRay.Direction = new Vector3(-1, 0, 0);
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
@@ -181,7 +187,7 @@ namespace BEPUutilitiesTests
                 simdRay.Position = new Vector3(1, 0.5f, 0);
                 simdRay.Direction = new Vector3(-1, 0, 0);
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
-                
+
                 simdRay.Position = new Vector3(1, 0.5f, 0.5f);
                 simdRay.Direction = new Vector3(-1, 0, 0);
                 TestIntersection(simdRay, simdBox, ref intersectionCount);
@@ -198,41 +204,16 @@ namespace BEPUutilitiesTests
             Console.WriteLine(t);
         }
 
-        public static float Repro(out Vector3 test)
+        public static Vector4 Repro()
         {
-            Vector3 tMin = new Vector3(0, float.NaN, float.NaN);
-            Vector3 tMax = new Vector3(float.NaN);
-
-            var positiveFilter = new Vector3(float.MaxValue);
-            var negativeFilter = new Vector3(float.MinValue);
-
-            tMin = Vector3.Max(Vector3.Min(tMin, positiveFilter), negativeFilter);
-            tMax = Vector3.Max(Vector3.Min(tMax, positiveFilter), negativeFilter);
-            
-            Vector3 tEarly = Vector3.Min(tMin, tMax);
-            //float t = Math.Max(Math.Max(tEarly.X, tEarly.Y), tEarly.Z);
-
-            float t;
-            var x = tEarly.X;
-            var y = tEarly.Y;
-            var z = tEarly.Z;
-            if (x > y)
-            {
-                t = x > z ? x : z;
-            }
-            else
-            {
-                t = y > z ? y : z;
-            }
-
-            test = tMin;
-            return t;
+            Vector4 notNan = new Vector4(0);
+            Vector4 nan = new Vector4(float.NaN);
+            return Vector4.Max(notNan, nan);
         }
 
         public static void Test()
         {
-            //Vector3 test;
-            //Console.WriteLine($"{Repro(out test)}, {test}");
+            Console.WriteLine($"{Repro()}");
             TestBoxRayCorrectness();
 
             const int iterations = 1000000;

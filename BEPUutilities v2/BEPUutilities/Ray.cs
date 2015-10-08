@@ -57,8 +57,8 @@ namespace BEPUutilities2
             //Careful! parameter order matters here- this is designed to deal with NaNs.
             //NaNs become float.MaxValue in tMax, and float.MinValue in tMin.
             //This ensures that any NaNs are used to expand the intervals.
-            tMin = Vector3.Min(Vector3.Max(tMin, negativeFilter), positiveFilter);
-            tMax = Vector3.Max(Vector3.Min(tMax, positiveFilter), negativeFilter);
+            tMin = Vector3.Max(tMin, negativeFilter);
+            tMax = Vector3.Min(tMax, positiveFilter);
 
             Vector3 tEarly = Vector3.Min(tMin, tMax);
             Vector3 tLate = Vector3.Max(tMin, tMax);
