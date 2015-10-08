@@ -1,16 +1,11 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 using bVector3 = BEPUutilities.Vector3;
 using bRay = BEPUutilities.Ray;
 using bBoundingBox = BEPUutilities.BoundingBox;
 using BEPUutilities2;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace BEPUutilitiesTests
 {
@@ -198,22 +193,9 @@ namespace BEPUutilitiesTests
             Console.WriteLine($"intersectionCount: {intersectionCount}");
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Print(float t)
-        {
-            Console.WriteLine(t);
-        }
-
-        public static Vector4 Repro()
-        {
-            Vector4 notNan = new Vector4(0);
-            Vector4 nan = new Vector4(float.NaN);
-            return Vector4.Max(notNan, nan);
-        }
 
         public static void Test()
         {
-            Console.WriteLine($"{Repro()}");
             TestBoxRayCorrectness();
 
             const int iterations = 1000000;
