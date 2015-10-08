@@ -82,6 +82,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BoundingTests.cs" />
+    <Compile Include="AffineTests.cs" />
     <Compile Include="Matrix3x3Tests.cs" />
     <Compile Include="Matrix4x4Tests.cs" />
     <Compile Include="Repro.cs" />

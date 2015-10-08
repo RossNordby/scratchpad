@@ -21,7 +21,7 @@ namespace BEPUutilitiesTests
             box.Min = new Vector3(-1);
             box.Max = new Vector3(1);
 
-            
+
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
@@ -51,7 +51,7 @@ namespace BEPUutilitiesTests
             box.Min = new bVector3(-1, -1, -1);
             box.Max = new bVector3(1, 1, 1);
 
-            
+
             float accumulator = 0;
             for (int i = 0; i < iterationCount; ++i)
             {
@@ -192,7 +192,7 @@ namespace BEPUutilitiesTests
             }
             Console.WriteLine($"intersectionCount: {intersectionCount}");
         }
-
+        
 
         public static void Test()
         {

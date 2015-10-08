@@ -12,6 +12,8 @@ namespace BEPUutilitiesTests
         {
             BoundingTests.Test();
             Console.WriteLine();
+            AffineTests.Test();
+            Console.WriteLine();
             Vector3Tests.Test();
             Console.WriteLine();
             Matrix3x3Tests.Test();
