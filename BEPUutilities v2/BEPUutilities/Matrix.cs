@@ -43,6 +43,20 @@ namespace BEPUutilities2
             }
         }
 
+        public Vector3 Translation
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return new Vector3(W.X, W.Y, W.Z);
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set
+            {
+                W = new Vector4(value, W.W);
+            }
+        }
+
         struct M
         {
             public float M11, M12, M13, M14;
@@ -50,6 +64,7 @@ namespace BEPUutilities2
             public float M31, M32, M33, M34;
             public float M41, M42, M43, M44;
         }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe static void Transpose(M* m, M* transposed)
@@ -83,7 +98,7 @@ namespace BEPUutilities2
             transposed->M42 = m24;
             transposed->M43 = m34;
             transposed->M44 = m->M44;
-            
+
         }
 
 
@@ -97,7 +112,7 @@ namespace BEPUutilities2
         public static void Transpose(ref Matrix m, out Matrix transposed)
         {
             //Not an ideal implementation. Shuffles would be handy.
-            
+
             var xy = m.X.Y;
             var xz = m.X.Z;
             var xw = m.X.W;
@@ -187,6 +202,223 @@ namespace BEPUutilities2
                 var w = new Vector4(a.W.W);
                 result.W = (x * bX + y * bY) + (z * bZ + w * b.W);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromAxisAngle(ref Vector3 axis, float angle, out Matrix result)
+        {
+            //TODO: Could be better simdified.
+            float xx = axis.X * axis.X;
+            float yy = axis.Y * axis.Y;
+            float zz = axis.Z * axis.Z;
+            float xy = axis.X * axis.Y;
+            float xz = axis.X * axis.Z;
+            float yz = axis.Y * axis.Z;
+
+            float sinAngle = (float)Math.Sin(angle);
+            float oneMinusCosAngle = 1 - (float)Math.Cos(angle);
+
+            result.X = new Vector4(
+                1 + oneMinusCosAngle * (xx - 1),
+                axis.Z * sinAngle + oneMinusCosAngle * xy,
+                -axis.Y * sinAngle + oneMinusCosAngle * xz,
+                0);
+
+            result.Y = new Vector4(
+                -axis.Z * sinAngle + oneMinusCosAngle * xy,
+                1 + oneMinusCosAngle * (yy - 1),
+                axis.X * sinAngle + oneMinusCosAngle * yz,
+                0);
+
+            result.Z = new Vector4(
+                axis.Y * sinAngle + oneMinusCosAngle * xz,
+                -axis.X * sinAngle + oneMinusCosAngle * yz,
+                1 + oneMinusCosAngle * (zz - 1),
+                0);
+
+            result.W = new Vector4(0, 0, 0, 1);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix CreateFromAxisAngle(Vector3 axis, float angle)
+        {
+            Matrix result;
+            CreateFromAxisAngle(ref axis, angle, out result);
+            return result;
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromQuaternion(ref Quaternion quaternion, out Matrix result)
+        {
+            float qX2 = quaternion.X + quaternion.X;
+            float qY2 = quaternion.Y + quaternion.Y;
+            float qZ2 = quaternion.Z + quaternion.Z;
+            float XX = qX2 * quaternion.X;
+            float YY = qY2 * quaternion.Y;
+            float ZZ = qZ2 * quaternion.Z;
+            float XY = qX2 * quaternion.Y;
+            float XZ = qX2 * quaternion.Z;
+            float XW = qX2 * quaternion.W;
+            float YZ = qY2 * quaternion.Z;
+            float YW = qY2 * quaternion.W;
+            float ZW = qZ2 * quaternion.W;
+
+            result.X = new Vector4(
+                1 - YY - ZZ,
+                XY + ZW,
+                XZ - YW,
+                0);
+
+            result.Y = new Vector4(
+                XY - ZW,
+                1 - XX - ZZ,
+                YZ + XW,
+                0);
+
+            result.Z = new Vector4(
+                XZ + YW,
+                YZ - XW,
+                1 - XX - YY,
+                0);
+
+            result.W = new Vector4(
+                0,
+                0,
+                0,
+                1);
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix CreateFromQuaternion(Quaternion quaternion)
+        {
+            Matrix toReturn;
+            CreateFromQuaternion(ref quaternion, out toReturn);
+            return toReturn;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix operator *(Matrix m1, Matrix m2)
+        {
+            Matrix toReturn;
+            Multiply(ref m1, ref m2, out toReturn);
+            return toReturn;
+        }
+
+
+        /// <summary>
+        /// Creates a right-handed perspective matrix.
+        /// </summary>
+        /// <param name="fieldOfView">Field of view of the perspective in radians.</param>
+        /// <param name="aspectRatio">Width of the viewport over the height of the viewport.</param>
+        /// <param name="nearClip">Near clip plane of the perspective.</param>
+        /// <param name="farClip">Far clip plane of the perspective.</param>
+        /// <param name="perspective">Resulting perspective matrix.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreatePerspectiveFieldOfView(float fieldOfView, float aspectRatio, float nearClip, float farClip, out Matrix perspective)
+        {
+            float h = 1f / ((float)Math.Tan(fieldOfView * 0.5f));
+            float w = h / aspectRatio;
+            float m33 = farClip / (nearClip - farClip);
+            perspective.X = new Vector4(w, 0, 0, 0);
+            perspective.Y = new Vector4(0, h, 0, 0);
+            perspective.Z = new Vector4(0, 0, m33, -1);
+            perspective.W = new Vector4(0, 0, 0, nearClip * m33);
+
+        }
+
+
+        /// <summary>
+        /// Creates a right-handed perspective matrix.
+        /// </summary>
+        /// <param name="fieldOfView">Field of view of the perspective in radians.</param>
+        /// <param name="aspectRatio">Width of the viewport over the height of the viewport.</param>
+        /// <param name="nearClip">Near clip plane of the perspective.</param>
+        /// <param name="farClip">Far clip plane of the perspective.</param>
+        /// <returns>Resulting perspective matrix.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix CreatePerspectiveFieldOfView(float fieldOfView, float aspectRatio, float nearClip, float farClip)
+        {
+            Matrix toReturn;
+            CreatePerspectiveFieldOfView(fieldOfView, aspectRatio, nearClip, farClip, out toReturn);
+            return toReturn;
+        }
+
+
+        /// <summary>
+        /// Inverts the matrix.
+        /// </summary>
+        /// <param name="m">Matrix to invert.</param>
+        /// <param name="inverted">Inverted version of the matrix.</param>
+        public static void Invert(ref Matrix m, out Matrix inverted)
+        {
+            //TODO: This could be quite a bit faster, especially once shuffles exist... But inverting a 4x4 matrix should approximately never occur.
+            float s0 = m.X.X * m.Y.Y - m.Y.X * m.X.Y;
+            float s1 = m.X.X * m.Y.Z - m.Y.X * m.X.Z;
+            float s2 = m.X.X * m.Y.W - m.Y.X * m.X.W;
+            float s3 = m.X.Y * m.Y.Z - m.Y.Y * m.X.Z;
+            float s4 = m.X.Y * m.Y.W - m.Y.Y * m.X.W;
+            float s5 = m.X.Z * m.Y.W - m.Y.Z * m.X.W;
+
+            float c5 = m.Z.Z * m.W.W - m.W.Z * m.Z.W;
+            float c4 = m.Z.Y * m.W.W - m.W.Y * m.Z.W;
+            float c3 = m.Z.Y * m.W.Z - m.W.Y * m.Z.Z;
+            float c2 = m.Z.X * m.W.W - m.W.X * m.Z.W;
+            float c1 = m.Z.X * m.W.Z - m.W.X * m.Z.Z;
+            float c0 = m.Z.X * m.W.Y - m.W.X * m.Z.Y;
+
+            float inverseDeterminant = 1.0f / (s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0);
+
+            float m11 = m.X.X;
+            float m12 = m.X.Y;
+            float m13 = m.X.Z;
+            float m14 = m.X.W;
+            float m21 = m.Y.X;
+            float m22 = m.Y.Y;
+            float m23 = m.Y.Z;
+            float m31 = m.Z.X;
+            float m32 = m.Z.Y;
+            float m33 = m.Z.Z;
+
+            float m41 = m.W.X;
+            float m42 = m.W.Y;
+
+            inverted.X = new Vector4(
+                (m.Y.Y * c5 - m.Y.Z * c4 + m.Y.W * c3) * inverseDeterminant,
+                (-m.X.Y * c5 + m.X.Z * c4 - m.X.W * c3) * inverseDeterminant,
+                (m.W.Y * s5 - m.W.Z * s4 + m.W.W * s3) * inverseDeterminant,
+                (-m.Z.Y * s5 + m.Z.Z * s4 - m.Z.W * s3) * inverseDeterminant);
+
+            inverted.Y = new Vector4(
+                (-m.Y.X * c5 + m.Y.Z * c2 - m.Y.W * c1) * inverseDeterminant,
+                (m11 * c5 - m13 * c2 + m14 * c1) * inverseDeterminant,
+                (-m.W.X * s5 + m.W.Z * s2 - m.W.W * s1) * inverseDeterminant,
+                (m.Z.X * s5 - m.Z.Z * s2 + m.Z.W * s1) * inverseDeterminant);
+
+            inverted.Z = new Vector4(
+                (m21 * c4 - m22 * c2 + m.Y.W * c0) * inverseDeterminant,
+                (-m11 * c4 + m12 * c2 - m14 * c0) * inverseDeterminant,
+                (m.W.X * s4 - m.W.Y * s2 + m.W.W * s0) * inverseDeterminant,
+                (-m31 * s4 + m32 * s2 - m.Z.W * s0) * inverseDeterminant);
+
+            inverted.W = new Vector4(
+                (-m21 * c3 + m22 * c1 - m23 * c0) * inverseDeterminant,
+                (m11 * c3 - m12 * c1 + m13 * c0) * inverseDeterminant,
+                (-m41 * s3 + m42 * s1 - m.W.Z * s0) * inverseDeterminant,
+                (m31 * s3 - m32 * s1 + m33 * s0) * inverseDeterminant);
+        }
+
+        /// <summary>
+        /// Inverts the matrix.
+        /// </summary>
+        /// <param name="m">Matrix to invert.</param>
+        /// <returns>Inverted version of the matrix.</returns>
+        public static Matrix Invert(ref Matrix m)
+        {
+            Matrix inverted;
+            Invert(ref m, out inverted);
+            return inverted;
         }
 
     }

@@ -228,8 +228,55 @@ namespace BEPUutilities2
 
 
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromMatrix(ref Matrix matrix, out Matrix3x3 matrix3x3)
+        {
+            matrix3x3.X = new Vector3(matrix.X.X, matrix.X.Y, matrix.X.Z);
+            matrix3x3.Y = new Vector3(matrix.Y.X, matrix.Y.Y, matrix.Y.Z);
+            matrix3x3.Z = new Vector3(matrix.Z.X, matrix.Z.Y, matrix.Z.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromQuaternion(ref Quaternion quaternion, out Matrix3x3 result)
+        {
+            float qX2 = quaternion.X + quaternion.X;
+            float qY2 = quaternion.Y + quaternion.Y;
+            float qZ2 = quaternion.Z + quaternion.Z;
+            float XX = qX2 * quaternion.X;
+            float YY = qY2 * quaternion.Y;
+            float ZZ = qZ2 * quaternion.Z;
+            float XY = qX2 * quaternion.Y;
+            float XZ = qX2 * quaternion.Z;
+            float XW = qX2 * quaternion.W;
+            float YZ = qY2 * quaternion.Z;
+            float YW = qY2 * quaternion.W;
+            float ZW = qZ2 * quaternion.W;
+
+            result.X = new Vector3(
+                1 - YY - ZZ,
+                XY + ZW,
+                XZ - YW);
+
+            result.Y = new Vector3(
+                XY - ZW,
+                1 - XX - ZZ,
+                YZ + XW);
+
+            result.Z = new Vector3(
+                XZ + YW,
+                YZ - XW,
+                1 - XX - YY);
 
 
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix3x3 CreateFromQuaternion(Quaternion quaternion)
+        {
+            Matrix3x3 toReturn;
+            CreateFromQuaternion(ref quaternion, out toReturn);
+            return toReturn;
+        }
 
     }
 }

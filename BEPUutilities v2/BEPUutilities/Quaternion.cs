@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
 {
@@ -145,6 +146,7 @@ namespace BEPUutilities2
 
 
 
+
         /// <summary>
         /// Constructs a quaternion from a rotation matrix.
         /// </summary>
@@ -205,25 +207,68 @@ namespace BEPUutilities2
             CreateFromRotationMatrix(ref r, out toReturn);
             return toReturn;
         }
-        
+
+
+        /// <summary>
+        /// Constructs a quaternion from a rotation matrix.
+        /// </summary>
+        /// <param name="r">Rotation matrix to create the quaternion from.</param>
+        /// <param name="q">Quaternion based on the rotation matrix.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromRotationMatrix(ref Matrix r, out Quaternion q)
+        {
+            Matrix3x3 rotation3x3;
+            Matrix3x3.CreateFromMatrix(ref r, out rotation3x3);
+            CreateFromRotationMatrix(ref rotation3x3, out q);
+        }
+
+        /// <summary>
+        /// Constructs a quaternion from a rotation matrix.
+        /// </summary>
+        /// <param name="r">Rotation matrix to create the quaternion from.</param>
+        /// <returns>Quaternion based on the rotation matrix.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Quaternion CreateFromRotationMatrix(Matrix r)
+        {
+            Matrix3x3 rotation3x3;
+            Matrix3x3.CreateFromMatrix(ref r, out rotation3x3);
+            Quaternion q;
+            CreateFromRotationMatrix(ref rotation3x3, out q);
+            return q;
+        }
+
 
         /// <summary>
         /// Ensures the quaternion has unit length.
         /// </summary>
         /// <param name="quaternion">Quaternion to normalize.</param>
-        /// <param name="toReturn">Normalized quaternion.</param>
-        public static void Normalize(ref Quaternion quaternion, out Quaternion toReturn)
+        /// <param name="result">Normalized quaternion.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Normalize(ref Quaternion quaternion, out Quaternion result)
         {
+            float inverse = (float)(1 / Math.Sqrt(quaternion.X * quaternion.X + quaternion.Y * quaternion.Y + quaternion.Z * quaternion.Z + quaternion.W * quaternion.W));
+            result.X = quaternion.X * inverse;
+            result.Y = quaternion.Y * inverse;
+            result.Z = quaternion.Z * inverse;
+            result.W = quaternion.W * inverse;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Quaternion Normalize(Quaternion quaternion)
+        {
+            Quaternion toReturn;
             float inverse = (float)(1 / Math.Sqrt(quaternion.X * quaternion.X + quaternion.Y * quaternion.Y + quaternion.Z * quaternion.Z + quaternion.W * quaternion.W));
             toReturn.X = quaternion.X * inverse;
             toReturn.Y = quaternion.Y * inverse;
             toReturn.Z = quaternion.Z * inverse;
             toReturn.W = quaternion.W * inverse;
+            return toReturn;
         }
 
         /// <summary>
         /// Scales the quaternion such that it has unit length.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Normalize()
         {
             float inverse = (float)(1 / Math.Sqrt(X * X + Y * Y + Z * Z + W * W));
