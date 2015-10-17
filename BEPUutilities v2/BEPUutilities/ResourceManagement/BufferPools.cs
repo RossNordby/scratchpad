@@ -17,10 +17,7 @@ namespace BEPUutilities2.ResourceManagement
         /// <summary>
         /// Gets the locker acquired when new pools are created by BufferPools{T}.
         /// </summary>
-        public static object Locker
-        {
-            get; private set;
-        }
+        public static object Locker { get; } = new object();
 
         /// <summary>
         /// Gets a list of all thread pools created by BufferPools{T}.
