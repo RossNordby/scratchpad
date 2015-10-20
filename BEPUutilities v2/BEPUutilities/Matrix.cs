@@ -324,7 +324,7 @@ namespace BEPUutilities2
             perspective.X = new Vector4(w, 0, 0, 0);
             perspective.Y = new Vector4(0, h, 0, 0);
             perspective.Z = new Vector4(0, 0, m33, -1);
-            perspective.W = new Vector4(0, 0, 0, nearClip * m33);
+            perspective.W = new Vector4(0, 0, nearClip * m33, 0);
 
         }
 
