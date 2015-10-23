@@ -43,6 +43,8 @@ namespace BEPUutilities2
             }
         }
 
+
+
         public Vector3 Translation
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -343,6 +345,28 @@ namespace BEPUutilities2
             Matrix toReturn;
             CreatePerspectiveFieldOfView(fieldOfView, aspectRatio, nearClip, farClip, out toReturn);
             return toReturn;
+        }
+
+        /// <summary>
+        /// Creates a right handed orthographic projection.
+        /// </summary>
+        /// <param name="left">Leftmost coordinate of the projected area.</param>
+        /// <param name="right">Rightmost coordinate of the projected area.</param>
+        /// <param name="bottom">Bottom coordinate of the projected area.</param>
+        /// <param name="top">Top coordinate of the projected area.</param>
+        /// <param name="zNear">Near plane of the projection.</param>
+        /// <param name="zFar">Far plane of the projection.</param>
+        /// <param name="projection">The resulting orthographic projection matrix.</param>
+        public static void CreateOrthographic(float left, float right, float bottom, float top, float zNear, float zFar, out Matrix projection)
+        {
+            float width = right - left;
+            float height = top - bottom;
+            float depth = zFar - zNear;
+            projection.X = new Vector4(2f / width, 0, 0, 0);
+            projection.Y = new Vector4(0, 2f / height, 0, 0);
+            projection.Z = new Vector4(0, 0, -1f / depth, 0);
+            projection.W = new Vector4((left + right) / -width, (top + bottom) / -height, zNear / -depth, 1f);
+
         }
 
 

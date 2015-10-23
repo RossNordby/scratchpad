@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("BEPUutilities")]
+[assembly: AssemblyTitle("BEPUutilities2")]
 [assembly: AssemblyDescription("Common math, resource management, and data structure helpers.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Bepu Entertainment LLC")]
-[assembly: AssemblyProduct("BEPUutilities")]
+[assembly: AssemblyProduct("BEPUutilities2")]
 [assembly: AssemblyCopyright("Copyright © 2015, Bepu Entertainment LLC")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
