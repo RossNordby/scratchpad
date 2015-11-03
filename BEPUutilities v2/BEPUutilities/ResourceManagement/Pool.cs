@@ -8,7 +8,7 @@ namespace BEPUutilities2.ResourceManagement
     /// Manages a cache of a type of resource.
     /// </summary>
     /// <typeparam name="T">Type of object to pool.</typeparam>
-    public abstract class Pool<T> where T : class
+    public class Pool<T> where T : class
     {
         Stack<T> stack = new Stack<T>();
         SpinLock spinLock = new SpinLock();
@@ -39,7 +39,7 @@ namespace BEPUutilities2.ResourceManagement
             get; set;
         }
 
-        protected Pool(Func<T> creator, Action<T> cleaner = null)
+        public Pool(Func<T> creator, Action<T> cleaner = null)
         {
             if (creator == null)
                 throw new ArgumentException("Creator must not be null.");

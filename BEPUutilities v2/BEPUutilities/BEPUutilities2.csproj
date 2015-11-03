@@ -119,6 +119,7 @@
     <Compile Include="Ray.cs" />
     <Compile Include="RayHit.cs" />
     <Compile Include="ResourceManagement\LockingBufferPool.cs" />
+    <Compile Include="ResourceManagement\PassthroughBufferPool.cs" />
     <Compile Include="ResourceManagement\UnsafeBufferPool.cs" />
     <Compile Include="ResourceManagement\BufferPool.cs" />
     <Compile Include="ResourceManagement\BufferPools.cs" />
