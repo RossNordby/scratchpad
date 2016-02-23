@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using BEPUutilities2.ResourceManagement;
-#if FORCEINLINE
 using System.Runtime.CompilerServices;
-#endif
 
 namespace BEPUutilities2.DataStructures
 {
@@ -47,10 +45,18 @@ namespace BEPUutilities2.DataStructures
         public readonly TValue[] Values;
 
 
-
-        private readonly BufferPool<int> tablePool;
-        private readonly BufferPool<TKey> keyPool;
-        private readonly BufferPool<TValue> valuePool;
+        /// <summary>
+        /// Pool from which table arrays are pulled.
+        /// </summary>
+        public readonly BufferPool<int> TablePool;
+        /// <summary>
+        /// Pool from which key arrays are pulled.
+        /// </summary>
+        public readonly BufferPool<TKey> KeyPool;
+        /// <summary>
+        /// Pool from which value arrays are pulled.
+        /// </summary>
+        public readonly BufferPool<TValue> ValuePool;
 
         /// <summary>
         /// Gets or sets a key-value pair at the given index in the list representation.
@@ -61,17 +67,13 @@ namespace BEPUutilities2.DataStructures
         {
             //You would think that such a trivial accessor would inline without any external suggestion.
             //Sometimes, yes. Sometimes, no. :(
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             get
             {
                 Debug.Assert(index >= 0 && index < count, "Index should be within the list's size.");
                 return new KeyValuePair<TKey, TValue>(Keys[index], Values[index]);
             }
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             set
             {
                 Debug.Assert(index >= 0 && index < count, "Index should be within the list's size.");
@@ -83,6 +85,29 @@ namespace BEPUutilities2.DataStructures
         private int pairPoolIndex;
         private int tablePoolIndex;
         private int tableMask;
+
+        /// <summary>
+        /// Gets the buffer pool index associated with the key and value arrays.
+        /// </summary>
+        public int PairPoolIndex
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return pairPoolIndex;
+            }
+        }
+        /// <summary>
+        /// Gets the buffer pool index associated with the table array.
+        /// </summary>
+        public int TablePoolIndex
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return tablePoolIndex;
+            }
+        }
 
         /// <summary>
         /// Creates a new set.
@@ -98,9 +123,9 @@ namespace BEPUutilities2.DataStructures
                 throw new ArgumentException("The hash table must be larger than the element array.", "tableSizePower");
             if (initialElementPoolIndex < 0)
                 throw new ArgumentException("Initial pool index must be nonnegative.", "initialElementPoolIndex");
-            this.tablePool = tablePool;
-            this.keyPool = keyPool;
-            this.valuePool = valuePool;
+            this.TablePool = tablePool;
+            this.KeyPool = keyPool;
+            this.ValuePool = valuePool;
 
             pairPoolIndex = initialElementPoolIndex;
             tablePoolIndex = initialElementPoolIndex + tableSizePower;
@@ -119,9 +144,7 @@ namespace BEPUutilities2.DataStructures
         /// Ensures that the dictionary has enough room to hold the specified number of elements.
         /// </summary>
         /// <param name="count">Number of elements to hold.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void EnsureCapacity(int count)
         {
             if (count > Keys.Length)
@@ -136,8 +159,8 @@ namespace BEPUutilities2.DataStructures
             Debug.Assert(count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
             //Just double the size of the set.
             var oldDictionary = this;
-            this = new QuickDictionary<TKey, TValue>(keyPool, valuePool, tablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
-            for (int i = oldDictionary.count - 1; i >= 0; --i)
+            this = new QuickDictionary<TKey, TValue>(KeyPool, ValuePool, TablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
+            for (int i = 0; i < oldDictionary.count; ++i)
             {
                 Add(oldDictionary.Keys[i], oldDictionary.Values[i]);
             }
@@ -161,9 +184,7 @@ namespace BEPUutilities2.DataStructures
         /// <param name="tableIndex">Index of the element in the redirect table, or if it is not present, the index of where it would be added.</param>
         /// <param name="elementIndex">The index of the element in the element arrays, if it exists; -1 otherwise.</param>
         /// <returns>True if the element is present in the set, false if it is not.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         private bool GetIndices(TKey element, out int tableIndex, out int elementIndex)
         {
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
@@ -471,9 +492,9 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         public void Dispose()
         {
-            tablePool.Return(table, tablePoolIndex);
-            keyPool.Return(Keys, pairPoolIndex);
-            valuePool.Return(Values, pairPoolIndex);
+            TablePool.Return(table, tablePoolIndex);
+            KeyPool.Return(Keys, pairPoolIndex);
+            ValuePool.Return(Values, pairPoolIndex);
 #if DEBUG
             table = null;
 #endif

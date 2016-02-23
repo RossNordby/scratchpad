@@ -10,6 +10,7 @@ namespace BEPUutilitiesTests
     {
         static void Main(string[] args)
         {
+            AllocatorTests.TestChurnStability();
             BoundingTests.Test();
             Console.WriteLine();
             AffineTests.Test();

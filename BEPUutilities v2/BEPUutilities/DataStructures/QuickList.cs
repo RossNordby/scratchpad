@@ -2,9 +2,7 @@
 using System.Diagnostics;
 using BEPUutilities2.ResourceManagement;
 using System.Collections.Generic;
-#if FORCEINLINE
 using System.Runtime.CompilerServices;
-#endif
 
 namespace BEPUutilities2.DataStructures
 {
@@ -18,11 +16,29 @@ namespace BEPUutilities2.DataStructures
     public struct QuickList<T> : IDisposable, IList<T>
     {
         private int poolIndex;
+        /// <summary>
+        /// Gets the buffer pool index associated with the elements array.
+        /// </summary>
+        public int PoolIndex
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return poolIndex;
+            }
+        }
+
         private BufferPool<T> pool;
         /// <summary>
-        /// Gets the pool used by the quick list.
+        /// Pool from which element arrays are pulled.
         /// </summary>
-        public BufferPool<T> Pool { get { return pool; } }
+        public BufferPool<T> Pool
+        {
+            get
+            {
+                return pool;
+            }
+        }
 
         /// <summary>
         /// Gets the backing array containing the elements of the list.
@@ -54,17 +70,13 @@ namespace BEPUutilities2.DataStructures
         {
             //You would think that such a trivial accessor would inline without any external suggestion.
             //Sometimes, yes. Sometimes, no. :(
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             get
             {
                 ValidateIndex(index);
                 return Elements[index];
             }
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             set
             {
                 ValidateIndex(index);
@@ -91,9 +103,7 @@ namespace BEPUutilities2.DataStructures
         /// Ensures that the list has enough room to hold the specified number of elements.
         /// </summary>
         /// <param name="count">Number of elements to hold.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void EnsureCapacity(int count)
         {
             if (count > Elements.Length)
@@ -125,9 +135,7 @@ namespace BEPUutilities2.DataStructures
         /// Adds the elements of a list to the QuickList.
         /// </summary>
         /// <param name="list">List to add.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void AddRange(IList<T> list)
         {
             var newCount = count + list.Count;
@@ -140,9 +148,7 @@ namespace BEPUutilities2.DataStructures
         /// Adds the elements of a list to the QuickList.
         /// </summary>
         /// <param name="list">List to add.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void AddRange(ref QuickList<T> list)
         {
             var newCount = count + list.Count;
@@ -155,9 +161,7 @@ namespace BEPUutilities2.DataStructures
         /// Adds the element to the list.
         /// </summary>
         /// <param name="element">Item to add.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Add(T element)
         {
             Validate();
@@ -171,9 +175,7 @@ namespace BEPUutilities2.DataStructures
         /// Adds the element to the list without checking the count against the capacity.
         /// </summary>
         /// <param name="element">Item to add.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void AddUnsafely(T element)
         {
             Validate();
@@ -185,9 +187,7 @@ namespace BEPUutilities2.DataStructures
         /// Adds the element to the list.
         /// </summary>
         /// <param name="element">Element to add.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Add(ref T element)
         {
             Validate();
@@ -201,9 +201,7 @@ namespace BEPUutilities2.DataStructures
         /// Adds the element to the list without checking the count against the capacity.
         /// </summary>
         /// <param name="element">Element to add.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void AddUnsafely(ref T element)
         {
             Validate();
@@ -216,9 +214,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element to find.</param>
         /// <returns>Index of the element in the list if present, -1 otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public int IndexOf(T element)
         {
             Validate();
@@ -230,9 +226,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element to find.</param>
         /// <returns>Index of the element in the list if present, -1 otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public int IndexOf(ref T element)
         {
             Validate();
@@ -244,9 +238,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element to remove from the list.</param>
         /// <returns>True if the element was present and was removed, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool Remove(T element)
         {
             Validate();
@@ -264,9 +256,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element to remove from the list.</param>
         /// <returns>True if the element was present and was removed, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool Remove(ref T element)
         {
             Validate();
@@ -284,9 +274,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element to remove from the list.</param>
         /// <returns>True if the element was present and was removed, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool FastRemove(T element)
         {
             Validate();
@@ -304,9 +292,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element to remove from the list.</param>
         /// <returns>True if the element was present and was removed, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool FastRemove(ref T element)
         {
             Validate();
@@ -323,9 +309,7 @@ namespace BEPUutilities2.DataStructures
         /// Removes an element from the list at the given index. Preserves the order of elements.
         /// </summary>
         /// <param name="index">Index of the element to remove from the list.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void RemoveAt(int index)
         {
             Validate();
@@ -344,9 +328,7 @@ namespace BEPUutilities2.DataStructures
         /// Removes an element from the list at the given index. Does not preserve the order of elements.
         /// </summary>
         /// <param name="index">Index of the element to remove from the list.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void FastRemoveAt(int index)
         {
             Validate();
@@ -367,9 +349,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Last element of the list.</param>
         /// <returns>True if the element existed and was removed, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool TryPop(out T element)
         {
             Validate();
@@ -389,9 +369,7 @@ namespace BEPUutilities2.DataStructures
         /// <param name="index">The zero-based index at which <paramref name="element"/> should be inserted.</param>
         /// <param name="element">The object to insert into the <see cref="T:System.Collections.Generic.IList`1"/>.</param>
         /// <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="index"/> is not a valid index in the <see cref="T:System.Collections.Generic.IList`1"/>.</exception>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Insert(int index, T element)
         {
             Validate();
@@ -408,9 +386,7 @@ namespace BEPUutilities2.DataStructures
         /// <param name="index">The zero-based index at which <paramref name="element"/> should be inserted.</param>
         /// <param name="element">The object to insert into the <see cref="T:System.Collections.Generic.IList`1"/>.</param>
         /// <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="index"/> is not a valid index in the <see cref="T:System.Collections.Generic.IList`1"/>.</exception>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Insert(int index, ref T element)
         {
             Validate();
@@ -429,9 +405,7 @@ namespace BEPUutilities2.DataStructures
         /// true if <paramref name="element"/> is found in the <see cref="T:System.Collections.Generic.ICollection`1"/>; otherwise, false.
         /// </returns>
         /// <param name="element">The object to locate in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool Contains(T element)
         {
             return IndexOf(element) >= 0;
@@ -444,9 +418,7 @@ namespace BEPUutilities2.DataStructures
         /// true if <paramref name="element"/> is found in the <see cref="T:System.Collections.Generic.ICollection`1"/>; otherwise, false.
         /// </returns>
         /// <param name="element">The object to locate in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool Contains(ref T element)
         {
             return IndexOf(ref element) >= 0;
@@ -456,9 +428,7 @@ namespace BEPUutilities2.DataStructures
         /// Copies the elements of the <see cref="T:System.Collections.Generic.ICollection`1"/> to an <see cref="T:System.Array"/>, starting at a particular <see cref="T:System.Array"/> index.
         /// </summary>
         /// <param name="array">The one-dimensional <see cref="T:System.Array"/> that is the destination of the elements copied from <see cref="T:System.Collections.Generic.ICollection`1"/>. The <see cref="T:System.Array"/> must have zero-based indexing.</param><param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param><exception cref="T:System.ArgumentNullException"><paramref name="array"/> is null.</exception><exception cref="T:System.ArgumentOutOfRangeException"><paramref name="arrayIndex"/> is less than 0.</exception><exception cref="T:System.ArgumentException">The number of elements in the source <see cref="T:System.Collections.Generic.ICollection`1"/> is greater than the available space from <paramref name="arrayIndex"/> to the end of the destination <paramref name="array"/>.</exception>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void CopyTo(T[] array, int arrayIndex)
         {
             Array.Copy(Elements, 0, array, arrayIndex, Count);
@@ -468,9 +438,7 @@ namespace BEPUutilities2.DataStructures
         /// <summary>
         /// Clears the list by setting the count to zero and explicitly setting all relevant indices in the backing array to default values.
         /// </summary>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Clear()
         {
             Validate();

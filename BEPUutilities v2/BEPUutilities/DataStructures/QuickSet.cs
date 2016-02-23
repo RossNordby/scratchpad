@@ -2,9 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using BEPUutilities2.ResourceManagement;
-#if FORCEINLINE
 using System.Runtime.CompilerServices;
-#endif
 
 namespace BEPUutilities2.DataStructures
 {
@@ -38,10 +36,14 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         public readonly T[] Elements;
 
-
-
-        private readonly BufferPool<int> tablePool;
-        private readonly BufferPool<T> elementPool;
+        /// <summary>
+        /// Pool from which table arrays are pulled.
+        /// </summary>
+        public readonly BufferPool<int> TablePool;
+        /// <summary>
+        /// Pool from which element arrays are pulled.
+        /// </summary>
+        public readonly BufferPool<T> ElementPool;
 
         /// <summary>
         /// Gets or sets an element at the given index in the list representation.
@@ -52,17 +54,13 @@ namespace BEPUutilities2.DataStructures
         {
             //You would think that such a trivial accessor would inline without any external suggestion.
             //Sometimes, yes. Sometimes, no. :(
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             get
             {
                 Debug.Assert(index >= 0 && index < count, "Index should be within the list's size.");
                 return Elements[index];
             }
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             set
             {
                 Debug.Assert(index >= 0 && index < count, "Index should be within the list's size.");
@@ -73,7 +71,28 @@ namespace BEPUutilities2.DataStructures
         private int elementPoolIndex;
         private int tablePoolIndex;
         private int tableMask;
-
+        /// <summary>
+        /// Gets the buffer pool index associated with the elements array.
+        /// </summary>
+        public int ElementPoolIndex
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return elementPoolIndex;
+            }
+        }
+        /// <summary>
+        /// Gets the buffer pool index associated with the table array.
+        /// </summary>
+        public int TablePoolIndex
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return tablePoolIndex;
+            }
+        }
 
 
         /// <summary>
@@ -89,8 +108,8 @@ namespace BEPUutilities2.DataStructures
                 throw new ArgumentException("The hash table must be larger than the element array.", "tableSizePower");
             if (initialElementPoolIndex < 0)
                 throw new ArgumentException("Initial pool index must be nonnegative.", "initialElementPoolIndex");
-            this.tablePool = tablePool;
-            this.elementPool = elementPool;
+            this.TablePool = tablePool;
+            this.ElementPool = elementPool;
 
             elementPoolIndex = initialElementPoolIndex;
             tablePoolIndex = initialElementPoolIndex + tableSizePower;
@@ -107,9 +126,7 @@ namespace BEPUutilities2.DataStructures
         /// Ensures that the set has enough room to hold the specified number of elements.
         /// </summary>
         /// <param name="count">Number of elements to hold.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void EnsureCapacity(int count)
         {
             if (count > Elements.Length)
@@ -124,8 +141,8 @@ namespace BEPUutilities2.DataStructures
             Debug.Assert(count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
             //Just double the size of the set.
             var oldSet = this;
-            this = new QuickSet<T>(elementPool, tablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
-            for (int i = oldSet.count - 1; i >= 0; --i)
+            this = new QuickSet<T>(ElementPool, TablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
+            for (int i = 0; i < oldSet.count; ++i)
             {
                 Add(oldSet.Elements[i]);
             }
@@ -147,9 +164,7 @@ namespace BEPUutilities2.DataStructures
         /// <param name="tableIndex">Index of the element in the redirect table, or if it is not present, the index of where it would be added.</param>
         /// <param name="elementIndex">The index of the element in the elements array, if it exists; -1 otherwise.</param>
         /// <returns>True if the element is present in the set, false if it is not.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         private bool GetIndices(T element, out int tableIndex, out int elementIndex)
         {
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
@@ -428,8 +443,8 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         public void Dispose()
         {
-            tablePool.Return(table, tablePoolIndex);
-            elementPool.Return(Elements, elementPoolIndex);
+            TablePool.Return(table, tablePoolIndex);
+            ElementPool.Return(Elements, elementPoolIndex);
 #if DEBUG
             table = null;
 #endif

@@ -9,9 +9,10 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>BEPUutilities2</RootNamespace>
     <AssemblyName>BEPUutilities2</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -119,6 +120,7 @@
     <Compile Include="Ray.cs" />
     <Compile Include="RayHit.cs" />
     <Compile Include="ResourceManagement\LockingBufferPool.cs" />
+    <Compile Include="ResourceManagement\Allocator.cs" />
     <Compile Include="ResourceManagement\PassthroughBufferPool.cs" />
     <Compile Include="ResourceManagement\UnsafeBufferPool.cs" />
     <Compile Include="ResourceManagement\BufferPool.cs" />

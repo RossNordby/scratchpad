@@ -2,9 +2,7 @@
 using System.Diagnostics;
 using BEPUutilities2.ResourceManagement;
 using System.Collections.Generic;
-#if FORCEINLINE
 using System.Runtime.CompilerServices;
-#endif
 
 namespace BEPUutilities2.DataStructures
 {
@@ -18,7 +16,29 @@ namespace BEPUutilities2.DataStructures
     public struct QuickQueue<T> : IDisposable, IEnumerable<T>
     {
         private int poolIndex;
+        /// <summary>
+        /// Gets the buffer pool index associated with the elements array.
+        /// </summary>
+        public int PoolIndex
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return poolIndex;
+            }
+        }
+        
         private BufferPool<T> pool;
+        /// <summary>
+        /// Pool from which element arrays are pulled.
+        /// </summary>
+        public BufferPool<T> Pool
+        {
+            get
+            {
+                return pool;
+            }
+        }
         int capacityMask;
 
 
@@ -74,17 +94,13 @@ namespace BEPUutilities2.DataStructures
         {
             //You would think that such a trivial accessor would inline without any external suggestion.
             //Sometimes, yes. Sometimes, no. :(
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             get
             {
                 ValidateIndex(index);
                 return Elements[(FirstIndex + index) & capacityMask];
             }
-#if FORCEINLINE
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
             set
             {
                 ValidateIndex(index);
@@ -113,9 +129,7 @@ namespace BEPUutilities2.DataStructures
         /// Ensures that the queue has enough room to hold the specified number of elements.
         /// </summary>
         /// <param name="count">Number of elements to hold.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void EnsureCapacity(int count)
         {
             if (count > Elements.Length)
@@ -160,9 +174,7 @@ namespace BEPUutilities2.DataStructures
         /// Enqueues the element to the end of the queue, incrementing the last index.
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Enqueue(T element)
         {
             Validate();
@@ -176,9 +188,7 @@ namespace BEPUutilities2.DataStructures
         /// Enqueues the element to the start of the queue, decrementing the first index.
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void EnqueueFirst(T element)
         {
             Validate();
@@ -192,9 +202,7 @@ namespace BEPUutilities2.DataStructures
         /// Enqueues the element to the end of the queue, incrementing the last index.
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Enqueue(ref T element)
         {
             Validate();
@@ -208,9 +216,7 @@ namespace BEPUutilities2.DataStructures
         /// Enqueues the element to the start of the queue, decrementing the first index.
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void EnqueueFirst(ref T element)
         {
             Validate();
@@ -224,9 +230,7 @@ namespace BEPUutilities2.DataStructures
         /// Dequeues an element from the start of the queue, incrementing the first index.
         /// </summary>
         /// <returns>Element removed from the queue.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public T Dequeue()
         {
             Validate();
@@ -244,9 +248,7 @@ namespace BEPUutilities2.DataStructures
         /// Dequeues an element from the end of the queue, decrementing the last index.
         /// </summary>
         /// <returns>Element removed from the queue.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public T DequeueLast()
         {
             Validate();
@@ -265,9 +267,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element removed from the queue, if any.</param>
         /// <returns>True if an element was available to remove, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool TryDequeue(out T element)
         {
             Validate();
@@ -289,9 +289,7 @@ namespace BEPUutilities2.DataStructures
         /// </summary>
         /// <param name="element">Element removed from the queue, if any.</param>
         /// <returns>True if an element was available to remove, false otherwise.</returns>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public bool TryDequeueLast(out T element)
         {
             Validate();
@@ -312,9 +310,7 @@ namespace BEPUutilities2.DataStructures
         /// Copies the elements of the <see cref="T:System.Collections.Generic.ICollection`1"/> to an <see cref="T:System.Array"/>, starting at a particular <see cref="T:System.Array"/> index.
         /// </summary>
         /// <param name="array">The one-dimensional <see cref="T:System.Array"/> that is the destination of the elements copied from <see cref="T:System.Collections.Generic.ICollection`1"/>. The <see cref="T:System.Array"/> must have zero-based indexing.</param><param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param><exception cref="T:System.ArgumentNullException"><paramref name="array"/> is null.</exception><exception cref="T:System.ArgumentOutOfRangeException"><paramref name="arrayIndex"/> is less than 0.</exception><exception cref="T:System.ArgumentException">The number of elements in the source <see cref="T:System.Collections.Generic.ICollection`1"/> is greater than the available space from <paramref name="arrayIndex"/> to the end of the destination <paramref name="array"/>.</exception>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void CopyTo(T[] array, int arrayIndex)
         {
             if (count > 0)
@@ -336,9 +332,7 @@ namespace BEPUutilities2.DataStructures
         /// <summary>
         /// Clears the queue by setting the count to zero and explicitly setting all relevant indices in the backing array to default values.
         /// </summary>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void Clear()
         {
             Validate();
@@ -359,9 +353,7 @@ namespace BEPUutilities2.DataStructures
         /// <summary>
         /// Clears the queue without changing any of the values in the backing array. Be careful about using this if the queue contains reference types.
         /// </summary>
-#if FORCEINLINE
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#endif
         public void FastClear()
         {
             count = 0;

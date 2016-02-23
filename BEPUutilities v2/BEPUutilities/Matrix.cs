@@ -127,6 +127,14 @@ namespace BEPUutilities2
             transposed.W = new Vector4(xw, yw, zw, m.W.W);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe static Matrix Transpose(Matrix m)
+        {
+            Matrix transposed;
+            Transpose(&m, &transposed);
+            return transposed;
+        }
+
         /// <summary>
         /// Transforms a vector with a transposed matrix.
         /// </summary>
@@ -308,11 +316,10 @@ namespace BEPUutilities2
             return toReturn;
         }
 
-
         /// <summary>
         /// Creates a right-handed perspective matrix.
         /// </summary>
-        /// <param name="fieldOfView">Field of view of the perspective in radians.</param>
+        /// <param name="fieldOfView">Vertical field of view of the perspective in radians.</param>
         /// <param name="aspectRatio">Width of the viewport over the height of the viewport.</param>
         /// <param name="nearClip">Near clip plane of the perspective.</param>
         /// <param name="farClip">Far clip plane of the perspective.</param>
@@ -330,11 +337,48 @@ namespace BEPUutilities2
 
         }
 
+        /// <summary>
+        /// Creates a right-handed perspective matrix.
+        /// </summary>
+        /// <param name="verticalFieldOfView">Vertical field of view of the perspective in radians.</param>
+        /// <param name="horizontalFieldOfView">Horizontal field of view of the perspective in radians.</param>
+        /// <param name="nearClip">Near clip plane of the perspective.</param>
+        /// <param name="farClip">Far clip plane of the perspective.</param>
+        /// <returns>Resulting perspective matrix.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix CreatePerspectiveFromFieldOfViews(float verticalFieldOfView, float horizontalFieldOfView, float nearClip, float farClip)
+        {
+            Matrix perspective;
+            CreatePerspectiveFromFieldOfViews(verticalFieldOfView, horizontalFieldOfView, nearClip, farClip, out perspective);
+            return perspective;
+        }
+
 
         /// <summary>
         /// Creates a right-handed perspective matrix.
         /// </summary>
-        /// <param name="fieldOfView">Field of view of the perspective in radians.</param>
+        /// <param name="verticalFieldOfView">Vertical field of view of the perspective in radians.</param>
+        /// <param name="horizontalFieldOfView">Horizontal field of view of the perspective in radians.</param>
+        /// <param name="nearClip">Near clip plane of the perspective.</param>
+        /// <param name="farClip">Far clip plane of the perspective.</param>
+        /// <param name="perspective">Resulting perspective matrix.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreatePerspectiveFromFieldOfViews(float verticalFieldOfView, float horizontalFieldOfView, float nearClip, float farClip, out Matrix perspective)
+        {
+            float h = 1f / ((float)Math.Tan(verticalFieldOfView * 0.5f));
+            float w = 1f / ((float)Math.Tan(horizontalFieldOfView * 0.5f));
+            float m33 = farClip / (nearClip - farClip);
+            perspective.X = new Vector4(w, 0, 0, 0);
+            perspective.Y = new Vector4(0, h, 0, 0);
+            perspective.Z = new Vector4(0, 0, m33, -1);
+            perspective.W = new Vector4(0, 0, nearClip * m33, 0);
+        }
+
+
+        /// <summary>
+        /// Creates a right-handed perspective matrix.
+        /// </summary>
+        /// <param name="fieldOfView">Vertical field of view of the perspective in radians.</param>
         /// <param name="aspectRatio">Width of the viewport over the height of the viewport.</param>
         /// <param name="nearClip">Near clip plane of the perspective.</param>
         /// <param name="farClip">Far clip plane of the perspective.</param>
