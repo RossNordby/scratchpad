@@ -128,6 +128,7 @@
     <Compile Include="Constraints\Tests\NewScalarConstraintTest.cs" />
     <Compile Include="Matrix3x3.cs" />
     <Compile Include="MicroFiddling.cs" />
+    <Compile Include="Tests\MPRTest.cs" />
     <Compile Include="Tests\VectorAccelerationTest.cs" />
     <Compile Include="Trees\SingleArray\PriorityQueue.cs" />
     <Compile Include="Trees\SingleArray\Tree.cs" />

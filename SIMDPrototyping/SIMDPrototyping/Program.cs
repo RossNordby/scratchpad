@@ -21,7 +21,7 @@ namespace SIMDPrototyping
         static void Main()
         {
             Console.WriteLine("Vector hardware acceleration: " + Vector.IsHardwareAccelerated);
-
+            
             TreeTest.Test();
 
             //Console.ReadKey();
