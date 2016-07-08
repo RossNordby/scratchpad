@@ -8,7 +8,7 @@ namespace BEPUutilities2.ResourceManagement
     /// Manages a cache of a type of resource.
     /// </summary>
     /// <typeparam name="T">Type of object to pool.</typeparam>
-    public class Pool<T> where T : class
+    public class Pool<T>
     {
         Stack<T> stack = new Stack<T>();
         SpinLock spinLock = new SpinLock();
@@ -20,6 +20,20 @@ namespace BEPUutilities2.ResourceManagement
             get
             {
                 return spinLock;
+            }
+        }
+
+        /// <summary>
+        /// Gets the number of existing elements in the pool. This number of elements can be requested without creating any new ones.
+        /// </summary>
+        /// <remarks> 
+        /// Does not do any locking. Should not be used while elements may still be getting added to or removed from the pool.
+        /// </remarks>
+        public int PooledElementCount
+        {
+            get
+            {
+                return stack.Count;
             }
         }
 
@@ -95,12 +109,14 @@ namespace BEPUutilities2.ResourceManagement
         /// <param name="item">Item to give back to the pool.</param>
         public void Return(T item)
         {
-            if (Cleaner != null)
-                Cleaner(item);
 #if DEBUG
             if (!OutstandingElements.Remove(item))
                 throw new InvalidOperationException("Cannot return an item that did not originate from this pool.");
 #endif
+
+            if (Cleaner != null)
+                Cleaner(item);
+
             stack.Push(item);
         }
 

@@ -81,7 +81,6 @@ namespace BEPUutilities2.ResourceManagement
         /// <param name="id">Unique id of the memory to allocate.</param>
         /// <param name="size">Size of the memory to allocate.</param>
         /// <param name="outputStart">Starting index of the allocated memory, if successful.</param>
-        /// <param name="outputMemoryMoves">List of memory moves necessary to make room for the allocation.</param>
         /// <returns>True if the allocation succeeded, false if out of memory or if memory was too fragmented to find a spot.</returns>
         public bool Allocate(ulong id, long size, out long outputStart)
         {

@@ -338,6 +338,27 @@ namespace BEPUutilities2
         }
 
         /// <summary>
+        /// Creates a left-handed perspective matrix.
+        /// </summary>
+        /// <param name="fieldOfView">Vertical field of view of the perspective in radians.</param>
+        /// <param name="aspectRatio">Width of the viewport over the height of the viewport.</param>
+        /// <param name="nearClip">Near clip plane of the perspective.</param>
+        /// <param name="farClip">Far clip plane of the perspective.</param>
+        /// <param name="perspective">Resulting perspective matrix.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreatePerspectiveFieldOfViewLH(float fieldOfView, float aspectRatio, float nearClip, float farClip, out Matrix perspective)
+        {
+            float h = 1f / ((float)Math.Tan(fieldOfView * 0.5f));
+            float w = h / aspectRatio;
+            float m33 = farClip / (farClip - nearClip);
+            perspective.X = new Vector4(w, 0, 0, 0);
+            perspective.Y = new Vector4(0, h, 0, 0);
+            perspective.Z = new Vector4(0, 0, m33, 1);
+            perspective.W = new Vector4(0, 0, -nearClip * m33, 0);
+
+        }
+
+        /// <summary>
         /// Creates a right-handed perspective matrix.
         /// </summary>
         /// <param name="verticalFieldOfView">Vertical field of view of the perspective in radians.</param>
@@ -477,12 +498,84 @@ namespace BEPUutilities2
                 (m31 * s3 - m32 * s1 + m33 * s0) * inverseDeterminant);
         }
 
+
+        /// <summary>
+        /// Creates a view matrix pointing from a position to a target with the given up vector.
+        /// </summary>
+        /// <param name="position">Position of the camera.</param>
+        /// <param name="target">Target of the camera.</param>
+        /// <param name="upVector">Up vector of the camera.</param>
+        /// <param name="viewMatrix">Look at matrix.</param>
+        public static void CreateLookAt(ref Vector3 position, ref Vector3 target, ref Vector3 upVector, out Matrix viewMatrix)
+        {
+            Vector3 forward = target - position;
+            CreateView(ref position, ref forward, ref upVector, out viewMatrix);
+        }
+
+        /// <summary>
+        /// Creates a view matrix pointing from a position to a target with the given up vector.
+        /// </summary>
+        /// <param name="position">Position of the camera.</param>
+        /// <param name="target">Target of the camera.</param>
+        /// <param name="upVector">Up vector of the camera.</param>
+        /// <returns>Look at matrix.</returns>
+        public static Matrix CreateLookAt(Vector3 position, Vector3 target, Vector3 upVector)
+        {
+            Matrix lookAt;
+            var forward = target - position;
+            CreateView(ref position, ref forward, ref upVector, out lookAt);
+            return lookAt;
+        }
+
+
+        /// <summary>
+        /// Creates a view matrix pointing in a direction with a given up vector.
+        /// </summary>
+        /// <param name="position">Position of the camera.</param>
+        /// <param name="forward">Forward direction of the camera.</param>
+        /// <param name="upVector">Up vector of the camera.</param>
+        /// <param name="viewMatrix">Look at matrix.</param>
+        public static void CreateView(ref Vector3 position, ref Vector3 forward, ref Vector3 upVector, out Matrix viewMatrix)
+        {
+            float length = forward.Length();
+            var z = forward / -length;
+            Vector3 x;
+            Vector3x.Cross(ref upVector, ref z, out x);
+            x = Vector3.Normalize(x);
+            Vector3 y;
+            Vector3x.Cross(ref z, ref x, out y);
+
+            viewMatrix.X = new Vector4(x.X, y.X, z.X, 0);
+            viewMatrix.Y = new Vector4(x.Y, y.Y, z.Y, 0);
+            viewMatrix.Z = new Vector4(x.Z, y.Z, z.Z, 0);
+            viewMatrix.W = new Vector4(
+                -Vector3.Dot(x, position),
+                -Vector3.Dot(y, position),
+                -Vector3.Dot(z, position), 1);
+
+        }
+
+        /// <summary>
+        /// Creates a view matrix pointing looking in a direction with a given up vector.
+        /// </summary>
+        /// <param name="position">Position of the camera.</param>
+        /// <param name="forward">Forward direction of the camera.</param>
+        /// <param name="upVector">Up vector of the camera.</param>
+        /// <returns>Look at matrix.</returns>
+        public static Matrix CreateView(Vector3 position, Vector3 forward, Vector3 upVector)
+        {
+            Matrix lookat;
+            CreateView(ref position, ref forward, ref upVector, out lookat);
+            return lookat;
+        }
+
+
         /// <summary>
         /// Inverts the matrix.
         /// </summary>
         /// <param name="m">Matrix to invert.</param>
         /// <returns>Inverted version of the matrix.</returns>
-        public static Matrix Invert(ref Matrix m)
+        public static Matrix Invert(Matrix m)
         {
             Matrix inverted;
             Invert(ref m, out inverted);

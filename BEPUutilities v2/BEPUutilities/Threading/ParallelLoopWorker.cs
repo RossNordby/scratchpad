@@ -55,7 +55,7 @@ namespace BEPUutilities2.Threading
                     //Claim a piece of job.
                     int jobIndex = Interlocked.Increment(ref manager.jobIndex);
                     //The job interval.
-                    int endIndex = jobIndex * iterationsPerSteal;
+                    int endIndex = manager.currentBeginIndex + jobIndex * iterationsPerSteal;
                     int beginIndex = endIndex - iterationsPerSteal;
 
                     //Do the job piece.  Make sure you don't do more than exists in the list itself.

@@ -93,6 +93,7 @@ namespace BEPUutilities2.ResourceManagement
         [ThreadStatic]
         private static UnsafeBufferPool<T> threadPool;
 
+
         /// <summary>
         /// Gets the pool associated with this thread.
         /// </summary>
