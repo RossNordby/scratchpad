@@ -373,25 +373,31 @@ namespace SIMDPrototyping.Trees.SingleArray
                 bLeafCountY += resources.BinLeafCountsY[i];
                 bLeafCountZ += resources.BinLeafCountsZ[i];
 
-                var metricAX = ComputeBoundsMetric(ref resources.AMergedX[aIndex]);
-                var metricAY = ComputeBoundsMetric(ref resources.AMergedY[aIndex]);
-                var metricAZ = ComputeBoundsMetric(ref resources.AMergedZ[aIndex]);
-                var metricBX = ComputeBoundsMetric(ref bMergedX);
-                var metricBY = ComputeBoundsMetric(ref bMergedY);
-                var metricBZ = ComputeBoundsMetric(ref bMergedZ);
 
-                //It's possible for a lot of bins in a row to be unpopulated. In that event, you'll get a metric of -infinity. Avoid letting that propagate.
+                //It's possible for a lot of bins in a row to be unpopulated. In that event, the metric isn't defined; don't bother calculating it.
                 float costCandidateX, costCandidateY, costCandidateZ;
-                if (metricAX > 0 && metricBX > 0)
+                if (bLeafCountX > 0 && resources.ALeafCountsX[aIndex] > 0)
+                {
+                    var metricAX = ComputeBoundsMetric(ref resources.AMergedX[aIndex]);
+                    var metricBX = ComputeBoundsMetric(ref bMergedX);
                     costCandidateX = resources.ALeafCountsX[aIndex] * metricAX + bLeafCountX * metricBX;
+                }
                 else
                     costCandidateX = float.MaxValue;
-                if (metricAY > 0 && metricBY > 0)
+                if (bLeafCountY > 0 && resources.ALeafCountsY[aIndex] > 0)
+                {
+                    var metricAY = ComputeBoundsMetric(ref resources.AMergedY[aIndex]);
+                    var metricBY = ComputeBoundsMetric(ref bMergedY);
                     costCandidateY = resources.ALeafCountsY[aIndex] * metricAY + bLeafCountY * metricBY;
+                }
                 else
                     costCandidateY = float.MaxValue;
-                if (metricAZ > 0 && metricBZ > 0)
+                if (bLeafCountZ > 0 && resources.ALeafCountsZ[aIndex] > 0)
+                {
+                    var metricAZ = ComputeBoundsMetric(ref resources.AMergedZ[aIndex]);
+                    var metricBZ = ComputeBoundsMetric(ref bMergedZ);
                     costCandidateZ = resources.ALeafCountsZ[aIndex] * metricAZ + bLeafCountZ * metricBZ;
+                }
                 else
                     costCandidateZ = float.MaxValue;
                 if (costCandidateX < costCandidateY && costCandidateX < costCandidateZ)

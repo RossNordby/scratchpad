@@ -164,7 +164,7 @@ namespace SIMDPrototyping.Trees.SingleArray
             //Since refines are unable to change the volume of the root, there's
             //no point in including it in the volume change.
             //It does, however, normalize the child volume changes into a cost metric.
-            if (postmetric >= 0)
+            if (postmetric >= 1e-10)
             {
                 return childChange / postmetric;
             }

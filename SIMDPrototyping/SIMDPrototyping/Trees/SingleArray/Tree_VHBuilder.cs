@@ -18,9 +18,14 @@ namespace SIMDPrototyping.Trees.SingleArray
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static float ComputeBoundsMetric(ref BoundingBox boundingBox)
         {
-            return BoundingBox.ComputeVolume(ref boundingBox);
+            //return BoundingBox.ComputeVolume(ref boundingBox);
             //var offset = boundingBox.Max - boundingBox.Min;
             //return (offset.X * offset.Y + offset.Y * offset.Z + offset.Z * offset.X);
+            
+            //Surface area
+            var offset = boundingBox.Max - boundingBox.Min;
+            var shuffled = new Vector3(offset.Y, offset.Z, offset.X);
+            return Vector3.Dot(offset, shuffled);
         }
 
         int GetVolumeSplitIndex(int[] leafIds, BoundingBox[] leafBounds, int start, int length)

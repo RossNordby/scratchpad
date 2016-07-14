@@ -168,6 +168,7 @@
     <Compile Include="Trees\IBounded.cs" />
     <Compile Include="TestCollidable.cs" />
     <Compile Include="Trees\Tests\DHTests.cs" />
+    <Compile Include="Trees\Tests\ReconstructPerformanceTest.cs" />
     <Compile Include="Trees\Tests\SingleArrayTests.cs" />
     <Compile Include="Trees\Tests\BaselineTests.cs" />
     <Compile Include="Trees\Tests\BEPUTests.cs" />

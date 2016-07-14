@@ -210,6 +210,20 @@ namespace SIMDPrototyping.Trees.SingleArray
         }
 
         /// <summary>
+        /// Resets the tree to a fresh post-construction state, clearing out leaves and nodes.
+        /// </summary>
+        public void Reset()
+        {
+            Array.Clear(Nodes, 0, nodeCount);
+            Array.Clear(Leaves, 0, leafCount);
+            leafCount = 0;
+            //The root always exists, even if there are no children in it. Makes certain bookkeeping simpler.
+            nodeCount = 1;
+            nodes->Parent = -1;
+            nodes->IndexInParent = -1;
+        }
+
+        /// <summary>
         /// Constructs a tree directly from provided leaves and nodes with no copying or validation.
         /// </summary>
         /// <param name="leaves">Leaves to use in the tree.</param>
@@ -230,14 +244,7 @@ namespace SIMDPrototyping.Trees.SingleArray
                 this.nodeCount = nodes.Length;
 
         }
-
-
-        //Node initialNode;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void InitializeNode(out Node node)
-        {
-            node = new Node();
-        }
+        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int Encode(int index)
