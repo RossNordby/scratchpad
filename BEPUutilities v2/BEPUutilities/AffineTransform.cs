@@ -1,6 +1,4 @@
-﻿
-
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
@@ -20,7 +18,6 @@ namespace BEPUutilities2
         public Matrix3x3 LinearTransform;
 
 
-
         ///<summary>
         /// Gets the identity affine transform.
         ///</summary>
@@ -33,6 +30,96 @@ namespace BEPUutilities2
                 return t;
             }
         }
+
+        ///<summary>
+        /// Constructs a new affine transform.
+        ///</summary>
+        ///<param name="translation">Translation to use in the transform.</param>
+        public AffineTransform(ref Vector3 translation)
+        {
+            LinearTransform = Matrix3x3.Identity;
+            Translation = translation;
+        }
+
+        ///<summary>
+        /// Constructs a new affine transform.
+        ///</summary>
+        ///<param name="translation">Translation to use in the transform.</param>
+        public AffineTransform(Vector3 translation)
+            : this(ref translation)
+        {
+        }
+
+        ///<summary>
+        /// Constructs a new affine tranform.
+        ///</summary>
+        ///<param name="orientation">Orientation to use as the linear transform.</param>
+        ///<param name="translation">Translation to use in the transform.</param>
+        public AffineTransform(ref Quaternion orientation, ref Vector3 translation)
+        {
+            Matrix3x3.CreateFromQuaternion(ref orientation, out LinearTransform);
+            Translation = translation;
+        }
+
+        ///<summary>
+        /// Constructs a new affine tranform.
+        ///</summary>
+        ///<param name="orientation">Orientation to use as the linear transform.</param>
+        ///<param name="translation">Translation to use in the transform.</param>
+        public AffineTransform(Quaternion orientation, Vector3 translation)
+            : this(ref orientation, ref translation)
+        {
+        }
+
+        ///<summary>
+        /// Constructs a new affine transform.
+        ///</summary>
+        ///<param name="scaling">Scaling to apply in the linear transform.</param>
+        ///<param name="orientation">Orientation to apply in the linear transform.</param>
+        ///<param name="translation">Translation to apply.</param>
+        public AffineTransform(ref Vector3 scaling, ref Quaternion orientation, ref Vector3 translation)
+        {
+            //Create an SRT transform.
+            Matrix3x3.CreateScale(ref scaling, out LinearTransform);
+            Matrix3x3 rotation;
+            Matrix3x3.CreateFromQuaternion(ref orientation, out rotation);
+            Matrix3x3.Multiply(ref LinearTransform, ref rotation, out LinearTransform);
+            Translation = translation;
+        }
+
+        ///<summary>
+        /// Constructs a new affine transform.
+        ///</summary>
+        ///<param name="scaling">Scaling to apply in the linear transform.</param>
+        ///<param name="orientation">Orientation to apply in the linear transform.</param>
+        ///<param name="translation">Translation to apply.</param>
+        public AffineTransform(Vector3 scaling, Quaternion orientation, Vector3 translation)
+            : this(ref scaling, ref orientation, ref translation)
+        {
+        }
+
+        ///<summary>
+        /// Constructs a new affine transform.
+        ///</summary>
+        ///<param name="linearTransform">The linear transform component.</param>
+        ///<param name="translation">Translation component of the transform.</param>
+        public AffineTransform(ref Matrix3x3 linearTransform, ref Vector3 translation)
+        {
+            LinearTransform = linearTransform;
+            Translation = translation;
+
+        }
+
+        ///<summary>
+        /// Constructs a new affine transform.
+        ///</summary>
+        ///<param name="linearTransform">The linear transform component.</param>
+        ///<param name="translation">Translation component of the transform.</param>
+        public AffineTransform(Matrix3x3 linearTransform, Vector3 translation)
+            : this(ref linearTransform, ref translation)
+        {
+        }
+
 
         ///<summary>
         /// Transforms a vector by an affine transform.

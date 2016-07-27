@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
@@ -18,5 +19,10 @@ namespace BEPUutilities2
                 a.X * b.Y - a.Y * b.X);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Lerp(ref Vector3 a, ref Vector3 b, float t, out Vector3 result)
+        {
+            result = a * (1f - t) + b * t;
+        }
     }
 }

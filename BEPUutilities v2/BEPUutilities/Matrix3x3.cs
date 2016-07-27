@@ -191,6 +191,7 @@ namespace BEPUutilities2
             public float M31, M32, M33;
         }
 
+
         /// <summary>
         /// Multiplies the two matrices.
         /// </summary>
@@ -276,6 +277,20 @@ namespace BEPUutilities2
             Matrix3x3 toReturn;
             CreateFromQuaternion(ref quaternion, out toReturn);
             return toReturn;
+        }
+
+
+        /// <summary>
+        /// Creates a 3x3 matrix representing the given scale along its local axes.
+        /// </summary>
+        /// <param name="scale">Scale to represent.</param>
+        /// <param name="linearTransform">Matrix representing a scale.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateScale(ref Vector3 scale, out Matrix3x3 linearTransform)
+        {
+            linearTransform.X = new Vector3(scale.X, 0, 0);
+            linearTransform.Y = new Vector3(0, scale.Y, 0);
+            linearTransform.Z = new Vector3(0, 0, scale.Z);
         }
 
     }
