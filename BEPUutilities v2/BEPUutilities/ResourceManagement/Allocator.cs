@@ -57,6 +57,73 @@ namespace BEPUutilities2.ResourceManagement
             return allocations.ContainsKey(id);
         }
 
+        /// <summary>
+        /// Checks if a block of memory can fit into the current state of the allocator.
+        /// </summary>
+        /// <param name="size">Size of the memory to test.</param>
+        /// <param name="ignoredIds">Ids of allocations to treat as nonexistent for the purposes of the test.</param>
+        /// <returns>True if the size could fit, false if out of memory or if memory was too fragmented to find a spot.</returns>
+        public bool CanFit(long size, QuickList<ulong>? ignoredIds = null)
+        {
+            if (allocations.Count == 0)
+            {
+                return size <= memoryPoolSize;
+            }
+            //It's not the first allocation. Try to just tack it onto the end of the allocation set to begin with- it's a reasonably good place to look for empty space.
+            int allocationIndex = allocations.Count - 1;
+            var initialId = allocations.Keys[allocationIndex];
+            while (true)
+            {
+                var allocation = allocations.Values[allocationIndex];
+                int nextAllocationIndex;
+                Allocation nextAllocation;
+
+                //Skip any subsequent allocations that are ignored.
+                ulong nextAllocationId = allocation.Next;
+                do
+                {
+                    nextAllocationIndex = allocations.IndexOf(nextAllocationId);
+                    nextAllocation = allocations.Values[nextAllocationIndex];
+                    nextAllocationId = nextAllocation.Next;
+                } while (ignoredIds != null && ignoredIds.Value.Contains(nextAllocationId));
+
+                if (nextAllocation.Start < allocation.End)
+                {
+                    //Wrapped around, so the gap goes from here to the end of the memory block, and from the beginning of the memory block to the next allocation.
+                    //But we need contiguous space so the two areas have to be tested independently.
+                    if (memoryPoolSize - allocation.End >= size)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        if (nextAllocation.Start >= size)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                else
+                {
+                    //The next allocation is in order.
+                    if (nextAllocation.Start - allocation.End >= size)
+                    {
+                        return true;
+                    }
+
+                }
+                //If we get here, no open space was found.
+                //Move on to the next spot.
+                allocationIndex = nextAllocationIndex;
+
+                //Have we already wrapped around?
+                if (allocations.Keys[allocationIndex] == initialId)
+                {
+                    //Wrapped around without finding any space.
+                    return false;
+                }
+            }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AddAllocation(ulong id, long start, long end,
@@ -88,7 +155,7 @@ namespace BEPUutilities2.ResourceManagement
             if (allocations.Count == 0)
             {
                 //If it's the first allocation, then the next and previous pointers should circle around.
-                if (size < memoryPoolSize)
+                if (size <= memoryPoolSize)
                 {
                     outputStart = 0;
                     allocations.Add(id, new Allocation { Start = 0, End = size, Next = id, Previous = id });
@@ -178,6 +245,102 @@ namespace BEPUutilities2.ResourceManagement
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Gets the size of the largest contiguous area and the total free space in the allocator.
+        /// Not very efficient; runs in linear time for the number of allocations.
+        /// </summary>
+        /// <param name="largestContiguous">Largest contiguous region in the allocator. The allocator can hold an allocation up to this size.</param>
+        /// <param name="totalFreeSpace">Total free space in the allocator.</param>
+        public void GetLargestContiguousSize(out long largestContiguous, out long totalFreeSpace)
+        {
+            if (allocations.Count == 0)
+            {
+                totalFreeSpace = memoryPoolSize;
+                largestContiguous = memoryPoolSize;
+                return;
+            }
+            largestContiguous = 0;
+            totalFreeSpace = 0;
+            for (int i = 0; i < allocations.Count; ++i)
+            {
+                Allocation nextAllocation;
+                allocations.TryGetValue(allocations.Values[i].Next, out nextAllocation);
+                var toNext = nextAllocation.Start - allocations.Values[i].End;
+                if (toNext < 0)
+                {
+                    //The next allocation requires a wrap, so the actual contiguous area is only from our end to the end of the pool,
+                    //and then a second region from 0 to the next allocation.
+                    var adjacent = memoryPoolSize - allocations.Values[i].End;
+                    var wrapped = nextAllocation.Start;
+                    if (largestContiguous < adjacent)
+                        largestContiguous = adjacent;
+                    if (largestContiguous < wrapped)
+                        largestContiguous = wrapped;
+                    totalFreeSpace += adjacent + wrapped;
+                }
+                else
+                {
+                    if (largestContiguous < toNext)
+                        largestContiguous = toNext;
+                    totalFreeSpace += toNext;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Finds the first allocation with empty space before it and pulls it forward to close the gap. Assumes the ability to perform synchronous reallocation.
+        /// </summary>
+        /// <param name="id">Id of the allocation to be moved, if any.</param>
+        /// <param name="size">Size of the moved allocation.</param>
+        /// <param name="oldStart">Old starting location of the allocation.</param>
+        /// <param name="newStart">New starting location of the allocation.</param>
+        /// <returns>True if a compaction was performed, false otherwise.</returns>
+        public bool IncrementalCompact(out ulong id, out long size, out long oldStart, out long newStart)
+        {
+            //Find the allocation nearest whose previous pointer requires a wrap across the 
+            //Start at the beginning of the list since it's marginally more likely to be there than at the end of the list where new allocations get appended.
+            for (int i = 0; i < allocations.Count; ++i)
+            {
+                Allocation previousAllocation;
+                allocations.TryGetValue(allocations.Values[i].Previous, out previousAllocation);
+                if (previousAllocation.End > allocations.Values[i].Start)
+                {
+                    //Found the beginning of the list! This index is the first index.
+                    //Now, scan forward through the allocation links looking for the first gap.
+                    var index = i;
+                    var previousEnd = 0L;
+                    //Note that we stop before wrapping.
+                    for (int iterationIndex = 0; iterationIndex < allocations.Count; ++iterationIndex)
+                    {
+                        if (allocations.Values[index].Start > previousEnd)
+                        {
+                            //Found a gap.
+                            id = allocations.Keys[index];
+                            size = allocations.Values[index].End - allocations.Values[index].Start;
+                            oldStart = allocations.Values[index].Start;
+                            newStart = previousEnd;
+                            //Actually perform the move.
+                            allocations.Values[index].Start = newStart;
+                            allocations.Values[index].End = newStart + size;
+                            return true;
+                        }
+                        //Haven't found a gap yet. Move to the next.
+                        previousEnd = allocations.Values[index].End;
+                        index = allocations.IndexOf(allocations.Values[i].Next);
+                    }
+                    break;
+                }
+            }
+            id = 0;
+            size = 0;
+            oldStart = 0;
+            newStart = 0;
+            return false;
+
+            //Note: a slightly fancier allocator could 1) track the start and 2) coalesce allocations such that this entire process would become O(1). 
+            //Something to consider if this allocator ever bottlenecks.
         }
 
         [Conditional("DEBUG")]
