@@ -1,4 +1,4 @@
-﻿using BEPUutilities2.DataStructures;
+﻿using BEPUutilities2.Collections;
 using System;
 using System.Collections.Generic;
 using System.Linq;

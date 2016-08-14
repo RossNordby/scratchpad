@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using BEPUutilities2;
-using BEPUutilities2.DataStructures;
+using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
 using System.Numerics;
 using System.Runtime.CompilerServices;

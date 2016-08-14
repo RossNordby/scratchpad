@@ -1,4 +1,4 @@
-﻿using BEPUutilities2.DataStructures;
+﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;

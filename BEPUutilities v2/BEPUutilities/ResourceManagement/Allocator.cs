@@ -1,4 +1,4 @@
-﻿using BEPUutilities2.DataStructures;
+﻿using BEPUutilities2.Collections;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
