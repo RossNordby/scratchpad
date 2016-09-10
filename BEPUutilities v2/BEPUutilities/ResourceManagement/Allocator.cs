@@ -299,7 +299,7 @@ namespace BEPUutilities2.ResourceManagement
         /// <returns>True if a compaction was performed, false otherwise.</returns>
         public bool IncrementalCompact(out ulong id, out long size, out long oldStart, out long newStart)
         {
-            //Find the allocation nearest whose previous pointer requires a wrap across the 
+            //Find the allocation nearest to the zero index. Identify it by checking for the previous allocation requiring a wraparound.
             //Start at the beginning of the list since it's marginally more likely to be there than at the end of the list where new allocations get appended.
             for (int i = 0; i < allocations.Count; ++i)
             {
@@ -328,7 +328,7 @@ namespace BEPUutilities2.ResourceManagement
                         }
                         //Haven't found a gap yet. Move to the next.
                         previousEnd = allocations.Values[index].End;
-                        index = allocations.IndexOf(allocations.Values[i].Next);
+                        index = allocations.IndexOf(allocations.Values[index].Next);
                     }
                     break;
                 }

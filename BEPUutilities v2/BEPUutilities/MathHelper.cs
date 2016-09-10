@@ -49,7 +49,7 @@ namespace BEPUutilities2
             return angle;
 
         }
-
+        
         /// <summary>
         /// Clamps a value between a minimum and maximum value.
         /// </summary>
@@ -196,6 +196,18 @@ namespace BEPUutilities2
         public static float ToDegrees(float radians)
         {
             return radians * (180f / Pi);
+        }
+
+
+        /// <summary>
+        /// Returns -1 if the value is negative and 1 otherwise.
+        /// </summary>
+        /// <param name="x">Value to compute the sign of.</param>
+        /// <returns>-1 if the input is negative, and 1 otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static float BinarySign(float x)
+        {
+            return x < 0 ? -1 : 1;
         }
     }
 }

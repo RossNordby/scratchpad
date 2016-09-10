@@ -12,6 +12,15 @@ namespace BEPUutilities2.Collections
         T[] array;
         int start;
         int end;
+
+        public int Count
+        {
+            get
+            {
+                return end - start;
+            }
+        }
+
         /// <summary>
         /// Creates a enumerable that spans an interval in an array.
         /// </summary>
