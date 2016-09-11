@@ -16,6 +16,10 @@ namespace BEPUutilities2.ResourceManagement
     {
 
         private readonly long memoryPoolSize;
+        /// <summary>
+        /// Index in allocations that we should start at during the next allocation attempt.
+        /// </summary>
+        int searchStartIndex;
 
         public struct Allocation
         {
@@ -69,8 +73,7 @@ namespace BEPUutilities2.ResourceManagement
             {
                 return size <= memoryPoolSize;
             }
-            //It's not the first allocation. Try to just tack it onto the end of the allocation set to begin with- it's a reasonably good place to look for empty space.
-            int allocationIndex = allocations.Count - 1;
+            int allocationIndex = searchStartIndex;
             var initialId = allocations.Keys[allocationIndex];
             while (true)
             {
@@ -140,6 +143,8 @@ namespace BEPUutilities2.ResourceManagement
             //This avoids a potential pointer invalidation caused by a resize in the allocations dictionary.
             allocation.Next = id;
             nextAllocation.Previous = id;
+            //About to add a new allocation. We had space here this time, so there's a high chance we'll have some more space next time. Point the search to this index.
+            searchStartIndex = allocations.Count;
             allocations.Add(id, newAllocation);
         }
         /// <summary>
@@ -164,8 +169,8 @@ namespace BEPUutilities2.ResourceManagement
                 outputStart = 0;
                 return false;
             }
-            //It's not the first allocation. Try to just tack it onto the end of the allocation set to begin with- it's a reasonably good place to look for empty space.
-            int allocationIndex = allocations.Count - 1;
+            Debug.Assert(searchStartIndex >= 0 && searchStartIndex < allocations.Count, "Search start index must be within the allocation set!");
+            int allocationIndex = searchStartIndex;
             var initialId = allocations.Keys[allocationIndex];
             while (true)
             {
@@ -235,13 +240,20 @@ namespace BEPUutilities2.ResourceManagement
                     Debug.Assert(allocations.Values[nextIndex].Previous == id, "Next and current must agree about their relationship.");
                     //Make the next allocation point to the previous allocation to get rid of the current allocation.
                     allocations.Values[nextIndex].Previous = allocation.Previous;
+
                 }
                 else
                 {
                     Debug.Assert(allocation.Next == id, "The next index should be itself too, if previous was itself.");
                     Debug.Assert(allocations.Count == 1, "The only time where the previous allocation is itself should be when there is only a single allocation.");
+                    //If there are no more allocations, then the searchStartIndex is irrelevant. It won't be used on the next allocation.
                 }
                 allocations.FastRemove(id);
+                //By removing this id, a promising place to look for an allocation next time is the position next to the previous allocation!
+                //Note that we request the previous index here again, because the previousIndex might change during the call to FastRemove.
+                //If there are no elements remaining, the index will be invalid, and that's fine- if there are no elements then the next allocation will not use the searchStartIndex.
+                searchStartIndex = allocations.IndexOf(allocation.Previous);
+                Debug.Assert(allocations.Count == 0 || (searchStartIndex >= 0 && searchStartIndex < allocations.Count), "Search start index must be within the allocation set!");
                 return true;
             }
             return false;
@@ -314,6 +326,8 @@ namespace BEPUutilities2.ResourceManagement
                     //Note that we stop before wrapping.
                     for (int iterationIndex = 0; iterationIndex < allocations.Count; ++iterationIndex)
                     {
+                        searchStartIndex = index; //If the traversal ends, we want to have this index cached so that the next allocation will start at the end of the contiguous block.
+                        Debug.Assert(searchStartIndex >= 0 && searchStartIndex < allocations.Count, "Search start index must be within the allocation set!");
                         if (allocations.Values[index].Start > previousEnd)
                         {
                             //Found a gap.
