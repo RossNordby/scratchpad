@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2.Collections;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System;
 
 namespace BEPUutilities2.ResourceManagement
 {
@@ -59,6 +60,17 @@ namespace BEPUutilities2.ResourceManagement
         public bool Contains(ulong id)
         {
             return allocations.ContainsKey(id);
+        }
+        
+        /// <summary>
+        /// Gets the allocation region associated with the given allocation id if it is present.
+        /// </summary>
+        /// <param name="allocationId">Allocation id to look up the allocation for.</param>
+        /// <param name="allocation">Allocation associated with the id, if present.</param>
+        /// <returns>True if the allocationId was present in the allocator, false otherwise.</returns>
+        public bool TryGetAllocationRegion(ulong allocationId, out Allocation allocation)
+        {
+            return allocations.TryGetValue(allocationId, out allocation);
         }
 
         /// <summary>
@@ -258,6 +270,7 @@ namespace BEPUutilities2.ResourceManagement
             }
             return false;
         }
+
 
         /// <summary>
         /// Gets the size of the largest contiguous area and the total free space in the allocator.
