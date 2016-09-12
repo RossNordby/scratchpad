@@ -176,6 +176,7 @@ namespace BEPUutilities2.ResourceManagement
                 {
                     outputStart = 0;
                     allocations.Add(id, new Allocation { Start = 0, End = size, Next = id, Previous = id });
+                    searchStartIndex = 0;
                     return true;
                 }
                 outputStart = 0;
