@@ -82,7 +82,16 @@ namespace BEPUutilities2.Collections
             get { return count; }
         }
 
-
+        /// <summary>
+        /// Gets the backing array index for the logical queue index.
+        /// </summary>
+        /// <param name="queueIndex">Index in the logical queue.</param>
+        /// <returns>The index in in the backing array corresponding to the given logical queue index.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int GetBackingArrayIndex(int queueIndex)
+        {
+            return (FirstIndex + queueIndex) & capacityMask;
+        }
 
         /// <summary>
         /// Gets an element at the given index in the queue.
@@ -98,13 +107,13 @@ namespace BEPUutilities2.Collections
             get
             {
                 ValidateIndex(index);
-                return Elements[(FirstIndex + index) & capacityMask];
+                return Elements[GetBackingArrayIndex(index)];
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
                 ValidateIndex(index);
-                Elements[(FirstIndex + index) & capacityMask] = value;
+                Elements[GetBackingArrayIndex(index)] = value;
             }
         }
 
@@ -237,9 +246,7 @@ namespace BEPUutilities2.Collections
             if (count == 0)
                 throw new InvalidOperationException("The queue is empty.");
             var element = Elements[firstIndex];
-            Elements[firstIndex] = default(T);
-            firstIndex = (firstIndex + 1) & capacityMask;
-            --count;
+            DeleteFirst();
             return element;
 
         }
@@ -255,9 +262,7 @@ namespace BEPUutilities2.Collections
             if (count == 0)
                 throw new InvalidOperationException("The queue is empty.");
             var element = Elements[lastIndex];
-            Elements[lastIndex] = default(T);
-            lastIndex = (lastIndex - 1) & capacityMask;
-            --count;
+            DeleteLast();
             return element;
 
         }
@@ -274,9 +279,7 @@ namespace BEPUutilities2.Collections
             if (count > 0)
             {
                 element = Elements[firstIndex];
-                Elements[firstIndex] = default(T);
-                firstIndex = (firstIndex + 1) & capacityMask;
-                --count;
+                DeleteFirst();
                 return true;
             }
             element = default(T);
@@ -296,14 +299,68 @@ namespace BEPUutilities2.Collections
             if (count > 0)
             {
                 element = Elements[lastIndex];
-                Elements[lastIndex] = default(T);
-                lastIndex = (lastIndex - 1) & capacityMask;
-                --count;
+                DeleteLast();
                 return true;
             }
             element = default(T);
             return false;
 
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void DeleteFirst()
+        {
+            Elements[firstIndex] = default(T);
+            firstIndex = (firstIndex + 1) & capacityMask;
+            --count;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void DeleteLast()
+        {
+            Elements[lastIndex] = default(T);
+            lastIndex = (lastIndex - 1) & capacityMask;
+            --count;
+        }
+
+        /// <summary>
+        /// Removes the element at the given index, preserving the order of the queue.
+        /// </summary>
+        /// <param name="queueIndex">Index in the queue to remove. The index is in terms of the conceptual queue, not the backing array.</param>
+        public void RemoveAt(int queueIndex)
+        {
+            Validate();
+            ValidateIndex(queueIndex);
+            if (lastIndex == queueIndex)
+            {
+                DeleteLast();
+                return;
+            }
+            if (firstIndex == queueIndex)
+            {
+                DeleteFirst();
+                return;
+            }
+            //It's internal.
+            var arrayIndex = GetBackingArrayIndex(queueIndex);
+
+            //Four possible cases:
+            //1) Queue wraps around end and arrayIndex is in [0, lastIndex),
+            //2) Queue wraps around end and arrayIndex is in (firstIndex, arrayLength),
+            //3) Queue is contiguous and arrayIndex is closer to lastIndex than firstIndex, or
+            //4) Queue is contiguous and arrayIndex is closer to firstIndex than lastIndex
+            //In cases #1 and #3, we should move [arrayIndex + 1, lastIndex] to [arrayIndex, lastIndex - 1], deleting the last element.
+            //In cases #2 and #4, we should move [firstIndex, arrayIndex - 1] to [firstIndex + 1, arrayIndex], deleting the first element.
+
+            if ((firstIndex > lastIndex && arrayIndex < lastIndex) || //Case 1
+                (firstIndex < lastIndex && (lastIndex - arrayIndex) < (arrayIndex - firstIndex))) //Case 3
+            {
+                Array.Copy(Elements, arrayIndex + 1, Elements, arrayIndex, lastIndex - arrayIndex);
+                DeleteLast();
+            }
+            else
+            {
+                Array.Copy(Elements, firstIndex, Elements, firstIndex + 1, arrayIndex - firstIndex);
+                DeleteFirst();
+            }
         }
 
         /// <summary>
