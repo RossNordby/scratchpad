@@ -329,18 +329,18 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             ValidateIndex(queueIndex);
-            if (lastIndex == queueIndex)
+            var arrayIndex = GetBackingArrayIndex(queueIndex);
+            if (lastIndex == arrayIndex)
             {
                 DeleteLast();
                 return;
             }
-            if (firstIndex == queueIndex)
+            if (firstIndex == arrayIndex)
             {
                 DeleteFirst();
                 return;
             }
             //It's internal.
-            var arrayIndex = GetBackingArrayIndex(queueIndex);
 
             //Four possible cases:
             //1) Queue wraps around end and arrayIndex is in [0, lastIndex),
