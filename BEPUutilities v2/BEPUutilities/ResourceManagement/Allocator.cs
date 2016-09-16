@@ -61,7 +61,7 @@ namespace BEPUutilities2.ResourceManagement
         {
             return allocations.ContainsKey(id);
         }
-        
+
         /// <summary>
         /// Gets the allocation region associated with the given allocation id if it is present.
         /// </summary>
@@ -369,6 +369,51 @@ namespace BEPUutilities2.ResourceManagement
 
             //Note: a slightly fancier allocator could 1) track the start and 2) coalesce allocations such that this entire process would become O(1). 
             //Something to consider if this allocator ever bottlenecks.
+        }
+
+        /// <summary>
+        /// Attempts to resize a given allocation to a new size. If the new size is smaller, the start index remains unchanged.
+        /// </summary>
+        /// <param name="id">Id of the allocation to resize.</param>
+        /// <param name="size">New desired size of the allocation.</param>
+        /// <param name="oldStart">Old start location of the allocation.</param>
+        /// <param name="newStart">New start location of the allocation.</param>
+        /// <returns>True if the resize was successful. False if there was insufficient room for the larger allocation.</returns>
+        public bool Resize(ulong id, long size, out long oldStart, out long newStart)
+        {
+            var allocationIndex = allocations.IndexOf(id);
+            Debug.Assert(allocationIndex >= 0, "The allocation must be present inside the allocator to resize it!");
+            //Ref locals would be so nice.
+            var allocation = allocations.Values[allocationIndex];
+            oldStart = allocation.Start;
+            var currentSize = allocation.End - allocation.Start;
+            Debug.Assert(size != currentSize, "Why are you calling resize if the new size is the same as the old one?");
+
+            if (size < currentSize)
+            {
+                //We can resize without worrying about redoing an allocation.
+                //Note that we always shrink the interval by moving the end closer to the start, even though that might
+                //increase fragmentation. However, by only moving the endpoint, we eliminate the need to move the interval.
+                //Externally, this means resource uploads are avoided.
+                //Conceptually, the incremental compaction algorithm already induces a bias toward 0. In other words,
+                //temporarily introducing fragmentation doesn't matter because the incremental compaction algorithm ends up 
+                //doing the same amount of work either way. So we might as well avoid doing double-moves.
+                allocations.Values[allocationIndex].End = allocation.Start + size;
+                newStart = allocation.Start;
+                return true;
+            }
+            //The size is increasing (unless the above assertion was hit!).
+            //This requires a reallocation.
+            var success = Deallocate(id);
+            Debug.Assert(success, "Sanity check: you just looked this allocation up, yet the deallocation failed. Did you introduce a race condition?");
+            if (!Allocate(id, size, out newStart))
+            {
+                //Failed to find a location that fits the requested size. Allocate at the old size.
+                success = Allocate(id, currentSize, out newStart);
+                Debug.Assert(success, "You just deallocated a region of this size, so the allocation must succeed. Did you introduce a race condition?");
+                return false;
+            }
+            return true;
         }
 
         [Conditional("DEBUG")]
