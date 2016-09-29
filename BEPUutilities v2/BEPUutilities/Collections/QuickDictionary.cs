@@ -179,6 +179,15 @@ namespace BEPUutilities2.Collections
                 Array.Clear(oldDictionary.Values, 0, oldDictionary.Count);
             oldDictionary.Dispose();
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static int Rehash(int hash)
+        {
+            //Many common keys, such as ints and longs, will result in contiguous hash codes.
+            //Contiguous hash codes mean contiguous table entries, which tend to murder linear probing performance.
+            //To avoid this performance pitfall, scramble the hashcode using something similar to a permutation polynomial (though we do not care if it actually generates a permutation).
+            return (hash * 353868019 + 879190747) * hash + 756065179;
+        }
 
         /// <summary>
         /// Gets the index of the element in the table.
@@ -191,8 +200,9 @@ namespace BEPUutilities2.Collections
         public bool GetTableIndices(TKey element, out int tableIndex, out int elementIndex)
         {
             Validate();
+            
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
-            tableIndex = element.GetHashCode() & tableMask;
+            tableIndex = Rehash(element.GetHashCode()) & tableMask;
             //0 in the table means 'not taken'; all other values are offset by 1 upward. That is, 1 is actually index 0, 2 is actually index 1, and so on.
             //This is preferred over using a negative number for flagging since clean buffers will contain all 0's.
             while ((elementIndex = Table[tableIndex]) > 0)
@@ -356,7 +366,7 @@ namespace BEPUutilities2.Collections
                 {
                     //This slot contains something. What is its actual index?
                     --moveCandidateIndex;
-                    int desiredIndex = Keys[moveCandidateIndex].GetHashCode() & tableMask;
+                    int desiredIndex = Rehash(Keys[moveCandidateIndex].GetHashCode()) & tableMask;
 
                     //Would this element be closer to its actual index if it was moved to the gap?
                     //To find out, compute the clockwise distance from the gap and the clockwise distance from the ideal location.
