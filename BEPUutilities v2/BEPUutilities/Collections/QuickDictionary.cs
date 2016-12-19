@@ -182,11 +182,27 @@ namespace BEPUutilities2.Collections
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static int Rehash(int hash)
-        {
-            //Many common keys, such as ints and longs, will result in contiguous hash codes.
-            //Contiguous hash codes mean contiguous table entries, which tend to murder linear probing performance.
-            //To avoid this performance pitfall, scramble the hashcode using something similar to a permutation polynomial (though we do not care if it actually generates a permutation).
-            return (hash * 353868019 + 879190747) * hash + 756065179;
+        { 
+            //This rehash aims to address two problems:
+            //1) Many common keys, such as ints and longs, will result in contiguous hash codes. 
+            //Contiguous hash codes result in contiguous table entries, which destroy this implementation's linear probing performance.
+            //2) Many common hashes have significantly patterned input, such as having all 0's in the lower bits. Since this implementation uses pow2-sized tables, 
+            //patterns which could align with the pow2 table size can cause massive numbers of collisions.
+            //So, we apply an additional scrambling pass on the hash to get rid of most such patterns. This won't stop a malicious attacker, but most coincidences should be avoided.
+            //Keep in mind that this implementation is performance critical- there's no time for a bunch of rounds.
+            //The initial multiplication serves to avoid some contiguity-induced patterning, the 
+            //following xor'd rotations take care of most bit distribution patterning, and together it's super cheap. 
+            //(You may be familiar with these rotation constants from SHA2 rounds.)
+
+            const int a = 6;
+            const int b = 13;
+            const int c = 25;
+            uint uhash = (uint)hash * 982451653u;
+            var redongled =
+                ((uhash << a) | (uhash >> (32 - a))) ^
+                ((uhash << b) | (uhash >> (32 - b))) ^
+                ((uhash << c) | (uhash >> (32 - c)));
+            return (int)redongled;
         }
 
         /// <summary>

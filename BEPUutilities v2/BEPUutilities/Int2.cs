@@ -43,8 +43,10 @@ namespace BEPUutilities2
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            const uint p1 = 961748927u;
-            return (int)((uint)X * p1 + (uint)Y);
+            const ulong p1 = 961748927UL;
+            const ulong p2 = 899809343UL;
+            var hash64 = (ulong)X * (p1 * p2) + (ulong)Y * (p2);
+            return (int)(hash64 ^ (hash64 >> 32));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
