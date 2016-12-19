@@ -43,7 +43,8 @@ namespace BEPUutilities2
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
-            return (X * 533000401) ^ (Y * 920419813);
+            const uint p1 = 961748927u;
+            return (int)((uint)X * p1 + (uint)Y);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
