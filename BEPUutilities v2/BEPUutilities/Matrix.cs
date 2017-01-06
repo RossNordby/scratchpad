@@ -44,7 +44,6 @@ namespace BEPUutilities2
         }
 
 
-
         public Vector3 Translation
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -308,6 +307,12 @@ namespace BEPUutilities2
             return toReturn;
         }
 
+        /// <summary>
+        /// Concatenates two matrices.
+        /// </summary>
+        /// <param name="m1">First input matrix.</param>
+        /// <param name="m2">Second input matrix.</param>
+        /// <returns>Concatenated transformation of the form m1 * m2.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Matrix operator *(Matrix m1, Matrix m2)
         {
@@ -500,6 +505,18 @@ namespace BEPUutilities2
 
 
         /// <summary>
+        /// Inverts the matrix.
+        /// </summary>
+        /// <param name="m">Matrix to invert.</param>
+        /// <returns>Inverted version of the matrix.</returns>
+        public static Matrix Invert(Matrix m)
+        {
+            Matrix inverted;
+            Invert(ref m, out inverted);
+            return inverted;
+        }
+
+        /// <summary>
         /// Creates a view matrix pointing from a position to a target with the given up vector.
         /// </summary>
         /// <param name="position">Position of the camera.</param>
@@ -570,17 +587,59 @@ namespace BEPUutilities2
         }
 
 
+
         /// <summary>
-        /// Inverts the matrix.
+        /// Creates a rigid world matrix from a rotation and position.
         /// </summary>
-        /// <param name="m">Matrix to invert.</param>
-        /// <returns>Inverted version of the matrix.</returns>
-        public static Matrix Invert(Matrix m)
+        /// <param name="rotation">Rotation of the transform.</param>
+        /// <param name="position">Position of the transform.</param>
+        /// <param name="world">4x4 matrix representing the combined transform.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateRigid(ref Matrix3x3 rotation, ref Vector3 position, out Matrix world)
         {
-            Matrix inverted;
-            Invert(ref m, out inverted);
-            return inverted;
+            world.X = new Vector4(rotation.X, 0);
+            world.Y = new Vector4(rotation.Y, 0);
+            world.Z = new Vector4(rotation.Z, 0);
+            world.W = new Vector4(position, 1);
         }
 
+        /// <summary>
+        /// Creates a rigid world matrix from a rotation and position.
+        /// </summary>
+        /// <param name="rotation">Rotation of the transform.</param>
+        /// <param name="position">Position of the transform.</param>
+        /// <param name="world">4x4 matrix representing the combined transform.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateRigid(ref Quaternion rotation, ref Vector3 position, out Matrix world)
+        {
+            Matrix3x3.CreateFromQuaternion(ref rotation, out var rotationMatrix);
+            world.X = new Vector4(rotationMatrix.X, 0);
+            world.Y = new Vector4(rotationMatrix.Y, 0);
+            world.Z = new Vector4(rotationMatrix.Z, 0);
+            world.W = new Vector4(position, 1);
+        }
+
+        /// <summary>
+        /// Creates a 4x4 matrix from a 3x3 matrix. All extra columns and rows filled with 0 except the W.W, which is set to 1.
+        /// </summary>
+        /// <param name="matrix3x3">Smaller matrix to base the larger matrix on.</param>
+        /// <param name="matrix4x4">Larger matrix that has the smaller matrix as a submatrix.</param>
+        public static void CreateFrom3x3(ref Matrix3x3 matrix3x3, out Matrix matrix4x4)
+        {
+            matrix4x4.X = new Vector4(matrix3x3.X, 0);
+            matrix4x4.Y = new Vector4(matrix3x3.Y, 0);
+            matrix4x4.Z = new Vector4(matrix3x3.Z, 0);
+            matrix4x4.W = new Vector4(0, 0, 0, 1);
+        }
+        /// <summary>
+        /// Creates a 4x4 matrix from a 3x3 matrix. All extra columns and rows filled with 0 except the W.W, which is set to 1.
+        /// </summary>
+        /// <param name="matrix3x3">Smaller matrix to base the larger matrix on.</param>
+        /// <returns>Larger matrix that has the smaller matrix as a submatrix.</returns>
+        public static Matrix CreateFrom3x3(Matrix3x3 matrix3x3)
+        {
+            CreateFrom3x3(ref matrix3x3, out var matrix4x4);
+            return matrix4x4;
+        }
     }
 }

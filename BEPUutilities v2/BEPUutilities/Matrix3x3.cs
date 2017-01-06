@@ -293,5 +293,67 @@ namespace BEPUutilities2
             linearTransform.Z = new Vector3(0, 0, scale.Z);
         }
 
+        /// <summary>
+        /// Creates a matrix representing a rotation derived from an axis and angle.
+        /// </summary>
+        /// <param name="axis">Axis of the rotation.</param>
+        /// <param name="angle">Angle of the rotation.</param>
+        /// <param name="result">Resulting rotation matrix.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromAxisAngle(ref Vector3 axis, float angle, out Matrix3x3 result)
+        {
+            //TODO: Could be better simdified.
+            float xx = axis.X * axis.X;
+            float yy = axis.Y * axis.Y;
+            float zz = axis.Z * axis.Z;
+            float xy = axis.X * axis.Y;
+            float xz = axis.X * axis.Z;
+            float yz = axis.Y * axis.Z;
+
+            float sinAngle = (float)Math.Sin(angle);
+            float oneMinusCosAngle = 1 - (float)Math.Cos(angle);
+
+            result.X = new Vector3(
+                1 + oneMinusCosAngle * (xx - 1),
+                axis.Z * sinAngle + oneMinusCosAngle * xy,
+                -axis.Y * sinAngle + oneMinusCosAngle * xz);
+
+            result.Y = new Vector3(
+                -axis.Z * sinAngle + oneMinusCosAngle * xy,
+                1 + oneMinusCosAngle * (yy - 1),
+                axis.X * sinAngle + oneMinusCosAngle * yz);
+
+            result.Z = new Vector3(
+                axis.Y * sinAngle + oneMinusCosAngle * xz,
+                -axis.X * sinAngle + oneMinusCosAngle * yz,
+                1 + oneMinusCosAngle * (zz - 1));
+            
+        }
+        /// <summary>
+        /// Creates a matrix representing a rotation derived from an axis and angle.
+        /// </summary>
+        /// <param name="axis">Axis of the rotation.</param>
+        /// <param name="angle">Angle of the rotation.</param>
+        /// <returns>Resulting rotation matrix.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix3x3 CreateFromAxisAngle(Vector3 axis, float angle)
+        {
+            CreateFromAxisAngle(ref axis, angle, out var result);
+            return result;
+
+        }  
+
+        /// <summary>
+        /// Concatenates two matrices.
+        /// </summary>
+        /// <param name="m1">First input matrix.</param>
+        /// <param name="m2">Second input matrix.</param>
+        /// <returns>Concatenated transformation of the form m1 * m2.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Matrix3x3 operator *(Matrix3x3 m1, Matrix3x3 m2)
+        {
+            Multiply(ref m1, ref m2, out var toReturn);
+            return toReturn;
+        }
     }
 }
