@@ -8,8 +8,29 @@ using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
-    class GatherScatter
+    public class GatherScatter
     {
+
+        /// <summary>
+        /// Gets a reference to an element from a vector without using pointers, bypassing direct vector access for codegen reasons.
+        /// This appears to produce identical assembly to taking the pointer and applying an offset. You can do slightly better for batched accesses
+        /// by taking the pointer or reference only once, though the performance difference is small.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe ref float Get(ref Vector<float> vector, int index)
+        {
+            //Interestingly, despite encountering situations where Unsafe.Add itself would not inline,
+            //this usage tends to inline perfectly fine. The result is 
+            return ref Unsafe.Add(ref Unsafe.As<Vector<float>, float>(ref vector), index);
+
+            //For comparison, an implementation like this:
+            //return ref *((float*)Unsafe.AsPointer(ref vector) + index);
+            //doesn't inline (sometimes?). 
+            //The good news is that, in addition to inlining and producing decent assembly, the pointerless approach doesn't open the door
+            //for GC related problems and the user doesn't need to pin memory.
+        }
+
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static unsafe void GatherVelocities(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
         {
@@ -31,6 +52,11 @@ namespace SolverPrototype
             var csvAngularBX = csvLinearBX + 3 * Vector<float>.Count;
             var csvAngularBY = csvLinearBX + 4 * Vector<float>.Count;
             var csvAngularBZ = csvLinearBX + 5 * Vector<float>.Count;
+
+            var bundleIndicesA = Unsafe.AsPointer(ref references.BundleIndexA);
+            var bundleIndicesB = Unsafe.AsPointer(ref references.BundleIndexB);
+            var innerIndicesA = Unsafe.AsPointer(ref references.InnerIndexA);
+            var innerIndicesB = Unsafe.AsPointer(ref references.InnerIndexB);
 
             //TODO: Should check if a simpler approach that just inline-grabs the specific pointer is faster... I doubt we can avoid caching it, but we might be able to avoid pointer arithmetic.
             //Would be nice to have an indexable struct that is exactly the same size as vector<float>, but creating such a thing is tricky since the size is not known at compile time.
