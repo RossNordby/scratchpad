@@ -4,7 +4,8 @@
     {
         static void Main(string[] args)
         {
-            VectorAccessTests.Test();
+            //VectorAccessTests.Test();
+            GatherScatterTests.Test();
         }
     }
 }

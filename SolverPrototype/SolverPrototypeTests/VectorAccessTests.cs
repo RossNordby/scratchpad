@@ -11,10 +11,10 @@ using System.Threading.Tasks;
 namespace SolverPrototypeTests
 {
     class VectorAccessTests
-    {        //The following tests show different methods of accessing an element within a vector.
+    {        
+        //The following tests show different methods of accessing an element within a vector.
         //(The fact that it is a vector is basically irrelevant in all of them except for the direct index.)
         //Direct vector indexing introduces bounds tests which the alternate methods avoid, making it slightly slower.
-        //
         [MethodImpl(MethodImplOptions.NoInlining)]
         unsafe static float[] TestVectorPointerAccess(int iterationCount)
         {

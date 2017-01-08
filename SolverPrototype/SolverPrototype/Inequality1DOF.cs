@@ -65,13 +65,14 @@ namespace SolverPrototype
     /// </summary>
     public struct BodyReferences
     {
-        //TODO: We could optionally compute the bundle and inner index from the whole index. Might want to try it if we end up cache or memory bottlenecked.
-        //Strongly suspect that codegen for the vectorized types will be worse than scalar storage. Worth trying it both ways.
-        //However, we do not have a good way to create an indexable struct of size equal to the vector size. So we might just have to cast this if there are bad codegen issues.
+        //Unfortunately, there does not exist any Vector<int>.Shift instruction yet, so we cannot efficiently derive the bundle and inner indices from the 'true' indices on the fly.
+        //Instead, group references are preconstructed and cached in a nonvectorized way.
         public Vector<int> BundleIndexA;
         public Vector<int> BundleIndexB;
+        //Inner indices contain 
         public Vector<int> InnerIndexA;
         public Vector<int> InnerIndexB;
+        //TODO: there may be an argument to make this a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
         public int Count;
     }
 
@@ -129,6 +130,11 @@ namespace SolverPrototype
         public static void ApplyImpulse(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData data,
             ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Vector<float> correctiveImpulse)
         {
+            //Applying the impulse requires transforming the constraint space impulse into a world space velocity change.
+            //The first step is to transform into a world space impulse, which requires transforming by the transposed jacobian
+            //(jacobian goes from world to constraint space, transposed jacobian goes from constraint to world space).
+            //That world space impulse is then converted to a corrective velocity change by scaling the impulse by the inverse mass/inertia.
+            //As an optimization for constraints with smaller jacobians, the transpose(jacobian) * (inertia or mass) transform is precomputed.
             BodyVelocities correctiveVelocityA, correctiveVelocityB;
             Vector3Wide.Multiply(ref correctiveImpulse, ref data.CSIToWSVLinearA, out correctiveVelocityA.LinearVelocity);
             Vector3Wide.Multiply(ref correctiveImpulse, ref data.CSIToWSVAngularA, out correctiveVelocityA.AngularVelocity);
@@ -154,7 +160,7 @@ namespace SolverPrototype
         public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref IterationData data, ref Vector<float> accumulatedImpulse,
             out Vector<float> correctiveCSI)
         {
-            //Take the world space velocity of each body into constraint space by transforming by transpose(jacobian).
+            //Take the world space velocity of each body into constraint space by transforming by the jacobian (a column vector, as compared to our linear velocity row vectors).
             Vector3Wide.Dot(ref wsvA.LinearVelocity, ref data.LinearJacobianA, out var csvaLinear);
             Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.AngularJacobianA, out var csvaAngular);
             Vector3Wide.Dot(ref wsvB.LinearVelocity, ref data.LinearJacobianB, out var csvbLinear);
