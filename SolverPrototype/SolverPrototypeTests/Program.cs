@@ -1,4 +1,8 @@
-﻿namespace SolverPrototypeTests
+﻿using SolverPrototype;
+using System;
+using System.Numerics;
+
+namespace SolverPrototypeTests
 {
     class Program
     {

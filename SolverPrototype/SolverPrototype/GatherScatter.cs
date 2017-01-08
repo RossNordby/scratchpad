@@ -95,7 +95,8 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GatherVelocities2(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        internal static unsafe void GatherVelocities2(BodyVelocities[] allBodyVelocities,
+            ref Vector<int> bundleIndicesVector, ref Vector<int> innerIndicesVector, int bodyCount, ref BodyVelocities velocities)
         {
             //The user guarantees that the entity velocities are pointer safe.
             //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
@@ -103,65 +104,129 @@ namespace SolverPrototype
             //This logic is coupled with the layout of the EntityVelocities struct and makes assumptions about the memory layout of the type.
             //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
             //With any luck, it will be later enough that a proper solution exists.
-            var csvLinearAX = (float*)Unsafe.AsPointer(ref velocitiesA);
-            var csvLinearAY = csvLinearAX + Vector<float>.Count;
-            var csvLinearAZ = csvLinearAX + 2 * Vector<float>.Count;
-            var csvAngularAX = csvLinearAX + 3 * Vector<float>.Count;
-            var csvAngularAY = csvLinearAX + 4 * Vector<float>.Count;
-            var csvAngularAZ = csvLinearAX + 5 * Vector<float>.Count;
-            var csvLinearBX = (float*)Unsafe.AsPointer(ref velocitiesB);
-            var csvLinearBY = csvLinearBX + Vector<float>.Count;
-            var csvLinearBZ = csvLinearBX + 2 * Vector<float>.Count;
-            var csvAngularBX = csvLinearBX + 3 * Vector<float>.Count;
-            var csvAngularBY = csvLinearBX + 4 * Vector<float>.Count;
-            var csvAngularBZ = csvLinearBX + 5 * Vector<float>.Count;
+            ref var linearX = ref Unsafe.As<Vector<float>, float>(ref velocities.LinearVelocity.X);
+            ref var linearY = ref Unsafe.Add(ref linearX, Vector<float>.Count);
+            ref var linearZ = ref Unsafe.Add(ref linearX, 2 * Vector<float>.Count);
+            ref var angularX = ref Unsafe.Add(ref linearX, 3 * Vector<float>.Count);
+            ref var angularY = ref Unsafe.Add(ref linearX, 4 * Vector<float>.Count);
+            ref var angularZ = ref Unsafe.Add(ref linearX, 5 * Vector<float>.Count);
 
-            var bundleIndicesA = Unsafe.AsPointer(ref references.BundleIndexA);
-            var bundleIndicesB = Unsafe.AsPointer(ref references.BundleIndexB);
-            var innerIndicesA = Unsafe.AsPointer(ref references.InnerIndexA);
-            var innerIndicesB = Unsafe.AsPointer(ref references.InnerIndexB);
+            //Grab the base references for the body indices.
+            ref var baseBundle = ref Unsafe.As<Vector<int>, int>(ref bundleIndicesVector);
+            //Note that the inner indices are encoded. They have the form:
+            //(leading zeroes)(1 bit, null if set)(1 bit, kinematic if set)(actualIndex)
+            //In other words, you can think of it as a 2 bit enum: 0 is dynamic, 1 is kinematic, 2 is null.
+            //The actual index bit length depends on the Vector<int>.Count. 4 slots require 2 bits, 8 slots require 3, 16 slots require 4.
+            //When gathering, we only care about whether the object is null. We don't gather from null bodies. (We still gather from kinematic bodies!)
+            //TODO: Does those constant vectors fold?
+            //var bodyIsNullVector = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Vector<int>.Count << 1));
+            //ref var bodyIsNull = ref Unsafe.As<Vector<int>, int>(ref bodyIsNullVector);
+            //var decodedInnerIndices = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Solver.VectorMask));
+            ref var baseInner = ref Unsafe.As<Vector<int>, int>(ref innerIndicesVector);
 
-            //TODO: Should check if a simpler approach that just inline-grabs the specific pointer is faster... I doubt we can avoid caching it, but we might be able to avoid pointer arithmetic.
-            //Would be nice to have an indexable struct that is exactly the same size as vector<float>, but creating such a thing is tricky since the size is not known at compile time.
-            //TODO: avoiding pointer arithmetic entirely so the user didn't have to guarantee GC safety would be nice- we could use Unsafe.Add if the codegen is good enough.
-
-            for (int i = 0; i < references.Count; ++i)
+            for (int i = 0; i < bodyCount; ++i)
             {
-                //Null connections are inaccessible for reads.
-                //Their velocities are always zero.
-                //Since locals get initialized to zero, we don't need to write it explicitly.
-                var bundleIndexA = references.BundleIndexB[i];
-                if (bundleIndexA >= -1)
+                //When gathering velocities, there is no reason to consider null connections.
+                //Null connections are those which are not actually associated with a kinematic or dynamic body.
+                //They exist as a convenience for using multibody constraints that are connected to the 'world'.
+                //(There is a question of whether such a feature should even exist. You can always use a kinematic object...
+                //For reference, the overhead is around 9% on gather performance.)
+                //if (Unsafe.Add(ref bodyIsNull, i) == 0)
                 {
-                    ref var bundleA = ref velocities[bundleIndexA];
-                    var innerIndexA = references.InnerIndexA[i];
-                    csvLinearAX[i] = bundleA.LinearVelocity.X[innerIndexA];
-                    csvLinearAY[i] = bundleA.LinearVelocity.Y[innerIndexA];
-                    csvLinearAZ[i] = bundleA.LinearVelocity.Z[innerIndexA];
-                    csvAngularAX[i] = bundleA.AngularVelocity.X[innerIndexA];
-                    csvAngularAY[i] = bundleA.AngularVelocity.Y[innerIndexA];
-                    csvAngularAZ[i] = bundleA.AngularVelocity.Z[innerIndexA];
+                    var bundleIndex = Unsafe.Add(ref baseBundle, i);
+                    var innerIndex = Unsafe.Add(ref baseInner, i);
+                    ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
+                    Unsafe.Add(ref linearX, i) = bundleLinearX;
+                    Unsafe.Add(ref linearY, i) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
+                    Unsafe.Add(ref linearZ, i) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
+                    Unsafe.Add(ref angularX, i) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
+                    Unsafe.Add(ref angularY, i) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
+                    Unsafe.Add(ref angularZ, i) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
+
+                    //ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
+                    //Get(ref velocities.LinearVelocity.X, i) = bundleLinearX;
+                    //Get(ref velocities.LinearVelocity.Y, i) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
+                    //Get(ref velocities.LinearVelocity.Z, i) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
+                    //Get(ref velocities.AngularVelocity.X, i) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
+                    //Get(ref velocities.AngularVelocity.Y, i) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
+                    //Get(ref velocities.AngularVelocity.Z, i) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
+
+                    //ref var bundle = ref allBodyVelocities[bundleIndex];
+                    //Get(ref velocities.LinearVelocity.X, i) =  Get(ref bundle.LinearVelocity.X, innerIndex);
+                    //Get(ref velocities.LinearVelocity.Y, i) =  Get(ref bundle.LinearVelocity.Y, innerIndex);
+                    //Get(ref velocities.LinearVelocity.Z, i) =  Get(ref bundle.LinearVelocity.Z, innerIndex);
+                    //Get(ref velocities.AngularVelocity.X, i) = Get(ref bundle.AngularVelocity.X, innerIndex);
+                    //Get(ref velocities.AngularVelocity.Y, i) = Get(ref bundle.AngularVelocity.Y, innerIndex);
+                    //Get(ref velocities.AngularVelocity.Z, i) = Get(ref bundle.AngularVelocity.Z, innerIndex);
                 }
 
-                ref var bundleB = ref velocities[references.BundleIndexB[i]];
-                var innerIndexB = references.InnerIndexB[i];
-                csvLinearBX[i] = bundleB.LinearVelocity.X[innerIndexB];
-                csvLinearBY[i] = bundleB.LinearVelocity.Y[innerIndexB];
-                csvLinearBZ[i] = bundleB.LinearVelocity.Z[innerIndexB];
-                csvAngularBX[i] = bundleB.AngularVelocity.X[innerIndexB];
-                csvAngularBY[i] = bundleB.AngularVelocity.Y[innerIndexB];
-                csvAngularBZ[i] = bundleB.AngularVelocity.Z[innerIndexB];
             }
 
             //You may notice that this is a pretty dang heavy weight preamble to every solve iteration. Two points:
             //1) You should make sure to make this preamble as common as possible to all constraints, so that every time a new optimization becomes possible, you needn't
-            //revisit every single constraint. This means the initial jacobian multiply can't be bundled with it. Good thing there's no reason for it to be.
+            //revisit every single constraint.
             //2) When there's a possibility to increase the quality of a constraint solve by doing a little more effort within the solve iteration, chances are it's
             //worth it. For cheap low quality solves on low-DOF constraints, the pregather and postscatter may take significantly longer than the actual math!
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        public static unsafe void GatherVelocities2(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        {
+            GatherVelocities2(velocities, ref references.BundleIndexA, ref references.InnerIndexA, references.Count, ref velocitiesA);
+            GatherVelocities2(velocities, ref references.BundleIndexB, ref references.InnerIndexB, references.Count, ref velocitiesB);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static unsafe void GatherVelocities3(BodyVelocities[] allBodyVelocities,
+            ref Vector<int> bundleIndicesVector, ref Vector<int> innerIndicesVector, int bodyCount, ref BodyVelocities velocities)
+        {
+            //The user guarantees that the entity velocities are pointer safe.
+            //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
+            //we do a really gross hack where we manually stuff the memory backing of a bunch of vectors.
+            //This logic is coupled with the layout of the EntityVelocities struct and makes assumptions about the memory layout of the type.
+            //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
+            //With any luck, it will be later enough that a proper solution exists.
+
+            //Grab the base references for the body indices.
+            ref var baseBundle = ref Unsafe.As<Vector<int>, int>(ref bundleIndicesVector);
+            //Note that the inner indices are encoded. They have the form:
+            //(leading zeroes)(1 bit, null if set)(1 bit, kinematic if set)(actualIndex)
+            //In other words, you can think of it as a 2 bit enum: 0 is dynamic, 1 is kinematic, 2 is null.
+            //The actual index bit length depends on the Vector<int>.Count. 4 slots require 2 bits, 8 slots require 3, 16 slots require 4.
+            //When gathering, we only care about whether the object is null. We don't gather from null bodies. (We still gather from kinematic bodies!)
+            //TODO: Does those constant vectors fold?
+            var bodyIsNullVector = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Vector<int>.Count << 1));
+            ref var bodyIsNull = ref Unsafe.As<Vector<int>, int>(ref bodyIsNullVector);
+            var decodedInnerIndices = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Solver.VectorMask));
+            ref var baseInner = ref Unsafe.As<Vector<int>, int>(ref decodedInnerIndices);
+            ref var linearX = ref Unsafe.As<Vector<float>, float>(ref velocities.LinearVelocity.X);
+            for (int velocityIndex = 0; velocityIndex < 6; ++velocityIndex)
+            {
+                ref var velocity = ref Unsafe.Add(ref linearX, velocityIndex << Solver.VectorShift);
+                for (int i = 0; i < bodyCount; ++i)
+                {
+                    if (Unsafe.Add(ref bodyIsNull, i) == 0)
+                    {
+                        ref var bundleIndex = ref Unsafe.Add(ref baseBundle, i);
+                        ref var innerIndex = ref Unsafe.Add(ref baseInner, i);
+                        ref var bundle = ref allBodyVelocities[bundleIndex];
+                        Unsafe.Add(ref velocity, i) = Get(ref bundle.LinearVelocity.X, innerIndex);
+                    }
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void GatherVelocities3(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        {
+            GatherVelocities3(velocities, ref references.BundleIndexA, ref references.InnerIndexA, references.Count, ref velocitiesA);
+            GatherVelocities3(velocities, ref references.BundleIndexB, ref references.InnerIndexB, references.Count, ref velocitiesB);
+        }
+
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
         {
             //Scatter is actually harder than gathering. For every single constraint, we have to find the associated entities independently.
             //We can't precache the source pointers or anything.
