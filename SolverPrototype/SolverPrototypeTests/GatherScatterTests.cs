@@ -19,7 +19,7 @@ namespace SolverPrototypeTests
             public BodyReferences[] BodyReferences;
             public int IterationCount;
         }
-        static Context GetFreshContext(int iterationCount, int bundleCount)
+        static Context GetFreshContext(int iterationCount, int bundleCount, double nullConnectionProbability = 0)
         {
             Context context;
             context.IterationCount = iterationCount;
@@ -27,16 +27,33 @@ namespace SolverPrototypeTests
             context.BodyReferences = new BodyReferences[iterationCount];
             var random = new Random(5);
             int maximumBodyIndex = bundleCount * Vector<float>.Count;
+
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
                 for (int i = 0; i < Vector<int>.Count; ++i)
                 {
-                    var indexA = random.Next(maximumBodyIndex);
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = indexA >> Solver.VectorShift;
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = indexA & Solver.VectorMask;
-                    var indexB = random.Next(maximumBodyIndex);
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = indexB >> Solver.VectorShift;
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = indexB & Solver.VectorMask;
+                    if (random.NextDouble() >= nullConnectionProbability)
+                    {
+                        var index = random.Next(maximumBodyIndex);
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = index >> Solver.VectorShift;
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = index & Solver.VectorMask;
+                    }
+                    else
+                    {
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = 0;
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = Vector<float>.Count << 1;
+                    }
+                    if (random.NextDouble() >= nullConnectionProbability)
+                    {
+                        var index = random.Next(maximumBodyIndex);
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = index >> Solver.VectorShift;
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = index & Solver.VectorMask;
+                    }
+                    else
+                    {
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = 0;
+                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = Vector<float>.Count << 1;
+                    }
                 }
                 context.BodyReferences[iterationIndex].Count = Vector<int>.Count;
             }
@@ -57,9 +74,9 @@ namespace SolverPrototypeTests
             }
         }
 
-        static double Time(Action<Context> action, int iterationCount, int bundleCount)
+        static double Time(Action<Context> action, int iterationCount, int bundleCount, double nullConnectionProbability = 0)
         {
-            var context = GetFreshContext(iterationCount, bundleCount);
+            var context = GetFreshContext(iterationCount, bundleCount, nullConnectionProbability);
             var timer = Timer.Start();
             action(context);
             return timer.Stop() / iterationCount;
@@ -120,11 +137,11 @@ namespace SolverPrototypeTests
             const int bundleCount = 8192;
             GC.Collect();
 
-            var refGatherTime = Time(TestRefGather, iterationCount, bundleCount);
+            var refGatherTime = Time(TestRefGather, iterationCount, bundleCount, 0.7);
             GC.Collect();
             var refGather2Time = Time(TestRefGather2, iterationCount, bundleCount);
             GC.Collect();
-            var refGather3Time = Time(TestRefGather3, iterationCount, bundleCount);
+            var refGather3Time = Time(TestRefGather3, iterationCount, bundleCount, 0.7);
             GC.Collect();
             //var refScatterTime = Time(TestRefScatter, iterationCount, bundleCount);
 
