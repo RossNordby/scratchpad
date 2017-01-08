@@ -113,52 +113,24 @@ namespace SolverPrototype
 
             //Grab the base references for the body indices.
             ref var baseBundle = ref Unsafe.As<Vector<int>, int>(ref bundleIndicesVector);
-            //Note that the inner indices are encoded. They have the form:
-            //(leading zeroes)(1 bit, null if set)(1 bit, kinematic if set)(actualIndex)
-            //In other words, you can think of it as a 2 bit enum: 0 is dynamic, 1 is kinematic, 2 is null.
-            //The actual index bit length depends on the Vector<int>.Count. 4 slots require 2 bits, 8 slots require 3, 16 slots require 4.
-            //When gathering, we only care about whether the object is null. We don't gather from null bodies. (We still gather from kinematic bodies!)
-            //TODO: Does those constant vectors fold?
-            //var bodyIsNullVector = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Vector<int>.Count << 1));
-            //ref var bodyIsNull = ref Unsafe.As<Vector<int>, int>(ref bodyIsNullVector);
-            //var decodedInnerIndices = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Solver.VectorMask));
             ref var baseInner = ref Unsafe.As<Vector<int>, int>(ref innerIndicesVector);
 
             for (int i = 0; i < bodyCount; ++i)
             {
-                //When gathering velocities, there is no reason to consider null connections.
-                //Null connections are those which are not actually associated with a kinematic or dynamic body.
-                //They exist as a convenience for using multibody constraints that are connected to the 'world'.
-                //(There is a question of whether such a feature should even exist. You can always use a kinematic object...
-                //For reference, the overhead is around 20% on gather performance.)
-                //if (Unsafe.Add(ref bodyIsNull, i) == 0)
-                {
-                    var bundleIndex = Unsafe.Add(ref baseBundle, i);
-                    var innerIndex = Unsafe.Add(ref baseInner, i);
-                    ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
-                    Unsafe.Add(ref linearX, i) = bundleLinearX;
-                    Unsafe.Add(ref linearY, i) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
-                    Unsafe.Add(ref linearZ, i) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
-                    Unsafe.Add(ref angularX, i) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
-                    Unsafe.Add(ref angularY, i) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
-                    Unsafe.Add(ref angularZ, i) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
-
-                    //ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
-                    //Get(ref velocities.LinearVelocity.X, i) = bundleLinearX;
-                    //Get(ref velocities.LinearVelocity.Y, i) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
-                    //Get(ref velocities.LinearVelocity.Z, i) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
-                    //Get(ref velocities.AngularVelocity.X, i) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
-                    //Get(ref velocities.AngularVelocity.Y, i) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
-                    //Get(ref velocities.AngularVelocity.Z, i) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
-
-                    //ref var bundle = ref allBodyVelocities[bundleIndex];
-                    //Get(ref velocities.LinearVelocity.X, i) =  Get(ref bundle.LinearVelocity.X, innerIndex);
-                    //Get(ref velocities.LinearVelocity.Y, i) =  Get(ref bundle.LinearVelocity.Y, innerIndex);
-                    //Get(ref velocities.LinearVelocity.Z, i) =  Get(ref bundle.LinearVelocity.Z, innerIndex);
-                    //Get(ref velocities.AngularVelocity.X, i) = Get(ref bundle.AngularVelocity.X, innerIndex);
-                    //Get(ref velocities.AngularVelocity.Y, i) = Get(ref bundle.AngularVelocity.Y, innerIndex);
-                    //Get(ref velocities.AngularVelocity.Z, i) = Get(ref bundle.AngularVelocity.Z, innerIndex);
-                }
+                //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
+                //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
+                //The benefit of not having to load data is extremely weak, and often introducing null connections actually slows things down further
+                //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
+                //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
+                var bundleIndex = Unsafe.Add(ref baseBundle, i);
+                var innerIndex = Unsafe.Add(ref baseInner, i);
+                ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
+                Unsafe.Add(ref linearX, i) = bundleLinearX;
+                Unsafe.Add(ref linearY, i) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
+                Unsafe.Add(ref linearZ, i) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
+                Unsafe.Add(ref angularX, i) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
+                Unsafe.Add(ref angularY, i) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
+                Unsafe.Add(ref angularZ, i) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
 
             }
 
@@ -179,52 +151,35 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static unsafe void GatherVelocities3(BodyVelocities[] allBodyVelocities,
             ref Vector<int> bundleIndicesVector, ref Vector<int> innerIndicesVector, int bodyCount, ref BodyVelocities velocities)
-        {     
-            //The user guarantees that the entity velocities are pointer safe.
+        {
             //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
-            //we do a really gross hack where we manually stuff the memory backing of a bunch of vectors.
+            //we do a gross hack where we manually stuff the memory backing of a bunch of vectors.
             //This logic is coupled with the layout of the EntityVelocities struct and makes assumptions about the memory layout of the type.
             //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
             //With any luck, it will be later enough that a proper solution exists.
             ref var linearX = ref Unsafe.As<Vector<float>, float>(ref velocities.LinearVelocity.X);
-            ref var linearY = ref Unsafe.Add(ref linearX, Vector<float>.Count);
-            ref var linearZ = ref Unsafe.Add(ref linearX, 2 * Vector<float>.Count);
-            ref var angularX = ref Unsafe.Add(ref linearX, 3 * Vector<float>.Count);
-            ref var angularY = ref Unsafe.Add(ref linearX, 4 * Vector<float>.Count);
-            ref var angularZ = ref Unsafe.Add(ref linearX, 5 * Vector<float>.Count);
 
             //Grab the base references for the body indices.
             ref var baseBundle = ref Unsafe.As<Vector<int>, int>(ref bundleIndicesVector);
-            //Note that the inner indices are encoded. They have the form:
-            //(leading zeroes)(1 bit, null if set)(1 bit, kinematic if set)(actualIndex)
-            //In other words, you can think of it as a 2 bit enum: 0 is dynamic, 1 is kinematic, 2 is null.
-            //The actual index bit length depends on the Vector<int>.Count. 4 slots require 2 bits, 8 slots require 3, 16 slots require 4.
-            //When gathering, we only care about whether the object is null. We don't gather from null bodies. (We still gather from kinematic bodies!)
-            //TODO: Does those constant vectors fold?
-            var bodyIsNullVector = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Vector<int>.Count << 1));
-            ref var bodyIsNull = ref Unsafe.As<Vector<int>, int>(ref bodyIsNullVector);
-            var decodedInnerIndices = Vector.BitwiseAnd(innerIndicesVector, new Vector<int>(Solver.VectorMask));
-            ref var baseInner = ref Unsafe.As<Vector<int>, int>(ref decodedInnerIndices);
+            ref var baseInner = ref Unsafe.As<Vector<int>, int>(ref innerIndicesVector);
 
             for (int i = 0; i < bodyCount; ++i)
             {
-                //When gathering velocities, there is no reason to consider null connections.
-                //Null connections are those which are not actually associated with a kinematic or dynamic body.
-                //They exist as a convenience for using multibody constraints that are connected to the 'world'.
-                //(There is a question of whether such a feature should even exist. You can always use a kinematic object...
-                //For reference, the overhead is around 20% on gather performance.)
-                if (Unsafe.Add(ref bodyIsNull, i) == 0)
-                {
-                    var bundleIndex = Unsafe.Add(ref baseBundle, i);
-                    var innerIndex = Unsafe.Add(ref baseInner, i);
-                    ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
-                    Unsafe.Add(ref linearX, i) = bundleLinearX;
-                    Unsafe.Add(ref linearY, i) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
-                    Unsafe.Add(ref linearZ, i) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
-                    Unsafe.Add(ref angularX, i) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
-                    Unsafe.Add(ref angularY, i) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
-                    Unsafe.Add(ref angularZ, i) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
-                }
+                //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
+                //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
+                //The benefit of not having to load data is extremely weak, and often introducing null connections actually slows things down further
+                //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
+                //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
+                var bundleIndex = Unsafe.Add(ref baseBundle, i);
+                var innerIndex = Unsafe.Add(ref baseInner, i);
+                ref var bundleLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
+                ref var targetLinearX = ref Unsafe.Add(ref linearX, i);
+                targetLinearX = bundleLinearX;
+                Unsafe.Add(ref targetLinearX, Vector<float>.Count) = Unsafe.Add(ref bundleLinearX, Vector<float>.Count);
+                Unsafe.Add(ref targetLinearX, 2 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearX, 2 * Vector<float>.Count);
+                Unsafe.Add(ref targetLinearX, 3 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearX, 3 * Vector<float>.Count);
+                Unsafe.Add(ref targetLinearX, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearX, 4 * Vector<float>.Count);
+                Unsafe.Add(ref targetLinearX, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearX, 5 * Vector<float>.Count);
 
             }
 

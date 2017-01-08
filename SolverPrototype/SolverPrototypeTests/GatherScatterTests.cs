@@ -137,11 +137,11 @@ namespace SolverPrototypeTests
             const int bundleCount = 8192;
             GC.Collect();
 
-            var refGatherTime = Time(TestRefGather, iterationCount, bundleCount, 0.7);
+            var refGatherTime = Time(TestRefGather, iterationCount, bundleCount);
             GC.Collect();
             var refGather2Time = Time(TestRefGather2, iterationCount, bundleCount);
             GC.Collect();
-            var refGather3Time = Time(TestRefGather3, iterationCount, bundleCount, 0.7);
+            var refGather3Time = Time(TestRefGather3, iterationCount, bundleCount);
             GC.Collect();
             //var refScatterTime = Time(TestRefScatter, iterationCount, bundleCount);
 
