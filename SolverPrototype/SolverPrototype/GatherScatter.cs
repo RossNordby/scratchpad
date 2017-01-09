@@ -251,37 +251,47 @@ namespace SolverPrototype
                 Unsafe.Add(ref targetLinearBX, 5 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 5 * Vector<float>.Count);
             }
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static unsafe void ScatterVelocities3(BodyVelocities[] allBodyVelocities,
-            ref Vector<int> bundleIndicesVector, ref Vector<int> innerIndicesVector, int bodyCount, ref BodyVelocities velocities)
-        {
-            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref bundleIndicesVector);
-            ref var baseInnerA = ref Unsafe.As<Vector<int>, int>(ref innerIndicesVector);
-            ref var baseSourceLinearX = ref Unsafe.As<Vector<float>, float>(ref velocities.LinearVelocity.X);
+        public static unsafe void ScatterVelocities3(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        {            
+            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
+            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
+            ref var baseSourceLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);            
+            ref var baseSourceLinearBX = ref Unsafe.As<Vector<float>, float>(ref velocitiesB.LinearVelocity.X);
 
-            for (int i = 0; i < bodyCount; ++i)
+            for (int i = 0; i < references.Count; ++i)
             {
                 //We'll use the memory layout of the EntityVelocities struct. 
                 //Grab the pointer to the row within the velocities bundle, and use a stride of Vector<float>.Count to reach the next velocity entry.
-                ref var sourceLinearX = ref Unsafe.Add(ref baseSourceLinearX, i);
-                var bundleIndex = Unsafe.Add(ref baseBundleA, i);
-                var innerIndex = Unsafe.Add(ref baseInnerA, i);
-                ref var targetLinearX = ref Get(ref allBodyVelocities[bundleIndex].LinearVelocity.X, innerIndex);
-                targetLinearX = sourceLinearX;
-                Unsafe.Add(ref targetLinearX, Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, Vector<float>.Count);
-                Unsafe.Add(ref targetLinearX, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 2 * Vector<float>.Count);
-                Unsafe.Add(ref targetLinearX, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 3 * Vector<float>.Count);
-                Unsafe.Add(ref targetLinearX, 4 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 4 * Vector<float>.Count);
-                Unsafe.Add(ref targetLinearX, 5 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 5 * Vector<float>.Count);
+                //Same for the bundles.
+                ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
+                {
+                    var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
+                    ref var sourceLinearAX = ref Unsafe.Add(ref baseSourceLinearAX, i);
+                    ref var targetLinearAX = ref Get(ref velocities[bundleIndexA].LinearVelocity.X, innerIndexA);
+                    targetLinearAX = sourceLinearAX;
+                    Unsafe.Add(ref targetLinearAX, Vector<float>.Count) = Unsafe.Add(ref sourceLinearAX, Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearAX, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearAX, 2 * Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearAX, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearAX, 3 * Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearAX, 4 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearAX, 4 * Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearAX, 5 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearAX, 5 * Vector<float>.Count);
+                }
 
+                {
+                    var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
+                    var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
+                    ref var sourceLinearBX = ref Unsafe.Add(ref baseSourceLinearBX, i);
+                    ref var targetLinearBX = ref Get(ref velocities[bundleIndexB].LinearVelocity.X, innerIndexB);
+                    targetLinearBX = sourceLinearBX;
+                    Unsafe.Add(ref targetLinearBX, Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearBX, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 2 * Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearBX, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 3 * Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearBX, 4 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 4 * Vector<float>.Count);
+                    Unsafe.Add(ref targetLinearBX, 5 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 5 * Vector<float>.Count);
+                }
             }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void ScatterVelocities3(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
-        {
-            ScatterVelocities3(velocities, ref references.BundleIndexA, ref references.InnerIndexA, references.Count, ref velocitiesA);
-            ScatterVelocities3(velocities, ref references.BundleIndexB, ref references.InnerIndexB, references.Count, ref velocitiesB);
         }
     }
 }
+
