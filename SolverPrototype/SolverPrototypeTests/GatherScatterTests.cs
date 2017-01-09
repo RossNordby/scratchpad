@@ -172,6 +172,16 @@ namespace SolverPrototypeTests
                 GatherScatter.ScatterVelocities4(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
             }
         }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void TestRefScatter5(Context context)
+        {
+            var a = new BodyVelocities();
+            var b = new BodyVelocities();
+            for (int i = 0; i < context.IterationCount; ++i)
+            {
+                GatherScatter.ScatterVelocities5(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+            }
+        }
 
 
 
@@ -188,6 +198,7 @@ namespace SolverPrototypeTests
             var refScatter2Time = Time(TestRefScatter2, iterationCount, bundleCount);
             var refScatter3Time = Time(TestRefScatter3, iterationCount, bundleCount);
             var refScatter4Time = Time(TestRefScatter4, iterationCount, bundleCount);
+            var refScatter5Time = Time(TestRefScatter5, iterationCount, bundleCount);
 
             const double scaling = 1e9;
             
@@ -198,7 +209,8 @@ namespace SolverPrototypeTests
                 $"Ref scatter time (ns): {refScatterTime * scaling},\n" +
                 $"Ref scatter 2 time (ns): {refScatter2Time * scaling},\n" +
                 $"Ref scatter 3 time (ns): {refScatter3Time * scaling},\n" +
-                $"Ref scatter 4 time (ns): {refScatter4Time * scaling}");
+                $"Ref scatter 4 time (ns): {refScatter4Time * scaling},\n" +
+                $"Ref scatter 5 time (ns): {refScatter5Time * scaling}");
 
         }
 

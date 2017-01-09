@@ -350,7 +350,7 @@ namespace SolverPrototype
             ref var baseInnerB = ref Unsafe.As<Vector<int>, int>(ref references.InnerIndexB);
             ref var baseSourceLinearBX = ref Unsafe.As<Vector<float>, float>(ref velocitiesB.LinearVelocity.X);
 
-            for (int i = 0; i < 4; ++i)
+            for (int i = 0; i < references.Count; ++i)
             {
                 ScatterLane3(i, velocities, ref baseSourceLinearAX, ref baseBundleA, ref baseInnerA, ref baseSourceLinearBX, ref baseBundleB, ref baseInnerB);
             }
@@ -390,6 +390,50 @@ namespace SolverPrototype
                 ScatterLane4(i, velocities, ref baseSourceLinearBX, ref baseBundleB, ref baseInnerB);
             }
         }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void ScatterLane5(int laneIndex, BodyVelocities[] velocities, ref float baseSourceLinearX, int bundleIndex, int innerIndex)
+        {
+            //We'll use the memory layout of the EntityVelocities struct. 
+            //Grab the pointer to the row within the velocities bundle, and use a stride of Vector<float>.Count to reach the next velocity entry.
+            ref var sourceLinearX = ref Unsafe.Add(ref baseSourceLinearX, laneIndex);
+            ref var targetLinearX = ref Get(ref velocities[bundleIndex].LinearVelocity.X, innerIndex);
+            targetLinearX = sourceLinearX;
+            Unsafe.Add(ref targetLinearX, Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, Vector<float>.Count);
+            Unsafe.Add(ref targetLinearX, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 2 * Vector<float>.Count);
+            Unsafe.Add(ref targetLinearX, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 3 * Vector<float>.Count);
+            Unsafe.Add(ref targetLinearX, 4 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 4 * Vector<float>.Count);
+            Unsafe.Add(ref targetLinearX, 5 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearX, 5 * Vector<float>.Count);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void ScatterVelocities5(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        {
+            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
+            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
+            ref var baseSourceLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);
+            ref var baseSourceLinearBX = ref Unsafe.As<Vector<float>, float>(ref velocitiesB.LinearVelocity.X);
+
+            for (int i = 0; i < references.Count; ++i)
+            {
+                //We'll use the memory layout of the EntityVelocities struct. 
+                //Grab the pointer to the row within the velocities bundle, and use a stride of Vector<float>.Count to reach the next velocity entry.
+                //Same for the bundles.
+                ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
+                {
+                    var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
+                    ScatterLane5(i, velocities, ref baseSourceLinearAX, bundleIndexA, innerIndexA);
+                }
+
+                {
+                    var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
+                    var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
+                    ScatterLane5(i, velocities, ref baseSourceLinearBX, bundleIndexB, innerIndexB);
+                }
+            }
+        }
+
     }
 }
 
