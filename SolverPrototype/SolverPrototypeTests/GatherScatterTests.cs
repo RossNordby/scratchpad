@@ -116,6 +116,16 @@ namespace SolverPrototypeTests
                 GatherScatter.GatherVelocities3(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
             }
         }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void TestRefGather4(Context context)
+        {
+            var a = new BodyVelocities();
+            var b = new BodyVelocities();
+            for (int i = 0; i < context.IterationCount; ++i)
+            {
+                GatherScatter.GatherVelocities4(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+            }
+        }
 
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -152,6 +162,16 @@ namespace SolverPrototypeTests
                 GatherScatter.ScatterVelocities3(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
             }
         }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void TestRefScatter4(Context context)
+        {
+            var a = new BodyVelocities();
+            var b = new BodyVelocities();
+            for (int i = 0; i < context.IterationCount; ++i)
+            {
+                GatherScatter.ScatterVelocities4(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+            }
+        }
 
 
 
@@ -163,14 +183,22 @@ namespace SolverPrototypeTests
             var refGatherTime = Time(TestRefGather, iterationCount, bundleCount);
             var refGather2Time = Time(TestRefGather2, iterationCount, bundleCount);
             var refGather3Time = Time(TestRefGather3, iterationCount, bundleCount);
+            var refGather4Time = Time(TestRefGather4, iterationCount, bundleCount);
             var refScatterTime = Time(TestRefScatter, iterationCount, bundleCount);
             var refScatter2Time = Time(TestRefScatter2, iterationCount, bundleCount);
             var refScatter3Time = Time(TestRefScatter3, iterationCount, bundleCount);
+            var refScatter4Time = Time(TestRefScatter4, iterationCount, bundleCount);
 
             const double scaling = 1e9;
             
-            Console.WriteLine($"Ref gather time (ns): {refGatherTime * scaling}, Ref gather 2 time (ns): {refGather2Time * scaling}, Ref gather 3 time (ns): {refGather3Time * scaling}, " +
-                $"Ref scatter time (ns): {refScatterTime * scaling}, Ref scatter 2 time (ns): {refScatter2Time * scaling}, Ref scatter 3 time (ns): {refScatter3Time * scaling}");
+            Console.WriteLine($"Ref gather time (ns): {refGatherTime * scaling},\n" +
+                $"Ref gather 2 time (ns): {refGather2Time * scaling},\n" +
+                $"Ref gather 3 time (ns): {refGather3Time * scaling},\n" + 
+                $"Ref gather 4 time (ns): {refGather4Time * scaling},\n" +
+                $"Ref scatter time (ns): {refScatterTime * scaling},\n" +
+                $"Ref scatter 2 time (ns): {refScatter2Time * scaling},\n" +
+                $"Ref scatter 3 time (ns): {refScatter3Time * scaling},\n" +
+                $"Ref scatter 4 time (ns): {refScatter4Time * scaling}");
 
         }
 
