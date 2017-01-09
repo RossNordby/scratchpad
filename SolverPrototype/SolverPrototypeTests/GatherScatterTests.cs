@@ -74,8 +74,12 @@ namespace SolverPrototypeTests
             }
         }
 
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         static double Time(Action<Context> action, int iterationCount, int bundleCount, double nullConnectionProbability = 0)
         {
+            //Note lack of optimizations; the pre-jit seems to get poofed when optimizations are enabled.
+            action(GetFreshContext(1, 1));
+            GC.Collect(3, GCCollectionMode.Forced, true, true);
             var context = GetFreshContext(iterationCount, bundleCount, nullConnectionProbability);
             var timer = Timer.Start();
             action(context);
@@ -113,6 +117,7 @@ namespace SolverPrototypeTests
             }
         }
 
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void TestRefScatter(Context context)
         {
@@ -125,30 +130,47 @@ namespace SolverPrototypeTests
         }
 
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void TestRefScatter2(Context context)
+        {
+            var a = new BodyVelocities();
+            var b = new BodyVelocities();
+            for (int i = 0; i < context.IterationCount; ++i)
+            {
+                GatherScatter.ScatterVelocities2(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+            }
+        }
+
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void TestRefScatter3(Context context)
+        {
+            var a = new BodyVelocities();
+            var b = new BodyVelocities();
+            for (int i = 0; i < context.IterationCount; ++i)
+            {
+                GatherScatter.ScatterVelocities3(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+            }
+        }
+
+
 
         public static void Test()
         {
-            TestRefGather(GetFreshContext(1, 1));
-            TestRefGather2(GetFreshContext(1, 1));
-            TestRefGather3(GetFreshContext(1, 1));
-            TestRefScatter(GetFreshContext(1, 1));
-
             const int iterationCount = 10000000;
             const int bundleCount = 8192;
-            GC.Collect();
 
             var refGatherTime = Time(TestRefGather, iterationCount, bundleCount);
-            GC.Collect();
             var refGather2Time = Time(TestRefGather2, iterationCount, bundleCount);
-            GC.Collect();
             var refGather3Time = Time(TestRefGather3, iterationCount, bundleCount);
-            GC.Collect();
-            //var refScatterTime = Time(TestRefScatter, iterationCount, bundleCount);
+            var refScatterTime = Time(TestRefScatter, iterationCount, bundleCount);
+            var refScatter2Time = Time(TestRefScatter2, iterationCount, bundleCount);
+            var refScatter3Time = Time(TestRefScatter3, iterationCount, bundleCount);
 
             const double scaling = 1e9;
-
-            //Console.WriteLine($"Ref gather time (ns): {refGatherTime * scaling}, Ref gather 2 time (ns): {refGather2Time * scaling}, ref scatter time (ns): {refScatterTime * scaling}");
-            Console.WriteLine($"Ref gather time (ns): {refGatherTime * scaling}, Ref gather 2 time (ns): {refGather2Time * scaling}, Ref gather 3 time (ns): {refGather3Time * scaling}");
+            
+            Console.WriteLine($"Ref gather time (ns): {refGatherTime * scaling}, Ref gather 2 time (ns): {refGather2Time * scaling}, Ref gather 3 time (ns): {refGather3Time * scaling}, " +
+                $"Ref scatter time (ns): {refScatterTime * scaling}, Ref scatter 2 time (ns): {refScatter2Time * scaling}, Ref scatter 3 time (ns): {refScatter3Time * scaling}");
 
         }
 

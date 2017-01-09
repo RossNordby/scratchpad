@@ -68,9 +68,8 @@ namespace SolverPrototype
         //Unfortunately, there does not exist any Vector<int>.Shift instruction yet, so we cannot efficiently derive the bundle and inner indices from the 'true' indices on the fly.
         //Instead, group references are preconstructed and cached in a nonvectorized way.
         public Vector<int> BundleIndexA;
-        public Vector<int> BundleIndexB;
-        //Inner indices contain 
         public Vector<int> InnerIndexA;
+        public Vector<int> BundleIndexB;
         public Vector<int> InnerIndexB;
         //TODO: there may be an argument to make this a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
         public int Count;
