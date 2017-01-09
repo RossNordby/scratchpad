@@ -1,12 +1,8 @@
 ﻿using SolverPrototype;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototypeTests
 {
@@ -17,43 +13,43 @@ namespace SolverPrototypeTests
         {
             public BodyVelocities[] BodyVelocities;
             public BodyReferences[] BodyReferences;
-            public int IterationCount;
+            public int ConstraintCount;
         }
-        static Context GetFreshContext(int iterationCount, int bundleCount, double nullConnectionProbability = 0)
+        struct ConstraintBodies
+        {
+            public int A, B;
+        }
+        static Context GetFreshContext(int constraintCount, int bodyBundleCount, Comparison<ConstraintBodies> sortComparison = null)
         {
             Context context;
-            context.IterationCount = iterationCount;
-            context.BodyVelocities = new BodyVelocities[bundleCount];
-            context.BodyReferences = new BodyReferences[iterationCount];
+            context.ConstraintCount = constraintCount;
+            context.BodyVelocities = new BodyVelocities[bodyBundleCount];
+            var connections = new ConstraintBodies[constraintCount * Vector<int>.Count];
             var random = new Random(5);
-            int maximumBodyIndex = bundleCount * Vector<float>.Count;
+            int maximumBodyIndex = bodyBundleCount * Vector<float>.Count;
 
-            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+            for (int i = 0; i < connections.Length; ++i)
             {
+                connections[i] = new ConstraintBodies { A = random.Next(maximumBodyIndex), B = random.Next(maximumBodyIndex) };
+            }
+            if (sortComparison != null)
+            {
+                //Sorting the connections should increase the probability that at least one of the two bodies associated with a constraint will be in the cache already from earlier prefetches.
+                Array.Sort(connections, sortComparison);
+            }
+            context.BodyReferences = new BodyReferences[constraintCount];
+            for (int iterationIndex = 0; iterationIndex < constraintCount; ++iterationIndex)
+            {
+                var baseSourceIndex = iterationIndex << Solver.VectorShift;
                 for (int i = 0; i < Vector<int>.Count; ++i)
                 {
-                    if (random.NextDouble() >= nullConnectionProbability)
-                    {
-                        var index = random.Next(maximumBodyIndex);
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = index >> Solver.VectorShift;
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = index & Solver.VectorMask;
-                    }
-                    else
-                    {
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = 0;
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = Vector<float>.Count << 1;
-                    }
-                    if (random.NextDouble() >= nullConnectionProbability)
-                    {
-                        var index = random.Next(maximumBodyIndex);
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = index >> Solver.VectorShift;
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = index & Solver.VectorMask;
-                    }
-                    else
-                    {
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = 0;
-                        GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = Vector<float>.Count << 1;
-                    }
+                    var c = connections[baseSourceIndex + i];
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = c.A >> Solver.VectorShift;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = c.A & Solver.VectorMask;
+                    
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = c.B >> Solver.VectorShift;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = c.B & Solver.VectorMask;
+
                 }
                 context.BodyReferences[iterationIndex].Count = Vector<int>.Count;
             }
@@ -75,15 +71,18 @@ namespace SolverPrototypeTests
         }
 
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        static double Time(Action<Context> action, int iterationCount, int bundleCount, double nullConnectionProbability = 0)
+        static double Time(Action<Context> action, int iterationCount, int constraintCount, int bodyBundleCount, Comparison<ConstraintBodies> constraintSort = null)
         {
             //Note lack of optimizations; the pre-jit seems to get poofed when optimizations are enabled.
             action(GetFreshContext(1, 1));
             GC.Collect(3, GCCollectionMode.Forced, true, true);
-            var context = GetFreshContext(iterationCount, bundleCount, nullConnectionProbability);
+            var context = GetFreshContext(constraintCount, bodyBundleCount, constraintSort);
             var timer = Timer.Start();
-            action(context);
-            return timer.Stop() / iterationCount;
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                action(context);
+            }
+            return timer.Stop() / (constraintCount * iterationCount);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -91,22 +90,11 @@ namespace SolverPrototypeTests
         {
             var a = new BodyVelocities();
             var b = new BodyVelocities();
-            for (int i = 0; i < context.IterationCount; ++i)
+            for (int i = 0; i < context.ConstraintCount; ++i)
             {
                 GatherScatter.GatherVelocities(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
             }
         }
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        static void TestGather2(Context context)
-        {
-            var a = new BodyVelocities();
-            var b = new BodyVelocities();
-            for (int i = 0; i < context.IterationCount; ++i)
-            {
-                GatherScatter.GatherVelocities2(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
-            }
-        }
-
 
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -114,7 +102,7 @@ namespace SolverPrototypeTests
         {
             var a = new BodyVelocities();
             var b = new BodyVelocities();
-            for (int i = 0; i < context.IterationCount; ++i)
+            for (int i = 0; i < context.ConstraintCount; ++i)
             {
                 GatherScatter.ScatterVelocities(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
             }
@@ -125,19 +113,32 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            const int iterationCount = 10000000;
-            const int bundleCount = 8192;
+            const int iterationCount = 1000;
+            const int constraintCount = 4096 << 3;
+            const int bodyBundleCount = 1024 << 2; 
+            Comparison<ConstraintBodies> smallestBiggestSort = (x, y) =>
+            {
+                ulong Encode(ConstraintBodies bodies)
+                {
+                    if (bodies.A < bodies.B)
+                        return (ulong)(bodies.A << 32) | (ulong)bodies.B;
+                    return (ulong)(bodies.B << 32) | (ulong)bodies.A;
+                }
+                return Encode(x).CompareTo(Encode(y));
+            };
 
-            var gatherTime = Time(TestGather, iterationCount, bundleCount);
-            var gather2Time = Time(TestGather2, iterationCount, bundleCount);
-            var scatterTime = Time(TestScatter, iterationCount, bundleCount);
+            var gatherTime = Time(TestGather, iterationCount, constraintCount, bodyBundleCount);
+            var sortedGatherTime = Time(TestGather, iterationCount, constraintCount, bodyBundleCount, smallestBiggestSort);
+            var scatterTime = Time(TestScatter, iterationCount, constraintCount, bodyBundleCount);
+            var sortedScatterTime = Time(TestScatter, iterationCount, constraintCount, bodyBundleCount, smallestBiggestSort);
 
             const double scaling = 1e9;
 
             Console.WriteLine(
                 $"gather time (ns): {gatherTime * scaling},\n" +
-                $"gather2 time (ns): {gather2Time * scaling},\n" +
-                $"scatter time (ns): {scatterTime * scaling}");
+                $"sorted gather time (ns): {sortedGatherTime * scaling},\n" +
+                $"scatter time (ns): {scatterTime * scaling},\n" +
+                $"sorted scatter time (ns): {sortedScatterTime * scaling}");
 
         }
 

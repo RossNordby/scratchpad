@@ -24,15 +24,32 @@ namespace SolverPrototype
             //for GC related problems and the user doesn't need to pin memory.
         }
 
+        //IMPLEMENTATION NOTES:
+
+        //'NULL' CONSTRAINT CONNECTIONS
+        //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
+        //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
+        //The benefit of not having to read/write data is extremely weak, and often introducing null connections actually slows things down further
+        //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
+        //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
+        //During scatters, there is a risk of false sharing on the reserved slot when running with multiple threads. 
+        //However, we should take measures to avoid false sharing for all constraints. More measurement should be done to check the impact later.
+
+        //UNSAFE CASTS FOR VECTOR MEMORY ACCESS
+        //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
+        //we do a gross hack where we manually stuff the memory backing of a bunch of vectors.
+        //This logic is coupled with the layout of the EntityVelocities and BodyReferences structs and makes assumptions about the memory layout of the types.
+        //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
+        //With any luck, it will be later enough that a proper solution exists.
+
+        //MULTIBODY CONSTRAINTS AND MANUAL INLINING
+        //Unfortunately, as of this writing, there still seems to be a very small value in manually inlining all involved bodies.
+        //This is going to get pretty annoying if there are a variety of different constraint body counts. For runtime-defined N-body constraints,
+        //we will likely end up just having a per-body gather, and that will be fine. I'm not gonna make 128 variants of this function!
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
         {
-            //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
-            //we do a gross hack where we manually stuff the memory backing of a bunch of vectors.
-            //This logic is coupled with the layout of the EntityVelocities struct and makes assumptions about the memory layout of the type.
-            //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
-            //With any luck, it will be later enough that a proper solution exists.
             ref var baseLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);
             ref var baseLinearBX = ref Unsafe.As<Vector<float>, float>(ref velocitiesB.LinearVelocity.X);
 
@@ -41,11 +58,6 @@ namespace SolverPrototype
 
             for (int i = 0; i < references.Count; ++i)
             {
-                //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
-                //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
-                //The benefit of not having to load data is extremely weak, and often introducing null connections actually slows things down further
-                //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
-                //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
                 ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
                 {
                     var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
@@ -75,58 +87,6 @@ namespace SolverPrototype
                 }
             }
         }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GatherVelocities2(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
-        {
-            //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
-            //we do a gross hack where we manually stuff the memory backing of a bunch of vectors.
-            //This logic is coupled with the layout of the EntityVelocities struct and makes assumptions about the memory layout of the type.
-            //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
-            //With any luck, it will be later enough that a proper solution exists.
-            ref var baseLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);
-            ref var baseLinearBX = ref Unsafe.As<Vector<float>, float>(ref velocitiesB.LinearVelocity.X);
-
-            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
-            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
-
-            for (int i = 0; i < references.Count; ++i)
-            {
-                //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
-                //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
-                //The benefit of not having to load data is extremely weak, and often introducing null connections actually slows things down further
-                //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
-                //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
-                ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
-                var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
-                var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
-                var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
-
-                ref var bundleLinearAX = ref Get(ref velocities[bundleIndexA].LinearVelocity.X, innerIndexA);
-                ref var linearAX = ref Unsafe.Add(ref baseLinearAX, i);
-                ref var bundleLinearBX = ref Get(ref velocities[bundleIndexB].LinearVelocity.X, innerIndexB);
-                ref var linearBX = ref Unsafe.Add(ref baseLinearBX, i);
-
-                linearAX = bundleLinearAX;
-                linearBX = bundleLinearBX;
-
-                Unsafe.Add(ref linearAX, Vector<float>.Count) = Unsafe.Add(ref bundleLinearAX, Vector<float>.Count);
-                Unsafe.Add(ref linearBX, Vector<float>.Count) = Unsafe.Add(ref bundleLinearBX, Vector<float>.Count);
-                Unsafe.Add(ref linearAX, 2 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearAX, 2 * Vector<float>.Count);
-                Unsafe.Add(ref linearBX, 2 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearBX, 2 * Vector<float>.Count);
-                Unsafe.Add(ref linearAX, 3 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearAX, 3 * Vector<float>.Count);
-                Unsafe.Add(ref linearBX, 3 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearBX, 3 * Vector<float>.Count);
-                Unsafe.Add(ref linearAX, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearAX, 4 * Vector<float>.Count);
-                Unsafe.Add(ref linearBX, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearBX, 4 * Vector<float>.Count);
-                Unsafe.Add(ref linearAX, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearAX, 5 * Vector<float>.Count);
-                Unsafe.Add(ref linearBX, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleLinearBX, 5 * Vector<float>.Count);
-
-
-
-            }
-        }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
@@ -164,6 +124,9 @@ namespace SolverPrototype
                 Unsafe.Add(ref targetLinearBX, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 3 * Vector<float>.Count);
                 Unsafe.Add(ref targetLinearBX, 4 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 4 * Vector<float>.Count);
                 Unsafe.Add(ref targetLinearBX, 5 * Vector<float>.Count) = Unsafe.Add(ref sourceLinearBX, 5 * Vector<float>.Count);
+
+                //Note that no attempt is made to avoid writing to kinematic or null velocities. Branching to avoid the write takes longer than just writing it.
+                //No constraint should actually result in a change to the velocity of a kinematic or null body since they have infinite inertia.
             }
         }
 
