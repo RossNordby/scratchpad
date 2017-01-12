@@ -5,49 +5,6 @@ using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
-
-    public struct Matrix3x3Wide
-    {
-        public Vector<float> M11;
-        public Vector<float> M12;
-        public Vector<float> M13;
-        public Vector<float> M21;
-        public Vector<float> M22;
-        public Vector<float> M23;
-        public Vector<float> M31;
-        public Vector<float> M32;
-        public Vector<float> M33;
-    }
-    public struct Vector3Wide
-    {
-        public Vector<float> X;
-        public Vector<float> Y;
-        public Vector<float> Z;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Add(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
-        {
-            result.X = a.X + b.X;
-            result.Y = a.Y + b.Y;
-            result.Z = a.Z + b.Z;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Dot(ref Vector3Wide a, ref Vector3Wide b, out Vector<float> result)
-        {
-            result = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void Multiply(ref Vector<float> scalar, ref Vector3Wide vector, out Vector3Wide result)
-        {
-            result.X = scalar * vector.X;
-            result.Y = scalar * vector.Y;
-            result.Z = scalar * vector.Z;
-        }
-    }
-
-
     /// <summary>
     /// Body data is stored in AOSOA for the integration step.
     /// From the solver's perspective, some form of gather is required for velocities regardless of the layout, so it might as well be optimal for some other stage.
@@ -81,21 +38,23 @@ namespace SolverPrototype
     {
         public struct IterationData
         {
-            //The iteration needs to project from world space to constraint space initially.
-            public Vector3Wide LinearJacobianA;
-            public Vector3Wide LinearJacobianB;
-            public Vector3Wide AngularJacobianA;
-            public Vector3Wide AngularJacobianB;
+            //Rather than projecting from world space to constraint space *velocity* using JT, we precompute JT * effective mass
+            //and go directly from world space velocity to constraint space impulse.
+            public Vector3Wide WSVtoCSILinearA;
+            public Vector3Wide WSVtoCSIAngularA;
+            public Vector3Wide WSVtoCSILinearB;
+            public Vector3Wide WSVtoCSIAngularB;
 
-            public Vector<float> EffectiveMass;
-            public Vector<float> VelocityBias;
-            public Vector<float> Softness;
+            //Since we jump directly from world space velocity to constraint space impulse, the velocity bias needs to be precomputed into an impulse offset too.
+            public Vector<float> BiasImpulse;
+            //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
+            public Vector<float> SoftnessImpulseScale;
 
             //It also needs to project from constraint space to world space.
             //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,
             //we just go directly from constraint impulse to world velocity change.
             //For constraints with lower DOF counts, using this format also saves us some memory bandwidth- 
-            //the inverse inertia tensor and inverse mass for a 2 body constraint cost 20 floats, compared to this implemenation's 12.
+            //the inverse inertia tensor and inverse mass for a 2 body constraint cost 20 floats, compared to this implementation's 12.
             //(Note that even in an implementation where we use the body inertias, we should still cache it constraint-locally to avoid big gathers.)
             public Vector3Wide CSIToWSVLinearA;
             public Vector3Wide CSIToWSVAngularA;
@@ -103,11 +62,71 @@ namespace SolverPrototype
             public Vector3Wide CSIToWSVAngularB;
         }
 
+        public struct TwoBody1DOFJacobians
+        {
+            public Vector3Wide LinearA;
+            public Vector3Wide AngularA;
+            public Vector3Wide LinearB;
+            public Vector3Wide AngularB;
+        }
+
+        public struct SpringSettings
+        {
+            public Vector<float> NaturalFrequency;
+            public Vector<float> DampingRatio;
+        }
+
+        public struct ContactConstraintData
+        {
+            public Vector3Wide OffsetA;
+            public Vector3Wide OffsetB;
+            public Vector3Wide Normal;
+            public Vector<float> PenetrationDepth;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyReferences references, ref IterationData data, float inverseDt)
+        public static void ComputeJacobiansAndError(ref ContactConstraintData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)
         {
-            //Use the jacobians present in the iteration data to update the effective mass.
+            //Technically we could take advantage of the redundant form on the linear jacobians, but it's made complex by the pretransformations.
+            //For now, just leave it fully generic and unspecialized.
+
+            //The contact penetration constraint takes the form:
+            //dot(positionA + offsetA, N) <= dot(positionB + offsetB, N)
+            //Or:
+            //dot(positionA + offsetA, N) - dot(positionB + offsetB, N) <= 0
+            //dot(positionA + offsetA - positionB - offsetB, N) <= 0
+            //In practice, we'll use the collision detection system's penetration depth instead of trying to recompute the error here.
+
+            //So, treating the normal as constant, the velocity constraint is:
+            //dot(d/dt(positionA + offsetA - positionB - offsetB), N) <= 0
+            //dot(linearVelocityA + d/dt(offsetA) - linearVelocityB - d/dt(offsetB)), N) <= 0
+            //The velocity of the offsets are defined by the angular velocity.
+            //dot(linearVelocityA + angularVelocityA x offsetA - linearVelocityB - angularVelocityB x offsetB), N) <= 0
+            //dot(linearVelocityA, N) + dot(angularVelocityA x offsetA, N) - dot(linearVelocityB, N) - dot(angularVelocityB x offsetB), N) <= 0
+            //Use the properties of the scalar triple product:
+            //dot(linearVelocityA, N) + dot(offsetA x N, angularVelocityA) - dot(linearVelocityB, N) - dot(offsetB x N, angularVelocityB) <= 0
+            //Bake in the negations:
+            //dot(linearVelocityA, N) + dot(offsetA x N, angularVelocityA) + dot(linearVelocityB, -N) + dot(-offsetB x N, angularVelocityB) <= 0
+            //A x B = -B x A:
+            //dot(linearVelocityA, N) + dot(offsetA x N, angularVelocityA) + dot(linearVelocityB, -N) + dot(N x offsetB, angularVelocityB) <= 0
+            //And there you go, the jacobians!
+            //linearA: N
+            //angularA: offsetA x N
+            //linearB: -N
+            //angularB: N x offsetB
+            jacobians.LinearA = contact.Normal;
+            Vector3Wide.Negate(ref contact.Normal, out jacobians.LinearB);
+            Vector3Wide.CrossWithoutOverlap(ref contact.OffsetA, ref contact.Normal, out jacobians.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref contact.Normal, ref contact.OffsetB, out jacobians.AngularB);
+
+            //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
+            error = contact.PenetrationDepth;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Prestep(ref BodyReferences references, ref IterationData data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
+            ref Vector<float> positionError, ref Vector<float> maximumRecoveryVelocity, float dt, float inverseDt)
+        {
             //effective mass = (J * M^-1 * JT)^-1
             //where J is a constraintDOF x bodyCount*3 sized matrix, JT is its transpose, and for two bodies M^-1 is:
             //[inverseMassA,    0, 0, 0]
@@ -127,24 +146,24 @@ namespace SolverPrototype
 
             //(If you want to know how this stuff works, go read the constraint related presentations: http://box2d.org/downloads/
             //Be mindful of the difference in conventions. You'll see J * v instead of v * JT, for example. Everything is still fundamentally the same, though.)
-
-
             GatherScatter.GatherInertia(ref references, out var inverseMassA, out var inverseInertiaA, out var inverseMassB, out var inverseInertiaB);
 
             //Due to the block structure of the mass matrix, we can handle each component separately and then sum the results.
             //For this 1DOF constraint, the result is a simple scalar.
-            //For the linear components, M^-1 is a scalar that can be pulled out and handled afterward without the need for an actual matrix multiplication.
-            Vector3Wide.Dot(ref data.LinearJacobianA, ref data.LinearJacobianA, out var linearA);
-            Vector3Wide.Dot(ref data.LinearJacobianB, ref data.LinearJacobianB, out var linearB);
-            linearA *= inverseMassA;
-            linearB *= inverseMassB;
+            //Note that we store the intermediate results of J * M^-1 for use when projecting from constraint space impulses to world velocity changes. 
+            //If we didn't store those intermediate values, we could just scale the dot product of jacobians.LinearA with itself to save 4 multiplies.
+            Vector3Wide.Multiply(ref jacobians.LinearA, ref inverseMassA, out data.CSIToWSVLinearA);
+            Vector3Wide.Multiply(ref jacobians.LinearB, ref inverseMassB, out data.CSIToWSVLinearB);
+            Vector3Wide.Dot(ref data.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
+            Vector3Wide.Dot(ref data.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
             //The angular components are a little more involved; (J * I^-1) * JT is explicitly computed.
-            Matrix3x3Wide.Transform(ref data.AngularJacobianA, ref inverseInertiaA, out var intermediateAngularA);
-            Matrix3x3Wide.Transform(ref data.AngularJacobianB, ref inverseInertiaB, out var intermediateAngularB);
-            Vector3Wide.Dot(ref intermediateAngularA, ref data.AngularJacobianA, out var angularA);
-            Vector3Wide.Dot(ref intermediateAngularB, ref data.AngularJacobianB, out var angularB);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inverseInertiaA, out data.CSIToWSVAngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inverseInertiaB, out data.CSIToWSVAngularB);
+            Vector3Wide.Dot(ref data.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
+            Vector3Wide.Dot(ref data.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
 
+            //Now for a digression!
             //Softness is applied along the diagonal (which, for a 1DOF constraint, is just the only element).
             //Check the the ODE reference for a bit more information: http://ode.org/ode-latest-userguide.html#sec_3_8_0
             //And also see Erin Catto's Soft Constraints presentation for more details: http://box2d.org/files/GDC2011/GDC2011_Catto_Erin_Soft_Constraints.pdf)
@@ -208,20 +227,22 @@ namespace SolverPrototype
             //We take the velocity error:
             //velocityError = bias + accumulatedImpulse * CFM - wsv * JT 
             //and convert it to a corrective impulse with the effective mass:
-            //impulse = (bias + accumulatedImpulse * CFM - wsv * JT) * effectiveMass
+            //impulse = (bias + accumulatedImpulse * CFM - wsv * JT) * softenedEffectiveMass
             //The effective mass distributes over the set:
-            //impulse = bias * effectiveMass + accumulatedImpulse * CFM * effectiveMass - wsv * JT * effectiveMass
+            //impulse = bias * softenedEffectiveMass + accumulatedImpulse * CFM * softenedEffectiveMass - wsv * JT * softenedEffectiveMass
             //Focus on the CFM term:
-            //accumulatedImpulse * CFM * effectiveMass
-            //What is CFM * effectiveMass? Substitute.
-            //(stiffness * dt + damping)^-1 * effectiveMass
-            //((effectiveMass * naturalFrequency^2) * dt + (effectiveMass * 2 * dampingRatio * naturalFrequency))^-1 * effectiveMass
+            //accumulatedImpulse * CFM * softenedEffectiveMass
+            //What is CFM * softenedEffectiveMass? Substitute.
+            //(stiffness * dt + damping)^-1 * softenedEffectiveMass
+            //((effectiveMass * naturalFrequency^2) * dt + (effectiveMass * 2 * dampingRatio * naturalFrequency))^-1 * softenedEffectiveMass
             //Combine terms: 
-            //(effectiveMass * (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency))^-1 * effectiveMass
+            //(effectiveMass * (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency))^-1 * softenedEffectiveMass
             //Apply inverse:
-            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * effectiveMass^-1 * effectiveMass
+            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * effectiveMass^-1 * softenedEffectiveMass
+            //Expand softened effective mass from earlier:
+            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * effectiveMass^-1 * effectiveMass * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
             //Cancel effective masses: (!)
-            //CFM * effectiveMass = (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1
+            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
             //Because CFM was created from effectiveMass, the CFM * effectiveMass term is actually independent of the effectiveMass!
             //The remaining expression is still a matrix, but fortunately it is a simple uniform scaling matrix that we can store and apply as a single scalar.
 
@@ -305,28 +326,33 @@ namespace SolverPrototype
 
             //(Also, note that large DOF jacobians are often very sparse. Consider the jacobians used by a 6DOF weld joint. You could likely do special case optimizations to reduce the
             //load further. It is unlikely that you could find a way to do the same to JT * effectiveMass. J * M^-1 might have some savings, though. But J*M^-1 isn't *sparser*
-            //than J by itself, so the space savings are limited. If you precompute, the above load requirement offset will persist.)
+            //than J by itself, so the space savings are limited. As long as you precompute, the above load requirement offset will persist.)
 
             //Good news, though! There are a lot of 1DOF and 2DOF constraints where this is an unambiguous win.
 
-            var inverseEffectiveMass = linearA + linearB + angularA + angularB;
-            data.Softness = CollisionResponseSettings.Softness * inverseEffectiveMass * inverseDt;
-            data.EffectiveMass = Vector<float>.One / (linearA + linearB + angularA + angularB + data.Softness);
+            //We'll start with the unsoftened effective mass, constructed from the contributions computed above:
+            var effectiveMass = Vector<float>.One / (linearA + linearB + angularA + angularB);
+            var frequencyDt = springSettings.NaturalFrequency * dt;
+            var twiceDampingRatio = springSettings.DampingRatio * 2; //Could precompute.
+            var extra = Vector<float>.One / (springSettings.NaturalFrequency * (frequencyDt + twiceDampingRatio));
+            var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
+            var softenedEffectiveMass = effectiveMass * effectiveMassCFMScale;
 
+            //CFM * softenedEffectiveMass:
+            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
+            data.SoftnessImpulseScale = extra * effectiveMassCFMScale;
+
+            //ERP = (naturalFrequency * dt) * (naturalFrequency * dt + 2 * dampingRatio)^-1
+            var erp = frequencyDt / (frequencyDt + twiceDampingRatio);
 
             //Note that we use a bit of a hack when computing the bias velocity- even if our damping ratio/natural frequency implies a strongly springy response
             //that could cause a significant velocity overshoot, we apply an arbitrary clamping value to keep it reasonable.
             //This is useful for a variety of inequality constraints (like contacts) because you don't always want them behaving as true springs.
+            var biasVelocity = Vector.Min(positionError * erp, maximumRecoveryVelocity);
+            data.BiasImpulse = biasVelocity * softenedEffectiveMass;
+
 
         }
-
-        static void ComputeErrorReductionAndSoftness(ref Vector<float> unsoftenedEffectiveMass, ref Vector<float> dampingRatio, ref Vector<float> naturalFrequency,
-            out Vector<float> errorReduction, out Vector<float> softness)
-        {
-            //This implementation only works for 1DOF. MultiDOF constraints require additional 
-            var damping = 2 * effectiveMassInverse
-        }
-
         //Naming conventions:
         //We transform between two spaces, world and constraint space. We also deal with two quantities- velocities, and impulses. 
         //And we have some number of entities involved in the constraint. So:
@@ -350,10 +376,10 @@ namespace SolverPrototype
             //That world space impulse is then converted to a corrective velocity change by scaling the impulse by the inverse mass/inertia.
             //As an optimization for constraints with smaller jacobians, the jacobian * (inertia or mass) transform is precomputed.
             BodyVelocities correctiveVelocityA, correctiveVelocityB;
-            Vector3Wide.Multiply(ref correctiveImpulse, ref data.CSIToWSVLinearA, out correctiveVelocityA.LinearVelocity);
-            Vector3Wide.Multiply(ref correctiveImpulse, ref data.CSIToWSVAngularA, out correctiveVelocityA.AngularVelocity);
-            Vector3Wide.Multiply(ref correctiveImpulse, ref data.CSIToWSVLinearB, out correctiveVelocityB.LinearVelocity);
-            Vector3Wide.Multiply(ref correctiveImpulse, ref data.CSIToWSVAngularB, out correctiveVelocityB.AngularVelocity);
+            Vector3Wide.Multiply(ref data.CSIToWSVLinearA, ref correctiveImpulse, out correctiveVelocityA.LinearVelocity);
+            Vector3Wide.Multiply(ref data.CSIToWSVAngularA, ref correctiveImpulse, out correctiveVelocityA.AngularVelocity);
+            Vector3Wide.Multiply(ref data.CSIToWSVLinearB, ref correctiveImpulse, out correctiveVelocityB.LinearVelocity);
+            Vector3Wide.Multiply(ref data.CSIToWSVAngularB, ref correctiveImpulse, out correctiveVelocityB.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityA.LinearVelocity, ref wsvA.LinearVelocity, out wsvA.LinearVelocity);
             Vector3Wide.Add(ref correctiveVelocityA.AngularVelocity, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityB.LinearVelocity, ref wsvB.LinearVelocity, out wsvB.LinearVelocity);
@@ -379,19 +405,17 @@ namespace SolverPrototype
             //Take the world space velocity of each body into constraint space by transforming by the transpose(jacobian).
             //(The jacobian is a row vector by convention, while we treat our velocity vectors as a 12x1 row vector for the purposes of constraint space velocity calculation.
             //So we are multiplying v * JT.)
-            Vector3Wide.Dot(ref wsvA.LinearVelocity, ref data.LinearJacobianA, out var csvaLinear);
-            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.AngularJacobianA, out var csvaAngular);
-            Vector3Wide.Dot(ref wsvB.LinearVelocity, ref data.LinearJacobianB, out var csvbLinear);
-            Vector3Wide.Dot(ref wsvB.AngularVelocity, ref data.AngularJacobianB, out var csvbAngular);
-            //Note that we did not premultiply the jacobians with the effective mass because of softness. While all the other components could have been pretransformed,
-            //pretransforming softness would have just resulted in a effectivemass-sized matrix multiply, i.e. CreateScale(data.Softness) * EffectiveMass.
-            //No computational savings, and worse cache behavior due to a second effectivemass-sized matrix.
-            //Note that we 
-            var csvError = (csvaLinear + csvaAngular) + (csvbLinear + csvbAngular) + (data.Softness * accumulatedImpulse + data.VelocityBias);
-
-            //Convert constraint space velocity to impulses.
-            //For 1DOF constraints, the effective mass is just a scalar.
-            var csi = csvError * data.EffectiveMass;
+            //Then, transform it into an impulse by applying the effective mass.
+            //Here, we combine the projection and impulse conversion into a precomputed value, i.e. v * (JT * softenedEffectiveMass).
+            Vector3Wide.Dot(ref wsvA.LinearVelocity, ref data.WSVtoCSILinearA, out var csiaLinear);
+            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.WSVtoCSIAngularB, out var csiaAngular);
+            Vector3Wide.Dot(ref wsvB.LinearVelocity, ref data.WSVtoCSILinearA, out var csibLinear);
+            Vector3Wide.Dot(ref wsvB.AngularVelocity, ref data.WSVtoCSIAngularB, out var csibAngular);
+            //Combine it all together, following:
+            //constraint space impulse = (targetVelocity - currentVelocity) * softenedEffectiveMass
+            //constraint space impulse = (bias + accumulatedImpulse * softness - wsv * JT) * softenedEffectiveMass
+            //constraint space impulse = (bias * softenedEffectiveMass) + accumulatedImpulse * (softness * softenedEffectiveMass) - wsv * (JT * softenedEffectiveMass)
+            var csi = data.BiasImpulse + accumulatedImpulse * data.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
 
             var previousAccumulated = accumulatedImpulse;
             accumulatedImpulse = Vector.Max(Vector<float>.Zero, accumulatedImpulse + csi);
