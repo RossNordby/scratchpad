@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
@@ -130,7 +131,16 @@ namespace SolverPrototype
             }
         }
 
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GatherInertia(ref BodyReferences references,
+            out Vector<float> inverseMassA, out Matrix3x3Wide inverseInertiaA, 
+            out Vector<float> inverseMassB, out Matrix3x3Wide inverseInertiaB)
+        {
+            //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.
+            //Branches are not particularly cheap, especially when they mispredict. Better to just gather it regardless.
+            //TODO: Confirm that. Inertias are larger than velocities...
+            throw new NotImplementedException();
+        }
     }
 }
 
