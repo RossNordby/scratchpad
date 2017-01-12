@@ -88,11 +88,9 @@ namespace SolverPrototypeTests
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void TestGather(Context context)
         {
-            var a = new BodyVelocities();
-            var b = new BodyVelocities();
             for (int i = 0; i < context.ConstraintCount; ++i)
             {
-                GatherScatter.GatherVelocities(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+                GatherScatter.GatherVelocities(context.BodyVelocities, ref context.BodyReferences[i], out var a, out var b);
             }
         }
 

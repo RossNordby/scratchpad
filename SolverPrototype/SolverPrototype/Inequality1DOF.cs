@@ -31,6 +31,12 @@ namespace SolverPrototype
         //TODO: there may be an argument to make this a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
         public int Count;
     }
+    public struct BodyInertias
+    {
+        public Matrix3x3Wide InverseInertiaTensor;
+        public Vector<float> InverseMass;
+    }
+
 
 
 
@@ -83,7 +89,6 @@ namespace SolverPrototype
             public Vector3Wide Normal;
             public Vector<float> PenetrationDepth;
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ComputeJacobiansAndError(ref ContactConstraintData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)
         {
@@ -122,9 +127,8 @@ namespace SolverPrototype
             //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
             error = contact.PenetrationDepth;
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyReferences references, ref IterationData data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
+        public static void Prestep(BodyInertias[] bodyInertias, ref BodyReferences references, ref IterationData data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
             ref Vector<float> positionError, ref Vector<float> maximumRecoveryVelocity, float dt, float inverseDt)
         {
             //effective mass = (J * M^-1 * JT)^-1
@@ -146,20 +150,20 @@ namespace SolverPrototype
 
             //(If you want to know how this stuff works, go read the constraint related presentations: http://box2d.org/downloads/
             //Be mindful of the difference in conventions. You'll see J * v instead of v * JT, for example. Everything is still fundamentally the same, though.)
-            GatherScatter.GatherInertia(ref references, out var inverseMassA, out var inverseInertiaA, out var inverseMassB, out var inverseInertiaB);
+            GatherScatter.GatherInertia(bodyInertias, ref references, out var inertiaA, out var inertiaB);
 
             //Due to the block structure of the mass matrix, we can handle each component separately and then sum the results.
             //For this 1DOF constraint, the result is a simple scalar.
             //Note that we store the intermediate results of J * M^-1 for use when projecting from constraint space impulses to world velocity changes. 
             //If we didn't store those intermediate values, we could just scale the dot product of jacobians.LinearA with itself to save 4 multiplies.
-            Vector3Wide.Multiply(ref jacobians.LinearA, ref inverseMassA, out data.CSIToWSVLinearA);
-            Vector3Wide.Multiply(ref jacobians.LinearB, ref inverseMassB, out data.CSIToWSVLinearB);
+            Vector3Wide.Multiply(ref jacobians.LinearA, ref inertiaA.InverseMass, out data.CSIToWSVLinearA);
+            Vector3Wide.Multiply(ref jacobians.LinearB, ref inertiaB.InverseMass, out data.CSIToWSVLinearB);
             Vector3Wide.Dot(ref data.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
             Vector3Wide.Dot(ref data.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
             //The angular components are a little more involved; (J * I^-1) * JT is explicitly computed.
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inverseInertiaA, out data.CSIToWSVAngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inverseInertiaB, out data.CSIToWSVAngularB);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSVAngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSVAngularB);
             Vector3Wide.Dot(ref data.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
             Vector3Wide.Dot(ref data.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
 
@@ -390,9 +394,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WarmStart(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData data, ref Vector<float> accumulatedImpulse)
         {
-            var wsvA = new BodyVelocities();
-            var wsvB = new BodyVelocities();
-            GatherScatter.GatherVelocities(velocities, ref references, ref wsvA, ref wsvB);
+            GatherScatter.GatherVelocities(velocities, ref references, out var wsvA, out var wsvB);
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
             ApplyImpulse(velocities, ref references, ref data, ref wsvA, ref wsvB, ref accumulatedImpulse);
@@ -427,9 +429,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Solve(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData data, ref Vector<float> accumulatedImpulse)
         {
-            var wsvA = new BodyVelocities();
-            var wsvB = new BodyVelocities();
-            GatherScatter.GatherVelocities(velocities, ref references, ref wsvA, ref wsvB);
+            GatherScatter.GatherVelocities(velocities, ref references, out var wsvA, out var wsvB);
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref accumulatedImpulse, out var correctiveCSI);
             ApplyImpulse(velocities, ref references, ref data, ref wsvA, ref wsvB, ref correctiveCSI);
 
