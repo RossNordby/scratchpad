@@ -53,6 +53,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ContactPenetration1DOFTests.cs" />
     <Compile Include="LayoutTests.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -64,6 +65,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj">
+      <Project>{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}</Project>
+      <Name>BEPUutilities2</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SolverPrototype\SolverPrototype.csproj">
       <Project>{31795c54-28fa-4dd6-8036-7aa49edda482}</Project>
       <Name>SolverPrototype</Name>

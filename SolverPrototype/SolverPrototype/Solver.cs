@@ -41,6 +41,13 @@ namespace SolverPrototype
                 }
             }
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetBundleIndices(int linearIndex, out int bundleIndex, out int indexInBundle)
+        {
+            bundleIndex = linearIndex >> VectorShift;
+            indexInBundle = linearIndex & VectorMask;
+        }
         
     }
 }

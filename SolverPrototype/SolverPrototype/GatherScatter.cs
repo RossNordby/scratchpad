@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BEPUutilities2;
+using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -186,6 +187,24 @@ namespace SolverPrototype
                     Unsafe.Add(ref targetSlot, 9 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 9 * Vector<float>.Count);
                 }
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void Scatter(ref BodyInertias targetBundle, int innerIndex, ref Matrix3x3 inverseInertiaTensor, float inverseMass)
+        {
+            ref var targetLane = ref Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
+
+            targetLane = inverseInertiaTensor.X.X;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = inverseInertiaTensor.X.Y;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inverseInertiaTensor.X.Z;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inverseInertiaTensor.Y.Z;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inverseInertiaTensor.Y.Z;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inverseInertiaTensor.Y.Z;
+            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inverseInertiaTensor.Z.Z;
+            Unsafe.Add(ref targetLane, 7 * Vector<float>.Count) = inverseInertiaTensor.Z.Z;
+            Unsafe.Add(ref targetLane, 8 * Vector<float>.Count) = inverseInertiaTensor.Z.Z;
+            Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inverseMass;
+            
         }
     }
 }

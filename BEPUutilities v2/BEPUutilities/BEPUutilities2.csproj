@@ -122,6 +122,7 @@
     <Compile Include="Quaternion.cs" />
     <Compile Include="Ray.cs" />
     <Compile Include="RayHit.cs" />
+    <Compile Include="ResourceManagement\IdPool.cs" />
     <Compile Include="ResourceManagement\LockingBufferPool.cs" />
     <Compile Include="ResourceManagement\Allocator.cs" />
     <Compile Include="ResourceManagement\PassthroughBufferPool.cs" />
