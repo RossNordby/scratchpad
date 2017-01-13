@@ -16,7 +16,7 @@ namespace SolverPrototypeTests
             Bodies bodies = new Bodies();
             const int bodyCount = 16384;
             var handleIndices = new int[bodyCount];
-            for (int i = 0; i < Vector<float>.Count * 2; ++i)
+            for (int i = 0; i < bodyCount; ++i)
             {
                 var description = new BodyDescription
                 {
@@ -30,6 +30,13 @@ namespace SolverPrototypeTests
                 };
                 var handleIndex = bodies.Add(ref description);
                 handleIndices[i] = handleIndex;
+
+                if ((i & 1) == 0)
+                {
+                    var linear = new Vector3(0, 1, 0);
+                    var angular = new Vector3();
+                    bodies.SetVelocity(handleIndex, ref linear, ref angular);
+                }
             }
 
             int constraintCount = bodyCount / 2;
@@ -71,7 +78,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 5;
-            const int frameCount = 1;
+            const int frameCount = 1000;
 
             void SolveFrame()
             {

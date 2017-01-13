@@ -356,7 +356,11 @@ namespace SolverPrototype
             var biasVelocity = Vector.Min(positionError * erp, maximumRecoveryVelocity);
             data.BiasImpulse = biasVelocity * softenedEffectiveMass;
 
-
+            //Precompute the wsv * (JT * softenedEffectiveMass) term.
+            Vector3Wide.Multiply(ref jacobians.LinearA, ref softenedEffectiveMass, out data.WSVtoCSILinearA);
+            Vector3Wide.Multiply(ref jacobians.AngularA, ref softenedEffectiveMass, out data.WSVtoCSIAngularA);
+            Vector3Wide.Multiply(ref jacobians.LinearB, ref softenedEffectiveMass, out data.WSVtoCSILinearB);
+            Vector3Wide.Multiply(ref jacobians.AngularB, ref softenedEffectiveMass, out data.WSVtoCSIAngularB);
         }
         //Naming conventions:
         //We transform between two spaces, world and constraint space. We also deal with two quantities- velocities, and impulses. 
@@ -411,8 +415,8 @@ namespace SolverPrototype
             //Then, transform it into an impulse by applying the effective mass.
             //Here, we combine the projection and impulse conversion into a precomputed value, i.e. v * (JT * softenedEffectiveMass).
             Vector3Wide.Dot(ref wsvA.LinearVelocity, ref data.WSVtoCSILinearA, out var csiaLinear);
-            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.WSVtoCSIAngularB, out var csiaAngular);
-            Vector3Wide.Dot(ref wsvB.LinearVelocity, ref data.WSVtoCSILinearA, out var csibLinear);
+            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.WSVtoCSIAngularA, out var csiaAngular);
+            Vector3Wide.Dot(ref wsvB.LinearVelocity, ref data.WSVtoCSILinearB, out var csibLinear);
             Vector3Wide.Dot(ref wsvB.AngularVelocity, ref data.WSVtoCSIAngularB, out var csibAngular);
             //Combine it all together, following:
             //constraint space impulse = (targetVelocity - currentVelocity) * softenedEffectiveMass
@@ -421,7 +425,7 @@ namespace SolverPrototype
             var csi = data.BiasImpulse + accumulatedImpulse * data.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
 
             var previousAccumulated = accumulatedImpulse;
-            accumulatedImpulse = Vector.Max(Vector<float>.Zero, accumulatedImpulse + csi);
+            accumulatedImpulse = Vector.Min(Vector<float>.Zero, accumulatedImpulse + csi);
 
             correctiveCSI = accumulatedImpulse - previousAccumulated;
 

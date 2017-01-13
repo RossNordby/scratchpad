@@ -49,7 +49,7 @@ namespace SolverPrototype
 
         unsafe static void InitializeIndices(int[] array, int start, int count)
         {
-            fixed (int* pointer = array)
+            fixed (int* pointer = &array[start])
             {
                 Unsafe.InitBlock(pointer, 0xFF, (uint)(sizeof(int) * count));
             }
