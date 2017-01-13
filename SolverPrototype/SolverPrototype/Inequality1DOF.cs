@@ -205,50 +205,51 @@ namespace SolverPrototype
 
             //3) Use CFM and ERP to create a softened effective mass matrix and a force mixing term for the solve iterations.
             //Start with a couple of base definitions which we won't be deriving. First, the softened effective mass:
-            //softenedEffectiveMass = (effectiveMass^-1 + CFM)^-1
+            //softenedEffectiveMass = (effectiveMass^-1 + CFM/dt)^-1
             //Then, the velocity target of the constraint. 
             //This means 'world space velocity projected into constraint space should equal the velocity bias term plus the constraint force mixing term'.
             //(The velocity bias term will be computed later- it's the position error scaled by the error reduction parameter, ERP. Position error is used to create a velocity motor goal.)
-            //wsv * JT = bias + accumulatedImpulse * CFM
+            //wsv * JT = bias + accumulatedImpulse * CFM/dt
 
             //Here's where some trickiness occurs. (Be mindful of the distinction between the softened and unsoftened effective mass).
             //Start by substituting CFM into the softened effective mass definition:
-            //softenedEffectiveMass = (effectiveMass^-1 + (stiffness * dt + damping)^-1)^-1
+            //CFM/dt = (stiffness * dt + damping)^-1 / dt = (dt * (stiffness * dt + damping))^-1 = (stiffness * dt^2 + damping*dt)^-1
+            //softenedEffectiveMass = (effectiveMass^-1 + (stiffness * dt^2 + damping * dt)^-1)^-1
             //Now substitute the definitions of stiffness and damping, treating the scalar components as uniform scaling matrices of dimension equal to effectiveMass:
-            //softenedEffectiveMass = (effectiveMass^-1 + ((effectiveMass * naturalFrequency^2) * dt + (effectiveMass * 2 * dampingRatio * naturalFrequency))^-1)^-1
+            //softenedEffectiveMass = (effectiveMass^-1 + ((effectiveMass * naturalFrequency^2) * dt^2 + (effectiveMass * 2 * dampingRatio * naturalFrequency) * dt)^-1)^-1
             //Combine the inner effectiveMass coefficients, given matrix multiplication distributes over addition:
-            //softenedEffectiveMass = (effectiveMass^-1 + (effectiveMass * (naturalFrequency^2 * dt) + effectiveMass * (2 * dampingRatio * naturalFrequency))^-1)^-1
-            //softenedEffectiveMass = (effectiveMass^-1 + (effectiveMass * (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency))^-1)^-1
+            //softenedEffectiveMass = (effectiveMass^-1 + (effectiveMass * (naturalFrequency^2 * dt^2) + effectiveMass * (2 * dampingRatio * naturalFrequency * dt))^-1)^-1
+            //softenedEffectiveMass = (effectiveMass^-1 + (effectiveMass * (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt))^-1)^-1
             //Apply the inner matrix inverse:
-            //softenedEffectiveMass = (effectiveMass^-1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * effectiveMass^-1)^-1
+            //softenedEffectiveMass = (effectiveMass^-1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * effectiveMass^-1)^-1
             //Once again, combine coefficients of the inner effectiveMass^-1 terms:
-            //softenedEffectiveMass = ((1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1) * effectiveMass^-1)^-1
+            //softenedEffectiveMass = ((1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1) * effectiveMass^-1)^-1
             //Apply the inverse again:
-            //softenedEffectiveMass = effectiveMass * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
+            //softenedEffectiveMass = effectiveMass * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
 
             //So, to put it another way- because CFM is based on the effective mass, applying it to the effective mass results in a simple downscale.
 
             //What has been gained? Consider what happens in the solve iteration.
             //We take the velocity error:
-            //velocityError = bias + accumulatedImpulse * CFM - wsv * JT 
+            //velocityError = bias + accumulatedImpulse * CFM/dt - wsv * JT 
             //and convert it to a corrective impulse with the effective mass:
-            //impulse = (bias + accumulatedImpulse * CFM - wsv * JT) * softenedEffectiveMass
+            //impulse = (bias + accumulatedImpulse * CFM/dt - wsv * JT) * softenedEffectiveMass
             //The effective mass distributes over the set:
-            //impulse = bias * softenedEffectiveMass + accumulatedImpulse * CFM * softenedEffectiveMass - wsv * JT * softenedEffectiveMass
+            //impulse = bias * softenedEffectiveMass + accumulatedImpulse * CFM/dt * softenedEffectiveMass - wsv * JT * softenedEffectiveMass
             //Focus on the CFM term:
-            //accumulatedImpulse * CFM * softenedEffectiveMass
-            //What is CFM * softenedEffectiveMass? Substitute.
-            //(stiffness * dt + damping)^-1 * softenedEffectiveMass
-            //((effectiveMass * naturalFrequency^2) * dt + (effectiveMass * 2 * dampingRatio * naturalFrequency))^-1 * softenedEffectiveMass
+            //accumulatedImpulse * CFM/dt * softenedEffectiveMass
+            //What is CFM/dt * softenedEffectiveMass? Substitute.
+            //(stiffness * dt^2 + damping * dt)^-1 * softenedEffectiveMass
+            //((effectiveMass * naturalFrequency^2) * dt^2 + (effectiveMass * 2 * dampingRatio * naturalFrequency * dt))^-1 * softenedEffectiveMass
             //Combine terms: 
-            //(effectiveMass * (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency))^-1 * softenedEffectiveMass
+            //(effectiveMass * (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt))^-1 * softenedEffectiveMass
             //Apply inverse:
-            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * effectiveMass^-1 * softenedEffectiveMass
+            //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * effectiveMass^-1 * softenedEffectiveMass
             //Expand softened effective mass from earlier:
-            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * effectiveMass^-1 * effectiveMass * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
+            //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * effectiveMass^-1 * effectiveMass * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
             //Cancel effective masses: (!)
-            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
-            //Because CFM was created from effectiveMass, the CFM * effectiveMass term is actually independent of the effectiveMass!
+            //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
+            //Because CFM was created from effectiveMass, the CFM/dt * effectiveMass term is actually independent of the effectiveMass!
             //The remaining expression is still a matrix, but fortunately it is a simple uniform scaling matrix that we can store and apply as a single scalar.
 
             //4) How do you compute ERP?
@@ -269,22 +270,22 @@ namespace SolverPrototype
             //5) So we can compute CFM, ERP, the softened effective mass matrix, and we have an interesting shortcut on the constraint force mixing term of the solve iterations.
             //Is there anything more that can be done? You bet!
             //Let's look at the post-distribution impulse computation again:
-            //impulse = bias * effectiveMass + accumulatedImpulse * CFM * effectiveMass - wsv * JT * effectiveMass
+            //impulse = bias * effectiveMass + accumulatedImpulse * CFM/dt * effectiveMass - wsv * JT * effectiveMass
             //During the solve iterations, the only quantities that vary are the accumulated impulse and world space velocities. So the rest can be precomputed.
             //bias * effectiveMass,
-            //CFM * effectiveMass,
+            //CFM/dt * effectiveMass,
             //JT * effectiveMass
             //In other words, we bypass the intermediate velocity state and go directly from source velocities to an impulse.
             //Note the sizes of the precomputed types above:
             //bias * effective mass is the same size as bias (vector with dimension equal to constrained DOFs)
-            //CFM * effectiveMass is a single scalar regardless of constrained DOFs,
+            //CFM/dt * effectiveMass is a single scalar regardless of constrained DOFs,
             //JT * effectiveMass is the same size as JT
             //But note that we no longer need to load the effective mass! It is implicit.
             //The resulting computation is:
             //impulse = a + accumulatedImpulse * b - wsv * c
             //two DOF-width adds (add/subtract), one DOF-width multiply, and a 1xDOF * DOFx12 jacobian-sized transform.
             //Compare to;
-            //(accumulatedImpulse * softness + bias - wsv * JT) * effectiveMass
+            //(accumulatedImpulse * CFM/dt + bias - wsv * JT) * effectiveMass
             //two DOF-width adds (add/subtract), one DOF width multiply, a 1xDOF * DOFx12 jacobian-sized transform, and a 1xDOF * DOFxDOF transform.
             //In other words, we shave off a whole 1xDOF * DOFxDOF transform per iteration.
             //So, taken in isolation, this is a strict win both in terms of memory and the amount of computation.
@@ -337,23 +338,27 @@ namespace SolverPrototype
 
             //We'll start with the unsoftened effective mass, constructed from the contributions computed above:
             var effectiveMass = Vector<float>.One / (linearA + linearB + angularA + angularB);
+            //softenedEffectiveMass = effectiveMass * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
             var frequencyDt = springSettings.NaturalFrequency * dt;
             var twiceDampingRatio = springSettings.DampingRatio * 2; //Could precompute.
-            var extra = Vector<float>.One / (springSettings.NaturalFrequency * (frequencyDt + twiceDampingRatio));
+            var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
             var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
             var softenedEffectiveMass = effectiveMass * effectiveMassCFMScale;
 
-            //CFM * softenedEffectiveMass:
-            //(naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1 * (1 + (naturalFrequency^2 * dt + 2 * dampingRatio * naturalFrequency)^-1)^-1
+            //CFM/dt * softenedEffectiveMass:
+            //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
             data.SoftnessImpulseScale = extra * effectiveMassCFMScale;
 
             //ERP = (naturalFrequency * dt) * (naturalFrequency * dt + 2 * dampingRatio)^-1
-            var erp = frequencyDt / (frequencyDt + twiceDampingRatio);
+            //"ERP" is the error reduction per frame. Note that it can never exceed 1 given physically valid input.
+            //Since it is a *per frame* term, note that the position error is additionally scaled by inverseDt to get the target velocity
+            //needed to accomplish the desired error reduction in one frame.
+            var positionErrorToVelocity = springSettings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
 
             //Note that we use a bit of a hack when computing the bias velocity- even if our damping ratio/natural frequency implies a strongly springy response
             //that could cause a significant velocity overshoot, we apply an arbitrary clamping value to keep it reasonable.
             //This is useful for a variety of inequality constraints (like contacts) because you don't always want them behaving as true springs.
-            var biasVelocity = Vector.Min(positionError * erp, maximumRecoveryVelocity);
+            var biasVelocity = Vector.Min(-positionError * positionErrorToVelocity, maximumRecoveryVelocity);
             data.BiasImpulse = biasVelocity * softenedEffectiveMass;
 
             //Precompute the wsv * (JT * softenedEffectiveMass) term.

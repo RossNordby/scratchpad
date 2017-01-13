@@ -69,7 +69,7 @@ namespace SolverPrototypeTests
                 GatherScatter.Get(ref contacts.Normal.Y, constraintInnerIndex) = 1;
                 GatherScatter.Get(ref contacts.OffsetA.Y, constraintInnerIndex) = 0.5f;
                 GatherScatter.Get(ref contacts.OffsetB.Y, constraintInnerIndex) = -0.5f;
-                GatherScatter.Get(ref contacts.PenetrationDepth, constraintInnerIndex) = 0;
+                GatherScatter.Get(ref contacts.PenetrationDepth, constraintInnerIndex) = 0.02f;
 
 
             }
