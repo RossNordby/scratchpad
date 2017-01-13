@@ -16,6 +16,20 @@ namespace SolverPrototype
         public Vector3Wide AngularVelocity;
     }
 
+
+    public struct BodyInertias
+    {
+        public Matrix3x3Wide InverseInertiaTensor;
+        public Vector<float> InverseMass;
+    }
+
+    public struct TwoBody1DOFJacobians
+    {
+        public Vector3Wide LinearA;
+        public Vector3Wide AngularA;
+        public Vector3Wide LinearB;
+        public Vector3Wide AngularB;
+    }
     /// <summary>
     /// A constraint's body references. Stored separately from the iteration data since it is accessed by both the prestep and solve.
     /// Two address streams isn't much of a problem for prefetching.
@@ -31,66 +45,53 @@ namespace SolverPrototype
         //TODO: there may be an argument to make this a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
         public int Count;
     }
-    public struct BodyInertias
+
+    public struct SpringSettings
     {
-        public Matrix3x3Wide InverseInertiaTensor;
-        public Vector<float> InverseMass;
+        public Vector<float> NaturalFrequency;
+        public Vector<float> DampingRatio;
     }
 
+    public struct ContactData
+    {
+        public Vector3Wide OffsetA;
+        public Vector3Wide OffsetB;
+        public Vector3Wide Normal;
+        public Vector<float> PenetrationDepth;
+    }
 
+    public struct IterationData
+    {
+        //Rather than projecting from world space to constraint space *velocity* using JT, we precompute JT * effective mass
+        //and go directly from world space velocity to constraint space impulse.
+        public Vector3Wide WSVtoCSILinearA;
+        public Vector3Wide WSVtoCSIAngularA;
+        public Vector3Wide WSVtoCSILinearB;
+        public Vector3Wide WSVtoCSIAngularB;
+
+        //Since we jump directly from world space velocity to constraint space impulse, the velocity bias needs to be precomputed into an impulse offset too.
+        public Vector<float> BiasImpulse;
+        //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
+        public Vector<float> SoftnessImpulseScale;
+
+        //It also needs to project from constraint space to world space.
+        //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,
+        //we just go directly from constraint impulse to world velocity change.
+        //For constraints with lower DOF counts, using this format also saves us some memory bandwidth- 
+        //the inverse inertia tensor and inverse mass for a 2 body constraint cost 20 floats, compared to this implementation's 12.
+        //(Note that even in an implementation where we use the body inertias, we should still cache it constraint-locally to avoid big gathers.)
+        public Vector3Wide CSIToWSVLinearA;
+        public Vector3Wide CSIToWSVAngularA;
+        public Vector3Wide CSIToWSVLinearB;
+        public Vector3Wide CSIToWSVAngularB;
+    }
 
 
     public struct PenetrationConstraint
     {
-        public struct IterationData
-        {
-            //Rather than projecting from world space to constraint space *velocity* using JT, we precompute JT * effective mass
-            //and go directly from world space velocity to constraint space impulse.
-            public Vector3Wide WSVtoCSILinearA;
-            public Vector3Wide WSVtoCSIAngularA;
-            public Vector3Wide WSVtoCSILinearB;
-            public Vector3Wide WSVtoCSIAngularB;
-
-            //Since we jump directly from world space velocity to constraint space impulse, the velocity bias needs to be precomputed into an impulse offset too.
-            public Vector<float> BiasImpulse;
-            //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
-            public Vector<float> SoftnessImpulseScale;
-
-            //It also needs to project from constraint space to world space.
-            //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,
-            //we just go directly from constraint impulse to world velocity change.
-            //For constraints with lower DOF counts, using this format also saves us some memory bandwidth- 
-            //the inverse inertia tensor and inverse mass for a 2 body constraint cost 20 floats, compared to this implementation's 12.
-            //(Note that even in an implementation where we use the body inertias, we should still cache it constraint-locally to avoid big gathers.)
-            public Vector3Wide CSIToWSVLinearA;
-            public Vector3Wide CSIToWSVAngularA;
-            public Vector3Wide CSIToWSVLinearB;
-            public Vector3Wide CSIToWSVAngularB;
-        }
-
-        public struct TwoBody1DOFJacobians
-        {
-            public Vector3Wide LinearA;
-            public Vector3Wide AngularA;
-            public Vector3Wide LinearB;
-            public Vector3Wide AngularB;
-        }
-
-        public struct SpringSettings
-        {
-            public Vector<float> NaturalFrequency;
-            public Vector<float> DampingRatio;
-        }
-
-        public struct ContactConstraintData
-        {
-            public Vector3Wide OffsetA;
-            public Vector3Wide OffsetB;
-            public Vector3Wide Normal;
-            public Vector<float> PenetrationDepth;
-        }
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeJacobiansAndError(ref ContactConstraintData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)
+        public static void ComputeJacobiansAndError(ref ContactData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)
         {
             //Technically we could take advantage of the redundant form on the linear jacobians, but it's made complex by the pretransformations.
             //For now, just leave it fully generic and unspecialized.

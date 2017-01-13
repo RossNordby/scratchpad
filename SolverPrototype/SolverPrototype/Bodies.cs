@@ -1,11 +1,8 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.ResourceManagement;
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
@@ -14,6 +11,9 @@ namespace SolverPrototype
         public Matrix3x3 InverseLocalInertiaTensor;
         public float InverseMass;
     }
+    /// <summary>
+    /// Collection of allocated bodies. For now, it is assumed that all bodies are active and dynamic.
+    /// </summary>
     public class Bodies
     {
         /// <summary>
@@ -31,13 +31,7 @@ namespace SolverPrototype
         public IdPool IdPool;
         public int BodyCount;
 
-        public BodyReference this[int bodyHandleIndex]
-        {
-            get
-            {
-                return new BodyReference(bodyHandleIndex, this);
-            }
-        }
+
 
         public unsafe Bodies(int initialCapacityInBundles = 1024)
         {
@@ -81,7 +75,7 @@ namespace SolverPrototype
             IndicesToHandleIndices[index] = handleIndex;
 
             Solver.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
-            GatherScatter.Scatter(ref InertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.InverseLocalInertiaTensor, bodyDescription.InverseMass);
+            GatherScatter.SetLane(ref InertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.InverseLocalInertiaTensor, bodyDescription.InverseMass);
 
             return handleIndex;
         }
@@ -112,30 +106,18 @@ namespace SolverPrototype
             IdPool.Return(handleIndex);
             BodyHandles[handleIndex] = -1;
         }
-    }
 
-    /// <summary>
-    /// Convenience structure for AOS-style access of body properties.
-    /// </summary>
-    public struct BodyReference
-    {
-        public readonly Bodies Bodies;
-        public readonly int HandleIndex;
-
-        public BodyReference(int bodyHandleIndex, Bodies bodies)
+        public void SetVelocity(int handleIndex, ref Vector3 linearVelocity, ref Vector3 angularVelocity)
         {
-            HandleIndex = bodyHandleIndex;
-            Bodies = bodies;
+            var index = BodyHandles[handleIndex];
+            Solver.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            GatherScatter.SetLane(ref VelocityBundles[bundleIndex], innerIndex, ref linearVelocity, ref angularVelocity);
         }
-
-        public Matrix3x3 InverseInertiaTensor
+        public void GetVelocity(int handleIndex, out Vector3 linearVelocity, out Vector3 angularVelocity)
         {
-            get
-            {
-            }
+            var index = BodyHandles[handleIndex];
+            Solver.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            GatherScatter.GetLane(ref VelocityBundles[bundleIndex], innerIndex, out linearVelocity, out angularVelocity);
         }
-
-
-
-    }
+    }    
 }

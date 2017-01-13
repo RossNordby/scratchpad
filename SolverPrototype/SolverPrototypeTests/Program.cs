@@ -9,8 +9,9 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             //VectorAccessTests.Test();
-            GatherScatterTests.Test();
+            //GatherScatterTests.Test();
             //LayoutTests.Test();
+            ContactPenetration1DOFTests.Test();
         }
     }
 }
