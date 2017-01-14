@@ -40,15 +40,15 @@ namespace SolverPrototypeTests
             context.BodyReferences = new BodyReferences[constraintCount];
             for (int iterationIndex = 0; iterationIndex < constraintCount; ++iterationIndex)
             {
-                var baseSourceIndex = iterationIndex << Solver.VectorShift;
+                var baseSourceIndex = iterationIndex << BundleIndexing.VectorShift;
                 for (int i = 0; i < Vector<int>.Count; ++i)
                 {
                     var c = connections[baseSourceIndex + i];
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = c.A >> Solver.VectorShift;
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = c.A & Solver.VectorMask;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = c.A >> BundleIndexing.VectorShift;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = c.A & BundleIndexing.VectorMask;
                     
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = c.B >> Solver.VectorShift;
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = c.B & Solver.VectorMask;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = c.B >> BundleIndexing.VectorShift;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = c.B & BundleIndexing.VectorMask;
 
                 }
                 context.BodyReferences[iterationIndex].Count = Vector<int>.Count;

@@ -176,7 +176,7 @@ namespace SolverPrototypeTests
         static SOAContext GetSOAContext(int laneCount, int laneWidth)
         {
             SOAContext context;
-            context.VectorLaneCount = laneCount >> Solver.VectorShift;
+            context.VectorLaneCount = laneCount >> BundleIndexing.VectorShift;
             context.Input = new Vector<float>[context.VectorLaneCount][];
             context.Result = new Vector<float>[context.VectorLaneCount];
             context.ExpectedResult = new Vector<float>[context.VectorLaneCount];
@@ -301,7 +301,7 @@ namespace SolverPrototypeTests
         {
             AOSOAContext<T> context;
             context.LaneWidth = laneWidth;
-            context.VectorLaneCount = laneCount >> Solver.VectorShift;
+            context.VectorLaneCount = laneCount >> BundleIndexing.VectorShift;
             context.Input = new T[context.VectorLaneCount];
             context.Result = new Vector<float>[context.VectorLaneCount];
             context.ExpectedResult = new Vector<float>[context.VectorLaneCount];

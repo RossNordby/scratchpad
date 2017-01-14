@@ -38,7 +38,7 @@ namespace SolverPrototype
             VelocityBundles = new BodyVelocities[initialCapacityInBundles];
             InertiaBundles = new BodyInertias[initialCapacityInBundles];
 
-            int initialBodyCapacity = initialCapacityInBundles << Solver.VectorShift;
+            int initialBodyCapacity = initialCapacityInBundles << BundleIndexing.VectorShift;
             IdPool = new IdPool(initialBodyCapacity);
             BodyHandles = new int[initialBodyCapacity];
             IndicesToHandleIndices = new int[initialBodyCapacity];
@@ -74,7 +74,7 @@ namespace SolverPrototype
             BodyHandles[handleIndex] = index;
             IndicesToHandleIndices[index] = handleIndex;
 
-            Solver.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
             GatherScatter.SetLane(ref InertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.InverseLocalInertiaTensor, bodyDescription.InverseMass);
 
             return handleIndex;
@@ -110,13 +110,13 @@ namespace SolverPrototype
         public void SetVelocity(int handleIndex, ref Vector3 linearVelocity, ref Vector3 angularVelocity)
         {
             var index = BodyHandles[handleIndex];
-            Solver.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             GatherScatter.SetLane(ref VelocityBundles[bundleIndex], innerIndex, ref linearVelocity, ref angularVelocity);
         }
         public void GetVelocity(int handleIndex, out Vector3 linearVelocity, out Vector3 angularVelocity)
         {
             var index = BodyHandles[handleIndex];
-            Solver.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             GatherScatter.GetLane(ref VelocityBundles[bundleIndex], innerIndex, out linearVelocity, out angularVelocity);
         }
     }    

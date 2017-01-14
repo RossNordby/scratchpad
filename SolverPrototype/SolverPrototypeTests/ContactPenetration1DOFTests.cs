@@ -50,15 +50,15 @@ namespace SolverPrototypeTests
             {
                 var bodyAIndex = bodies.BodyHandles[handleIndices[i * 2]];
                 var bodyBIndex = bodies.BodyHandles[handleIndices[i * 2 + 1]];
-                Solver.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
-                Solver.GetBundleIndices(bodyBIndex, out var bodyBBundleIndex, out var bodyBInnerIndex);
-                Solver.GetBundleIndices(i, out var constraintBundleIndex, out var constraintInnerIndex);
+                BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
+                BundleIndexing.GetBundleIndices(bodyBIndex, out var bodyBBundleIndex, out var bodyBInnerIndex);
+                BundleIndexing.GetBundleIndices(i, out var constraintBundleIndex, out var constraintInnerIndex);
                 ref var constraintBodies = ref bodyReferences[constraintBundleIndex];
                 GatherScatter.Get(ref constraintBodies.BundleIndexA, constraintInnerIndex) = bodyABundleIndex;
                 GatherScatter.Get(ref constraintBodies.InnerIndexA, constraintInnerIndex) = bodyAInnerIndex;
                 GatherScatter.Get(ref constraintBodies.BundleIndexB, constraintInnerIndex) = bodyBBundleIndex;
                 GatherScatter.Get(ref constraintBodies.InnerIndexB, constraintInnerIndex) = bodyBInnerIndex;
-                var constraintBundleBaseIndex = constraintBundleIndex << Solver.VectorShift;
+                var constraintBundleBaseIndex = constraintBundleIndex << BundleIndexing.VectorShift;
                 ++constraintBodies.Count;
 
                 ref var springs = ref springSettings[constraintBundleIndex];

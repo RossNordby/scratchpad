@@ -1,53 +1,95 @@
-﻿using System;
-using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.ResourceManagement;
+using System;
 
 namespace SolverPrototype
-{    
+{
     public class Solver
     {
+        QuickList<ConstraintBatch> batches;
+
+        int iterationCount;
         /// <summary>
-        /// <![CDATA[Gets the mask value such that x & VectorMask computes x % Vector<float>.Count.]]>
+        /// Gets or sets the number of solver iterations to compute per call to Update.
         /// </summary>
-        /// <remarks>The JIT recognizes that this value is constant!</remarks>
-        public static int VectorMask
+        public int IterationCount
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            get { return iterationCount; }
+            set
             {
-                return Vector<float>.Count - 1;
+                if (value < 1)
+                {
+                    throw new ArgumentException("Iteration count must be positive.");
+                }
+                iterationCount = value;
             }
         }
-        /// <summary>
-        /// <![CDATA[Gets the shift value such that x >> VectorShift divides x by Vector<float>.Count.]]>
-        /// </summary>
-        /// <remarks>The JIT recognizes that this value is constant!</remarks>
-        public static int VectorShift
+
+        public Solver(int iterationCount = 5)
         {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
+            this.iterationCount = iterationCount;
+            batches = new QuickList<ConstraintBatch>(new PassthroughBufferPool<ConstraintBatch>());
+        }
+
+        public void Add<T>(ref T constraint) where T : ITwoBodyConstraintDescription
+        {
+            ConstraintBatch targetBatch = null;
+            for (int i = 0; i < batches.Count; ++i)
             {
-                switch (Vector<float>.Count)
+                var batch = batches[i];
+                if (!batch.Handles.Contains(constraint.BodyHandleA) &&
+                    !batch.Handles.Contains(constraint.BodyHandleB))
                 {
-                    case 4:
-                        return 2;
-                    case 8:
-                        return 3;
-                    case 16:
-                        return 4;
-                    default:
-                        return 0;
+                    targetBatch = batch;
+                }
+            }
+            if (targetBatch == null)
+            {
+                //No batch available. Have to create a new one.
+                targetBatch = new ConstraintBatch();
+                batches.Add(targetBatch);
+            }
+            targetBatch.Handles.Add(constraint.BodyHandleA);
+            targetBatch.Handles.Add(constraint.BodyHandleB);
+            targetBatch.Add(ref constraint);
+        }
+
+        //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal
+        //should attempt to fill the entity reference gap left by the removal with a constraint from another batch if possible.
+        //Unfortunately, this requires a way to look up the constraint that is holding a given reference. That makes the
+        //bitfield approach insufficient- have to store indices...
+
+        public void Update()
+        {
+            //TODO: Note that the prestep phase is completely parallel. When multithreading, there is no need to stop at the boundaries of bodybatches.
+            //You could technically build a separate list that ignores bodybatch boundaries. Value is unclear.
+            for (int i = 0; i < batches.Count; ++i)
+            {
+                var batch = batches.Elements[i];
+                for (int j = 0; j < batch.TypeBatches.Count; ++j)
+                {
+                    batch.TypeBatches.Elements[j].Prestep();
+                }
+            }
+            for (int i = 0; i < batches.Count; ++i)
+            {
+                var batch = batches.Elements[i];
+                for (int j = 0; j < batch.TypeBatches.Count; ++j)
+                {
+                    batch.TypeBatches.Elements[j].WarmStart();
+                }
+            }
+            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+            {
+                for (int i = 0; i < batches.Count; ++i)
+                {
+                    var batch = batches.Elements[i];
+                    for (int j = 0; j < batch.TypeBatches.Count; ++j)
+                    {
+                        batch.TypeBatches.Elements[j].SolveIteration();
+                    }
                 }
             }
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetBundleIndices(int linearIndex, out int bundleIndex, out int indexInBundle)
-        {
-            bundleIndex = linearIndex >> VectorShift;
-            indexInBundle = linearIndex & VectorMask;
-        }
-        
     }
 }
