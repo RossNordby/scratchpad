@@ -13,7 +13,7 @@ namespace SolverPrototype
     /// permits the cache friendly contiguous storage of constraint properties.
     /// (And it avoids performing virtual dispatches at every constraint solve, but that's not very important.)
     /// </remarks>
-    abstract class ConstraintTypeBatch
+    public abstract class ConstraintTypeBatch
     {
         /// <summary>
         /// Gets the constraint type index associated with this type batch.

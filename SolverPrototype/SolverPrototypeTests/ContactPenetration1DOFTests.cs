@@ -43,7 +43,7 @@ namespace SolverPrototypeTests
             int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
             var bodyReferences = new BodyReferences[constraintBundleCount];
             var springSettings = new SpringSettings[constraintBundleCount];
-            var iterationData = new IterationData[constraintBundleCount];
+            var iterationData = new IterationData2Body1DOF[constraintBundleCount];
             var contactData = new ContactData[constraintBundleCount];
             var accumulatedImpulses = new Vector<float>[constraintBundleCount];
             for (int i = 0; i < constraintCount; ++i)
@@ -84,18 +84,18 @@ namespace SolverPrototypeTests
             {
                 for (int i = 0; i < constraintBundleCount; ++i)
                 {
-                    PenetrationConstraint.ComputeJacobiansAndError(ref contactData[i], out var jacobians, out var error);
+                    Inequality2Body1DOF.ComputeJacobiansAndError(ref contactData[i], out var jacobians, out var error);
                     var maximumRecoveryVelocity = new Vector<float>(1);
-                    PenetrationConstraint.Prestep(bodies.InertiaBundles, ref bodyReferences[i], ref iterationData[i], ref jacobians, ref springSettings[i],
+                    Inequality2Body1DOF.Prestep(bodies.InertiaBundles, ref bodyReferences[i], ref iterationData[i], ref jacobians, ref springSettings[i],
                         ref error, ref maximumRecoveryVelocity, dt, inverseDt);
 
-                    PenetrationConstraint.WarmStart(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
+                    Inequality2Body1DOF.WarmStart(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
                 }
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
                 {
                     for (int i = 0; i < constraintBundleCount; ++i)
                     {
-                        PenetrationConstraint.Solve(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
+                        Inequality2Body1DOF.Solve(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
                     }
                 }
             }

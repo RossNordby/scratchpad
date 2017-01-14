@@ -52,15 +52,8 @@ namespace SolverPrototype
         public Vector<float> DampingRatio;
     }
 
-    public struct ContactData
-    {
-        public Vector3Wide OffsetA;
-        public Vector3Wide OffsetB;
-        public Vector3Wide Normal;
-        public Vector<float> PenetrationDepth;
-    }
 
-    public struct IterationData
+    public struct IterationData2Body1DOF
     {
         //Rather than projecting from world space to constraint space *velocity* using JT, we precompute JT * effective mass
         //and go directly from world space velocity to constraint space impulse.
@@ -87,49 +80,11 @@ namespace SolverPrototype
     }
 
 
-    public struct PenetrationConstraint
+    public static class Inequality2Body1DOF
     {
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeJacobiansAndError(ref ContactData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)
-        {
-            //Technically we could take advantage of the redundant form on the linear jacobians, but it's made complex by the pretransformations.
-            //For now, just leave it fully generic and unspecialized.
-
-            //The contact penetration constraint takes the form:
-            //dot(positionA + offsetA, N) <= dot(positionB + offsetB, N)
-            //Or:
-            //dot(positionA + offsetA, N) - dot(positionB + offsetB, N) <= 0
-            //dot(positionA + offsetA - positionB - offsetB, N) <= 0
-            //In practice, we'll use the collision detection system's penetration depth instead of trying to recompute the error here.
-
-            //So, treating the normal as constant, the velocity constraint is:
-            //dot(d/dt(positionA + offsetA - positionB - offsetB), N) <= 0
-            //dot(linearVelocityA + d/dt(offsetA) - linearVelocityB - d/dt(offsetB)), N) <= 0
-            //The velocity of the offsets are defined by the angular velocity.
-            //dot(linearVelocityA + angularVelocityA x offsetA - linearVelocityB - angularVelocityB x offsetB), N) <= 0
-            //dot(linearVelocityA, N) + dot(angularVelocityA x offsetA, N) - dot(linearVelocityB, N) - dot(angularVelocityB x offsetB), N) <= 0
-            //Use the properties of the scalar triple product:
-            //dot(linearVelocityA, N) + dot(offsetA x N, angularVelocityA) - dot(linearVelocityB, N) - dot(offsetB x N, angularVelocityB) <= 0
-            //Bake in the negations:
-            //dot(linearVelocityA, N) + dot(offsetA x N, angularVelocityA) + dot(linearVelocityB, -N) + dot(-offsetB x N, angularVelocityB) <= 0
-            //A x B = -B x A:
-            //dot(linearVelocityA, N) + dot(offsetA x N, angularVelocityA) + dot(linearVelocityB, -N) + dot(N x offsetB, angularVelocityB) <= 0
-            //And there you go, the jacobians!
-            //linearA: N
-            //angularA: offsetA x N
-            //linearB: -N
-            //angularB: N x offsetB
-            jacobians.LinearA = contact.Normal;
-            Vector3Wide.Negate(ref contact.Normal, out jacobians.LinearB);
-            Vector3Wide.CrossWithoutOverlap(ref contact.OffsetA, ref contact.Normal, out jacobians.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref contact.Normal, ref contact.OffsetB, out jacobians.AngularB);
-
-            //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
-            error = contact.PenetrationDepth;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(BodyInertias[] bodyInertias, ref BodyReferences references, ref IterationData data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
+        public static void Prestep(BodyInertias[] bodyInertias, ref BodyReferences references, ref IterationData2Body1DOF data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
             ref Vector<float> positionError, ref Vector<float> maximumRecoveryVelocity, float dt, float inverseDt)
         {
             //effective mass = (J * M^-1 * JT)^-1
@@ -381,7 +336,7 @@ namespace SolverPrototype
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies,
         /// then scatters the result to the body velocity memory locations.
         /// </summary>
-        public static void ApplyImpulse(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData data,
+        public static void ApplyImpulse(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData2Body1DOF data,
             ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Vector<float> correctiveImpulse)
         {
             //Applying the impulse requires transforming the constraint space impulse into a world space velocity change.
@@ -402,7 +357,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData data, ref Vector<float> accumulatedImpulse)
+        public static void WarmStart(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse)
         {
             GatherScatter.GatherVelocities(velocities, ref references, out var wsvA, out var wsvB);
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
@@ -411,7 +366,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref IterationData data, ref Vector<float> accumulatedImpulse,
+        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse,
             out Vector<float> correctiveCSI)
         {
             //Take the world space velocity of each body into constraint space by transforming by the transpose(jacobian).
@@ -437,7 +392,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData data, ref Vector<float> accumulatedImpulse)
+        public static void Solve(BodyVelocities[] velocities, ref BodyReferences references, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse)
         {
             GatherScatter.GatherVelocities(velocities, ref references, out var wsvA, out var wsvB);
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref accumulatedImpulse, out var correctiveCSI);

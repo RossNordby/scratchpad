@@ -58,6 +58,18 @@ namespace SolverPrototype
         //should attempt to fill the entity reference gap left by the removal with a constraint from another batch if possible.
         //Unfortunately, this requires a way to look up the constraint that is holding a given reference. That makes the
         //bitfield approach insufficient- have to store indices...
+        //An alternative is to keep remove as simple and direct as possible, possibly leaving more batches than there would ideally be.
+        //Then, later, a dedicated batch analysis process tries to find any potential compressions.
+        //The dedicated batch analysis has some pretty nice advantages:
+        //0) Removes stay (relatively) fast- no O(n) searching or complex logic.
+        //1) High churn adds/removes are extremely common during chaotic collisions, which is exactly when you need as little overhead as possible. 
+        //1.5) High churn situations will tend to rapidly invalidate the 'optimization' effort of extremely aggressive on-remove swaps.
+        //2) On-removal will often fail to make any change due to other reference blockages.
+        //3) Dedicated batch analysis can be deferred over multiple frames because the intermediate results are all fine from a correctness standpoint. 
+        //3.5) Deferred costs can be kept consistently low no matter what kind of add/remove churn is happening.
+        //4) Dedicated batch analysis can be performed asynchronously and hidden behind other stally stages which aren't the solver and don't modify the solver (e.g. broadphase, midphase).
+        //5) Even if we are in a 'suboptimal' constraint configuration (i.e. some pulldowns exist), it will rarely have an effect on performance unless it actually results in extra batches.
+        //6) Dedicated analysis could afford to perform more complex heuristics to optimize batches.
 
         public void Update()
         {

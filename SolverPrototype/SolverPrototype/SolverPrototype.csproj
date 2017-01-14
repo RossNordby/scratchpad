@@ -53,6 +53,7 @@
     <Compile Include="Bodies.cs" />
     <Compile Include="ConstraintBatch.cs" />
     <Compile Include="ConstraintInterfaces.cs" />
+    <Compile Include="ContactManifoldConstraintBatch.cs" />
     <Compile Include="Solver.cs" />
     <Compile Include="ConstraintTypeBatch.cs" />
     <Compile Include="GatherScatter.cs" />
