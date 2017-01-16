@@ -31,7 +31,7 @@ namespace SIMDPrototyping
             VectorizedConstraintTest.Test();
             VectorizedManifoldTest.Test();
 
-            //TreeTest.Test();
+            TreeTest.Test();
 
             //Console.ReadKey();
 

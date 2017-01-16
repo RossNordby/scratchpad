@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2.ResourceManagement;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -63,5 +64,31 @@ namespace SolverPrototype
             }
         }
 
+    }
+
+
+    public static class ConstraintTypeRegistration
+    {
+        static class DescriptionIds<T> where T : IConstraintDescription
+        {
+            internal static int Id;
+        }
+        static class BatchIds<T> where T : ConstraintTypeBatch
+        {
+            internal static int Id;
+        }
+        
+        static HashSet<Type> registeredBatchTypes = new HashSet<Type>();
+
+
+        public void GetBatchId<T>() where T : ConstraintTypeBatch
+        {
+            Debug.Assert(registeredTypes.Contains(typeof(T)));
+        }
+
+        public void Register<TDescription, TBatch>()
+        {
+
+        }
     }
 }

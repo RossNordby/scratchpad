@@ -26,6 +26,29 @@ namespace SolverPrototype
             //for GC related problems and the user doesn't need to pin memory.
         }
 
+        /// <summary>
+        /// Copies from one bundle lane to another. The bundle must be a contiguous block of Vector types.
+        /// </summary>
+        /// <typeparam name="T">Type of the copied bundles.</typeparam>
+        /// <param name="sourceBundle">Source bundle of the data to copy.</param>
+        /// <param name="sourceInnerIndex">Index of the lane within the source bundle.</param>
+        /// <param name="targetBundle">Target bundle of the data to copy.</param>
+        /// <param name="targetInnerIndex">Index of the lane within the target bundle.</param>
+        /// <remarks>
+        /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
+        /// </remarks>
+        public static void CopyLane<T>(ref T sourceBundle, int sourceInnerIndex, ref T targetBundle, int targetInnerIndex)
+        {
+            var sizeInInts = Unsafe.SizeOf<T>() >> 2;
+            var strideInInts = sizeInInts >> BundleIndexing.VectorShift;
+            ref var sourceBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref sourceBundle), sourceInnerIndex);
+            ref var targetBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref targetBundle), targetInnerIndex);
+            for (int i = 0; i < sizeInInts; i+= strideInInts)
+            {
+                Unsafe.Add(ref targetBase, i) = Unsafe.Add(ref sourceBase, i);
+            }
+        }
+
         //IMPLEMENTATION NOTES:
 
         //'NULL' CONSTRAINT CONNECTIONS

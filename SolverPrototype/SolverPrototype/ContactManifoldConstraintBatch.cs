@@ -31,11 +31,14 @@ namespace SolverPrototype
         public Vector<float> PenetrationDepth;
     }
 
+
     /// <summary>
     /// Handles a batch of contact manifold constraints. 
     /// </summary>
-    /// <remarks>Note that the implementation of a constraint is handled at the batch level. Individual constraints are just blobs of data.
-    /// There is no SuchAndSuchConstraint.cs that contains per-constraint Prestep/WarmStart/Solve functions. This is it!</remarks>
+    /// <remarks>
+    /// Note that the implementation of a constraint is handled at the batch level. Individual constraints are just blobs of data.
+    /// There is no SuchAndSuchConstraint.cs that contains per-constraint Prestep/WarmStart/Solve functions. This is it!
+    /// </remarks>
     public class ContactManifoldConstraintBatch : ConstraintTypeBatch
     {
         int bundleCount;
@@ -54,15 +57,39 @@ namespace SolverPrototype
         internal Vector<float>[] AccumulatedImpulse;
         struct ContactManifoldPrestepData
         {
-            public Vector<int> SomeKindOfContactReference;
+            public Vector<int> ContactManifoldIndex;
             public BodyReferences BodyReferences;
         }
         ContactManifoldPrestepData[] prestepData;
 
+        public class ContactManifoldSet
+        {
+            //This is mostly a stand-in data source for testing purposes.
 
-        public ContactManifoldConstraintBatch(Bodies bodies)
+            //Use AOS until there's a reason not to. It's easier to create tests with this format.
+            //Contact manifold data won't tend to be contiguous with respect to the solver's order anyway.
+            //We could go through a bunch of effort to make it align, possibly? 
+            //Could scatter directly into constraint data, for example. If we already have the entity transforms gathered
+            //during collision detection (which we should), if we otherwise end up with world offsets in any way,
+            //then storing the world offsets 
+            //For now, just perform a gather. We can always make it better in the future.
+            public struct ContactDataSource
+            {
+                public Vector3 OffsetA;
+                public int A;
+                public Vector3 OffsetB;
+                public int B;
+                public Vector3 Normal;
+            }
+
+            public ContactDataSource[] ContactManifolds;
+        }
+        ContactManifoldSet contactManifolds;
+
+        public ContactManifoldConstraintBatch(Bodies bodies, ContactManifoldSet contactManifolds)
         {
             Bodies = bodies;
+            this.contactManifolds = contactManifolds;
         }
 
         public override void Add<TAddDescription>(ref TAddDescription genericDescription)
@@ -83,6 +110,12 @@ namespace SolverPrototype
         {
             throw new NotImplementedException();
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void GatherContactData(ref ContactManifoldPrestepData contactManifoldPrestepData, out ContactData contactData, out SpringSettings springSettings)
+        {
+            throw new NotImplementedException();
+        } 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ComputeJacobiansAndError(ref ContactData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)
@@ -123,15 +156,17 @@ namespace SolverPrototype
             error = contact.PenetrationDepth;
         }
 
-        public override void Prestep()
+        public override void Prestep(float dt, float inverseDt)
         {
             for (int i = 0; i < bundleCount; ++i)
             {
-                GatherContactData(ref prestepData[i], out var contactData, );
+                GatherContactData(ref prestepData[i], out var contactData, out var springSettings);
                 ComputeJacobiansAndError(ref contactData, out var jacobians, out var error);
-                Inequality2Body1DOF.Prestep(Bodies.InertiaBundles, ref prestepData[i].BodyReferences, ref IterationData[i], ref jacobians, ref contactData.SpringSettings, ref error, ref prestepData.MaximumReocver)
+                Inequality2Body1DOF.Prestep(Bodies.InertiaBundles, ref IterationData[i], ref jacobians, ref springSettings, ref error, dt, inverseDt);
             }
         }
+
+
         public override void WarmStart()
         {
             throw new NotImplementedException();
