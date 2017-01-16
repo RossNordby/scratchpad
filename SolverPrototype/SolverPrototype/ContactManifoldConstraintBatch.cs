@@ -29,6 +29,7 @@ namespace SolverPrototype
         public Vector3Wide OffsetB;
         public Vector3Wide Normal;
         public Vector<float> PenetrationDepth;
+        public SpringSettings SpringSettings;
     }
 
 
@@ -39,7 +40,7 @@ namespace SolverPrototype
     /// Note that the implementation of a constraint is handled at the batch level. Individual constraints are just blobs of data.
     /// There is no SuchAndSuchConstraint.cs that contains per-constraint Prestep/WarmStart/Solve functions. This is it!
     /// </remarks>
-    public class ContactManifoldConstraintBatch : ConstraintTypeBatch
+    public class ContactManifoldConstraintBatch : PrestepTypeBatch
     {
         int bundleCount;
         int constraintCount;
@@ -166,16 +167,7 @@ namespace SolverPrototype
             }
         }
 
-
-        public override void WarmStart()
-        {
-            throw new NotImplementedException();
-        }
-        public override void SolveIteration()
-        {
-            throw new NotImplementedException();
-        }
-
+        
 
 
     }

@@ -67,9 +67,8 @@ namespace SolverPrototype
         public Vector<float> BiasImpulse;
         //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
         public Vector<float> SoftnessImpulseScale;
-        //Technically, nothing above this point is accessed by the WarmStart, so you COULD split it into two pieces to lower the touched memory of WarmStart...
-        //but I'm not sure if we gain enough for that to be meaningful. We'd gain another address stream during solve. Something to test, maybe.
-        public Vector<float> AccumulatedImpulse;
+        //Technically, nothing above this point is accessed by the WarmStart, so you COULD split it into two pieces to eliminate large strides...
+        //but I'm not sure if we gain anything. We'd have another address stream during solve. Something to test, maybe. (Very low value!)
 
         //It also needs to project from constraint space to world space.
         //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,
@@ -81,8 +80,7 @@ namespace SolverPrototype
         public Vector3Wide CSIToWSVAngularA;
         public Vector3Wide CSIToWSVLinearB;
         public Vector3Wide CSIToWSVAngularB;
-
-        public BodyReferences BodyReferences;
+        
     }
 
 
@@ -90,7 +88,7 @@ namespace SolverPrototype
     {
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(BodyInertias[] bodyInertias, ref IterationData2Body1DOF data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
+        public static void Prestep(BodyInertias[] bodyInertias, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
             ref Vector<float> positionError, float dt, float inverseDt)
         {
             //effective mass = (J * M^-1 * JT)^-1
@@ -112,7 +110,7 @@ namespace SolverPrototype
 
             //(If you want to know how this stuff works, go read the constraint related presentations: http://box2d.org/downloads/
             //Be mindful of the difference in conventions. You'll see J * v instead of v * JT, for example. Everything is still fundamentally the same, though.)
-            GatherScatter.GatherInertia(bodyInertias, ref data.BodyReferences, out var inertiaA, out var inertiaB);
+            GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
 
             //Due to the block structure of the mass matrix, we can handle each component separately and then sum the results.
             //For this 1DOF constraint, the result is a simple scalar.
@@ -342,7 +340,7 @@ namespace SolverPrototype
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies,
         /// then scatters the result to the body velocity memory locations.
         /// </summary>
-        public static void ApplyImpulse(BodyVelocities[] velocities, ref IterationData2Body1DOF data,
+        public static void ApplyImpulse(BodyVelocities[] velocities, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data,
             ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Vector<float> correctiveImpulse)
         {
             //Applying the impulse requires transforming the constraint space impulse into a world space velocity change.
@@ -359,20 +357,20 @@ namespace SolverPrototype
             Vector3Wide.Add(ref correctiveVelocityA.AngularVelocity, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityB.LinearVelocity, ref wsvB.LinearVelocity, out wsvB.LinearVelocity);
             Vector3Wide.Add(ref correctiveVelocityB.AngularVelocity, ref wsvB.AngularVelocity, out wsvB.AngularVelocity);
-            GatherScatter.ScatterVelocities(velocities, ref data.BodyReferences, ref wsvA, ref wsvB);
+            GatherScatter.ScatterVelocities(velocities, ref bodyReferences, ref wsvA, ref wsvB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(BodyVelocities[] velocities, ref IterationData2Body1DOF data)
+        public static void WarmStart(BodyVelocities[] velocities, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse)
         {
-            GatherScatter.GatherVelocities(velocities, ref data.BodyReferences, out var wsvA, out var wsvB);
+            GatherScatter.GatherVelocities(velocities, ref bodyReferences, out var wsvA, out var wsvB);
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
-            ApplyImpulse(velocities, ref data, ref wsvA, ref wsvB, ref data.AccumulatedImpulse);
+            ApplyImpulse(velocities, ref bodyReferences, ref data, ref wsvA, ref wsvB, ref accumulatedImpulse);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref IterationData2Body1DOF data,
+        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse,
             out Vector<float> correctiveCSI)
         {
             //Take the world space velocity of each body into constraint space by transforming by the transpose(jacobian).
@@ -388,21 +386,21 @@ namespace SolverPrototype
             //constraint space impulse = (targetVelocity - currentVelocity) * softenedEffectiveMass
             //constraint space impulse = (bias + accumulatedImpulse * softness - wsv * JT) * softenedEffectiveMass
             //constraint space impulse = (bias * softenedEffectiveMass) + accumulatedImpulse * (softness * softenedEffectiveMass) - wsv * (JT * softenedEffectiveMass)
-            var csi = data.BiasImpulse + data.AccumulatedImpulse * data.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
+            var csi = data.BiasImpulse + accumulatedImpulse * data.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
 
-            var previousAccumulated = data.AccumulatedImpulse;
-            data.AccumulatedImpulse = Vector.Min(Vector<float>.Zero, data.AccumulatedImpulse + csi);
+            var previousAccumulated = accumulatedImpulse;
+            accumulatedImpulse = Vector.Min(Vector<float>.Zero, accumulatedImpulse + csi);
 
-            correctiveCSI = data.AccumulatedImpulse - previousAccumulated;
+            correctiveCSI = accumulatedImpulse - previousAccumulated;
 
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(BodyVelocities[] velocities,ref IterationData2Body1DOF data)
+        public static void Solve(BodyVelocities[] velocities, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse)
         {
-            GatherScatter.GatherVelocities(velocities, ref data.BodyReferences, out var wsvA, out var wsvB);
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, out var correctiveCSI);
-            ApplyImpulse(velocities, ref data, ref wsvA, ref wsvB, ref correctiveCSI);
+            GatherScatter.GatherVelocities(velocities, ref bodyReferences, out var wsvA, out var wsvB);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref accumulatedImpulse, out var correctiveCSI);
+            ApplyImpulse(velocities, ref bodyReferences, ref data, ref wsvA, ref wsvB, ref correctiveCSI);
 
         }
 

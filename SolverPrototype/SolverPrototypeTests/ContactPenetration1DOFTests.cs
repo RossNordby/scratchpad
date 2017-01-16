@@ -86,16 +86,16 @@ namespace SolverPrototypeTests
                 {
                     ContactManifoldConstraintBatch.ComputeJacobiansAndError(ref contactData[i], out var jacobians, out var error);
                     var maximumRecoveryVelocity = new Vector<float>(1);
-                    Inequality2Body1DOF.Prestep(bodies.InertiaBundles, ref iterationData[i], ref jacobians, ref springSettings[i],
+                    Inequality2Body1DOF.Prestep(bodies.InertiaBundles, ref bodyReferences[i], ref iterationData[i], ref jacobians, ref springSettings[i],
                         ref error, ref maximumRecoveryVelocity, dt, inverseDt);
 
-                    Inequality2Body1DOF.WarmStart(bodies.VelocityBundles, ref iterationData[i]);
+                    Inequality2Body1DOF.WarmStart(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
                 }
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
                 {
                     for (int i = 0; i < constraintBundleCount; ++i)
                     {
-                        Inequality2Body1DOF.Solve(bodies.VelocityBundles, ref iterationData[i]);
+                        Inequality2Body1DOF.Solve(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
                     }
                 }
             }

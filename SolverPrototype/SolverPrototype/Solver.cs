@@ -7,6 +7,7 @@ namespace SolverPrototype
     public class Solver
     {
         QuickList<ConstraintBatch> batches;
+        QuickList<TypeBatch> solveBatches;
 
         int iterationCount;
         /// <summary>
@@ -78,10 +79,8 @@ namespace SolverPrototype
             for (int i = 0; i < batches.Count; ++i)
             {
                 var batch = batches.Elements[i];
-                for (int j = 0; j < batch.TypeBatches.Count; ++j)
-                {
-                    batch.TypeBatches.Elements[j].Prestep();
-                }
+                batch.TypeBatches.Elements[j].Prestep();
+
             }
             for (int i = 0; i < batches.Count; ++i)
             {

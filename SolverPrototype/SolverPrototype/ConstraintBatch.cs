@@ -12,13 +12,13 @@ namespace SolverPrototype
     {
         public BatchReferencedHandles Handles;
         public int[] TypeIndexToTypeBatchIndex;
-        public QuickList<ConstraintTypeBatch> TypeBatches;
+        public QuickList<PrestepTypeBatch> TypeBatches;
 
         public ConstraintBatch()
         {
             Handles = new BatchReferencedHandles(128);
             ResizeTypeMap(16);
-            TypeBatches = new QuickList<ConstraintTypeBatch>(new PassthroughBufferPool<ConstraintTypeBatch>());
+            TypeBatches = new QuickList<PrestepTypeBatch>(new PassthroughBufferPool<PrestepTypeBatch>());
         }
 
         void ResizeTypeMap(int newSize)
@@ -33,12 +33,12 @@ namespace SolverPrototype
 
         public void Add<T>(ref T constraint) where T : IConstraintDescription
         {
-            ConstraintTypeBatch typeBatch;
+            PrestepTypeBatch typeBatch;
             if (constraint.ConstraintTypeId >= TypeIndexToTypeBatchIndex.Length)
             {
                 ResizeTypeMap(1 << BufferPool.GetPoolIndex(constraint.ConstraintTypeId));
                 TypeIndexToTypeBatchIndex[constraint.ConstraintTypeId] = TypeBatches.Count;
-                TypeBatches.Add(typeBatch = ConstraintTypeBatch.TypeBatchPools[constraint.ConstraintTypeId].LockingTake());
+                TypeBatches.Add(typeBatch = PrestepTypeBatch.TypeBatchPools[constraint.ConstraintTypeId].LockingTake());
             }
             else
             {
@@ -46,7 +46,7 @@ namespace SolverPrototype
                 if (typeBatchIndex == -1)
                 {
                     typeBatchIndex = TypeBatches.Count;
-                    TypeBatches.Add(typeBatch = ConstraintTypeBatch.TypeBatchPools[constraint.ConstraintTypeId].LockingTake());
+                    TypeBatches.Add(typeBatch = PrestepTypeBatch.TypeBatchPools[constraint.ConstraintTypeId].LockingTake());
                 }
                 else
                 {
@@ -72,7 +72,7 @@ namespace SolverPrototype
                     //If we swapped anything into the removed slot, we should update the type index to type batch mapping.
                     TypeIndexToTypeBatchIndex[TypeBatches.Elements[typeBatchIndex].ConstraintTypeIndex] = typeBatchIndex;
                 }
-                ConstraintTypeBatch.TypeBatchPools[constraintTypeId].LockingReturn(typeBatch);
+                PrestepTypeBatch.TypeBatchPools[constraintTypeId].LockingReturn(typeBatch);
 
             }
 

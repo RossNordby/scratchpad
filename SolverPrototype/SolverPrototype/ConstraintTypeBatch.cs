@@ -14,7 +14,7 @@ namespace SolverPrototype
     /// permits the cache friendly contiguous storage of constraint properties.
     /// (And it avoids performing virtual dispatches at every constraint solve, but that's not very important.)
     /// </remarks>
-    public abstract class ConstraintTypeBatch
+    public abstract class PrestepTypeBatch
     {
         /// <summary>
         /// Gets the constraint type index associated with this type batch.
@@ -29,41 +29,16 @@ namespace SolverPrototype
         //It is technically possible to misuse this and add with an invalid type.
         //This would require an internal bug of some kind, though- something like an invalid constraint type id.
         //We'll catch that failure with runtime debug asserts.
-        public abstract void Add<T>(ref T constraint);
+        public abstract void Add<T>(ref T constraint, SolveBatchSet solveBatchSet);
         public abstract void Remove(int constraintHandle);
 
         public abstract void Prestep();
-        public abstract void WarmStart();
-        public abstract void SolveIteration();
 
         /// <summary>
         /// Relinquishes resources to pools and returns to a freshly created state.
         /// </summary>
         public abstract void Reset();
-
-        /// <summary>
-        /// List of type batch pools, indices matching up with the constraint type produced by the pool.
-        /// If you want to add to it, use the RegisterConstraintType function.
-        /// </summary>
-        /// <remarks>Modifying this through anything but the RegisterConstraintType function can break a lot of stuff. Be careful about what you do and when you do it.</remarks>
-        public readonly static List<Pool<ConstraintTypeBatch>> TypeBatchPools = new List<Pool<ConstraintTypeBatch>>();
-
-        /// <summary>
-        /// Claims an index for a constraint type.
-        /// Not safe to call while adding constraints to a constraint batch or while the engine is updating.
-        /// </summary>
-        /// <returns>Registered index.</returns>
-        public static int RegisterConstraintType(Pool<ConstraintTypeBatch> typeBatchPool)
-        {
-            lock (TypeBatchPools)
-            {
-                Debug.Assert(!TypeBatchPools.Contains(typeBatchPool), "Can't register the same type pool multiple times!");
-                var typeIndex = TypeBatchPools.Count;
-                TypeBatchPools.Add(typeBatchPool);
-                return typeIndex;
-            }
-        }
-
+        
     }
 
 
@@ -73,15 +48,19 @@ namespace SolverPrototype
         {
             internal static int Id;
         }
-        static class BatchIds<T> where T : ConstraintTypeBatch
+        static class BatchIds<T> where T : PrestepTypeBatch
         {
             internal static int Id;
         }
-        
+        static class DescriptionIds<T> where T : IConstraintDescription
+        {
+            internal static int Id;
+        }
+
         static HashSet<Type> registeredBatchTypes = new HashSet<Type>();
 
 
-        public void GetBatchId<T>() where T : ConstraintTypeBatch
+        public void GetBatchId<T>() where T : PrestepTypeBatch
         {
             Debug.Assert(registeredTypes.Contains(typeof(T)));
         }

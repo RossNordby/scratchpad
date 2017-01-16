@@ -53,8 +53,9 @@
     <Compile Include="Bodies.cs" />
     <Compile Include="ConstraintBatch.cs" />
     <Compile Include="ConstraintInterfaces.cs" />
+    <Compile Include="IConstraint.cs" />
     <Compile Include="SolveBatch.cs" />
-    <Compile Include="Inequality1DOFSolveBatch.cs" />
+    <Compile Include="ContactPenetrationTypeBatch.cs" />
     <Compile Include="ContactManifoldConstraintBatch.cs" />
     <Compile Include="Solver.cs" />
     <Compile Include="ConstraintTypeBatch.cs" />

@@ -49,6 +49,27 @@ namespace SolverPrototype
             }
         }
 
+        /// <summary>
+        /// Clears a bundle lane using the default value of the specified type. The bundle must be a contiguous block of Vector types, all sharing the same type.
+        /// </summary>
+        /// <typeparam name="TOuter">Type containing one or more Vectors.</typeparam>
+        /// <typeparam name="TVector">Type of the vectors to clear.</typeparam>
+        /// <param name="bundle">Target bundle to clear a lane in.</param>
+        /// <param name="innerIndex">Index of the lane within the target bundle to clear.</param>
+        /// <remarks>
+        /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
+        /// </remarks>
+        internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex)
+        {
+            var sizeInInts = Unsafe.SizeOf<TOuter>() >> 2;
+            var strideInInts = sizeInInts >> BundleIndexing.VectorShift;
+            ref var laneBase = ref Unsafe.Add(ref Unsafe.As<TOuter, TVector>(ref bundle), innerIndex);
+            for (int i = 0; i < sizeInInts; i += strideInInts)
+            {
+                Unsafe.Add(ref laneBase, i) = default(TVector);
+            }
+        }
+
         //IMPLEMENTATION NOTES:
 
         //'NULL' CONSTRAINT CONNECTIONS
