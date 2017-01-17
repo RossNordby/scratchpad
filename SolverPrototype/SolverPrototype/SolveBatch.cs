@@ -93,12 +93,21 @@ namespace SolverPrototype
         public override void Initialize()
         {
             IterationData = BufferPools<TIterationData>.Locking.Take(InitialCapacity);
+            BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacity);
+            PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacity);
+            AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacity);
         }
 
         public override void Reset()
         {
             BufferPools<TIterationData>.Locking.Return(IterationData);
+            BufferPools<TBodyReferences>.Locking.Return(BodyReferences);
+            BufferPools<TPrestepData>.Locking.Return(PrestepData);
+            BufferPools<TAccumulatedImpulse>.Locking.Return(AccumulatedImpulses);
             IterationData = null;
+            BodyReferences = null;
+            AccumulatedImpulses = null;
+            AccumulatedImpulses = null;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

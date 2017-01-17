@@ -389,7 +389,7 @@ namespace SolverPrototype
             var csi = data.BiasImpulse + accumulatedImpulse * data.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
 
             var previousAccumulated = accumulatedImpulse;
-            accumulatedImpulse = Vector.Min(Vector<float>.Zero, accumulatedImpulse + csi);
+            accumulatedImpulse = Vector.Max(Vector<float>.Zero, accumulatedImpulse + csi);
 
             correctiveCSI = accumulatedImpulse - previousAccumulated;
 

@@ -52,13 +52,11 @@
     <Compile Include="BatchReferencedHandles.cs" />
     <Compile Include="Bodies.cs" />
     <Compile Include="ConstraintBatch.cs" />
-    <Compile Include="ConstraintInterfaces.cs" />
-    <Compile Include="IConstraint.cs" />
+    <Compile Include="ContactData.cs" />
     <Compile Include="SolveBatch.cs" />
     <Compile Include="ContactPenetrationTypeBatch.cs" />
-    <Compile Include="ContactManifoldConstraintBatch.cs" />
     <Compile Include="Solver.cs" />
-    <Compile Include="ConstraintTypeBatch.cs" />
+    <Compile Include="ConstraintTypeIds.cs" />
     <Compile Include="GatherScatter.cs" />
     <Compile Include="Matrix3x3Wide.cs" />
     <Compile Include="BundleIndexing.cs" />

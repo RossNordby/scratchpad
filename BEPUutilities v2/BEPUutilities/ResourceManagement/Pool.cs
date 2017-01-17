@@ -46,6 +46,14 @@ namespace BEPUutilities2.ResourceManagement
         }
 
         /// <summary>
+        /// Gets or sets the function used to initialize objects taken from the pool. Runs even if the object was just created by the Creator delegate.
+        /// </summary>
+        public Action<T> Initializer
+        {
+            get; set;
+        }
+
+        /// <summary>
         /// Gets or sets the action applied to an element when it is returned to the pool.
         /// </summary>
         public Action<T> Cleaner
@@ -53,11 +61,10 @@ namespace BEPUutilities2.ResourceManagement
             get; set;
         }
 
-        public Pool(Func<T> creator, Action<T> cleaner = null)
+        public Pool(Func<T> creator, Action<T> initializer = null, Action<T> cleaner = null)
         {
-            if (creator == null)
-                throw new ArgumentException("Creator must not be null.");
-            Creator = creator;
+            Creator = creator ?? throw new ArgumentException("Creator must not be null.");
+            Initializer = initializer;
             Cleaner = cleaner;
         }
 
@@ -96,6 +103,7 @@ namespace BEPUutilities2.ResourceManagement
             {
                 item = Creator();
             }
+            Initializer?.Invoke(item);
 #if DEBUG
             OutstandingElements.Add(item);
 #endif
@@ -114,8 +122,7 @@ namespace BEPUutilities2.ResourceManagement
                 throw new InvalidOperationException("Cannot return an item that did not originate from this pool.");
 #endif
 
-            if (Cleaner != null)
-                Cleaner(item);
+            Cleaner?.Invoke(item);
 
             stack.Push(item);
         }
