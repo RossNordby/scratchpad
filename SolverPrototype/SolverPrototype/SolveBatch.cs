@@ -22,6 +22,25 @@ namespace SolverPrototype
         public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle);
         public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
         public abstract void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt)
+        {
+            Prestep(bodyInertias, dt, inverseDt, 0, bundleCount);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WarmStart(BodyVelocities[] bodyVelocities)
+        {
+            WarmStart(bodyVelocities, 0, bundleCount);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SolveIteration(BodyVelocities[] bodyVelocities)
+        {
+            SolveIteration(bodyVelocities, 0, bundleCount);
+        }
+
     }
     public abstract class TypeBatch<TBodyReferences, TPrestepData, TIterationData, TAccumulatedImpulse> : TypeBatch
     {
@@ -110,16 +129,6 @@ namespace SolverPrototype
             AccumulatedImpulses = null;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WarmStart(BodyVelocities[] bodyVelocities)
-        {
-            WarmStart(bodyVelocities, 0, bundleCount);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SolveIteration(BodyVelocities[] bodyVelocities)
-        {
-            SolveIteration(bodyVelocities, 0, bundleCount);
-        }
 
 
     }

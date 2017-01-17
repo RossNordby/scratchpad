@@ -7,7 +7,6 @@ namespace SolverPrototype
     public class Solver
     {
         QuickList<ConstraintBatch> batches;
-        QuickList<TypeBatch> solveBatches;
 
         int iterationCount;
         /// <summary>
@@ -26,20 +25,22 @@ namespace SolverPrototype
             }
         }
 
-        public Solver(int iterationCount = 5)
+        Bodies bodies;
+        public Solver(Bodies bodies, int iterationCount = 5)
         {
             this.iterationCount = iterationCount;
+            this.bodies = bodies;
             batches = new QuickList<ConstraintBatch>(new PassthroughBufferPool<ConstraintBatch>());
         }
 
-        public void Add<T>(ref T constraint) where T : ITwoBodyConstraintDescription
+        public void Allocate<T>(int bodyHandleA, int bodyHandleB) where T : TypeBatch, new()
         {
             ConstraintBatch targetBatch = null;
             for (int i = 0; i < batches.Count; ++i)
             {
                 var batch = batches[i];
-                if (!batch.Handles.Contains(constraint.BodyHandleA) &&
-                    !batch.Handles.Contains(constraint.BodyHandleB))
+                if (!batch.Handles.Contains(bodyHandleA) &&
+                    !batch.Handles.Contains(bodyHandleB))
                 {
                     targetBatch = batch;
                 }
@@ -50,9 +51,9 @@ namespace SolverPrototype
                 targetBatch = new ConstraintBatch();
                 batches.Add(targetBatch);
             }
-            targetBatch.Handles.Add(constraint.BodyHandleA);
-            targetBatch.Handles.Add(constraint.BodyHandleB);
-            targetBatch.Add(ref constraint);
+            targetBatch.Handles.Add(bodyHandleA);
+            targetBatch.Handles.Add(bodyHandleB);
+            var indexInTypeBatch = targetBatch.Allocate<T>();
         }
 
         //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal
@@ -72,22 +73,24 @@ namespace SolverPrototype
         //5) Even if we are in a 'suboptimal' constraint configuration (i.e. some pulldowns exist), it will rarely have an effect on performance unless it actually results in extra batches.
         //6) Dedicated analysis could afford to perform more complex heuristics to optimize batches.
 
-        public void Update()
+        public void Update(float dt, float inverseDt)
         {
             //TODO: Note that the prestep phase is completely parallel. When multithreading, there is no need to stop at the boundaries of bodybatches.
             //You could technically build a separate list that ignores bodybatch boundaries. Value is unclear.
             for (int i = 0; i < batches.Count; ++i)
             {
                 var batch = batches.Elements[i];
-                batch.TypeBatches.Elements[j].Prestep();
-
+                for (int j = 0; j < batch.TypeBatches.Count; ++j)
+                {
+                    batch.TypeBatches.Elements[j].Prestep(bodies.InertiaBundles, dt, inverseDt);
+                }
             }
             for (int i = 0; i < batches.Count; ++i)
             {
                 var batch = batches.Elements[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches.Elements[j].WarmStart();
+                    batch.TypeBatches.Elements[j].WarmStart(bodies.VelocityBundles);
                 }
             }
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
@@ -97,7 +100,7 @@ namespace SolverPrototype
                     var batch = batches.Elements[i];
                     for (int j = 0; j < batch.TypeBatches.Count; ++j)
                     {
-                        batch.TypeBatches.Elements[j].SolveIteration();
+                        batch.TypeBatches.Elements[j].SolveIteration(bodies.VelocityBundles);
                     }
                 }
             }
