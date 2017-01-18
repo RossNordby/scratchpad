@@ -68,7 +68,9 @@ namespace SolverPrototype
         //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
         public Vector<float> SoftnessImpulseScale;
         //Technically, nothing above this point is accessed by the WarmStart, so you COULD split it into two pieces to eliminate large strides...
-        //but I'm not sure if we gain anything. We'd have another address stream during solve. Something to test, maybe. (Very low value!)
+        //but I'm not sure if we gain anything. We'd have another address stream during solve. Something to test, maybe.
+        //(Most likely, splitting would be a very slight overall win... note that even non-pretransformed constraints can use the same split.
+        //Bias and softness would be alone in the 'pre' data, while the jacobians and M^-1 would be in the 'post' data.
 
         //It also needs to project from constraint space to world space.
         //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,

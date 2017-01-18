@@ -34,7 +34,8 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int handleIndex)
         {
-            return (packedHandles[handleIndex >> shift] & (1ul << (handleIndex & mask))) > 0;
+            var packedIndex = handleIndex >> shift;
+            return packedIndex < packedHandles.Length && (packedHandles[packedIndex] & (1ul << (handleIndex & mask))) > 0;
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -57,15 +57,14 @@ namespace SolverPrototype
             return TypeBatches.Elements[typeBatchIndex];
         }
 
-        public int Allocate<T>() where T : TypeBatch, new()
+        public void Allocate<T>(out ConstraintReference<T> constraintPointer) where T : TypeBatch, new()
         {
-            var typeId = ConstraintTypeIds.GetId<T>();
-            TypeBatch typeBatch;
+            var typeId = ConstraintTypeIds.GetId<T>(); 
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
             {
                 ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
                 TypeIndexToTypeBatchIndex[typeId] = TypeBatches.Count;
-                TypeBatches.Add(typeBatch = ConstraintTypeIds.Take<T>());
+                TypeBatches.Add(constraintPointer.TypeBatch = ConstraintTypeIds.Take<T>());
             }
             else
             {
@@ -73,14 +72,15 @@ namespace SolverPrototype
                 if (typeBatchIndex == -1)
                 {
                     typeBatchIndex = TypeBatches.Count;
-                    TypeBatches.Add(typeBatch = ConstraintTypeIds.Take<T>());
+                    TypeBatches.Add(constraintPointer.TypeBatch = ConstraintTypeIds.Take<T>());
                 }
                 else
                 {
-                    typeBatch = TypeBatches.Elements[typeBatchIndex];
+                    Debug.Assert(typeof(T) == TypeBatches.Elements[typeBatchIndex].GetType());
+                    constraintPointer.TypeBatch = Unsafe.As<T>(TypeBatches.Elements[typeBatchIndex]);
                 }
             }
-            return typeBatch.Allocate();
+            constraintPointer.IndexInTypeBatch = constraintPointer.TypeBatch.Allocate();
         }
 
         public void Remove<T>(int indexInTypeBatch) where T : TypeBatch

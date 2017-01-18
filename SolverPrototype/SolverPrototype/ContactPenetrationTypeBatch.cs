@@ -1,7 +1,4 @@
-﻿using BEPUutilities2.ResourceManagement;
-using System;
-using System.Diagnostics;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype

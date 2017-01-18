@@ -1,9 +1,21 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
 using System;
+using System.Diagnostics;
 
 namespace SolverPrototype
 {
+    /// <summary>
+    /// Reference to a particular constraint in a type batch.
+    /// </summary>
+    /// <typeparam name="T">Type of the batch referenced.</typeparam>
+    public struct ConstraintReference<T>
+    {
+        public T TypeBatch;
+        public int IndexInTypeBatch;
+    }
+
+
     public class Solver
     {
         QuickList<ConstraintBatch> batches;
@@ -26,34 +38,69 @@ namespace SolverPrototype
         }
 
         Bodies bodies;
-        public Solver(Bodies bodies, int iterationCount = 5)
+
+        struct ConstraintLocation
+        {
+            //Note that the type id is omitted. To be useful, any access of a constraint pointer is expected to supply a generic type parameter.
+            //The type id can be retrieved from that efficiently. We may change this to store it later if typeless access patterns become common.
+            public int BatchIndex;
+            public int IndexInTypeBatch;
+        }
+        IdPool handlePool = new IdPool();
+        ConstraintLocation[] HandlesToConstraints;
+
+        public Solver(Bodies bodies, int iterationCount = 5, int initialCapacity = 128)
         {
             this.iterationCount = iterationCount;
             this.bodies = bodies;
             batches = new QuickList<ConstraintBatch>(new PassthroughBufferPool<ConstraintBatch>());
+            HandlesToConstraints = new ConstraintLocation[initialCapacity];
         }
 
-        public void Allocate<T>(int bodyHandleA, int bodyHandleB) where T : TypeBatch, new()
+
+        public void GetConstraintPointer<T>(int handleIndex, out ConstraintReference<T> constraintPointer) where T : TypeBatch
         {
-            ConstraintBatch targetBatch = null;
+            ref var constraintLocation = ref HandlesToConstraints[handleIndex];
+            constraintPointer.TypeBatch = batches.Elements[constraintLocation.BatchIndex].GetTypeBatch<T>();
+            constraintPointer.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
+        }
+
+        public void Allocate<T>(int bodyHandleA, int bodyHandleB, out ConstraintReference<T> constraintReference, out int handleIndex) where T : TypeBatch, new()
+        {
+            int targetBatchIndex = -1;
             for (int i = 0; i < batches.Count; ++i)
             {
                 var batch = batches[i];
                 if (!batch.Handles.Contains(bodyHandleA) &&
                     !batch.Handles.Contains(bodyHandleB))
                 {
-                    targetBatch = batch;
+                    targetBatchIndex = i;
                 }
             }
-            if (targetBatch == null)
+            ConstraintBatch targetBatch;
+            if (targetBatchIndex == -1)
             {
                 //No batch available. Have to create a new one.
                 targetBatch = new ConstraintBatch();
+                targetBatchIndex = batches.Count;
                 batches.Add(targetBatch);
+            }
+            else
+            {
+                targetBatch = batches.Elements[targetBatchIndex];
             }
             targetBatch.Handles.Add(bodyHandleA);
             targetBatch.Handles.Add(bodyHandleB);
-            var indexInTypeBatch = targetBatch.Allocate<T>();
+            targetBatch.Allocate(out constraintReference);
+
+            handleIndex = handlePool.Take();
+            if(handleIndex >= HandlesToConstraints.Length)
+            {
+                Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);
+                Debug.Assert(handleIndex < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
+            }
+            HandlesToConstraints[handleIndex].IndexInTypeBatch = constraintReference.IndexInTypeBatch;
+            HandlesToConstraints[handleIndex].BatchIndex = targetBatchIndex;
         }
 
         //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal

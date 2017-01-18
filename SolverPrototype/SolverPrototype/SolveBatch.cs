@@ -73,8 +73,10 @@ namespace SolverPrototype
             Debug.Assert(IterationData != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == IterationData.Length)
             {
+                IncreaseSize(ref BodyReferences);
                 IncreaseSize(ref PrestepData);
                 IncreaseSize(ref IterationData);
+                IncreaseSize(ref AccumulatedImpulses);
             }
             var index = constraintCount++;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
