@@ -42,8 +42,17 @@ namespace SolverPrototype
         public Vector<int> InnerIndexA;
         public Vector<int> BundleIndexB;
         public Vector<int> InnerIndexB;
-        //TODO: there may be an argument to make this a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
         public int Count;
+
+        //TODO: there may be an argument to make the count a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
+        //It would look something like this. A bit awkward due to the restrictions on ref returns, but functionally workable. This isn't something an external user is expected to deal with
+        //so as long as it is speedy, it doesn't matter.
+        //Vector<int> paddedCount;
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //public static ref int PaddedCount(ref BodyReferences references)
+        //{
+        //    return ref Unsafe.As<Vector<int>, int>(ref references.paddedCount);
+        //}
     }
 
     public struct SpringSettings
@@ -82,13 +91,13 @@ namespace SolverPrototype
         public Vector3Wide CSIToWSVAngularA;
         public Vector3Wide CSIToWSVLinearB;
         public Vector3Wide CSIToWSVAngularB;
-        
+
     }
 
 
     public static class Inequality2Body1DOF
     {
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(BodyInertias[] bodyInertias, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
             ref Vector<float> positionError, float dt, float inverseDt)

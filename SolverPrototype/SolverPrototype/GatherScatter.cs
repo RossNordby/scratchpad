@@ -43,7 +43,7 @@ namespace SolverPrototype
             var strideInInts = sizeInInts >> BundleIndexing.VectorShift;
             ref var sourceBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref sourceBundle), sourceInnerIndex);
             ref var targetBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref targetBundle), targetInnerIndex);
-            for (int i = 0; i < sizeInInts; i+= strideInInts)
+            for (int i = 0; i < sizeInInts; i += strideInInts)
             {
                 Unsafe.Add(ref targetBase, i) = Unsafe.Add(ref sourceBase, i);
             }
@@ -232,46 +232,66 @@ namespace SolverPrototype
                 }
             }
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void SetLane(ref BodyInertias targetBundle, int innerIndex, ref Matrix3x3 inverseInertiaTensor, float inverseMass)
+        public static unsafe void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
         {
             ref var targetLane = ref Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
 
-            targetLane = inverseInertiaTensor.X.X;
-            Unsafe.Add(ref targetLane, Vector<float>.Count) = inverseInertiaTensor.X.Y;
-            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inverseInertiaTensor.X.Z;
-            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inverseInertiaTensor.Y.X;
-            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inverseInertiaTensor.Y.Y;
-            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inverseInertiaTensor.Y.Z;
-            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inverseInertiaTensor.Z.X;
-            Unsafe.Add(ref targetLane, 7 * Vector<float>.Count) = inverseInertiaTensor.Z.Y;
-            Unsafe.Add(ref targetLane, 8 * Vector<float>.Count) = inverseInertiaTensor.Z.Z;
-            Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inverseMass;
+            targetLane = inertia.InverseInertiaTensor.X.X;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.X.Y;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inertia.InverseInertiaTensor.X.Z;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.X;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Y;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Z;
+            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.X;
+            Unsafe.Add(ref targetLane, 7 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Y;
+            Unsafe.Add(ref targetLane, 8 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Z;
+            Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inertia.InverseMass;
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void SetLane(ref BodyVelocities targetBundle, int innerIndex, ref Vector3 linearVelocity, ref Vector3 angularVelocity)
+        public static unsafe void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
         {
-            ref var targetLane = ref Get(ref targetBundle.LinearVelocity.X, innerIndex);
+            ref var sourceLane = ref Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
 
-            targetLane = linearVelocity.X;
-            Unsafe.Add(ref targetLane, Vector<float>.Count) = linearVelocity.Y;
-            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = linearVelocity.Z;
-            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = angularVelocity.X;
-            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = angularVelocity.Y;
-            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = angularVelocity.Z;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GetLane(ref BodyVelocities targetBundle, int innerIndex, out Vector3 linearVelocity, out Vector3 angularVelocity)
-        {
-            ref var sourceLane = ref Get(ref targetBundle.LinearVelocity.X, innerIndex);
-
-            linearVelocity = new Vector3(
+            inertia.InverseInertiaTensor.X = new Vector3(
                 sourceLane,
                 Unsafe.Add(ref sourceLane, Vector<float>.Count),
                 Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
-            angularVelocity = new Vector3(
+            inertia.InverseInertiaTensor.Y = new Vector3(
+                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
+            inertia.InverseInertiaTensor.Z = new Vector3(
+                Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 7 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 8 * Vector<float>.Count));
+            inertia.InverseMass =
+                Unsafe.Add(ref sourceLane, 9 * Vector<float>.Count);
+
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void SetLane(ref BodyVelocities targetBundle, int innerIndex, ref BodyVelocity velocity)
+        {
+            ref var targetLane = ref Get(ref targetBundle.LinearVelocity.X, innerIndex);
+
+            targetLane = velocity.Linear.X;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = velocity.Linear.Y;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = velocity.Linear.Z;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = velocity.Angular.X;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = velocity.Angular.Y;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = velocity.Angular.Z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void GetLane(ref BodyVelocities targetBundle, int innerIndex, out BodyVelocity velocity)
+        {
+            ref var sourceLane = ref Get(ref targetBundle.LinearVelocity.X, innerIndex);
+
+            velocity.Linear = new Vector3(
+                sourceLane,
+                Unsafe.Add(ref sourceLane, Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
+            velocity.Angular = new Vector3(
                 Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
                 Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
                 Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));

@@ -20,22 +20,26 @@ namespace SolverPrototypeTests
             {
                 var description = new BodyDescription
                 {
-                    InverseLocalInertiaTensor = new Matrix3x3
+                    LocalInertia = new BodyInertia
                     {
-                        X = new Vector3(1, 0, 0),
-                        Y = new Vector3(0, 1, 0),
-                        Z = new Vector3(0, 0, 1),
+                        InverseInertiaTensor = new Matrix3x3
+                        {
+                            X = new Vector3(1, 0, 0),
+                            Y = new Vector3(0, 1, 0),
+                            Z = new Vector3(0, 0, 1),
+                        },
+                        InverseMass = 1
                     },
-                    InverseMass = 1
                 };
                 var handleIndex = bodies.Add(ref description);
                 handleIndices[i] = handleIndex;
 
                 if ((i & 1) == 0)
                 {
-                    var linear = new Vector3(0, 1, 0);
-                    var angular = new Vector3();
-                    bodies.SetVelocity(handleIndex, ref linear, ref angular);
+                    BodyVelocity velocity;
+                    velocity.Linear = new Vector3(0, 1, 0);
+                    velocity.Angular = new Vector3();
+                    bodies.SetVelocity(handleIndex, ref velocity);
                 }
             }
 
@@ -86,7 +90,7 @@ namespace SolverPrototypeTests
                 {
                     ContactPenetrationTypeBatch.ComputeJacobiansAndError(ref contactData[i], out var jacobians, out var error);
                     var maximumRecoveryVelocity = new Vector<float>(1);
-                    Inequality2Body1DOF.Prestep(bodies.InertiaBundles, ref bodyReferences[i], ref iterationData[i], ref jacobians, ref springSettings[i],
+                    Inequality2Body1DOF.Prestep(bodies.LocalInertiaBundles, ref bodyReferences[i], ref iterationData[i], ref jacobians, ref springSettings[i],
                         ref error, dt, inverseDt);
 
                     Inequality2Body1DOF.WarmStart(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);

@@ -9,9 +9,9 @@ namespace SolverPrototype
     /// <summary>
     /// Contains a set of constraints which share no body references.
     /// </summary>
-    class ConstraintBatch
+    public class ConstraintBatch
     {
-        public BatchReferencedHandles Handles;
+        internal BatchReferencedHandles Handles;
         public int[] TypeIndexToTypeBatchIndex;
         public QuickList<TypeBatch> TypeBatches;
 

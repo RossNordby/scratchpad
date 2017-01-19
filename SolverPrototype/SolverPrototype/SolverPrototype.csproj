@@ -53,7 +53,7 @@
     <Compile Include="Bodies.cs" />
     <Compile Include="ConstraintBatch.cs" />
     <Compile Include="ContactData.cs" />
-    <Compile Include="SolveBatch.cs" />
+    <Compile Include="TypeBatch.cs" />
     <Compile Include="ContactPenetrationTypeBatch.cs" />
     <Compile Include="Solver.cs" />
     <Compile Include="ConstraintTypeIds.cs" />

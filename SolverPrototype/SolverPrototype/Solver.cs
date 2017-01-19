@@ -2,6 +2,7 @@
 using BEPUutilities2.ResourceManagement;
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
@@ -94,7 +95,7 @@ namespace SolverPrototype
             targetBatch.Allocate(out constraintReference);
 
             handleIndex = handlePool.Take();
-            if(handleIndex >= HandlesToConstraints.Length)
+            if (handleIndex >= HandlesToConstraints.Length)
             {
                 Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);
                 Debug.Assert(handleIndex < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
@@ -129,7 +130,7 @@ namespace SolverPrototype
                 var batch = batches.Elements[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches.Elements[j].Prestep(bodies.InertiaBundles, dt, inverseDt);
+                    batch.TypeBatches.Elements[j].Prestep(bodies.LocalInertiaBundles, dt, inverseDt);
                 }
             }
             for (int i = 0; i < batches.Count; ++i)
@@ -151,6 +152,21 @@ namespace SolverPrototype
                     }
                 }
             }
+        }
+
+        //This is a pure debug thing. Remember, it modifies the state of the simulation...
+        public float GetVelocityChangeHeuristic()
+        {
+            float accumulatedChanges = 0;
+            foreach (var batch in batches)
+            {
+                for (int i = 0; i < batch.TypeBatches.Count; ++i)
+                {
+                    //Replace unsafe cast with virtual call once we have other types that handle.
+                    accumulatedChanges += Unsafe.As<TypeBatch, ContactPenetrationTypeBatch>(ref batch.TypeBatches.Elements[i]).GetVelocityChangeHeuristic(bodies.VelocityBundles);
+                }
+            }
+            return accumulatedChanges;
         }
     }
 }

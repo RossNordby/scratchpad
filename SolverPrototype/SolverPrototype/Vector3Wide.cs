@@ -19,6 +19,14 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Subtract(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
+        {
+            result.X = a.X - b.X;
+            result.Y = a.Y - b.Y;
+            result.Z = a.Z - b.Z;
+        }                  
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Dot(ref Vector3Wide a, ref Vector3Wide b, out Vector<float> result)
         {
             result = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
@@ -54,5 +62,6 @@ namespace SolverPrototype
             CrossWithoutOverlap(ref a, ref b, out var temp);
             result = temp;
         }
+
     }
 }

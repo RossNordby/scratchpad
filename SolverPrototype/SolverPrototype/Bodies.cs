@@ -8,8 +8,18 @@ namespace SolverPrototype
 {
     public struct BodyDescription
     {
-        public Matrix3x3 InverseLocalInertiaTensor;
+        public BodyInertia LocalInertia;
+        public BodyVelocity Velocity;
+    }
+    public struct BodyInertia
+    {
+        public Matrix3x3 InverseInertiaTensor;
         public float InverseMass;
+    }
+    public struct BodyVelocity
+    {
+        public Vector3 Linear;
+        public Vector3 Angular;
     }
     /// <summary>
     /// Collection of allocated bodies. For now, it is assumed that all bodies are active and dynamic.
@@ -27,7 +37,13 @@ namespace SolverPrototype
         public int[] IndicesToHandleIndices;
 
         public BodyVelocities[] VelocityBundles;
-        public BodyInertias[] InertiaBundles;
+        public BodyInertias[] LocalInertiaBundles;
+        //TODO: While our current tests do not actually integrate orientation, when we do, we'll need to also update the world inertia.
+        //The constraints will need to gather from the transformed inertia rather than from the local variants.
+        //Note that the inverse mass is included in the BodyInertias bundle. InverseMass is rotationally invariant, so it doesn't need to be updated...
+        //But it's included alongside the rotated inertia tensor because to split it out would require that constraint presteps suffer another cache miss when they
+        //gather the inverse mass in isolation. (From the solver's perspective, inertia/mass gathering is incoherent.)
+        //public BodyInertias[] InertiaBundles;
         public IdPool IdPool;
         public int BodyCount;
 
@@ -36,7 +52,7 @@ namespace SolverPrototype
         public unsafe Bodies(int initialCapacityInBundles = 1024)
         {
             VelocityBundles = new BodyVelocities[initialCapacityInBundles];
-            InertiaBundles = new BodyInertias[initialCapacityInBundles];
+            LocalInertiaBundles = new BodyInertias[initialCapacityInBundles];
 
             int initialBodyCapacity = initialCapacityInBundles << BundleIndexing.VectorShift;
             IdPool = new IdPool(initialBodyCapacity);
@@ -62,7 +78,7 @@ namespace SolverPrototype
                 //Out of room; need to resize.
                 var newSize = BodyHandles.Length << 1;
                 Array.Resize(ref VelocityBundles, newSize);
-                Array.Resize(ref InertiaBundles, newSize);
+                Array.Resize(ref LocalInertiaBundles, newSize);
                 Array.Resize(ref IndicesToHandleIndices, newSize);
                 Array.Resize(ref BodyHandles, newSize);
 
@@ -75,7 +91,8 @@ namespace SolverPrototype
             IndicesToHandleIndices[index] = handleIndex;
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
-            GatherScatter.SetLane(ref InertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.InverseLocalInertiaTensor, bodyDescription.InverseMass);
+            GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
+            GatherScatter.SetLane(ref VelocityBundles[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
 
             return handleIndex;
         }
@@ -96,7 +113,7 @@ namespace SolverPrototype
                 var lastIndex = --BodyCount;
                 //Copy the memory state of the last element down.
                 VelocityBundles[index] = VelocityBundles[lastIndex];
-                InertiaBundles[index] = InertiaBundles[lastIndex];
+                LocalInertiaBundles[index] = LocalInertiaBundles[lastIndex];
                 //Point the body handles at the new location.
                 var lastHandleIndex = IndicesToHandleIndices[lastIndex];
                 BodyHandles[lastHandleIndex] = index;
@@ -107,17 +124,52 @@ namespace SolverPrototype
             BodyHandles[handleIndex] = -1;
         }
 
-        public void SetVelocity(int handleIndex, ref Vector3 linearVelocity, ref Vector3 angularVelocity)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void GetBundleIndices(int handleIndex, out int bundleIndex, out int innerIndex)
         {
             var index = BodyHandles[handleIndex];
-            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetLane(ref VelocityBundles[bundleIndex], innerIndex, ref linearVelocity, ref angularVelocity);
+            BundleIndexing.GetBundleIndices(index, out bundleIndex, out innerIndex);
         }
-        public void GetVelocity(int handleIndex, out Vector3 linearVelocity, out Vector3 angularVelocity)
+        public void SetVelocity(int handleIndex, ref BodyVelocity velocity)
         {
-            var index = BodyHandles[handleIndex];
-            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            GatherScatter.GetLane(ref VelocityBundles[bundleIndex], innerIndex, out linearVelocity, out angularVelocity);
+            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            GatherScatter.SetLane(ref VelocityBundles[bundleIndex], innerIndex, ref velocity);
         }
-    }    
+        public void GetVelocity(int handleIndex, out BodyVelocity velocity)
+        {
+            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            GatherScatter.GetLane(ref VelocityBundles[bundleIndex], innerIndex, out velocity);
+        }
+        public void SetLocalInertia(int handleIndex, ref BodyInertia inertia)
+        {
+            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, ref inertia);
+        }
+        public void GetLocalInertia(int handleIndex, ref BodyInertia inertia)
+        {
+            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            GatherScatter.GetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, out inertia);
+        }
+
+        public float GetBodyEnergyHeuristic()
+        {
+            float accumulated = 0;
+            var lastBundleIndex = (BodyCount - 1) >> BundleIndexing.VectorShift;
+            //Mask away the unused lanes. We're modifying the actual velocities; that's valid because they're unused.
+            var lastBundleCount = BodyCount - (lastBundleIndex << BundleIndexing.VectorShift);
+            var zeroVelocity = new BodyVelocity();
+            for (int i = lastBundleCount; i < Vector<float>.Count; ++i)
+            {
+                GatherScatter.SetLane(ref VelocityBundles[lastBundleIndex], lastBundleCount, ref zeroVelocity);
+            }
+            for (int bundleIndex = 0; bundleIndex <= lastBundleIndex; ++bundleIndex)
+            {
+                Vector3Wide.Dot(ref VelocityBundles[bundleIndex].LinearVelocity, ref VelocityBundles[bundleIndex].LinearVelocity, out var linearDot);
+                Vector3Wide.Dot(ref VelocityBundles[bundleIndex].AngularVelocity, ref VelocityBundles[bundleIndex].AngularVelocity, out var angularDot);
+
+                accumulated += Vector.Dot(linearDot, Vector<float>.One) + Vector.Dot(angularDot, Vector<float>.One);
+            }
+            return accumulated;
+        }
+    }
 }
