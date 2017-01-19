@@ -312,12 +312,12 @@ namespace SolverPrototype
             var frequencyDt = springSettings.NaturalFrequency * dt;
             var twiceDampingRatio = springSettings.DampingRatio * 2; //Could precompute.
             var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
-            var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
+            var effectiveMassCFMScale = Vector<float>.One;// Vector<float>.One / (Vector<float>.One + extra);
             var softenedEffectiveMass = effectiveMass * effectiveMassCFMScale;
 
             //CFM/dt * softenedEffectiveMass:
             //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
-            data.SoftnessImpulseScale = extra * effectiveMassCFMScale;
+            data.SoftnessImpulseScale = Vector<float>.Zero; //extra * effectiveMassCFMScale;
 
             //ERP = (naturalFrequency * dt) * (naturalFrequency * dt + 2 * dampingRatio)^-1
             //"ERP" is the error reduction per frame. Note that it can never exceed 1 given physically valid input.

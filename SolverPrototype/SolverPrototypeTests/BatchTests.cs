@@ -14,7 +14,7 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             Bodies bodies = new Bodies();
-            const int bodyCount = 1024;
+            const int bodyCount = 512;
             var handleIndices = new int[bodyCount];
             //Body 0 is a stationary kinematic acting as the ground.
             {
@@ -38,11 +38,11 @@ namespace SolverPrototypeTests
                         },
                         InverseMass = 1
                     },
-                    Velocity = new BodyVelocity { Linear = new Vector3(0, -1, 0) }
+                    //Velocity = new BodyVelocity { Linear = new Vector3(0, -1, 0) }
                 };
                 var handleIndex = bodies.Add(ref description);
                 handleIndices[i] = handleIndex;
-                
+
             }
 
             ConstraintTypeIds.Register<ContactPenetrationTypeBatch>();
@@ -88,8 +88,8 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 5;
-            const int frameCount = 256;
+            const int iterationCount = 128;
+            const int frameCount = 128;
             solver.IterationCount = iterationCount;
 
 
@@ -100,11 +100,19 @@ namespace SolverPrototypeTests
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = bodies.GetBodyEnergyHeuristic();
+                //Apply some gravity so we can simulate sorta-kinda stacking.
+                var bodyBundleCount = bodies.BodyCount >> BundleIndexing.VectorShift;
+                var impulse = new Vector<float>(-10 * dt);
+                for (int i = 0; i < bodyBundleCount; ++i)
+                {
+                    //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
+                    bodies.VelocityBundles[i].LinearVelocity.Y += bodies.LocalInertiaBundles[i].InverseMass * impulse;
+                }
                 solver.Update(dt, inverseDt);
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
-                //var velocityChange = solver.GetVelocityChangeHeuristic();
-                //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                Console.WriteLine($"Body energy change {frameIndex}: {energyAfter - energyBefore}");
+                var velocityChange = solver.GetVelocityChangeHeuristic();
+                Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
+                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
             var end = Stopwatch.GetTimestamp();
             Console.WriteLine($"Time (ms): {(1e3 * (end - start)) / Stopwatch.Frequency}");
