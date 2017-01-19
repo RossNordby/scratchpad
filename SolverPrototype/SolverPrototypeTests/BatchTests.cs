@@ -14,7 +14,7 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             Bodies bodies = new Bodies();
-            const int bodyCount = 4;
+            const int bodyCount = 256;
             var handleIndices = new int[bodyCount];
             //Body 0 is a stationary kinematic acting as the ground.
             {
@@ -23,7 +23,7 @@ namespace SolverPrototypeTests
                 handleIndices[0] = handleIndex;
             }
 
-            //The remaining bodies form an extremely tall stack with initial velocities set as if this is the first frame of impact.
+            //The remaining bodies form an extremely tall stack. 
             for (int i = 1; i < bodyCount; ++i)
             {
                 var description = new BodyDescription
@@ -38,7 +38,6 @@ namespace SolverPrototypeTests
                         },
                         InverseMass = 1
                     },
-                    //Velocity = new BodyVelocity { Linear = new Vector3(0, -1, 0) }
                 };
                 var handleIndex = bodies.Add(ref description);
                 handleIndices[i] = handleIndex;
@@ -74,8 +73,8 @@ namespace SolverPrototypeTests
 
                 ref var prestep = ref constraintReference.TypeBatch.PrestepData[constraintBundleIndex];
                 GatherScatter.Get(ref prestep.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
-                GatherScatter.Get(ref prestep.SpringSettings.DampingRatio, constraintInnerIndex) = 1;
-                GatherScatter.Get(ref prestep.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1;
+                GatherScatter.Get(ref prestep.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
+                GatherScatter.Get(ref prestep.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
 
                 //Normal goes from B to A by convention.
                 GatherScatter.Get(ref prestep.Normal.Y, constraintInnerIndex) = -1;
@@ -89,8 +88,8 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 8192;
-            const int frameCount = 8192;
+            const int iterationCount = 32;
+            const int frameCount = 4096;
             solver.IterationCount = iterationCount;
 
 
@@ -117,9 +116,9 @@ namespace SolverPrototypeTests
                             ref bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
                             GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
                     ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].PenetrationDepth, innerIndex);
-                    penetrationDepth += velocityA - velocityB;
+                    penetrationDepth += dt * (velocityA - velocityB);
                     if (i == 0)
-                        Console.WriteLine($"contact[0] penetration: {penetrationDepth}, velocity: {velocityB}");
+                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
