@@ -59,7 +59,7 @@ namespace SolverPrototype
         }
 
 
-        public void GetConstraintPointer<T>(int handleIndex, out ConstraintReference<T> constraintPointer) where T : TypeBatch
+        public void GetConstraintReference<T>(int handleIndex, out ConstraintReference<T> constraintPointer) where T : TypeBatch
         {
             ref var constraintLocation = ref HandlesToConstraints[handleIndex];
             constraintPointer.TypeBatch = batches.Elements[constraintLocation.BatchIndex].GetTypeBatch<T>();

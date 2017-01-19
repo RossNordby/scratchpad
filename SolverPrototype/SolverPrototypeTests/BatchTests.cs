@@ -14,7 +14,7 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             Bodies bodies = new Bodies();
-            const int bodyCount = 512;
+            const int bodyCount = 4;
             var handleIndices = new int[bodyCount];
             //Body 0 is a stationary kinematic acting as the ground.
             {
@@ -50,6 +50,7 @@ namespace SolverPrototypeTests
 
             int constraintCount = bodyCount - 1;
             int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
+            int[] constraintHandles = new int[constraintCount];
 
             var accumulatedImpulses = new Vector<float>[constraintBundleCount];
             for (int i = 0; i < constraintCount; ++i)
@@ -57,7 +58,7 @@ namespace SolverPrototypeTests
                 var bodyAIndex = bodies.BodyHandles[handleIndices[i]];
                 var bodyBIndex = bodies.BodyHandles[handleIndices[i + 1]];
 
-                solver.Allocate<ContactPenetrationTypeBatch>(bodyAIndex, bodyBIndex, out var constraintReference, out var handleIndex);
+                solver.Allocate<ContactPenetrationTypeBatch>(bodyAIndex, bodyBIndex, out var constraintReference, out constraintHandles[i]);
 
 
                 BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
@@ -88,8 +89,8 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 128;
-            const int frameCount = 128;
+            const int iterationCount = 8192;
+            const int frameCount = 8192;
             solver.IterationCount = iterationCount;
 
 
@@ -100,6 +101,29 @@ namespace SolverPrototypeTests
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = bodies.GetBodyEnergyHeuristic();
+                //Update the penetration depths associated with the constraints.
+                //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
+                for (int i = 0; i < constraintCount; ++i)
+                {
+                    solver.GetConstraintReference<ContactPenetrationTypeBatch>(constraintHandles[i], out var constraint);
+                    BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
+                    ref var bodyReferences = ref constraint.TypeBatch.BodyReferences[bundleIndex];
+                    var velocityA =
+                        GatherScatter.Get(
+                            ref bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex)].LinearVelocity.Y,
+                            GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex));
+                    var velocityB =
+                        GatherScatter.Get(
+                            ref bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
+                            GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
+                    ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].PenetrationDepth, innerIndex);
+                    penetrationDepth += velocityA - velocityB;
+                    if (i == 0)
+                        Console.WriteLine($"contact[0] penetration: {penetrationDepth}, velocity: {velocityB}");
+
+                }
+
+
                 //Apply some gravity so we can simulate sorta-kinda stacking.
                 var bodyBundleCount = bodies.BodyCount >> BundleIndexing.VectorShift;
                 var impulse = new Vector<float>(-10 * dt);
@@ -110,8 +134,8 @@ namespace SolverPrototypeTests
                 }
                 solver.Update(dt, inverseDt);
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
-                var velocityChange = solver.GetVelocityChangeHeuristic();
-                Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
+                //var velocityChange = solver.GetVelocityChangeHeuristic();
+                //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
                 Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
             var end = Stopwatch.GetTimestamp();
