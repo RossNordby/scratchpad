@@ -53,6 +53,9 @@
     <Compile Include="Bodies.cs" />
     <Compile Include="ConstraintBatch.cs" />
     <Compile Include="ContactData.cs" />
+    <Compile Include="Matrix2x2Wide.cs" />
+    <Compile Include="Matrix2x3Wide.cs" />
+    <Compile Include="TangentFriction.cs" />
     <Compile Include="TypeBatch.cs" />
     <Compile Include="ContactPenetrationTypeBatch.cs" />
     <Compile Include="Solver.cs" />
@@ -62,6 +65,7 @@
     <Compile Include="BundleIndexing.cs" />
     <Compile Include="Inequality1DOF.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Vector2Wide.cs" />
     <Compile Include="Vector3Wide.cs" />
   </ItemGroup>
   <ItemGroup>

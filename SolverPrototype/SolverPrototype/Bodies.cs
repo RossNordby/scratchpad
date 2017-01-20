@@ -5,7 +5,48 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
-{
+{   
+    /// <summary>
+    /// Body data is stored in AOSOA for the integration step.
+    /// From the solver's perspective, some form of gather is required for velocities regardless of the layout, so it might as well be optimal for some other stage.
+    /// We also reuse this layout for storing constraint space velocities.
+    /// </summary>
+    public struct BodyVelocities
+    {
+        public Vector3Wide LinearVelocity;
+        public Vector3Wide AngularVelocity;
+    }
+
+
+    public struct BodyInertias
+    {
+        public Matrix3x3Wide InverseInertiaTensor;
+        public Vector<float> InverseMass;
+    }
+    /// <summary>
+    /// A constraint's body references. Stored separately from the iteration data since it is accessed by both the prestep and solve.
+    /// Two address streams isn't much of a problem for prefetching.
+    /// </summary>
+    public struct BodyReferences
+    {
+        //Unfortunately, there does not exist any Vector<int>.Shift instruction yet, so we cannot efficiently derive the bundle and inner indices from the 'true' indices on the fly.
+        //Instead, group references are preconstructed and cached in a nonvectorized way.
+        public Vector<int> BundleIndexA;
+        public Vector<int> InnerIndexA;
+        public Vector<int> BundleIndexB;
+        public Vector<int> InnerIndexB;
+        public int Count;
+
+        //TODO: there may be an argument to make the count a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
+        //It would look something like this. A bit awkward due to the restrictions on ref returns, but functionally workable. This isn't something an external user is expected to deal with
+        //so as long as it is speedy, it doesn't matter.
+        //Vector<int> paddedCount;
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //public static ref int PaddedCount(ref BodyReferences references)
+        //{
+        //    return ref Unsafe.As<Vector<int>, int>(ref references.paddedCount);
+        //}
+    }
     public struct BodyDescription
     {
         public BodyInertia LocalInertia;

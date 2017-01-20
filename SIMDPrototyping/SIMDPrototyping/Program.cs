@@ -24,12 +24,12 @@ namespace SIMDPrototyping
 
             Console.WriteLine("Vector hardware acceleration: " + Vector.IsHardwareAccelerated);
 
-            HybridConstraintTest.Test();
-            NewScalarConstraintTest.Test();
-            OldScalarConstraintTest.Test();
-            SingleVectorizedConstraintTest.Test();
-            VectorizedConstraintTest.Test();
-            VectorizedManifoldTest.Test();
+            //HybridConstraintTest.Test();
+            //NewScalarConstraintTest.Test();
+            //OldScalarConstraintTest.Test();
+            //SingleVectorizedConstraintTest.Test();
+            //VectorizedConstraintTest.Test();
+            //VectorizedManifoldTest.Test();
 
             TreeTest.Test();
 

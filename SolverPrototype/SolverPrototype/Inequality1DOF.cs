@@ -5,24 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
-    /// <summary>
-    /// Body data is stored in AOSOA for the integration step.
-    /// From the solver's perspective, some form of gather is required for velocities regardless of the layout, so it might as well be optimal for some other stage.
-    /// We also reuse this layout for storing constraint space velocities.
-    /// </summary>
-    public struct BodyVelocities
-    {
-        public Vector3Wide LinearVelocity;
-        public Vector3Wide AngularVelocity;
-    }
-
-
-    public struct BodyInertias
-    {
-        public Matrix3x3Wide InverseInertiaTensor;
-        public Vector<float> InverseMass;
-    }
-
+ 
     public struct TwoBody1DOFJacobians
     {
         public Vector3Wide LinearA;
@@ -30,30 +13,7 @@ namespace SolverPrototype
         public Vector3Wide LinearB;
         public Vector3Wide AngularB;
     }
-    /// <summary>
-    /// A constraint's body references. Stored separately from the iteration data since it is accessed by both the prestep and solve.
-    /// Two address streams isn't much of a problem for prefetching.
-    /// </summary>
-    public struct BodyReferences
-    {
-        //Unfortunately, there does not exist any Vector<int>.Shift instruction yet, so we cannot efficiently derive the bundle and inner indices from the 'true' indices on the fly.
-        //Instead, group references are preconstructed and cached in a nonvectorized way.
-        public Vector<int> BundleIndexA;
-        public Vector<int> InnerIndexA;
-        public Vector<int> BundleIndexB;
-        public Vector<int> InnerIndexB;
-        public int Count;
 
-        //TODO: there may be an argument to make the count a full Vector<int> for padding reasons. We'd only ever access one component, but if alignment becomes an issue it could be a net win.
-        //It would look something like this. A bit awkward due to the restrictions on ref returns, but functionally workable. This isn't something an external user is expected to deal with
-        //so as long as it is speedy, it doesn't matter.
-        //Vector<int> paddedCount;
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static ref int PaddedCount(ref BodyReferences references)
-        //{
-        //    return ref Unsafe.As<Vector<int>, int>(ref references.paddedCount);
-        //}
-    }
 
     public struct SpringSettings
     {
@@ -127,8 +87,8 @@ namespace SolverPrototype
             //For this 1DOF constraint, the result is a simple scalar.
             //Note that we store the intermediate results of J * M^-1 for use when projecting from constraint space impulses to world velocity changes. 
             //If we didn't store those intermediate values, we could just scale the dot product of jacobians.LinearA with itself to save 4 multiplies.
-            Vector3Wide.Multiply(ref jacobians.LinearA, ref inertiaA.InverseMass, out data.CSIToWSVLinearA);
-            Vector3Wide.Multiply(ref jacobians.LinearB, ref inertiaB.InverseMass, out data.CSIToWSVLinearB);
+            Vector3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out data.CSIToWSVLinearA);
+            Vector3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out data.CSIToWSVLinearB);
             Vector3Wide.Dot(ref data.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
             Vector3Wide.Dot(ref data.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
@@ -350,10 +310,17 @@ namespace SolverPrototype
             data.BiasImpulse = biasVelocity * softenedEffectiveMass;
 
             //Precompute the wsv * (JT * softenedEffectiveMass) term.
-            Vector3Wide.Multiply(ref jacobians.LinearA, ref softenedEffectiveMass, out data.WSVtoCSILinearA);
-            Vector3Wide.Multiply(ref jacobians.AngularA, ref softenedEffectiveMass, out data.WSVtoCSIAngularA);
-            Vector3Wide.Multiply(ref jacobians.LinearB, ref softenedEffectiveMass, out data.WSVtoCSILinearB);
-            Vector3Wide.Multiply(ref jacobians.AngularB, ref softenedEffectiveMass, out data.WSVtoCSIAngularB);
+            //Note that we store it in a Vector3Wide as if it's a row vector, but this is really a column (because JT is a column vector).
+            //So we're really storing (JT * softenedEffectiveMass)T = softenedEffectiveMassT * J.
+            //Since this constraint is 1DOF, the softenedEffectiveMass is a scalar and the order doesn't matter.
+            //In the solve iterations, the WSVtoCSI term will be transposed during transformation,
+            //resulting in the proper wsv * (softenedEffectiveMassT * J)T = wsv * (JT * softenedEffectiveMass.
+            //You'll see this pattern repeated in higher DOF constraints. We explicitly compute softenedEffectiveMassT * J, and then apply the transpose in the solves.
+            //(Why? Because creating a Matrix3x2 and Matrix2x3 and 4x3 and 3x4 and 5x3 and 3x5 and so on just doubles the number of representations with little value.)
+            Vector3Wide.Scale(ref jacobians.LinearA, ref softenedEffectiveMass, out data.WSVtoCSILinearA);
+            Vector3Wide.Scale(ref jacobians.AngularA, ref softenedEffectiveMass, out data.WSVtoCSIAngularA);
+            Vector3Wide.Scale(ref jacobians.LinearB, ref softenedEffectiveMass, out data.WSVtoCSILinearB);
+            Vector3Wide.Scale(ref jacobians.AngularB, ref softenedEffectiveMass, out data.WSVtoCSIAngularB);
         }
         //Naming conventions:
         //We transform between two spaces, world and constraint space. We also deal with two quantities- velocities, and impulses. 
@@ -378,10 +345,10 @@ namespace SolverPrototype
             //That world space impulse is then converted to a corrective velocity change by scaling the impulse by the inverse mass/inertia.
             //As an optimization for constraints with smaller jacobians, the jacobian * (inertia or mass) transform is precomputed.
             BodyVelocities correctiveVelocityA, correctiveVelocityB;
-            Vector3Wide.Multiply(ref data.CSIToWSVLinearA, ref correctiveImpulse, out correctiveVelocityA.LinearVelocity);
-            Vector3Wide.Multiply(ref data.CSIToWSVAngularA, ref correctiveImpulse, out correctiveVelocityA.AngularVelocity);
-            Vector3Wide.Multiply(ref data.CSIToWSVLinearB, ref correctiveImpulse, out correctiveVelocityB.LinearVelocity);
-            Vector3Wide.Multiply(ref data.CSIToWSVAngularB, ref correctiveImpulse, out correctiveVelocityB.AngularVelocity);
+            Vector3Wide.Scale(ref data.CSIToWSVLinearA, ref correctiveImpulse, out correctiveVelocityA.LinearVelocity);
+            Vector3Wide.Scale(ref data.CSIToWSVAngularA, ref correctiveImpulse, out correctiveVelocityA.AngularVelocity);
+            Vector3Wide.Scale(ref data.CSIToWSVLinearB, ref correctiveImpulse, out correctiveVelocityB.LinearVelocity);
+            Vector3Wide.Scale(ref data.CSIToWSVAngularB, ref correctiveImpulse, out correctiveVelocityB.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityA.LinearVelocity, ref wsvA.LinearVelocity, out wsvA.LinearVelocity);
             Vector3Wide.Add(ref correctiveVelocityA.AngularVelocity, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityB.LinearVelocity, ref wsvB.LinearVelocity, out wsvB.LinearVelocity);

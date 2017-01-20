@@ -33,7 +33,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Multiply(ref Vector3Wide vector, ref Vector<float> scalar, out Vector3Wide result)
+        public static void Scale(ref Vector3Wide vector, ref Vector<float> scalar, out Vector3Wide result)
         {
             result.X = vector.X * scalar;
             result.Y = vector.Y * scalar;
@@ -63,5 +63,10 @@ namespace SolverPrototype
             result = temp;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Length(ref Vector3Wide v, out Vector<float> length)
+        {
+            length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
+        }
     }
 }
