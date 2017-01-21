@@ -87,7 +87,7 @@ namespace SolverPrototype
             Matrix2x2Wide.Add(ref linearA, ref linearB, out var linear);
             Matrix2x2Wide.Add(ref angularA, ref angularB, out var angular);
             Matrix2x2Wide.Add(ref linear, ref angular, out var inverseEffectiveMass);
-            Matrix2x2Wide.Invert(ref inverseEffectiveMass, out var effectiveMass);
+            Matrix2x2Wide.InvertWithoutOverlap(ref inverseEffectiveMass, out var effectiveMass);
 
             //Note that friction constraints have no bias velocity. They target zero velocity.
 

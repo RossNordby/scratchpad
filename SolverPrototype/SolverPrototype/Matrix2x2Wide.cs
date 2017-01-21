@@ -6,7 +6,7 @@ namespace SolverPrototype
 {
 
     public struct Matrix2x2Wide
-    {    
+    {
         /// <summary>
         /// First row of the matrix.
         /// </summary>
@@ -77,10 +77,21 @@ namespace SolverPrototype
             Vector2Wide.Add(ref a.Y, ref b.Y, out result.Y);
         }
 
+        /// <summary>
+        /// Inverts the given matix.
+        /// </summary>
+        /// <param name="matrix">Matrix to be inverted.</param>
+        /// <param name="result">Inverted matrix.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Invert(ref Matrix2x2Wide m, out Matrix2x2Wide inverse)
+        public static void InvertWithoutOverlap(ref Matrix2x2Wide m, out Matrix2x2Wide inverse)
         {
-            throw new NotImplementedException();
+            var determinantInverse = Vector<float>.One / (m.X.X * m.Y.Y - m.X.Y * m.Y.X);
+            inverse.X.X = m.Y.Y * determinantInverse;
+            inverse.X.Y = -m.X.Y * determinantInverse;
+
+            inverse.Y.X = -m.Y.X * determinantInverse;
+            inverse.Y.Y = m.X.X * determinantInverse;
+
         }
     }
 }

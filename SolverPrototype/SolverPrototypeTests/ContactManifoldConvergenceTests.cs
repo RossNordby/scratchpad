@@ -9,55 +9,26 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototypeTests
 {
-    static class BatchTests
+    static class ContactManifoldConvergenceTests
     {
         public static void Test()
         {
-            Bodies bodies = new Bodies();
             const int bodyCount = 256;
-            var handleIndices = new int[bodyCount];
-            //Body 0 is a stationary kinematic acting as the ground.
-            {
-                var description = new BodyDescription();
-                var handleIndex = bodies.Add(ref description);
-                handleIndices[0] = handleIndex;
-            }
+            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, out var handleIndices);
 
-            //The remaining bodies form an extremely tall stack. 
-            for (int i = 1; i < bodyCount; ++i)
-            {
-                var description = new BodyDescription
-                {
-                    LocalInertia = new BodyInertia
-                    {
-                        InverseInertiaTensor = new Matrix3x3
-                        {
-                            X = new Vector3(1, 0, 0),
-                            Y = new Vector3(0, 1, 0),
-                            Z = new Vector3(0, 0, 1),
-                        },
-                        InverseMass = 1
-                    },
-                };
-                var handleIndex = bodies.Add(ref description);
-                handleIndices[i] = handleIndex;
-
-            }
-
-            ConstraintTypeIds.Register<ContactPenetrationTypeBatch>();
+            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
             var solver = new Solver(bodies);
 
             int constraintCount = bodyCount - 1;
             int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
             int[] constraintHandles = new int[constraintCount];
 
-            var accumulatedImpulses = new Vector<float>[constraintBundleCount];
             for (int i = 0; i < constraintCount; ++i)
             {
                 var bodyAIndex = bodies.BodyHandles[handleIndices[i]];
                 var bodyBIndex = bodies.BodyHandles[handleIndices[i + 1]];
 
-                solver.Allocate<ContactPenetrationTypeBatch>(bodyAIndex, bodyBIndex, out var constraintReference, out constraintHandles[i]);
+                solver.Allocate<ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, out var constraintReference, out constraintHandles[i]);
 
 
                 BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
@@ -72,15 +43,30 @@ namespace SolverPrototypeTests
                 ++constraintBodies.Count;
 
                 ref var prestep = ref constraintReference.TypeBatch.PrestepData[constraintBundleIndex];
-                GatherScatter.Get(ref prestep.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
-                GatherScatter.Get(ref prestep.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
-                GatherScatter.Get(ref prestep.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
+                for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
+                {
+                    //TODO: Normal and spring settings should really be shared on convex manifolds.
+                    ref var contact = ref Unsafe.Add(ref prestep.Contact0, contactIndex);
+                    GatherScatter.Get(ref contact.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
+                    GatherScatter.Get(ref contact.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
+                    GatherScatter.Get(ref contact.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
 
-                //Normal goes from B to A by convention.
-                GatherScatter.Get(ref prestep.Normal.Y, constraintInnerIndex) = -1;
-                GatherScatter.Get(ref prestep.OffsetA.Y, constraintInnerIndex) = 0.5f;
-                GatherScatter.Get(ref prestep.OffsetB.Y, constraintInnerIndex) = -0.5f;
-                GatherScatter.Get(ref prestep.PenetrationDepth, constraintInnerIndex) = 0.00f;
+                    //Normal goes from B to A by convention.
+                    GatherScatter.Get(ref contact.Normal.Y, constraintInnerIndex) = -1;
+                    var x = (contactIndex & 1) - 0.5f;
+                    var z = (contactIndex & 2) - 0.5f;
+                    GatherScatter.Get(ref contact.OffsetA.X, constraintInnerIndex) = x;
+                    GatherScatter.Get(ref contact.OffsetA.Y, constraintInnerIndex) = 0.5f;
+                    GatherScatter.Get(ref contact.OffsetA.Z, constraintInnerIndex) = z;
+                    GatherScatter.Get(ref contact.OffsetB.X, constraintInnerIndex) = x;
+                    GatherScatter.Get(ref contact.OffsetB.Y, constraintInnerIndex) = -0.5f;
+                    GatherScatter.Get(ref contact.OffsetB.Z, constraintInnerIndex) = z;
+                    GatherScatter.Get(ref contact.PenetrationDepth, constraintInnerIndex) = 0.00f;
+                }
+
+                GatherScatter.Get(ref prestep.FrictionCoefficient, constraintInnerIndex) = 1;
+                GatherScatter.Get(ref prestep.TangentX.X, constraintInnerIndex) = 1;
+                GatherScatter.Get(ref prestep.TangentY.Z, constraintInnerIndex) = 1;
 
 
             }
@@ -104,7 +90,7 @@ namespace SolverPrototypeTests
                 //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
                 for (int i = 0; i < constraintCount; ++i)
                 {
-                    solver.GetConstraintReference<ContactPenetrationTypeBatch>(constraintHandles[i], out var constraint);
+                    solver.GetConstraintReference<ContactManifold4TypeBatch>(constraintHandles[i], out var constraint);
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
                     ref var bodyReferences = ref constraint.TypeBatch.BodyReferences[bundleIndex];
                     var velocityA =
@@ -115,8 +101,13 @@ namespace SolverPrototypeTests
                         GatherScatter.Get(
                             ref bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
                             GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
-                    ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].PenetrationDepth, innerIndex);
-                    penetrationDepth += dt * (velocityA - velocityB);
+                    var penetrationChange = dt * (velocityA - velocityB);
+                    ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
+                    penetrationDepth += penetrationChange;
+                    GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact1.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
+
                     if (i == 0)
                         Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
