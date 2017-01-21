@@ -142,7 +142,8 @@ namespace SolverPrototype
             Vector2Wide.Subtract(ref accumulatedImpulse, ref negativeCSI, out accumulatedImpulse);
             //The maximum force of friction depends upon the normal impulse. The maximum is supplied per iteration.
             Vector2Wide.Length(ref accumulatedImpulse, out var accumulatedMagnitude);
-            var scale = Vector.Min(Vector<float>.One, maximumImpulse / accumulatedMagnitude);
+            //Note division by zero guard.
+            var scale = Vector.Min(Vector<float>.One, maximumImpulse / Vector.Max(new Vector<float>(1e-16f), accumulatedMagnitude));
             Vector2Wide.Scale(ref accumulatedImpulse, ref scale, out accumulatedImpulse);
 
             Vector2Wide.Subtract(ref accumulatedImpulse, ref previousAccumulated, out correctiveCSI);

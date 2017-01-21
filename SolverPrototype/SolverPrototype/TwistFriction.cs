@@ -32,8 +32,14 @@ namespace SolverPrototype
             Vector3Wide.Dot(ref data.CSIToWSVAngularB, ref angularJacobianB, out var angularB);
 
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
-            var effectiveMass = Vector<float>.One / (angularA + angularB);
-
+            //Note that we have to guard against two bodies with infinite inertias. This is a valid state! 
+            //(We do not have to do such guarding on constraints with linear jacobians; dynamic bodies cannot have zero *mass*.)
+            //(Also note that there's no need for epsilons here... users shouldn't be setting their inertias to the absurd values it would take to cause a problem.
+            //Invalid conditions can't arise dynamically.)
+            var inverseEffectiveMass = angularA + angularB;
+            var inverseIsZero = Vector.Equals(Vector<float>.Zero, inverseEffectiveMass);
+            var effectiveMass = Vector.ConditionalSelect(inverseIsZero, Vector<float>.Zero, Vector<float>.One / (angularA + angularB));
+                
             //Note that friction constraints have no bias velocity. They target zero velocity.
 
             //Finally, compute the (transposed) transform for constraint space impulse to world space.

@@ -54,7 +54,7 @@ namespace SolverPrototypeTests
                     //Normal goes from B to A by convention.
                     GatherScatter.Get(ref contact.Normal.Y, constraintInnerIndex) = -1;
                     var x = (contactIndex & 1) - 0.5f;
-                    var z = (contactIndex & 2) - 0.5f;
+                    var z = ((contactIndex & 2) >> 1) - 0.5f;
                     GatherScatter.Get(ref contact.OffsetA.X, constraintInnerIndex) = x;
                     GatherScatter.Get(ref contact.OffsetA.Y, constraintInnerIndex) = 0.5f;
                     GatherScatter.Get(ref contact.OffsetA.Z, constraintInnerIndex) = z;
@@ -74,7 +74,7 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 32;
+            const int iterationCount = 192;
             const int frameCount = 4096;
             solver.IterationCount = iterationCount;
 

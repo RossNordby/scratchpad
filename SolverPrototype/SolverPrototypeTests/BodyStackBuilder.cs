@@ -24,12 +24,12 @@ namespace SolverPrototypeTests
                 {
                     LocalInertia = new BodyInertia
                     {
-                        InverseInertiaTensor = new Matrix3x3
-                        {
-                            X = new Vector3(1, 0, 0),
-                            Y = new Vector3(0, 1, 0),
-                            Z = new Vector3(0, 0, 1),
-                        },
+                        //InverseInertiaTensor = new Matrix3x3
+                        //{
+                        //    X = new Vector3(1, 0, 0),
+                        //    Y = new Vector3(0, 1, 0),
+                        //    Z = new Vector3(0, 0, 1),
+                        //},
                         InverseMass = 1
                     },
                 };
