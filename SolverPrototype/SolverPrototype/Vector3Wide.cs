@@ -68,5 +68,12 @@ namespace SolverPrototype
         {
             length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Distance(ref Vector3Wide a, ref Vector3Wide b, out Vector<float> distance)
+        {
+            Subtract(ref b, ref a, out var offset);
+            Length(ref offset, out distance);
+        }
     }
 }

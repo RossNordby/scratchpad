@@ -46,9 +46,8 @@ namespace SolverPrototype
         /// </summary>
         public static void ApplyImpulse(ref TwistFrictionIterationData data, ref Vector<float> correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            Vector3Wide correctiveVelocityA, correctiveVelocityB;
-            Vector3Wide.Scale(ref data.CSIToWSVAngularA, ref correctiveImpulse, out correctiveVelocityA);
-            Vector3Wide.Scale(ref data.CSIToWSVAngularB, ref correctiveImpulse, out correctiveVelocityB);
+            Vector3Wide.Scale(ref data.CSIToWSVAngularA, ref correctiveImpulse, out var correctiveVelocityA);
+            Vector3Wide.Scale(ref data.CSIToWSVAngularB, ref correctiveImpulse, out var correctiveVelocityB);
             Vector3Wide.Add(ref correctiveVelocityA, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityB, ref wsvB.AngularVelocity, out wsvB.AngularVelocity);
         }

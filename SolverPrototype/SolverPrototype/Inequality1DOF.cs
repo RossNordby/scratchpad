@@ -59,8 +59,8 @@ namespace SolverPrototype
     {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(BodyInertias[] bodyInertias, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
-            ref Vector<float> positionError, float dt, float inverseDt)
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
+            ref Vector<float> positionError, float dt, float inverseDt, out IterationData2Body1DOF data)
         {
             //effective mass = (J * M^-1 * JT)^-1
             //where J is a constraintDOF x bodyCount*3 sized matrix, JT is its transpose, and for two bodies M^-1 is:
@@ -81,7 +81,6 @@ namespace SolverPrototype
 
             //(If you want to know how this stuff works, go read the constraint related presentations: http://box2d.org/downloads/
             //Be mindful of the difference in conventions. You'll see J * v instead of v * JT, for example. Everything is still fundamentally the same, though.)
-            GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
 
             //Due to the block structure of the mass matrix, we can handle each component separately and then sum the results.
             //For this 1DOF constraint, the result is a simple scalar.
