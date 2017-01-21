@@ -333,11 +333,10 @@ namespace SolverPrototype
 
 
         /// <summary>
-        /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies,
-        /// then scatters the result to the body velocity memory locations.
+        /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
-        public static void ApplyImpulse(BodyVelocities[] velocities, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data,
-            ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Vector<float> correctiveImpulse)
+        public static void ApplyImpulse(ref IterationData2Body1DOF data, ref Vector<float> correctiveImpulse,
+            ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //Applying the impulse requires transforming the constraint space impulse into a world space velocity change.
             //The first step is to transform into a world space impulse, which requires transforming by the transposed jacobian
@@ -353,16 +352,14 @@ namespace SolverPrototype
             Vector3Wide.Add(ref correctiveVelocityA.AngularVelocity, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
             Vector3Wide.Add(ref correctiveVelocityB.LinearVelocity, ref wsvB.LinearVelocity, out wsvB.LinearVelocity);
             Vector3Wide.Add(ref correctiveVelocityB.AngularVelocity, ref wsvB.AngularVelocity, out wsvB.AngularVelocity);
-            GatherScatter.ScatterVelocities(velocities, ref bodyReferences, ref wsvA, ref wsvB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(BodyVelocities[] velocities, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse)
+        public static void WarmStart(ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            GatherScatter.GatherVelocities(velocities, ref bodyReferences, out var wsvA, out var wsvB);
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
-            ApplyImpulse(velocities, ref bodyReferences, ref data, ref wsvA, ref wsvB, ref accumulatedImpulse);
+            ApplyImpulse(ref data, ref accumulatedImpulse, ref wsvA, ref wsvB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -392,11 +389,10 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(BodyVelocities[] velocities, ref BodyReferences bodyReferences, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse)
+        public static void Solve(ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            GatherScatter.GatherVelocities(velocities, ref bodyReferences, out var wsvA, out var wsvB);
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(velocities, ref bodyReferences, ref data, ref wsvA, ref wsvB, ref correctiveCSI);
+            ApplyImpulse(ref data, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

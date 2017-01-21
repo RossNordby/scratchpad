@@ -93,13 +93,17 @@ namespace SolverPrototypeTests
                     Inequality2Body1DOF.Prestep(bodies.LocalInertiaBundles, ref bodyReferences[i], ref iterationData[i], ref jacobians, ref springSettings[i],
                         ref error, dt, inverseDt);
 
-                    Inequality2Body1DOF.WarmStart(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
+                    GatherScatter.GatherVelocities(bodies.VelocityBundles, ref bodyReferences[i], out var wsvA, out var wsvB);
+                    Inequality2Body1DOF.WarmStart(ref iterationData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
+                    GatherScatter.ScatterVelocities(bodies.VelocityBundles, ref bodyReferences[i], ref wsvA, ref wsvB);
                 }
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
                 {
                     for (int i = 0; i < constraintBundleCount; ++i)
                     {
-                        Inequality2Body1DOF.Solve(bodies.VelocityBundles, ref bodyReferences[i], ref iterationData[i], ref accumulatedImpulses[i]);
+                        GatherScatter.GatherVelocities(bodies.VelocityBundles, ref bodyReferences[i], out var wsvA, out var wsvB);
+                        Inequality2Body1DOF.Solve(ref iterationData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
+                        GatherScatter.ScatterVelocities(bodies.VelocityBundles, ref bodyReferences[i], ref wsvA, ref wsvB);
                     }
                 }
             }

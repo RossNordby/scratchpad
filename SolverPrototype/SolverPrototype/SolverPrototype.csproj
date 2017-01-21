@@ -55,6 +55,7 @@
     <Compile Include="ContactData.cs" />
     <Compile Include="Matrix2x2Wide.cs" />
     <Compile Include="Matrix2x3Wide.cs" />
+    <Compile Include="TwistFriction.cs" />
     <Compile Include="TangentFriction.cs" />
     <Compile Include="TypeBatch.cs" />
     <Compile Include="ContactPenetrationTypeBatch.cs" />

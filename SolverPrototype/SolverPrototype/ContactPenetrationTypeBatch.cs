@@ -1,5 +1,4 @@
-﻿using System;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
@@ -62,14 +61,18 @@ namespace SolverPrototype
         {
             for (int i = startBundle; i < endBundle; ++i)
             {
-                Inequality2Body1DOF.WarmStart(bodyVelocities, ref BodyReferences[i], ref IterationData[i], ref AccumulatedImpulses[i]);
+                GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
+                Inequality2Body1DOF.WarmStart(ref IterationData[i], ref AccumulatedImpulses[i], ref wsvA, ref wsvB);
+                GatherScatter.ScatterVelocities(bodyVelocities, ref BodyReferences[i], ref wsvA, ref wsvB);
             }
         }
         public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
         {
             for (int i = startBundle; i < endBundle; ++i)
             {
-                Inequality2Body1DOF.Solve(bodyVelocities, ref BodyReferences[i], ref IterationData[i], ref AccumulatedImpulses[i]);
+                GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
+                Inequality2Body1DOF.Solve(ref IterationData[i], ref AccumulatedImpulses[i], ref wsvA, ref wsvB);
+                GatherScatter.ScatterVelocities(bodyVelocities, ref BodyReferences[i], ref wsvA, ref wsvB);
             }
         }
 
@@ -85,7 +88,7 @@ namespace SolverPrototype
                 Inequality2Body1DOF.ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref IterationData[i], ref AccumulatedImpulses[i], out var correctiveCSI);
                 var previousA = wsvA;
                 var previousB = wsvB;
-                Inequality2Body1DOF.ApplyImpulse(velocities, ref BodyReferences[i], ref IterationData[i], ref wsvA, ref wsvB, ref correctiveCSI);
+                Inequality2Body1DOF.ApplyImpulse(ref IterationData[i], ref correctiveCSI, ref wsvA, ref wsvB);
                 ref var bundleA = ref Unsafe.Add(ref velocityChangesA, i);
                 ref var bundleB = ref Unsafe.Add(ref velocityChangesB, i);
                 Vector3Wide.Subtract(ref wsvA.LinearVelocity, ref previousA.LinearVelocity, out bundleA.LinearVelocity);

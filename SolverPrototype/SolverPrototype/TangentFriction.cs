@@ -21,8 +21,6 @@ namespace SolverPrototype
         public Matrix2x3Wide WSVtoCSILinearB;
         public Matrix2x3Wide WSVtoCSIAngularB;
 
-        public Vector<float> FrictionCoefficient;
-
         public Matrix2x3Wide CSIToWSVLinearA;
         public Matrix2x3Wide CSIToWSVAngularA;
         public Matrix2x3Wide CSIToWSVLinearB;
@@ -72,11 +70,8 @@ namespace SolverPrototype
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Jacobians2Body2DOF jacobians,
-            ref Vector<float> frictionCoefficient, float dt, float inverseDt, out TangentFrictionIterationData data)
+            out TangentFrictionIterationData data)
         {
-
-            data.FrictionCoefficient = frictionCoefficient;
-
             //Compute effective mass matrix contributions.
             Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out data.CSIToWSVLinearA);
             Matrix2x3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out data.CSIToWSVLinearB);
@@ -109,7 +104,7 @@ namespace SolverPrototype
         /// <summary>
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
-        public static void ApplyImpulse(ref TangentFrictionIterationData data, ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Vector2Wide correctiveImpulse)
+        public static void ApplyImpulse(ref TangentFrictionIterationData data, ref Vector2Wide correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             BodyVelocities correctiveVelocityA, correctiveVelocityB;
             Matrix2x3Wide.Transform(ref correctiveImpulse, ref data.CSIToWSVLinearA, out correctiveVelocityA.LinearVelocity);
@@ -123,15 +118,15 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionIterationData data, ref Vector2Wide accumulatedImpulse)
+        public static void WarmStart(ref TangentFrictionIterationData data, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
-            ApplyImpulse(ref data, ref wsvA, ref wsvB, ref accumulatedImpulse);
+            ApplyImpulse(ref data, ref accumulatedImpulse, ref wsvA, ref wsvB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionIterationData data, ref Vector<float> normalImpulse,
+        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionIterationData data, ref Vector<float> maximumImpulse,
             ref Vector2Wide accumulatedImpulse, out Vector2Wide correctiveCSI)
         {
             //Recall that our WSVtoCSI... is transposed due to the lack of a 3x2 representation.
@@ -145,9 +140,7 @@ namespace SolverPrototype
 
             var previousAccumulated = accumulatedImpulse;
             Vector2Wide.Subtract(ref accumulatedImpulse, ref negativeCSI, out accumulatedImpulse);
-            //The maximum force of friction depends upon the normal impulse.
-            var maximumImpulse = data.FrictionCoefficient * normalImpulse;
-            var maximumImpulseSquared = maximumImpulse * maximumImpulse;
+            //The maximum force of friction depends upon the normal impulse. The maximum is supplied per iteration.
             Vector2Wide.Length(ref accumulatedImpulse, out var accumulatedMagnitude);
             var scale = Vector.Min(Vector<float>.One, maximumImpulse / accumulatedMagnitude);
             Vector2Wide.Scale(ref accumulatedImpulse, ref scale, out accumulatedImpulse);
@@ -157,10 +150,10 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionIterationData data, ref Vector<float> normalImpulse, ref Vector2Wide accumulatedImpulse)
+        public static void Solve(ref TangentFrictionIterationData data, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref normalImpulse, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(ref data, ref wsvA, ref wsvB, ref correctiveCSI);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);
+            ApplyImpulse(ref data, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 
