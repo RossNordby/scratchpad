@@ -71,7 +71,7 @@ namespace SolverPrototype
                     out var error1,
                     out var error2,
                     out var error3);
-                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref prestep.SpringSettings,
+                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, ref jacobians, ref prestep.SpringSettings,
                     ref error0,
                     ref error1,
                     ref error2,

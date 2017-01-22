@@ -8,7 +8,6 @@ namespace SolverPrototype
 
     public struct ContactPenetrationLimit4Jacobians
     {
-        public Vector3Wide Normal;
         public Vector3Wide AngularA0;
         public Vector3Wide AngularB0;
         public Vector3Wide AngularA1;
@@ -107,7 +106,6 @@ namespace SolverPrototype
             //angularA: offsetA x N
             //linearB: -N
             //angularB: N x offsetB
-            jacobians.Normal = normal;
             Vector3Wide.CrossWithoutOverlap(ref contact0.OffsetA, ref normal, out jacobians.AngularA0);
             Vector3Wide.CrossWithoutOverlap(ref normal, ref contact0.OffsetB, out jacobians.AngularB0);
             Vector3Wide.CrossWithoutOverlap(ref contact1.OffsetA, ref normal, out jacobians.AngularA1);
@@ -125,7 +123,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref ContactPenetrationLimit4Jacobians jacobians, ref SpringSettings springSettings,
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactPenetrationLimit4Jacobians angularJacobians, ref SpringSettings springSettings,
             ref Vector<float> error0,
             ref Vector<float> error1,
             ref Vector<float> error2,
@@ -133,40 +131,42 @@ namespace SolverPrototype
         {
             //effective mass
             //Note redundancy of linear components. Pretty silly to keep them around!
-            Vector3Wide.Scale(ref jacobians.Normal, ref inertiaA.InverseMass, out data.CSIToWSV0.LinearA);
-            Vector3Wide.Negate(ref data.CSIToWSV0.LinearA, out data.CSIToWSV0.LinearB);
-            Vector3Wide.Dot(ref data.CSIToWSV0.LinearA, ref jacobians.Normal, out var linear);
+            Vector3Wide.Negate(ref normal, out var jLinearB);
+            Vector3Wide.Scale(ref normal, ref inertiaA.InverseMass, out data.CSIToWSV0.LinearA);
+            Vector3Wide.Scale(ref jLinearB, ref inertiaB.InverseMass, out data.CSIToWSV0.LinearB);
+            Vector3Wide.Dot(ref data.CSIToWSV0.LinearA, ref normal, out var linearA);
+            Vector3Wide.Dot(ref data.CSIToWSV0.LinearB, ref jLinearB, out var linearB);
 
+
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA0, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV0.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB0, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV0.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV0.AngularA, ref angularJacobians.AngularA0, out var angularA0);
+            Vector3Wide.Dot(ref data.CSIToWSV0.AngularB, ref angularJacobians.AngularB0, out var angularB0);
             data.CSIToWSV1.LinearA = data.CSIToWSV0.LinearA;
-            data.CSIToWSV2.LinearA = data.CSIToWSV0.LinearA;
-            data.CSIToWSV3.LinearA = data.CSIToWSV0.LinearA;
             data.CSIToWSV1.LinearB = data.CSIToWSV0.LinearB;
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA1, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV1.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB1, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV1.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV1.AngularA, ref angularJacobians.AngularA1, out var angularA1);
+            Vector3Wide.Dot(ref data.CSIToWSV1.AngularB, ref angularJacobians.AngularB1, out var angularB1);
+            data.CSIToWSV2.LinearA = data.CSIToWSV0.LinearA;
             data.CSIToWSV2.LinearB = data.CSIToWSV0.LinearB;
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA2, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV2.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB2, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV2.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV2.AngularA, ref angularJacobians.AngularA2, out var angularA2);
+            Vector3Wide.Dot(ref data.CSIToWSV2.AngularB, ref angularJacobians.AngularB2, out var angularB2);
+            data.CSIToWSV3.LinearA = data.CSIToWSV0.LinearA;
             data.CSIToWSV3.LinearB = data.CSIToWSV0.LinearB;
-
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA0, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV0.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB0, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV0.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV0.AngularA, ref jacobians.AngularA0, out var angularA0);
-            Vector3Wide.Dot(ref data.CSIToWSV0.AngularB, ref jacobians.AngularB0, out var angularB0);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA1, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV1.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB1, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV1.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV1.AngularA, ref jacobians.AngularA1, out var angularA1);
-            Vector3Wide.Dot(ref data.CSIToWSV1.AngularB, ref jacobians.AngularB1, out var angularB1);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA2, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV2.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB2, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV2.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV2.AngularA, ref jacobians.AngularA2, out var angularA2);
-            Vector3Wide.Dot(ref data.CSIToWSV2.AngularB, ref jacobians.AngularB2, out var angularB2);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA3, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV3.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB3, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV3.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV3.AngularA, ref jacobians.AngularA3, out var angularA3);
-            Vector3Wide.Dot(ref data.CSIToWSV3.AngularB, ref jacobians.AngularB3, out var angularB3);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA3, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV3.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB3, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV3.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV3.AngularA, ref angularJacobians.AngularA3, out var angularA3);
+            Vector3Wide.Dot(ref data.CSIToWSV3.AngularB, ref angularJacobians.AngularB3, out var angularB3);
 
 
-            var twoLinear = linear + linear;
-            var effectiveMass0 = Vector<float>.One / (twoLinear + angularA0 + angularB0);
-            var effectiveMass1 = Vector<float>.One / (twoLinear + angularA1 + angularB1);
-            var effectiveMass2 = Vector<float>.One / (twoLinear + angularA2 + angularB2);
-            var effectiveMass3 = Vector<float>.One / (twoLinear + angularA3 + angularB3);
+            var linear = linearA + linearB;
+            var effectiveMass0 = Vector<float>.One / (linear + angularA0 + angularB0);
+            var effectiveMass1 = Vector<float>.One / (linear + angularA1 + angularB1);
+            var effectiveMass2 = Vector<float>.One / (linear + angularA2 + angularB2);
+            var effectiveMass3 = Vector<float>.One / (linear + angularA3 + angularB3);
 
             var frequencyDt = springSettings.NaturalFrequency * dt;
             var twiceDampingRatio = springSettings.DampingRatio * 2; //Could precompute.
@@ -192,26 +192,25 @@ namespace SolverPrototype
 
             //Precompute the wsv * (JT * softenedEffectiveMass) term.
             //Note redundancy again.
-            Vector3Wide.Negate(ref jacobians.Normal, out var jLinearB);
-            Vector3Wide.Scale(ref jacobians.Normal, ref softenedEffectiveMass0, out data.WSVToCSI0.LinearA);
+            Vector3Wide.Scale(ref normal, ref softenedEffectiveMass0, out data.WSVToCSI0.LinearA);
             Vector3Wide.Scale(ref jLinearB, ref softenedEffectiveMass0, out data.WSVToCSI0.LinearB);
-            Vector3Wide.Scale(ref jacobians.AngularA0, ref softenedEffectiveMass0, out data.WSVToCSI0.AngularA);
-            Vector3Wide.Scale(ref jacobians.AngularB0, ref softenedEffectiveMass0, out data.WSVToCSI0.AngularB);
+            Vector3Wide.Scale(ref angularJacobians.AngularA0, ref softenedEffectiveMass0, out data.WSVToCSI0.AngularA);
+            Vector3Wide.Scale(ref angularJacobians.AngularB0, ref softenedEffectiveMass0, out data.WSVToCSI0.AngularB);
 
-            Vector3Wide.Scale(ref jacobians.Normal, ref softenedEffectiveMass1, out data.WSVToCSI1.LinearA);
+            Vector3Wide.Scale(ref normal, ref softenedEffectiveMass1, out data.WSVToCSI1.LinearA);
             Vector3Wide.Scale(ref jLinearB, ref softenedEffectiveMass1, out data.WSVToCSI1.LinearB);
-            Vector3Wide.Scale(ref jacobians.AngularA1, ref softenedEffectiveMass1, out data.WSVToCSI1.AngularA);
-            Vector3Wide.Scale(ref jacobians.AngularB1, ref softenedEffectiveMass1, out data.WSVToCSI1.AngularB);
+            Vector3Wide.Scale(ref angularJacobians.AngularA1, ref softenedEffectiveMass1, out data.WSVToCSI1.AngularA);
+            Vector3Wide.Scale(ref angularJacobians.AngularB1, ref softenedEffectiveMass1, out data.WSVToCSI1.AngularB);
 
-            Vector3Wide.Scale(ref jacobians.Normal, ref softenedEffectiveMass2, out data.WSVToCSI2.LinearA);
+            Vector3Wide.Scale(ref normal, ref softenedEffectiveMass2, out data.WSVToCSI2.LinearA);
             Vector3Wide.Scale(ref jLinearB, ref softenedEffectiveMass2, out data.WSVToCSI2.LinearB);
-            Vector3Wide.Scale(ref jacobians.AngularA2, ref softenedEffectiveMass2, out data.WSVToCSI2.AngularA);
-            Vector3Wide.Scale(ref jacobians.AngularB2, ref softenedEffectiveMass2, out data.WSVToCSI2.AngularB);
+            Vector3Wide.Scale(ref angularJacobians.AngularA2, ref softenedEffectiveMass2, out data.WSVToCSI2.AngularA);
+            Vector3Wide.Scale(ref angularJacobians.AngularB2, ref softenedEffectiveMass2, out data.WSVToCSI2.AngularB);
 
-            Vector3Wide.Scale(ref jacobians.Normal, ref softenedEffectiveMass3, out data.WSVToCSI3.LinearA);
+            Vector3Wide.Scale(ref normal, ref softenedEffectiveMass3, out data.WSVToCSI3.LinearA);
             Vector3Wide.Scale(ref jLinearB, ref softenedEffectiveMass3, out data.WSVToCSI3.LinearB);
-            Vector3Wide.Scale(ref jacobians.AngularA3, ref softenedEffectiveMass3, out data.WSVToCSI3.AngularA);
-            Vector3Wide.Scale(ref jacobians.AngularB3, ref softenedEffectiveMass3, out data.WSVToCSI3.AngularB);
+            Vector3Wide.Scale(ref angularJacobians.AngularA3, ref softenedEffectiveMass3, out data.WSVToCSI3.AngularA);
+            Vector3Wide.Scale(ref angularJacobians.AngularB3, ref softenedEffectiveMass3, out data.WSVToCSI3.AngularB);
         }
 
         /// <summary>
