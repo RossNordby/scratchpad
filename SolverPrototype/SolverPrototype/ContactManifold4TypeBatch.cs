@@ -113,7 +113,7 @@ namespace SolverPrototype
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
-                var maximumImpulse = iteration.PremultipliedFrictionCoefficient * 
+                var maximumImpulse = iteration.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
                 TwistFriction.Solve(ref iteration.Twist, ref maximumImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 TangentFriction.Solve(ref iteration.Tangent, ref maximumImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
@@ -124,6 +124,7 @@ namespace SolverPrototype
                 Inequality2Body1DOF.Solve(ref iteration.Penetration1, ref accumulatedImpulses.Penetration1, ref wsvA, ref wsvB);
                 Inequality2Body1DOF.Solve(ref iteration.Penetration2, ref accumulatedImpulses.Penetration2, ref wsvA, ref wsvB);
                 Inequality2Body1DOF.Solve(ref iteration.Penetration3, ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
+
                 GatherScatter.ScatterVelocities(bodyVelocities, ref BodyReferences[i], ref wsvA, ref wsvB);
             }
         }

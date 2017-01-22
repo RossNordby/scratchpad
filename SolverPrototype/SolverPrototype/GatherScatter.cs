@@ -8,6 +8,29 @@ namespace SolverPrototype
     public class GatherScatter
     {
 
+        //IMPLEMENTATION NOTES:
+
+        //UNSAFE CASTS FOR VECTOR MEMORY ACCESS
+        //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
+        //we do a gross hack where we manually stuff the memory backing of a bunch of vectors.
+        //This logic is coupled with the layout of the EntityVelocities and BodyReferences structs and makes assumptions about the memory layout of the types.
+        //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
+        //With any luck, it will be later enough that a proper solution exists.
+
+        //'NULL' CONSTRAINT CONNECTIONS
+        //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
+        //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
+        //The benefit of not having to read/write data is extremely weak, and often introducing null connections actually slows things down further
+        //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
+        //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
+        //During scatters, there is a risk of false sharing on the reserved slot when running with multiple threads. 
+        //However, we should take measures to avoid false sharing for all constraints. More measurement should be done to check the impact later.
+
+        //MULTIBODY CONSTRAINTS AND MANUAL INLINING
+        //Unfortunately, as of this writing, there still seems to be a very small value in manually inlining all involved bodies.
+        //This is going to get pretty annoying if there are a variety of different constraint body counts. For runtime-defined N-body constraints,
+        //we will likely end up just having a per-body gather, and that will be fine. I'm not gonna make 128 variants of this function!
+
         /// <summary>
         /// Gets a reference to an element from a vector without using pointers, bypassing direct vector access for codegen reasons.
         /// This appears to produce identical assembly to taking the pointer and applying an offset. You can do slightly better for batched accesses
@@ -40,12 +63,36 @@ namespace SolverPrototype
         public static void CopyLane<T>(ref T sourceBundle, int sourceInnerIndex, ref T targetBundle, int targetInnerIndex)
         {
             var sizeInInts = Unsafe.SizeOf<T>() >> 2;
-            var strideInInts = sizeInInts >> BundleIndexing.VectorShift;
             ref var sourceBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref sourceBundle), sourceInnerIndex);
             ref var targetBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref targetBundle), targetInnerIndex);
-            for (int i = 0; i < sizeInInts; i += strideInInts)
+            for (int i = 0; i < sizeInInts; i += Vector<int>.Count)
             {
                 Unsafe.Add(ref targetBase, i) = Unsafe.Add(ref sourceBase, i);
+            }
+        }
+
+        /// <summary>
+        /// Swaps lanes between two bundles. The bundle type must be a contiguous block of Vector types.
+        /// </summary>
+        /// <typeparam name="T">Type of the swapped bundles.</typeparam>
+        /// <param name="bundleA">Source bundle of the data to copy.</param>
+        /// <param name="innerIndexA">Index of the lane within the source bundle.</param>
+        /// <param name="bundleB">Target bundle of the data to copy.</param>
+        /// <param name="innerIndexB">Index of the lane within the target bundle.</param>
+        /// <remarks>
+        /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
+        /// </remarks>
+        public static void SwapLanes<T>(ref T bundleA, int innerIndexA, ref T bundleB, int innerIndexB)
+        {
+            var sizeInInts = Unsafe.SizeOf<T>() >> 2;
+            ref var aBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref bundleA), innerIndexA);
+            ref var bBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref bundleB), innerIndexB);
+            for (int i = 0; i < sizeInInts; i += Vector<int>.Count)
+            {
+                var oldA = Unsafe.Add(ref aBase, i);
+                ref var b = ref Unsafe.Add(ref bBase, i);
+                Unsafe.Add(ref aBase, i) = b;
+                b = oldA;
             }
         }
 
@@ -62,36 +109,13 @@ namespace SolverPrototype
         internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex)
         {
             var sizeInInts = Unsafe.SizeOf<TOuter>() >> 2;
-            var strideInInts = sizeInInts >> BundleIndexing.VectorShift;
             ref var laneBase = ref Unsafe.Add(ref Unsafe.As<TOuter, TVector>(ref bundle), innerIndex);
-            for (int i = 0; i < sizeInInts; i += strideInInts)
+            for (int i = 0; i < sizeInInts; i += Vector<int>.Count)
             {
                 Unsafe.Add(ref laneBase, i) = default(TVector);
             }
         }
 
-        //IMPLEMENTATION NOTES:
-
-        //'NULL' CONSTRAINT CONNECTIONS
-        //Any 'null' connections should simply redirect to a reserved velocities slot containing zeroes.
-        //Attempting to include a branch to special case null connections slows it down quite a bit (~20% total with zero null connections).
-        //The benefit of not having to read/write data is extremely weak, and often introducing null connections actually slows things down further
-        //until ~70% of constraints have null connections (overheads presumably caused by branch misprediction).
-        //In any simulation with a nontrivial number of null connections, the reserved velocity slot will tend to end up in cache anyway, so the loads should be cheap.
-        //During scatters, there is a risk of false sharing on the reserved slot when running with multiple threads. 
-        //However, we should take measures to avoid false sharing for all constraints. More measurement should be done to check the impact later.
-
-        //UNSAFE CASTS FOR VECTOR MEMORY ACCESS
-        //Because there is no exposed 'gather' API, and because the vector constructor only takes managed arrays, and because there is no way to set vector indices,
-        //we do a gross hack where we manually stuff the memory backing of a bunch of vectors.
-        //This logic is coupled with the layout of the EntityVelocities and BodyReferences structs and makes assumptions about the memory layout of the types.
-        //This assumption SHOULD hold on all current runtimes, but don't be too surprised if it breaks later.
-        //With any luck, it will be later enough that a proper solution exists.
-
-        //MULTIBODY CONSTRAINTS AND MANUAL INLINING
-        //Unfortunately, as of this writing, there still seems to be a very small value in manually inlining all involved bodies.
-        //This is going to get pretty annoying if there are a variety of different constraint body counts. For runtime-defined N-body constraints,
-        //we will likely end up just having a per-body gather, and that will be fine. I'm not gonna make 128 variants of this function!
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref BodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)

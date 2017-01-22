@@ -14,7 +14,7 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             const int bodyCount = 256;
-            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, out var handleIndices);
+            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, true, out var handleIndices);
 
             ConstraintTypeIds.Register<ContactPenetrationTypeBatch>();
             var solver = new Solver(bodies);
@@ -67,7 +67,7 @@ namespace SolverPrototypeTests
             //prejit
             //solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
-            var start = Stopwatch.GetTimestamp();
+            long totalTicks = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = bodies.GetBodyEnergyHeuristic();
@@ -88,8 +88,8 @@ namespace SolverPrototypeTests
                             GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
                     ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].PenetrationDepth, innerIndex);
                     penetrationDepth += dt * (velocityA - velocityB);
-                    if (i == 0)
-                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
+                    //if (i == 0)
+                    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
@@ -102,14 +102,16 @@ namespace SolverPrototypeTests
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
                     bodies.VelocityBundles[i].LinearVelocity.Y += bodies.LocalInertiaBundles[i].InverseMass * impulse;
                 }
+                var frameStart = Stopwatch.GetTimestamp();
                 solver.Update(dt, inverseDt);
+                var frameEnd = Stopwatch.GetTimestamp();
+                totalTicks += frameEnd - frameStart;
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
-            var end = Stopwatch.GetTimestamp();
-            Console.WriteLine($"Time (ms): {(1e3 * (end - start)) / Stopwatch.Frequency}");
+            Console.WriteLine($"Time (ms): {(1e3 * totalTicks) / Stopwatch.Frequency}");
 
         }
 

@@ -212,5 +212,25 @@ namespace SolverPrototype
             }
             return accumulated;
         }
+
+
+        /// <summary>
+        /// Swaps the memory of two bodies. Indexed by memory slot, not by handle index.
+        /// </summary>
+        /// <param name="slotA">Memory slot of the first body to swap.</param>
+        /// <param name="slotB">Memory slot of the second body to swap.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Swap(int slotA, int slotB)
+        {
+            BodyHandles[IndicesToHandleIndices[slotA]] = slotB;
+            BodyHandles[IndicesToHandleIndices[slotB]] = slotA;
+            var oldHandleIndexA = IndicesToHandleIndices[slotA];
+            IndicesToHandleIndices[slotA] = IndicesToHandleIndices[slotB];
+            IndicesToHandleIndices[slotB] = oldHandleIndexA;
+            BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
+            BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
+            GatherScatter.SwapLanes(ref VelocityBundles[bundleA], innerA, ref VelocityBundles[bundleB], innerB);
+            GatherScatter.SwapLanes(ref LocalInertiaBundles[bundleA], innerA, ref LocalInertiaBundles[bundleB], innerB);
+        }
     }
 }
