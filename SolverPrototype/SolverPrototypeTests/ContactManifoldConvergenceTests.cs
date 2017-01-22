@@ -82,7 +82,7 @@ namespace SolverPrototypeTests
 
 
             //prejit
-            //solver.Update(dt, inverseDt);
+            solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             long totalTicks = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
