@@ -43,16 +43,18 @@ namespace SolverPrototypeTests
                 ++constraintBodies.Count;
 
                 ref var prestep = ref constraintReference.TypeBatch.PrestepData[constraintBundleIndex];
+
+                GatherScatter.Get(ref prestep.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
+                GatherScatter.Get(ref prestep.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
+                GatherScatter.Get(ref prestep.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
+                //Normal goes from B to A by convention.
+                GatherScatter.Get(ref prestep.Normal.Y, constraintInnerIndex) = -1;
+
                 for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
                 {
                     //TODO: Normal and spring settings should really be shared on convex manifolds.
                     ref var contact = ref Unsafe.Add(ref prestep.Contact0, contactIndex);
-                    GatherScatter.Get(ref contact.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
-                    GatherScatter.Get(ref contact.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
-                    GatherScatter.Get(ref contact.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
 
-                    //Normal goes from B to A by convention.
-                    GatherScatter.Get(ref contact.Normal.Y, constraintInnerIndex) = -1;
                     var x = (contactIndex & 1) - 0.5f;
                     var z = ((contactIndex & 2) >> 1) - 0.5f;
                     GatherScatter.Get(ref contact.OffsetA.X, constraintInnerIndex) = x;
