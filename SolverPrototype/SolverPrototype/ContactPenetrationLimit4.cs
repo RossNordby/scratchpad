@@ -42,16 +42,15 @@ namespace SolverPrototype
         //Storing only the linear jacobian (normal) and then multiplying by the effective mass (a scalar per contact) saves a bunch of stores and loads.
         public Vector3Wide Normal;
         public ContactPenetrationLimitWSVToCSI WSVToCSI0;
-        public ContactPenetrationLimitWSVToCSI WSVToCSI1;
-        public ContactPenetrationLimitWSVToCSI WSVToCSI2;
-        public ContactPenetrationLimitWSVToCSI WSVToCSI3;
-
         public Vector<float> BiasImpulse0;
-        public Vector<float> BiasImpulse1;
-        public Vector<float> BiasImpulse2;
-        public Vector<float> BiasImpulse3;
-        //Recall that the softness impulse scale is independent of effective mass due to cancellation.
         public Vector<float> SoftnessImpulseScale;
+        public ContactPenetrationLimitWSVToCSI WSVToCSI1;
+        public Vector<float> BiasImpulse1;
+        public ContactPenetrationLimitWSVToCSI WSVToCSI2;
+        public Vector<float> BiasImpulse2;
+        public ContactPenetrationLimitWSVToCSI WSVToCSI3;
+        public Vector<float> BiasImpulse3;
+        
 
         //Nothing above is accessed by the warm start. Should really try splitting it.
 
@@ -204,12 +203,13 @@ namespace SolverPrototype
             data.BiasImpulse2 = biasVelocity2 * data.WSVToCSI2.EffectiveMass;
             data.BiasImpulse3 = biasVelocity3 * data.WSVToCSI3.EffectiveMass;
 
-
+        
         }
 
         /// <summary>
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ApplyImpulse(ref ContactPenetrationLimitCSIToWSV csiToWSV, ref Vector3Wide normal,
             ref Vector<float> inverseMassA, ref Vector<float> inverseMassB,
             ref Vector<float> correctiveImpulse,
