@@ -62,20 +62,7 @@ namespace SolverPrototype
                 ref var iteration = ref Unsafe.Add(ref iterationBase, i);
 
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
-                ContactPenetrationLimit4.ComputeJacobiansAndError(ref prestep.Normal,
-                    ref prestep.Contact0,
-                    ref prestep.Contact1,
-                    ref prestep.Contact2,
-                    ref prestep.Contact3, out var jacobians,
-                    out var error0,
-                    out var error1,
-                    out var error2,
-                    out var error3);
-                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, ref jacobians, ref prestep.SpringSettings,
-                    ref error0,
-                    ref error1,
-                    ref error2,
-                    ref error3, dt, inverseDt, out iteration.Penetration);
+                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep, dt, inverseDt, out iteration.Penetration);
                 TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, out iteration.Twist);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetA, ref prestep.Contact1.OffsetA, out var a01);
                 Vector3Wide.Add(ref prestep.Contact2.OffsetA, ref prestep.Contact3.OffsetA, out var a23);

@@ -5,19 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
-
-    public struct ContactPenetrationLimit4Jacobians
-    {
-        public Vector3Wide AngularA0;
-        public Vector3Wide AngularB0;
-        public Vector3Wide AngularA1;
-        public Vector3Wide AngularB1;
-        public Vector3Wide AngularA2;
-        public Vector3Wide AngularB2;
-        public Vector3Wide AngularA3;
-        public Vector3Wide AngularB3;
-    }
-
+    
     public struct ContactPenetrationLimitWSVToCSI
     {
         public Vector<float> EffectiveMass;
@@ -50,7 +38,7 @@ namespace SolverPrototype
         public Vector<float> BiasImpulse2;
         public ContactPenetrationLimitWSVToCSI WSVToCSI3;
         public Vector<float> BiasImpulse3;
-        
+
 
         //Nothing above is accessed by the warm start. Should really try splitting it.
 
@@ -75,18 +63,10 @@ namespace SolverPrototype
     public static class ContactPenetrationLimit4
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeJacobiansAndError(
-            ref Vector3Wide normal,
-            ref ManifoldContactData contact0,
-            ref ManifoldContactData contact1,
-            ref ManifoldContactData contact2,
-            ref ManifoldContactData contact3,
-            out ContactPenetrationLimit4Jacobians jacobians,
-            out Vector<float> error0,
-            out Vector<float> error1,
-            out Vector<float> error2,
-            out Vector<float> error3)
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref ContactManifold4PrestepData prestep, float dt, float inverseDt, out ContactPenetrationLimit4IterationData data)
         {
+            //We directly take the prestep data here since the jacobians and error don't undergo any processing.
+
             //The contact penetration constraint takes the form:
             //dot(positionA + offsetA, N) >= dot(positionB + offsetB, N)
             //Or:
@@ -113,57 +93,43 @@ namespace SolverPrototype
             //angularA: offsetA x N
             //linearB: -N
             //angularB: N x offsetB
-            Vector3Wide.CrossWithoutOverlap(ref contact0.OffsetA, ref normal, out jacobians.AngularA0);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref contact0.OffsetB, out jacobians.AngularB0);
-            Vector3Wide.CrossWithoutOverlap(ref contact1.OffsetA, ref normal, out jacobians.AngularA1);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref contact1.OffsetB, out jacobians.AngularB1);
-            Vector3Wide.CrossWithoutOverlap(ref contact2.OffsetA, ref normal, out jacobians.AngularA2);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref contact2.OffsetB, out jacobians.AngularB2);
-            Vector3Wide.CrossWithoutOverlap(ref contact3.OffsetA, ref normal, out jacobians.AngularA3);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref contact3.OffsetB, out jacobians.AngularB3);
-
             //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
-            error0 = contact0.PenetrationDepth;
-            error1 = contact1.PenetrationDepth;
-            error2 = contact2.PenetrationDepth;
-            error3 = contact3.PenetrationDepth;
-        }
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact0.OffsetA, ref prestep.Normal, out data.WSVToCSI0.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact0.OffsetB, out data.WSVToCSI0.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact1.OffsetA, ref prestep.Normal, out data.WSVToCSI1.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact1.OffsetB, out data.WSVToCSI1.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact2.OffsetA, ref prestep.Normal, out data.WSVToCSI2.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact2.OffsetB, out data.WSVToCSI2.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact3.OffsetA, ref prestep.Normal, out data.WSVToCSI3.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact3.OffsetB, out data.WSVToCSI3.AngularB);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactPenetrationLimit4Jacobians angularJacobians, ref SpringSettings springSettings,
-            ref Vector<float> error0,
-            ref Vector<float> error1,
-            ref Vector<float> error2,
-            ref Vector<float> error3, float dt, float inverseDt, out ContactPenetrationLimit4IterationData data)
-        {
             //effective mass
             //Note that the linear components are all redundant due to the shared normal.
             //Also note that the J * M^-1 * JT can be reordered to J * JT * M^-1 for the linear components, since each constraint is 1DOF (scalar multiply commutativity).
 
-            data.Normal = normal;
-            Vector3Wide.Dot(ref normal, ref normal, out var normalLengthSquared);
+            data.Normal = prestep.Normal;
+            Vector3Wide.Dot(ref prestep.Normal, ref prestep.Normal, out var normalLengthSquared);
             var linearA = normalLengthSquared * inertiaA.InverseMass;
             var linearB = normalLengthSquared * inertiaB.InverseMass;
 
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA0, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV0.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB0, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV0.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV0.AngularA, ref angularJacobians.AngularA0, out var angularA0);
-            Vector3Wide.Dot(ref data.CSIToWSV0.AngularB, ref angularJacobians.AngularB0, out var angularB0);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA1, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV1.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB1, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV1.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV1.AngularA, ref angularJacobians.AngularA1, out var angularA1);
-            Vector3Wide.Dot(ref data.CSIToWSV1.AngularB, ref angularJacobians.AngularB1, out var angularB1);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA2, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV2.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB2, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV2.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV2.AngularA, ref angularJacobians.AngularA2, out var angularA2);
-            Vector3Wide.Dot(ref data.CSIToWSV2.AngularB, ref angularJacobians.AngularB2, out var angularB2);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularA3, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV3.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularJacobians.AngularB3, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV3.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV3.AngularA, ref angularJacobians.AngularA3, out var angularA3);
-            Vector3Wide.Dot(ref data.CSIToWSV3.AngularB, ref angularJacobians.AngularB3, out var angularB3);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI0.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV0.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI0.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV0.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV0.AngularA, ref data.WSVToCSI0.AngularA, out var angularA0);
+            Vector3Wide.Dot(ref data.CSIToWSV0.AngularB, ref data.WSVToCSI0.AngularB, out var angularB0);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI1.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV1.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI1.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV1.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV1.AngularA, ref data.WSVToCSI1.AngularA, out var angularA1);
+            Vector3Wide.Dot(ref data.CSIToWSV1.AngularB, ref data.WSVToCSI1.AngularB, out var angularB1);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI2.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV2.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI2.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV2.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV2.AngularA, ref data.WSVToCSI2.AngularA, out var angularA2);
+            Vector3Wide.Dot(ref data.CSIToWSV2.AngularB, ref data.WSVToCSI2.AngularB, out var angularB2);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI3.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV3.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI3.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV3.AngularB);
+            Vector3Wide.Dot(ref data.CSIToWSV3.AngularA, ref data.WSVToCSI3.AngularA, out var angularA3);
+            Vector3Wide.Dot(ref data.CSIToWSV3.AngularB, ref data.WSVToCSI3.AngularB, out var angularB3);
             data.InverseMassA = inertiaA.InverseMass;
             data.InverseMassB = inertiaB.InverseMass;
-
 
             var linear = linearA + linearB;
             var effectiveMass0 = Vector<float>.One / (linear + angularA0 + angularB0);
@@ -171,39 +137,28 @@ namespace SolverPrototype
             var effectiveMass2 = Vector<float>.One / (linear + angularA2 + angularB2);
             var effectiveMass3 = Vector<float>.One / (linear + angularA3 + angularB3);
 
-            var frequencyDt = springSettings.NaturalFrequency * dt;
-            var twiceDampingRatio = springSettings.DampingRatio * 2; //Could precompute.
+            var frequencyDt = prestep.SpringSettings.NaturalFrequency * dt;
+            var twiceDampingRatio = prestep.SpringSettings.DampingRatio * 2; //Could precompute.
+            var positionErrorToVelocity = prestep.SpringSettings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
             var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
             var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
-
             data.SoftnessImpulseScale = extra * effectiveMassCFMScale;
 
-            var positionErrorToVelocity = springSettings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
-            
             //Note that we don't precompute the JT * effectiveMass term. Since the jacobians are shared, we have to do that multiply anyway.
             data.WSVToCSI0.EffectiveMass = effectiveMass0 * effectiveMassCFMScale;
-            data.WSVToCSI0.AngularA = angularJacobians.AngularA0;
-            data.WSVToCSI0.AngularB = angularJacobians.AngularB0;
             data.WSVToCSI1.EffectiveMass = effectiveMass1 * effectiveMassCFMScale;
-            data.WSVToCSI1.AngularA = angularJacobians.AngularA1;
-            data.WSVToCSI1.AngularB = angularJacobians.AngularB1;
             data.WSVToCSI2.EffectiveMass = effectiveMass2 * effectiveMassCFMScale;
-            data.WSVToCSI2.AngularA = angularJacobians.AngularA2;
-            data.WSVToCSI2.AngularB = angularJacobians.AngularB2;
             data.WSVToCSI3.EffectiveMass = effectiveMass3 * effectiveMassCFMScale;
-            data.WSVToCSI3.AngularA = angularJacobians.AngularA3;
-            data.WSVToCSI3.AngularB = angularJacobians.AngularB3;
 
-            var biasVelocity0 = Vector.Min(error0 * positionErrorToVelocity, springSettings.MaximumRecoveryVelocity);
-            var biasVelocity1 = Vector.Min(error1 * positionErrorToVelocity, springSettings.MaximumRecoveryVelocity);
-            var biasVelocity2 = Vector.Min(error2 * positionErrorToVelocity, springSettings.MaximumRecoveryVelocity);
-            var biasVelocity3 = Vector.Min(error3 * positionErrorToVelocity, springSettings.MaximumRecoveryVelocity);
+            var biasVelocity0 = Vector.Min(prestep.Contact0.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            var biasVelocity1 = Vector.Min(prestep.Contact1.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            var biasVelocity2 = Vector.Min(prestep.Contact2.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            var biasVelocity3 = Vector.Min(prestep.Contact3.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
             data.BiasImpulse0 = biasVelocity0 * data.WSVToCSI0.EffectiveMass;
             data.BiasImpulse1 = biasVelocity1 * data.WSVToCSI1.EffectiveMass;
             data.BiasImpulse2 = biasVelocity2 * data.WSVToCSI2.EffectiveMass;
             data.BiasImpulse3 = biasVelocity3 * data.WSVToCSI3.EffectiveMass;
 
-        
         }
 
         /// <summary>
