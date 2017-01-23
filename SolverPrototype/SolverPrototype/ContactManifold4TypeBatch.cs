@@ -3,12 +3,22 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
+    public struct ManifoldContactData
+    {
+        public Vector3Wide OffsetA;
+        public Vector3Wide OffsetB;
+        public Vector<float> PenetrationDepth;
+    }
     public struct ContactManifold4PrestepData
     {
-        public ContactData Contact0;
-        public ContactData Contact1;
-        public ContactData Contact2;
-        public ContactData Contact3;
+        //In a convex manifold, all contacts share the same normal.
+        public Vector3Wide Normal;
+        public ManifoldContactData Contact0;
+        public ManifoldContactData Contact1;
+        public ManifoldContactData Contact2;
+        public ManifoldContactData Contact3;
+        //All contacts also share the spring settings.
+        public SpringSettings SpringSettings;
         public Vector3Wide TangentX;
         public Vector3Wide TangentY;
         public Vector<float> FrictionCoefficient;
@@ -22,10 +32,7 @@ namespace SolverPrototype
         public Vector<float> PremultipliedFrictionCoefficient;
         public TwistFrictionIterationData Twist;
         public TangentFrictionIterationData Tangent;
-        public IterationData2Body1DOF Penetration0;
-        public IterationData2Body1DOF Penetration1;
-        public IterationData2Body1DOF Penetration2;
-        public IterationData2Body1DOF Penetration3;
+        public ContactPenetrationLimit4IterationData Penetration;
     }
 
     public struct ContactManifold4AccumulatedImpulses
@@ -53,16 +60,23 @@ namespace SolverPrototype
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var iteration = ref Unsafe.Add(ref iterationBase, i);
-                ContactPenetrationLimit.ComputeJacobiansAndError(ref prestep.Contact0, out var jacobians0, out var error0);
-                ContactPenetrationLimit.ComputeJacobiansAndError(ref prestep.Contact1, out var jacobians1, out var error1);
-                ContactPenetrationLimit.ComputeJacobiansAndError(ref prestep.Contact2, out var jacobians2, out var error2);
-                ContactPenetrationLimit.ComputeJacobiansAndError(ref prestep.Contact3, out var jacobians3, out var error3);
+
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
-                Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians0, ref prestep.Contact0.SpringSettings, ref error0, dt, inverseDt, out iteration.Penetration0);
-                Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians1, ref prestep.Contact1.SpringSettings, ref error1, dt, inverseDt, out iteration.Penetration1);
-                Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians2, ref prestep.Contact2.SpringSettings, ref error2, dt, inverseDt, out iteration.Penetration2);
-                Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians3, ref prestep.Contact3.SpringSettings, ref error3, dt, inverseDt, out iteration.Penetration3);
-                TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Contact0.Normal, out iteration.Twist);
+                ContactPenetrationLimit4.ComputeJacobiansAndError(ref prestep.Normal,
+                    ref prestep.Contact0,
+                    ref prestep.Contact1,
+                    ref prestep.Contact2,
+                    ref prestep.Contact3, out var jacobians,
+                    out var error0,
+                    out var error1,
+                    out var error2,
+                    out var error3);
+                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, ref jacobians, ref prestep.SpringSettings,
+                    ref error0,
+                    ref error1,
+                    ref error2,
+                    ref error3, dt, inverseDt, out iteration.Penetration);
+                TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, out iteration.Twist);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetA, ref prestep.Contact1.OffsetA, out var a01);
                 Vector3Wide.Add(ref prestep.Contact2.OffsetA, ref prestep.Contact3.OffsetA, out var a23);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetB, ref prestep.Contact1.OffsetB, out var b01);
@@ -93,10 +107,11 @@ namespace SolverPrototype
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                Inequality2Body1DOF.WarmStart(ref iteration.Penetration0, ref accumulatedImpulses.Penetration0, ref wsvA, ref wsvB);
-                Inequality2Body1DOF.WarmStart(ref iteration.Penetration1, ref accumulatedImpulses.Penetration1, ref wsvA, ref wsvB);
-                Inequality2Body1DOF.WarmStart(ref iteration.Penetration2, ref accumulatedImpulses.Penetration2, ref wsvA, ref wsvB);
-                Inequality2Body1DOF.WarmStart(ref iteration.Penetration3, ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
+                ContactPenetrationLimit4.WarmStart(ref iteration.Penetration,
+                    ref accumulatedImpulses.Penetration0,
+                    ref accumulatedImpulses.Penetration1,
+                    ref accumulatedImpulses.Penetration2,
+                    ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
                 TwistFriction.WarmStart(ref iteration.Twist, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 TangentFriction.WarmStart(ref iteration.Tangent, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
@@ -120,10 +135,11 @@ namespace SolverPrototype
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
-                Inequality2Body1DOF.Solve(ref iteration.Penetration0, ref accumulatedImpulses.Penetration0, ref wsvA, ref wsvB);
-                Inequality2Body1DOF.Solve(ref iteration.Penetration1, ref accumulatedImpulses.Penetration1, ref wsvA, ref wsvB);
-                Inequality2Body1DOF.Solve(ref iteration.Penetration2, ref accumulatedImpulses.Penetration2, ref wsvA, ref wsvB);
-                Inequality2Body1DOF.Solve(ref iteration.Penetration3, ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
+                ContactPenetrationLimit4.Solve(ref iteration.Penetration,
+                    ref accumulatedImpulses.Penetration0,
+                    ref accumulatedImpulses.Penetration1,
+                    ref accumulatedImpulses.Penetration2,
+                    ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
 
                 GatherScatter.ScatterVelocities(bodyVelocities, ref BodyReferences[i], ref wsvA, ref wsvB);
             }

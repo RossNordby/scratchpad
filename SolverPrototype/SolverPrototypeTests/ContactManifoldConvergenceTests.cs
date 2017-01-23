@@ -13,7 +13,7 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            const int bodyCount = 256;
+            const int bodyCount = 512;
             var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, true, out var handleIndices);
 
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
@@ -43,16 +43,18 @@ namespace SolverPrototypeTests
                 ++constraintBodies.Count;
 
                 ref var prestep = ref constraintReference.TypeBatch.PrestepData[constraintBundleIndex];
+
+                GatherScatter.Get(ref prestep.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
+                GatherScatter.Get(ref prestep.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
+                GatherScatter.Get(ref prestep.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
+                //Normal goes from B to A by convention.
+                GatherScatter.Get(ref prestep.Normal.Y, constraintInnerIndex) = -1;
+
                 for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
                 {
                     //TODO: Normal and spring settings should really be shared on convex manifolds.
                     ref var contact = ref Unsafe.Add(ref prestep.Contact0, contactIndex);
-                    GatherScatter.Get(ref contact.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
-                    GatherScatter.Get(ref contact.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
-                    GatherScatter.Get(ref contact.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
 
-                    //Normal goes from B to A by convention.
-                    GatherScatter.Get(ref contact.Normal.Y, constraintInnerIndex) = -1;
                     var x = (contactIndex & 1) - 0.5f;
                     var z = ((contactIndex & 2) >> 1) - 0.5f;
                     GatherScatter.Get(ref contact.OffsetA.X, constraintInnerIndex) = x;
@@ -74,7 +76,7 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 32;
+            const int iterationCount = 5;
             const int frameCount = 4096;
             solver.IterationCount = iterationCount;
 
