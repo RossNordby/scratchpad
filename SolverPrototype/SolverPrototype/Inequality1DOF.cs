@@ -22,8 +22,7 @@ namespace SolverPrototype
         public Vector<float> MaximumRecoveryVelocity;
     }
 
-
-    public struct IterationData2Body1DOF
+    public struct Projection2Body1DOF
     {
         //Rather than projecting from world space to constraint space *velocity* using JT, we precompute JT * effective mass
         //and go directly from world space velocity to constraint space impulse.
@@ -36,11 +35,10 @@ namespace SolverPrototype
         public Vector<float> BiasImpulse;
         //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
         public Vector<float> SoftnessImpulseScale;
-        //Technically, nothing above this point is accessed by the WarmStart, so you COULD split it into two pieces to eliminate large strides...
-        //but I'm not sure if we gain anything. We'd have another address stream during solve. Something to test, maybe.
-        //(Most likely, splitting would be a very slight overall win... note that even non-pretransformed constraints can use the same split.
-        //Bias and softness would be alone in the 'pre' data, while the jacobians and M^-1 would be in the 'post' data.
-
+        //Nothing in the projection type is accessed by the WarmStart, hence the split.
+    }
+    public struct Unprojection2Body1DOF
+    {
         //It also needs to project from constraint space to world space.
         //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,
         //we just go directly from constraint impulse to world velocity change.
@@ -53,14 +51,14 @@ namespace SolverPrototype
         public Vector3Wide CSIToWSVAngularB;
 
     }
-
+    
 
     public static class Inequality2Body1DOF
     {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
-            ref Vector<float> positionError, float dt, float inverseDt, out IterationData2Body1DOF data)
+            ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection, out Unprojection2Body1DOF unprojection)
         {
             //effective mass = (J * M^-1 * JT)^-1
             //where J is a constraintDOF x bodyCount*3 sized matrix, JT is its transpose, and for two bodies M^-1 is:
@@ -86,16 +84,16 @@ namespace SolverPrototype
             //For this 1DOF constraint, the result is a simple scalar.
             //Note that we store the intermediate results of J * M^-1 for use when projecting from constraint space impulses to world velocity changes. 
             //If we didn't store those intermediate values, we could just scale the dot product of jacobians.LinearA with itself to save 4 multiplies.
-            Vector3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out data.CSIToWSVLinearA);
-            Vector3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out data.CSIToWSVLinearB);
-            Vector3Wide.Dot(ref data.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
-            Vector3Wide.Dot(ref data.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
+            Vector3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out unprojection.CSIToWSVLinearA);
+            Vector3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out unprojection.CSIToWSVLinearB);
+            Vector3Wide.Dot(ref unprojection.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
+            Vector3Wide.Dot(ref unprojection.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
             //The angular components are a little more involved; (J * I^-1) * JT is explicitly computed.
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSVAngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSVAngularB);
-            Vector3Wide.Dot(ref data.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
-            Vector3Wide.Dot(ref data.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSVAngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSVAngularB);
+            Vector3Wide.Dot(ref unprojection.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
+            Vector3Wide.Dot(ref unprojection.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
 
             //Now for a digression!
             //Softness is applied along the diagonal (which, for a 1DOF constraint, is just the only element).
@@ -294,7 +292,7 @@ namespace SolverPrototype
 
             //CFM/dt * softenedEffectiveMass:
             //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
-            data.SoftnessImpulseScale = extra * effectiveMassCFMScale;
+            projection.SoftnessImpulseScale = extra * effectiveMassCFMScale;
 
             //ERP = (naturalFrequency * dt) * (naturalFrequency * dt + 2 * dampingRatio)^-1
             //"ERP" is the error reduction per frame. Note that it can never exceed 1 given physically valid input.
@@ -306,7 +304,7 @@ namespace SolverPrototype
             //that could cause a significant velocity overshoot, we apply an arbitrary clamping value to keep it reasonable.
             //This is useful for a variety of inequality constraints (like contacts) because you don't always want them behaving as true springs.
             var biasVelocity = Vector.Min(positionError * positionErrorToVelocity, springSettings.MaximumRecoveryVelocity);
-            data.BiasImpulse = biasVelocity * softenedEffectiveMass;
+            projection.BiasImpulse = biasVelocity * softenedEffectiveMass;
 
             //Precompute the wsv * (JT * softenedEffectiveMass) term.
             //Note that we store it in a Vector3Wide as if it's a row vector, but this is really a column (because JT is a column vector).
@@ -316,10 +314,10 @@ namespace SolverPrototype
             //resulting in the proper wsv * (softenedEffectiveMassT * J)T = wsv * (JT * softenedEffectiveMass.
             //You'll see this pattern repeated in higher DOF constraints. We explicitly compute softenedEffectiveMassT * J, and then apply the transpose in the solves.
             //(Why? Because creating a Matrix3x2 and Matrix2x3 and 4x3 and 3x4 and 5x3 and 3x5 and so on just doubles the number of representations with little value.)
-            Vector3Wide.Scale(ref jacobians.LinearA, ref softenedEffectiveMass, out data.WSVtoCSILinearA);
-            Vector3Wide.Scale(ref jacobians.AngularA, ref softenedEffectiveMass, out data.WSVtoCSIAngularA);
-            Vector3Wide.Scale(ref jacobians.LinearB, ref softenedEffectiveMass, out data.WSVtoCSILinearB);
-            Vector3Wide.Scale(ref jacobians.AngularB, ref softenedEffectiveMass, out data.WSVtoCSIAngularB);
+            Vector3Wide.Scale(ref jacobians.LinearA, ref softenedEffectiveMass, out projection.WSVtoCSILinearA);
+            Vector3Wide.Scale(ref jacobians.AngularA, ref softenedEffectiveMass, out projection.WSVtoCSIAngularA);
+            Vector3Wide.Scale(ref jacobians.LinearB, ref softenedEffectiveMass, out projection.WSVtoCSILinearB);
+            Vector3Wide.Scale(ref jacobians.AngularB, ref softenedEffectiveMass, out projection.WSVtoCSIAngularB);
         }
         //Naming conventions:
         //We transform between two spaces, world and constraint space. We also deal with two quantities- velocities, and impulses. 
@@ -335,7 +333,7 @@ namespace SolverPrototype
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ApplyImpulse(ref IterationData2Body1DOF data, ref Vector<float> correctiveImpulse,
+        public static void ApplyImpulse(ref Unprojection2Body1DOF data, ref Vector<float> correctiveImpulse,
             ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //Applying the impulse requires transforming the constraint space impulse into a world space velocity change.
@@ -355,7 +353,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void WarmStart(ref Unprojection2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
@@ -363,7 +361,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse,
+        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Projection2Body1DOF projection, ref Vector<float> accumulatedImpulse,
             out Vector<float> correctiveCSI)
         {
             //Take the world space velocity of each body into constraint space by transforming by the transpose(jacobian).
@@ -371,15 +369,15 @@ namespace SolverPrototype
             //So we are multiplying v * JT.)
             //Then, transform it into an impulse by applying the effective mass.
             //Here, we combine the projection and impulse conversion into a precomputed value, i.e. v * (JT * softenedEffectiveMass).
-            Vector3Wide.Dot(ref wsvA.LinearVelocity, ref data.WSVtoCSILinearA, out var csiaLinear);
-            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.WSVtoCSIAngularA, out var csiaAngular);
-            Vector3Wide.Dot(ref wsvB.LinearVelocity, ref data.WSVtoCSILinearB, out var csibLinear);
-            Vector3Wide.Dot(ref wsvB.AngularVelocity, ref data.WSVtoCSIAngularB, out var csibAngular);
+            Vector3Wide.Dot(ref wsvA.LinearVelocity, ref projection.WSVtoCSILinearA, out var csiaLinear);
+            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref projection.WSVtoCSIAngularA, out var csiaAngular);
+            Vector3Wide.Dot(ref wsvB.LinearVelocity, ref projection.WSVtoCSILinearB, out var csibLinear);
+            Vector3Wide.Dot(ref wsvB.AngularVelocity, ref projection.WSVtoCSIAngularB, out var csibAngular);
             //Combine it all together, following:
             //constraint space impulse = (targetVelocity - currentVelocity) * softenedEffectiveMass
             //constraint space impulse = (bias - accumulatedImpulse * softness - wsv * JT) * softenedEffectiveMass
             //constraint space impulse = (bias * softenedEffectiveMass) - accumulatedImpulse * (softness * softenedEffectiveMass) - wsv * (JT * softenedEffectiveMass)
-            var csi = data.BiasImpulse - accumulatedImpulse * data.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
+            var csi = projection.BiasImpulse - accumulatedImpulse * projection.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
 
             var previousAccumulated = accumulatedImpulse;
             accumulatedImpulse = Vector.Max(Vector<float>.Zero, accumulatedImpulse + csi);
@@ -389,10 +387,10 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref IterationData2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Solve(ref Projection2Body1DOF projection, ref Unprojection2Body1DOF unprojection, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(ref data, ref correctiveCSI, ref wsvA, ref wsvB);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulse, out var correctiveCSI);
+            ApplyImpulse(ref unprojection, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

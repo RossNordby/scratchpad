@@ -47,7 +47,8 @@ namespace SolverPrototypeTests
             int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
             var bodyReferences = new BodyReferences[constraintBundleCount];
             var springSettings = new SpringSettings[constraintBundleCount];
-            var iterationData = new IterationData2Body1DOF[constraintBundleCount];
+            var projectionData = new Projection2Body1DOF[constraintBundleCount];
+            var unprojectionData = new Unprojection2Body1DOF[constraintBundleCount];
             var contactData = new ContactData[constraintBundleCount];
             var accumulatedImpulses = new Vector<float>[constraintBundleCount];
             for (int i = 0; i < constraintCount; ++i)
@@ -92,10 +93,10 @@ namespace SolverPrototypeTests
                     var maximumRecoveryVelocity = new Vector<float>(1);
                     GatherScatter.GatherInertia(bodies.LocalInertiaBundles, ref bodyReferences[i], out var inertiaA, out var inertiaB);
                     Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref springSettings[i],
-                        ref error, dt, inverseDt, out iterationData[i]);
+                        ref error, dt, inverseDt, out projectionData[i], out unprojectionData[i]);
 
                     GatherScatter.GatherVelocities(bodies.VelocityBundles, ref bodyReferences[i], out var wsvA, out var wsvB);
-                    Inequality2Body1DOF.WarmStart(ref iterationData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
+                    Inequality2Body1DOF.WarmStart(ref unprojectionData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
                     GatherScatter.ScatterVelocities(bodies.VelocityBundles, ref bodyReferences[i], ref wsvA, ref wsvB);
                 }
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
@@ -103,7 +104,7 @@ namespace SolverPrototypeTests
                     for (int i = 0; i < constraintBundleCount; ++i)
                     {
                         GatherScatter.GatherVelocities(bodies.VelocityBundles, ref bodyReferences[i], out var wsvA, out var wsvB);
-                        Inequality2Body1DOF.Solve(ref iterationData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
+                        Inequality2Body1DOF.Solve(ref projectionData[i], ref unprojectionData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
                         GatherScatter.ScatterVelocities(bodies.VelocityBundles, ref bodyReferences[i], ref wsvA, ref wsvB);
                     }
                 }

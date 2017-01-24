@@ -12,15 +12,16 @@ namespace SolverPrototype
         public Matrix2x3Wide LinearB;
         public Matrix2x3Wide AngularB;
     }
-
-
-    public struct TangentFrictionIterationData
+    public struct TangentFrictionProjection
     {
         public Matrix2x3Wide WSVtoCSILinearA;
         public Matrix2x3Wide WSVtoCSIAngularA;
         public Matrix2x3Wide WSVtoCSILinearB;
         public Matrix2x3Wide WSVtoCSIAngularB;
+    }
 
+    public struct TangentFrictionUnprojection
+    {
         public Matrix2x3Wide CSIToWSVLinearA;
         public Matrix2x3Wide CSIToWSVAngularA;
         public Matrix2x3Wide CSIToWSVLinearB;
@@ -70,18 +71,18 @@ namespace SolverPrototype
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Jacobians2Body2DOF jacobians,
-            out TangentFrictionIterationData data)
+            out TangentFrictionProjection projection, out TangentFrictionUnprojection unprojection)
         {
             //Compute effective mass matrix contributions.
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out data.CSIToWSVLinearA);
-            Matrix2x3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out data.CSIToWSVLinearB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref data.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref data.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
+            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out unprojection.CSIToWSVLinearA);
+            Matrix2x3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out unprojection.CSIToWSVLinearB);
+            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref unprojection.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
+            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref unprojection.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSVAngularA);
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSVAngularB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref data.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref data.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
+            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSVAngularA);
+            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSVAngularB);
+            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref unprojection.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
+            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref unprojection.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
 
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
             Matrix2x2Wide.Add(ref linearA, ref linearB, out var linear);
@@ -95,16 +96,16 @@ namespace SolverPrototype
             //This is precomputing wsv * (JT * effectiveMass).
             //Note that we only have a 2x3 representation, so we are actually storing (JT * effectiveMass)T = effectiveMassT * J.
             //During the solve, we use wsv * (effectiveMassT * J)T.
-            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.LinearA, out data.WSVtoCSILinearA);
-            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.AngularA, out data.WSVtoCSIAngularA);
-            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.LinearB, out data.WSVtoCSILinearB);
-            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.AngularB, out data.WSVtoCSIAngularB);
+            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.LinearA, out projection.WSVtoCSILinearA);
+            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.AngularA, out projection.WSVtoCSIAngularA);
+            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.LinearB, out projection.WSVtoCSILinearB);
+            Matrix2x3Wide.MultiplyTransposedWithoutOverlap(ref effectiveMass, ref jacobians.AngularB, out projection.WSVtoCSIAngularB);
         }
 
         /// <summary>
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
-        public static void ApplyImpulse(ref TangentFrictionIterationData data, ref Vector2Wide correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void ApplyImpulse(ref TangentFrictionUnprojection data, ref Vector2Wide correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             BodyVelocities correctiveVelocityA, correctiveVelocityB;
             Matrix2x3Wide.Transform(ref correctiveImpulse, ref data.CSIToWSVLinearA, out correctiveVelocityA.LinearVelocity);
@@ -118,7 +119,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(ref TangentFrictionIterationData data, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void WarmStart(ref TangentFrictionUnprojection data, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
@@ -126,7 +127,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionIterationData data, ref Vector<float> maximumImpulse,
+        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionProjection data, ref Vector<float> maximumImpulse,
             ref Vector2Wide accumulatedImpulse, out Vector2Wide correctiveCSI)
         {
             //Recall that our WSVtoCSI... is transposed due to the lack of a 3x2 representation.
@@ -151,10 +152,10 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref TangentFrictionIterationData data, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Solve(ref TangentFrictionProjection projection, ref TangentFrictionUnprojection unprojection, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(ref data, ref correctiveCSI, ref wsvA, ref wsvB);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);
+            ApplyImpulse(ref unprojection, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

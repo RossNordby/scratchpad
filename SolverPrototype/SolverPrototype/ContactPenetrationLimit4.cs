@@ -20,15 +20,15 @@ namespace SolverPrototype
         public Vector3Wide AngularA;
         public Vector3Wide AngularB;
     }
+
     /// <summary>
-    /// Four convex-sourced contact penetration limits solved together. Internally implemented using SI solver. 
-    /// Batching saves on redundant data.
+    /// Data required to project world space velocities into a constraint impulse.
     /// </summary>
-    public struct ContactPenetrationLimit4IterationData
+    public struct ContactPenetrationLimit4Projection
     {
         //Note that all linear components of WSVToCSI are simply the normal vector times the effective mass (negated for B).
         //Storing only the linear jacobian (normal) and then multiplying by the effective mass (a scalar per contact) saves a bunch of stores and loads.
-        public Vector3Wide Normal;
+        //Note that the normal is stored in the unprojection; that's because it's needed by warmstart and warmstart doesn't use the projection stuff.
         public ContactPenetrationLimitWSVToCSI WSVToCSI0;
         public Vector<float> BiasImpulse0;
         public Vector<float> SoftnessImpulseScale;
@@ -38,32 +38,38 @@ namespace SolverPrototype
         public Vector<float> BiasImpulse2;
         public ContactPenetrationLimitWSVToCSI WSVToCSI3;
         public Vector<float> BiasImpulse3;
+        //The first half sharing introduces 4 multiplies, and saves 17 loads.
+    }
 
-
-        //Nothing above is accessed by the warm start. Should really try splitting it.
-
+    /// <summary>
+    /// Data required to transform from constraint impulses to world space velocities.
+    /// </summary>
+    public struct ContactPenetrationLimit4Unprojection
+    {
 
         //Again, note that the linear jacobian is shared (the contact manifold normal).
         //The M^-1 term for both bodies in reintroduced, but for linear terms it's only 2 scalars per lane, compared to 21 scalars for the redundant jacobians.
-
+        public Vector3Wide Normal;
         public Vector<float> InverseMassA;
         public Vector<float> InverseMassB;
         public ContactPenetrationLimitCSIToWSV CSIToWSV0;
         public ContactPenetrationLimitCSIToWSV CSIToWSV1;
         public ContactPenetrationLimitCSIToWSV CSIToWSV2;
         public ContactPenetrationLimitCSIToWSV CSIToWSV3;
-
-        //The first half would introduce 4 multiplies, and save 17 loads.
-        //The second half would introduce 8 multiplies, and save 19 loads.
-        //My guess is that it's worthwhile. Really need to collect some data.
+        //The second half sharing introduces 8 multiplies, and saves 19 loads.
 
     }
 
 
+    /// <summary>
+    /// Four convex-sourced contact penetration limits solved together. Internally implemented using SI solver. 
+    /// Batching saves on redundant data.
+    /// </summary>
     public static class ContactPenetrationLimit4
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref ContactManifold4PrestepData prestep, float dt, float inverseDt, out ContactPenetrationLimit4IterationData data)
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref ContactManifold4PrestepData prestep, float dt, float inverseDt,
+            out ContactPenetrationLimit4Projection projection, out ContactPenetrationLimit4Unprojection unprojection)
         {
             //We directly take the prestep data here since the jacobians and error don't undergo any processing.
 
@@ -94,44 +100,44 @@ namespace SolverPrototype
             //linearB: -N
             //angularB: N x offsetB
             //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact0.OffsetA, ref prestep.Normal, out data.WSVToCSI0.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact0.OffsetB, out data.WSVToCSI0.AngularB);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact1.OffsetA, ref prestep.Normal, out data.WSVToCSI1.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact1.OffsetB, out data.WSVToCSI1.AngularB);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact2.OffsetA, ref prestep.Normal, out data.WSVToCSI2.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact2.OffsetB, out data.WSVToCSI2.AngularB);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact3.OffsetA, ref prestep.Normal, out data.WSVToCSI3.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact3.OffsetB, out data.WSVToCSI3.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact0.OffsetA, ref prestep.Normal, out projection.WSVToCSI0.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact0.OffsetB, out projection.WSVToCSI0.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact1.OffsetA, ref prestep.Normal, out projection.WSVToCSI1.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact1.OffsetB, out projection.WSVToCSI1.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact2.OffsetA, ref prestep.Normal, out projection.WSVToCSI2.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact2.OffsetB, out projection.WSVToCSI2.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact3.OffsetA, ref prestep.Normal, out projection.WSVToCSI3.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.Normal, ref prestep.Contact3.OffsetB, out projection.WSVToCSI3.AngularB);
 
             //effective mass
             //Note that the linear components are all redundant due to the shared normal.
             //Also note that the J * M^-1 * JT can be reordered to J * JT * M^-1 for the linear components, since each constraint is 1DOF (scalar multiply commutativity).
 
-            data.Normal = prestep.Normal;
+            unprojection.Normal = prestep.Normal;
             Vector3Wide.Dot(ref prestep.Normal, ref prestep.Normal, out var normalLengthSquared);
             var linearA = normalLengthSquared * inertiaA.InverseMass;
             var linearB = normalLengthSquared * inertiaB.InverseMass;
-
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI0.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV0.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI0.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV0.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV0.AngularA, ref data.WSVToCSI0.AngularA, out var angularA0);
-            Vector3Wide.Dot(ref data.CSIToWSV0.AngularB, ref data.WSVToCSI0.AngularB, out var angularB0);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI1.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV1.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI1.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV1.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV1.AngularA, ref data.WSVToCSI1.AngularA, out var angularA1);
-            Vector3Wide.Dot(ref data.CSIToWSV1.AngularB, ref data.WSVToCSI1.AngularB, out var angularB1);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI2.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV2.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI2.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV2.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV2.AngularA, ref data.WSVToCSI2.AngularA, out var angularA2);
-            Vector3Wide.Dot(ref data.CSIToWSV2.AngularB, ref data.WSVToCSI2.AngularB, out var angularB2);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI3.AngularA, ref inertiaA.InverseInertiaTensor, out data.CSIToWSV3.AngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref data.WSVToCSI3.AngularB, ref inertiaB.InverseInertiaTensor, out data.CSIToWSV3.AngularB);
-            Vector3Wide.Dot(ref data.CSIToWSV3.AngularA, ref data.WSVToCSI3.AngularA, out var angularA3);
-            Vector3Wide.Dot(ref data.CSIToWSV3.AngularB, ref data.WSVToCSI3.AngularB, out var angularB3);
-            data.InverseMassA = inertiaA.InverseMass;
-            data.InverseMassB = inertiaB.InverseMass;
-
             var linear = linearA + linearB;
+
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI0.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSV0.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI0.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSV0.AngularB);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV0.AngularA, ref projection.WSVToCSI0.AngularA, out var angularA0);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV0.AngularB, ref projection.WSVToCSI0.AngularB, out var angularB0);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI1.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSV1.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI1.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSV1.AngularB);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV1.AngularA, ref projection.WSVToCSI1.AngularA, out var angularA1);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV1.AngularB, ref projection.WSVToCSI1.AngularB, out var angularB1);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI2.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSV2.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI2.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSV2.AngularB);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV2.AngularA, ref projection.WSVToCSI2.AngularA, out var angularA2);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV2.AngularB, ref projection.WSVToCSI2.AngularB, out var angularB2);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI3.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSV3.AngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref projection.WSVToCSI3.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSV3.AngularB);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV3.AngularA, ref projection.WSVToCSI3.AngularA, out var angularA3);
+            Vector3Wide.Dot(ref unprojection.CSIToWSV3.AngularB, ref projection.WSVToCSI3.AngularB, out var angularB3);
+            unprojection.InverseMassA = inertiaA.InverseMass;
+            unprojection.InverseMassB = inertiaB.InverseMass;
+
             var effectiveMass0 = Vector<float>.One / (linear + angularA0 + angularB0);
             var effectiveMass1 = Vector<float>.One / (linear + angularA1 + angularB1);
             var effectiveMass2 = Vector<float>.One / (linear + angularA2 + angularB2);
@@ -142,22 +148,22 @@ namespace SolverPrototype
             var positionErrorToVelocity = prestep.SpringSettings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
             var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
             var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
-            data.SoftnessImpulseScale = extra * effectiveMassCFMScale;
+            projection.SoftnessImpulseScale = extra * effectiveMassCFMScale;
 
             //Note that we don't precompute the JT * effectiveMass term. Since the jacobians are shared, we have to do that multiply anyway.
-            data.WSVToCSI0.EffectiveMass = effectiveMass0 * effectiveMassCFMScale;
-            data.WSVToCSI1.EffectiveMass = effectiveMass1 * effectiveMassCFMScale;
-            data.WSVToCSI2.EffectiveMass = effectiveMass2 * effectiveMassCFMScale;
-            data.WSVToCSI3.EffectiveMass = effectiveMass3 * effectiveMassCFMScale;
+            projection.WSVToCSI0.EffectiveMass = effectiveMass0 * effectiveMassCFMScale;
+            projection.WSVToCSI1.EffectiveMass = effectiveMass1 * effectiveMassCFMScale;
+            projection.WSVToCSI2.EffectiveMass = effectiveMass2 * effectiveMassCFMScale;
+            projection.WSVToCSI3.EffectiveMass = effectiveMass3 * effectiveMassCFMScale;
 
             var biasVelocity0 = Vector.Min(prestep.Contact0.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
             var biasVelocity1 = Vector.Min(prestep.Contact1.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
             var biasVelocity2 = Vector.Min(prestep.Contact2.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
             var biasVelocity3 = Vector.Min(prestep.Contact3.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            data.BiasImpulse0 = biasVelocity0 * data.WSVToCSI0.EffectiveMass;
-            data.BiasImpulse1 = biasVelocity1 * data.WSVToCSI1.EffectiveMass;
-            data.BiasImpulse2 = biasVelocity2 * data.WSVToCSI2.EffectiveMass;
-            data.BiasImpulse3 = biasVelocity3 * data.WSVToCSI3.EffectiveMass;
+            projection.BiasImpulse0 = biasVelocity0 * projection.WSVToCSI0.EffectiveMass;
+            projection.BiasImpulse1 = biasVelocity1 * projection.WSVToCSI1.EffectiveMass;
+            projection.BiasImpulse2 = biasVelocity2 * projection.WSVToCSI2.EffectiveMass;
+            projection.BiasImpulse3 = biasVelocity3 * projection.WSVToCSI3.EffectiveMass;
 
         }
 
@@ -185,7 +191,7 @@ namespace SolverPrototype
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WarmStart(
-            ref ContactPenetrationLimit4IterationData data,
+            ref ContactPenetrationLimit4Unprojection data,
             ref Vector<float> accumulatedImpulse0,
             ref Vector<float> accumulatedImpulse1,
             ref Vector<float> accumulatedImpulse2,
@@ -218,24 +224,24 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref ContactPenetrationLimit4IterationData data,
+        public static void Solve(ref ContactPenetrationLimit4Projection projection, ref ContactPenetrationLimit4Unprojection unprojection,
             ref Vector<float> accumulatedImpulse0,
             ref Vector<float> accumulatedImpulse1,
             ref Vector<float> accumulatedImpulse2,
             ref Vector<float> accumulatedImpulse3, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data.WSVToCSI0, ref data.Normal, ref data.BiasImpulse0, ref data.SoftnessImpulseScale,
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection.WSVToCSI0, ref unprojection.Normal, ref projection.BiasImpulse0, ref projection.SoftnessImpulseScale,
                 ref accumulatedImpulse0, out var correctiveCSI);
-            ApplyImpulse(ref data.CSIToWSV0, ref data.Normal, ref data.InverseMassA, ref data.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data.WSVToCSI1, ref data.Normal, ref data.BiasImpulse1, ref data.SoftnessImpulseScale,
+            ApplyImpulse(ref unprojection.CSIToWSV0, ref unprojection.Normal, ref unprojection.InverseMassA, ref unprojection.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection.WSVToCSI1, ref unprojection.Normal, ref projection.BiasImpulse1, ref projection.SoftnessImpulseScale,
                 ref accumulatedImpulse1, out correctiveCSI);
-            ApplyImpulse(ref data.CSIToWSV1, ref data.Normal, ref data.InverseMassA, ref data.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data.WSVToCSI2, ref data.Normal, ref data.BiasImpulse2, ref data.SoftnessImpulseScale,
+            ApplyImpulse(ref unprojection.CSIToWSV1, ref unprojection.Normal, ref unprojection.InverseMassA, ref unprojection.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection.WSVToCSI2, ref unprojection.Normal, ref projection.BiasImpulse2, ref projection.SoftnessImpulseScale,
                 ref accumulatedImpulse2, out correctiveCSI);
-            ApplyImpulse(ref data.CSIToWSV2, ref data.Normal, ref data.InverseMassA, ref data.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref data.WSVToCSI3, ref data.Normal, ref data.BiasImpulse3, ref data.SoftnessImpulseScale,
+            ApplyImpulse(ref unprojection.CSIToWSV2, ref unprojection.Normal, ref unprojection.InverseMassA, ref unprojection.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
+            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection.WSVToCSI3, ref unprojection.Normal, ref projection.BiasImpulse3, ref projection.SoftnessImpulseScale,
                 ref accumulatedImpulse3, out correctiveCSI);
-            ApplyImpulse(ref data.CSIToWSV3, ref data.Normal, ref data.InverseMassA, ref data.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
+            ApplyImpulse(ref unprojection.CSIToWSV3, ref unprojection.Normal, ref unprojection.InverseMassA, ref unprojection.InverseMassB, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

@@ -42,16 +42,17 @@ namespace SolverPrototype
         }
 
     }
-    public abstract class TypeBatch<TBodyReferences, TPrestepData, TIterationData, TAccumulatedImpulse> : TypeBatch
+    public abstract class TypeBatch<TBodyReferences, TPrestepData, TProjection, TUnprojection, TAccumulatedImpulse> : TypeBatch
     {
         public TBodyReferences[] BodyReferences;
         public TPrestepData[] PrestepData;
         //Technically, the iteration data does not need to persist outside of the scope of the solve. We let it persist for simplicity- it does not take much space.
-        /// <summary>
-        /// Data required by the WarmStart and SolveIteration. Note that this data is conceptually ephemeral- external users should not depend upon it outside of the solver's execution.
-        /// (At the moment, it does persist, but it becomes unreliable when constraints are removed, and the implementation reserves the right to make it completely temporary.)
-        /// </summary>
-        protected TIterationData[] IterationData;
+
+        //Projection and unprojection data required by the WarmStart and SolveIteration. Note that this data is conceptually ephemeral.
+        //External users should not depend upon it outside of the solver's execution.
+        //(At the moment, it does persist, but it becomes unreliable when constraints are removed, and the implementation reserves the right to make it completely temporary.)
+        protected TProjection[] Projection;
+        protected TUnprojection[] Unprojection;
         public TAccumulatedImpulse[] AccumulatedImpulses;
 
         public static int InitialCapacity = 128;
@@ -70,12 +71,13 @@ namespace SolverPrototype
         /// <returns>Index of the slot in the batch.</returns>
         public override int Allocate()
         {
-            Debug.Assert(IterationData != null, "Should initialize the batch before allocating anything from it.");
-            if (constraintCount == IterationData.Length)
+            Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
+            if (constraintCount == Projection.Length)
             {
                 IncreaseSize(ref BodyReferences);
                 IncreaseSize(ref PrestepData);
-                IncreaseSize(ref IterationData);
+                IncreaseSize(ref Projection);
+                IncreaseSize(ref Unprojection);
                 IncreaseSize(ref AccumulatedImpulses);
             }
             var index = constraintCount++;
@@ -113,7 +115,8 @@ namespace SolverPrototype
 
         public override void Initialize()
         {
-            IterationData = BufferPools<TIterationData>.Locking.Take(InitialCapacity);
+            Projection = BufferPools<TProjection>.Locking.Take(InitialCapacity);
+            Unprojection = BufferPools<TUnprojection>.Locking.Take(InitialCapacity);
             BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacity);
             PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacity);
             AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacity);
@@ -121,11 +124,12 @@ namespace SolverPrototype
 
         public override void Reset()
         {
-            BufferPools<TIterationData>.Locking.Return(IterationData);
+            BufferPools<TProjection>.Locking.Return(Projection);
+            BufferPools<TUnprojection>.Locking.Return(Unprojection);
             BufferPools<TBodyReferences>.Locking.Return(BodyReferences);
             BufferPools<TPrestepData>.Locking.Return(PrestepData);
             BufferPools<TAccumulatedImpulse>.Locking.Return(AccumulatedImpulses);
-            IterationData = null;
+            Projection = null;
             BodyReferences = null;
             AccumulatedImpulses = null;
             AccumulatedImpulses = null;

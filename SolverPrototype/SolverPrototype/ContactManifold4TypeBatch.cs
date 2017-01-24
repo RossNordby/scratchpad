@@ -23,16 +23,22 @@ namespace SolverPrototype
         public Vector3Wide TangentY;
         public Vector<float> FrictionCoefficient;
     }
-    public struct ContactManifold4IterationData
+    public struct ContactManifold4Projection
     {
         public Vector<float> LeverArm0;
         public Vector<float> LeverArm1;
         public Vector<float> LeverArm2;
         public Vector<float> LeverArm3;
         public Vector<float> PremultipliedFrictionCoefficient;
-        public TwistFrictionIterationData Twist;
-        public TangentFrictionIterationData Tangent;
-        public ContactPenetrationLimit4IterationData Penetration;
+        public TwistFrictionProjection Twist;
+        public TangentFrictionProjection Tangent;
+        public ContactPenetrationLimit4Projection Penetration;
+    }
+    public struct ContactManifold4Unprojection
+    {
+        public TwistFrictionUnprojection Twist;
+        public TangentFrictionUnprojection Tangent;
+        public ContactPenetrationLimit4Unprojection Penetration;
     }
 
     public struct ContactManifold4AccumulatedImpulses
@@ -47,23 +53,25 @@ namespace SolverPrototype
     /// <summary>
     /// Handles the solve iterations of a bunch of 4-contact convex manifold constraints.
     /// </summary>
-    public class ContactManifold4TypeBatch : TypeBatch<BodyReferences, ContactManifold4PrestepData, ContactManifold4IterationData, ContactManifold4AccumulatedImpulses>
+    public class ContactManifold4TypeBatch : TypeBatch<BodyReferences, ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4Unprojection, ContactManifold4AccumulatedImpulses>
     {
 
         public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle)
         {
             ref var prestepBase = ref PrestepData[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
-            ref var iterationBase = ref IterationData[0];
+            ref var projectionBase = ref Projection[0];
+            ref var unprojectionBase = ref Unprojection[0];
             for (int i = startBundle; i < endBundle; ++i)
             {
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
-                ref var iteration = ref Unsafe.Add(ref iterationBase, i);
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                ref var unprojection = ref Unsafe.Add(ref unprojectionBase, i);
 
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
-                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep, dt, inverseDt, out iteration.Penetration);
-                TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, out iteration.Twist);
+                ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep, dt, inverseDt, out projection.Penetration, out unprojection.Penetration);
+                TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, out projection.Twist, out unprojection.Twist);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetA, ref prestep.Contact1.OffsetA, out var a01);
                 Vector3Wide.Add(ref prestep.Contact2.OffsetA, ref prestep.Contact3.OffsetA, out var a23);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetB, ref prestep.Contact1.OffsetB, out var b01);
@@ -74,55 +82,57 @@ namespace SolverPrototype
                 Vector3Wide.Scale(ref offsetToManifoldCenterA, ref scale, out offsetToManifoldCenterA);
                 Vector3Wide.Scale(ref offsetToManifoldCenterB, ref scale, out offsetToManifoldCenterB);
                 //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
-                Vector3Wide.Distance(ref prestep.Contact0.OffsetA, ref offsetToManifoldCenterA, out iteration.LeverArm0);
-                Vector3Wide.Distance(ref prestep.Contact1.OffsetA, ref offsetToManifoldCenterA, out iteration.LeverArm1);
-                Vector3Wide.Distance(ref prestep.Contact2.OffsetA, ref offsetToManifoldCenterA, out iteration.LeverArm2);
-                Vector3Wide.Distance(ref prestep.Contact3.OffsetA, ref offsetToManifoldCenterA, out iteration.LeverArm3);
-                iteration.PremultipliedFrictionCoefficient = scale * prestep.FrictionCoefficient;
+                Vector3Wide.Distance(ref prestep.Contact0.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm0);
+                Vector3Wide.Distance(ref prestep.Contact1.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm1);
+                Vector3Wide.Distance(ref prestep.Contact2.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm2);
+                Vector3Wide.Distance(ref prestep.Contact3.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm3);
+                projection.PremultipliedFrictionCoefficient = scale * prestep.FrictionCoefficient;
                 TangentFriction.ComputeJacobians(ref prestep.TangentX, ref prestep.TangentY, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, out var tangentJacobians);
-                TangentFriction.Prestep(ref inertiaA, ref inertiaB, ref tangentJacobians, out iteration.Tangent);
+                TangentFriction.Prestep(ref inertiaA, ref inertiaB, ref tangentJacobians, out projection.Tangent, out unprojection.Tangent);
             }
         }
         public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
         {
-            ref var iterationBase = ref IterationData[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
+            ref var unprojectionBase = ref Unprojection[0];
             for (int i = startBundle; i < endBundle; ++i)
             {
-                ref var iteration = ref Unsafe.Add(ref iterationBase, i);
+                ref var unprojection = ref Unsafe.Add(ref unprojectionBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                ContactPenetrationLimit4.WarmStart(ref iteration.Penetration,
+                ContactPenetrationLimit4.WarmStart(ref unprojection.Penetration,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
                     ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
-                TwistFriction.WarmStart(ref iteration.Twist, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
-                TangentFriction.WarmStart(ref iteration.Tangent, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TwistFriction.WarmStart(ref unprojection.Twist, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TangentFriction.WarmStart(ref unprojection.Tangent, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
         public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
         {
-            ref var iterationBase = ref IterationData[0];
+            ref var projectionBase = ref Projection[0];
+            ref var unprojectionBase = ref Unprojection[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
             for (int i = startBundle; i < endBundle; ++i)
             {
-                ref var iteration = ref Unsafe.Add(ref iterationBase, i);
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                ref var unprojection = ref Unsafe.Add(ref unprojectionBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
-                var maximumImpulse = iteration.PremultipliedFrictionCoefficient *
+                var maximumImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
-                TwistFriction.Solve(ref iteration.Twist, ref maximumImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
-                TangentFriction.Solve(ref iteration.Tangent, ref maximumImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TwistFriction.Solve(ref projection.Twist, ref unprojection.Twist, ref maximumImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TangentFriction.Solve(ref projection.Tangent, ref unprojection.Tangent, ref maximumImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
-                ContactPenetrationLimit4.Solve(ref iteration.Penetration,
+                ContactPenetrationLimit4.Solve(ref projection.Penetration, ref unprojection.Penetration,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
