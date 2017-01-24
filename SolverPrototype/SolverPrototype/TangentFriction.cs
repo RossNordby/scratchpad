@@ -18,6 +18,7 @@ namespace SolverPrototype
         public Matrix2x3Wide WSVtoCSIAngularA;
         public Matrix2x3Wide WSVtoCSILinearB;
         public Matrix2x3Wide WSVtoCSIAngularB;
+        public TangentFrictionUnprojection Unprojection;
     }
 
     public struct TangentFrictionUnprojection
@@ -83,6 +84,7 @@ namespace SolverPrototype
             Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSVAngularB);
             Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref unprojection.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
             Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref unprojection.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
+            projection.Unprojection = unprojection;
 
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
             Matrix2x2Wide.Add(ref linearA, ref linearB, out var linear);
@@ -152,10 +154,10 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref TangentFrictionProjection projection, ref TangentFrictionUnprojection unprojection, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Solve(ref TangentFrictionProjection projection, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(ref unprojection, ref correctiveCSI, ref wsvA, ref wsvB);
+            ApplyImpulse(ref projection.Unprojection, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

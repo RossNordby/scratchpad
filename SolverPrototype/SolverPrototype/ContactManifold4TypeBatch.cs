@@ -115,20 +115,18 @@ namespace SolverPrototype
         public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
         {
             ref var projectionBase = ref Projection[0];
-            ref var unprojectionBase = ref Unprojection[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
             for (int i = startBundle; i < endBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-                ref var unprojection = ref Unsafe.Add(ref unprojectionBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
                 var maximumImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
-                TwistFriction.Solve(ref projection.Twist, ref unprojection.Twist, ref maximumImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
-                TangentFriction.Solve(ref projection.Tangent, ref unprojection.Tangent, ref maximumImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TwistFriction.Solve(ref projection.Twist, ref maximumImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TangentFriction.Solve(ref projection.Tangent, ref maximumImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
