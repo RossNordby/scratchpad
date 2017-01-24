@@ -13,7 +13,7 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            const int bodyCount = 32768;
+            const int bodyCount = 512;
             var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, true, out var handleIndices);
 
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
@@ -76,8 +76,8 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 1;
-            const int frameCount = 256;
+            const int iterationCount = 5;
+            const int frameCount = 4096;
             solver.IterationCount = iterationCount;
 
 
