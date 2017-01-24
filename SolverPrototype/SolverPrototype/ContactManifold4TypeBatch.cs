@@ -115,10 +115,15 @@ namespace SolverPrototype
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
-                var maximumImpulse = projection.PremultipliedFrictionCoefficient *
+                var maximumTwistImpulse = projection.PremultipliedFrictionCoefficient * (
+                    accumulatedImpulses.Penetration0 * projection.LeverArm0 +
+                    accumulatedImpulses.Penetration1 * projection.LeverArm1 +
+                    accumulatedImpulses.Penetration2 * projection.LeverArm2 + 
+                    accumulatedImpulses.Penetration3 * projection.LeverArm3);
+                var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
-                TwistFriction.Solve(ref projection.Twist, ref maximumImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
-                TangentFriction.Solve(ref projection.Tangent, ref maximumImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TwistFriction.Solve(ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TangentFriction.Solve(ref projection.Tangent, ref maximumTangentImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.

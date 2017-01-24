@@ -76,8 +76,8 @@ namespace SolverPrototypeTests
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 1;
-            const int frameCount = 256;
+            const int iterationCount = 32;
+            const int frameCount = 8;
             solver.IterationCount = iterationCount;
 
 
