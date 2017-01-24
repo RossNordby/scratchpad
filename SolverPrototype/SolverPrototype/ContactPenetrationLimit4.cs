@@ -130,12 +130,7 @@ namespace SolverPrototype
             var effectiveMass2 = Vector<float>.One / (linear + angularA2 + angularB2);
             var effectiveMass3 = Vector<float>.One / (linear + angularA3 + angularB3);
 
-            var frequencyDt = prestep.SpringSettings.NaturalFrequency * dt;
-            var twiceDampingRatio = prestep.SpringSettings.DampingRatio * 2; //Could precompute.
-            var positionErrorToVelocity = prestep.SpringSettings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
-            var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
-            var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
-            projection.SoftnessImpulseScale = extra * effectiveMassCFMScale;
+            Springiness.ComputeSpringiness(ref prestep.SpringSettings, dt, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
 
             //Note that we don't precompute the JT * effectiveMass term. Since the jacobians are shared, we have to do that multiply anyway.
             projection.WSVToCSI0.EffectiveMass = effectiveMass0 * effectiveMassCFMScale;
@@ -152,6 +147,7 @@ namespace SolverPrototype
             projection.BiasImpulse2 = biasVelocity2 * projection.WSVToCSI2.EffectiveMass;
             projection.BiasImpulse3 = biasVelocity3 * projection.WSVToCSI3.EffectiveMass;
         }
+
 
         /// <summary>
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.

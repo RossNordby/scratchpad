@@ -58,6 +58,7 @@
     <Compile Include="ContactPenetrationLimit4.cs" />
     <Compile Include="Matrix2x2Wide.cs" />
     <Compile Include="Matrix2x3Wide.cs" />
+    <Compile Include="Springiness.cs" />
     <Compile Include="TwistFriction.cs" />
     <Compile Include="TangentFriction.cs" />
     <Compile Include="TypeBatch.cs" />

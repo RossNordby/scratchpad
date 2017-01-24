@@ -15,12 +15,6 @@ namespace SolverPrototype
     }
 
 
-    public struct SpringSettings
-    {
-        public Vector<float> NaturalFrequency;
-        public Vector<float> DampingRatio;
-        public Vector<float> MaximumRecoveryVelocity;
-    }
 
     public struct Projection2Body1DOF
     {
@@ -278,23 +272,10 @@ namespace SolverPrototype
 
             //We'll start with the unsoftened effective mass, constructed from the contributions computed above:
             var effectiveMass = Vector<float>.One / (linearA + linearB + angularA + angularB);
-            //softenedEffectiveMass = effectiveMass * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
-            var frequencyDt = springSettings.NaturalFrequency * dt;
-            var twiceDampingRatio = springSettings.DampingRatio * 2; //Could precompute.
-            var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
-            var effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
+
+            Springiness.ComputeSpringiness(ref springSettings, dt, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
             var softenedEffectiveMass = effectiveMass * effectiveMassCFMScale;
-
-            //CFM/dt * softenedEffectiveMass:
-            //(naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1 * (1 + (naturalFrequency^2 * dt^2 + 2 * dampingRatio * naturalFrequency * dt)^-1)^-1
-            projection.SoftnessImpulseScale = extra * effectiveMassCFMScale;
-
-            //ERP = (naturalFrequency * dt) * (naturalFrequency * dt + 2 * dampingRatio)^-1
-            //"ERP" is the error reduction per frame. Note that it can never exceed 1 given physically valid input.
-            //Since it is a *per frame* term, note that the position error is additionally scaled by inverseDt to get the target velocity
-            //needed to accomplish the desired error reduction in one frame.
-            var positionErrorToVelocity = springSettings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
-
+            
             //Note that we use a bit of a hack when computing the bias velocity- even if our damping ratio/natural frequency implies a strongly springy response
             //that could cause a significant velocity overshoot, we apply an arbitrary clamping value to keep it reasonable.
             //This is useful for a variety of inequality constraints (like contacts) because you don't always want them behaving as true springs.
