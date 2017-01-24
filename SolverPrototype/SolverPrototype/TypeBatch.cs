@@ -42,7 +42,7 @@ namespace SolverPrototype
         }
 
     }
-    public abstract class TypeBatch<TBodyReferences, TPrestepData, TProjection, TUnprojection, TAccumulatedImpulse> : TypeBatch
+    public abstract class TypeBatch<TBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse> : TypeBatch
     {
         public TBodyReferences[] BodyReferences;
         public TPrestepData[] PrestepData;
@@ -52,7 +52,6 @@ namespace SolverPrototype
         //External users should not depend upon it outside of the solver's execution.
         //(At the moment, it does persist, but it becomes unreliable when constraints are removed, and the implementation reserves the right to make it completely temporary.)
         protected TProjection[] Projection;
-        protected TUnprojection[] Unprojection;
         public TAccumulatedImpulse[] AccumulatedImpulses;
 
         public static int InitialCapacity = 128;
@@ -77,7 +76,6 @@ namespace SolverPrototype
                 IncreaseSize(ref BodyReferences);
                 IncreaseSize(ref PrestepData);
                 IncreaseSize(ref Projection);
-                IncreaseSize(ref Unprojection);
                 IncreaseSize(ref AccumulatedImpulses);
             }
             var index = constraintCount++;
@@ -116,7 +114,6 @@ namespace SolverPrototype
         public override void Initialize()
         {
             Projection = BufferPools<TProjection>.Locking.Take(InitialCapacity);
-            Unprojection = BufferPools<TUnprojection>.Locking.Take(InitialCapacity);
             BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacity);
             PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacity);
             AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacity);
@@ -125,7 +122,6 @@ namespace SolverPrototype
         public override void Reset()
         {
             BufferPools<TProjection>.Locking.Return(Projection);
-            BufferPools<TUnprojection>.Locking.Return(Unprojection);
             BufferPools<TBodyReferences>.Locking.Return(BodyReferences);
             BufferPools<TPrestepData>.Locking.Return(PrestepData);
             BufferPools<TAccumulatedImpulse>.Locking.Return(AccumulatedImpulses);

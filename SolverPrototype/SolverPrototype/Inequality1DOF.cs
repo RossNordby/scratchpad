@@ -35,10 +35,7 @@ namespace SolverPrototype
         public Vector<float> BiasImpulse;
         //And once again, CFM becomes CFM * EffectiveMass- massively cancels out due to the derivation of CFM. (See prestep notes.)
         public Vector<float> SoftnessImpulseScale;
-        //Nothing in the projection type is accessed by the WarmStart, hence the split.
-    }
-    public struct Unprojection2Body1DOF
-    {
+
         //It also needs to project from constraint space to world space.
         //We bundle this with the inertia/mass multiplier, so rather than taking a constraint impulse to world impulse and then to world velocity change,
         //we just go directly from constraint impulse to world velocity change.
@@ -49,16 +46,14 @@ namespace SolverPrototype
         public Vector3Wide CSIToWSVAngularA;
         public Vector3Wide CSIToWSVLinearB;
         public Vector3Wide CSIToWSVAngularB;
-
     }
-    
 
     public static class Inequality2Body1DOF
     {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
-            ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection, out Unprojection2Body1DOF unprojection)
+            ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection)
         {
             //effective mass = (J * M^-1 * JT)^-1
             //where J is a constraintDOF x bodyCount*3 sized matrix, JT is its transpose, and for two bodies M^-1 is:
@@ -84,16 +79,16 @@ namespace SolverPrototype
             //For this 1DOF constraint, the result is a simple scalar.
             //Note that we store the intermediate results of J * M^-1 for use when projecting from constraint space impulses to world velocity changes. 
             //If we didn't store those intermediate values, we could just scale the dot product of jacobians.LinearA with itself to save 4 multiplies.
-            Vector3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out unprojection.CSIToWSVLinearA);
-            Vector3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out unprojection.CSIToWSVLinearB);
-            Vector3Wide.Dot(ref unprojection.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
-            Vector3Wide.Dot(ref unprojection.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
+            Vector3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out projection.CSIToWSVLinearA);
+            Vector3Wide.Scale(ref jacobians.LinearB, ref inertiaB.InverseMass, out projection.CSIToWSVLinearB);
+            Vector3Wide.Dot(ref projection.CSIToWSVLinearA, ref jacobians.LinearA, out var linearA);
+            Vector3Wide.Dot(ref projection.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
             //The angular components are a little more involved; (J * I^-1) * JT is explicitly computed.
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out unprojection.CSIToWSVAngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out unprojection.CSIToWSVAngularB);
-            Vector3Wide.Dot(ref unprojection.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
-            Vector3Wide.Dot(ref unprojection.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out projection.CSIToWSVAngularA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out projection.CSIToWSVAngularB);
+            Vector3Wide.Dot(ref projection.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
+            Vector3Wide.Dot(ref projection.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
 
             //Now for a digression!
             //Softness is applied along the diagonal (which, for a 1DOF constraint, is just the only element).
@@ -333,7 +328,7 @@ namespace SolverPrototype
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ApplyImpulse(ref Unprojection2Body1DOF data, ref Vector<float> correctiveImpulse,
+        public static void ApplyImpulse(ref Projection2Body1DOF data, ref Vector<float> correctiveImpulse,
             ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //Applying the impulse requires transforming the constraint space impulse into a world space velocity change.
@@ -353,7 +348,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(ref Unprojection2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void WarmStart(ref Projection2Body1DOF data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
@@ -387,10 +382,10 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref Projection2Body1DOF projection, ref Unprojection2Body1DOF unprojection, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Solve(ref Projection2Body1DOF projection, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(ref unprojection, ref correctiveCSI, ref wsvA, ref wsvB);
+            ApplyImpulse(ref projection, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

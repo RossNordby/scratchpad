@@ -47,24 +47,6 @@ namespace SolverPrototype
         public ContactPenetrationLimitCSIToWSV CSIToWSV3;
     }
 
-    /// <summary>
-    /// Data required to transform from constraint impulses to world space velocities.
-    /// </summary>
-    public struct ContactPenetrationLimit4Unprojection
-    {
-        //Again, note that the linear jacobian is shared (the contact manifold normal).
-        //The M^-1 term for both bodies in reintroduced, but for linear terms it's only 2 scalars per lane, compared to 21 scalars for the redundant jacobians.
-        public Vector3Wide Normal;
-        public Vector<float> InverseMassA;
-        public Vector<float> InverseMassB;
-        public ContactPenetrationLimitCSIToWSV CSIToWSV0;
-        public ContactPenetrationLimitCSIToWSV CSIToWSV1;
-        public ContactPenetrationLimitCSIToWSV CSIToWSV2;
-        public ContactPenetrationLimitCSIToWSV CSIToWSV3;
-        //The second half sharing introduces 8 multiplies, and saves 19 loads.
-
-    }
-
 
     /// <summary>
     /// Four convex-sourced contact penetration limits solved together. Internally implemented using SI solver. 
@@ -74,7 +56,7 @@ namespace SolverPrototype
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref ContactManifold4PrestepData prestep, float dt, float inverseDt,
-            out ContactPenetrationLimit4Projection projection, out ContactPenetrationLimit4Unprojection unprojection)
+            out ContactPenetrationLimit4Projection projection)
         {
             //We directly take the prestep data here since the jacobians and error don't undergo any processing.
 
@@ -169,16 +151,6 @@ namespace SolverPrototype
             projection.BiasImpulse1 = biasVelocity1 * projection.WSVToCSI1.EffectiveMass;
             projection.BiasImpulse2 = biasVelocity2 * projection.WSVToCSI2.EffectiveMass;
             projection.BiasImpulse3 = biasVelocity3 * projection.WSVToCSI3.EffectiveMass;
-
-            //We output a copy of the unprojection-only data for the sake of efficient access by the warmstart. TODO: This is questionable. Test it.
-            unprojection.Normal = projection.Normal;
-            unprojection.InverseMassA = projection.InverseMassA;
-            unprojection.InverseMassB = projection.InverseMassB;
-            unprojection.CSIToWSV0 = projection.CSIToWSV0;
-            unprojection.CSIToWSV1 = projection.CSIToWSV1;
-            unprojection.CSIToWSV2 = projection.CSIToWSV2;
-            unprojection.CSIToWSV3 = projection.CSIToWSV3;
-
         }
 
         /// <summary>
@@ -205,7 +177,7 @@ namespace SolverPrototype
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WarmStart(
-            ref ContactPenetrationLimit4Unprojection data,
+            ref ContactPenetrationLimit4Projection data,
             ref Vector<float> accumulatedImpulse0,
             ref Vector<float> accumulatedImpulse1,
             ref Vector<float> accumulatedImpulse2,
