@@ -132,7 +132,7 @@ namespace SolverPrototype
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
-                ContactPenetrationLimit4.Solve(ref projection.Penetration, ref unprojection.Penetration,
+                ContactPenetrationLimit4.Solve(ref projection.Penetration,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
