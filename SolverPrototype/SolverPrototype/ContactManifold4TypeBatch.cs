@@ -37,8 +37,8 @@ namespace SolverPrototype
 
     public struct ContactManifold4AccumulatedImpulses
     {
-        public Vector2Wide Tangent;
         public Vector<float> Twist;
+        public Vector2Wide Tangent;
         public Vector<float> Penetration0;
         public Vector<float> Penetration1;
         public Vector<float> Penetration2;

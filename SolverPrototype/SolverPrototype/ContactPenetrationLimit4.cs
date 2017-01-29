@@ -129,8 +129,8 @@ namespace SolverPrototype
             var effectiveMass1 = Vector<float>.One / (linear + angularA1 + angularB1);
             var effectiveMass2 = Vector<float>.One / (linear + angularA2 + angularB2);
             var effectiveMass3 = Vector<float>.One / (linear + angularA3 + angularB3);
-
-            Springiness.ComputeSpringiness(ref prestep.SpringSettings, dt, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
+            
+            Springiness.ComputeSpringiness(ref prestep.SpringSettings, dt, 4f, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
 
             //Note that we don't precompute the JT * effectiveMass term. Since the jacobians are shared, we have to do that multiply anyway.
             projection.WSVToCSI0.EffectiveMass = effectiveMass0 * effectiveMassCFMScale;

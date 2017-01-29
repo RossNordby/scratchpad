@@ -88,8 +88,8 @@ namespace SolverPrototypeTests
                             GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
                     ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].PenetrationDepth, innerIndex);
                     penetrationDepth += dt * (velocityA - velocityB);
-                    //if (i == 0)
-                    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
+                    if (i == 0)
+                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
@@ -109,7 +109,7 @@ namespace SolverPrototypeTests
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
             Console.WriteLine($"Time (ms): {(1e3 * totalTicks) / Stopwatch.Frequency}");
 
