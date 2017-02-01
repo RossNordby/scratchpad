@@ -53,6 +53,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CacheBlaster.cs" />
     <Compile Include="ContactManifoldConvergenceTests.cs" />
     <Compile Include="PenetrationConvergenceTests.cs" />
     <Compile Include="BodyStackBuilder.cs" />

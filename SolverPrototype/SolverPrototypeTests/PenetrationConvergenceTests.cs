@@ -102,6 +102,7 @@ namespace SolverPrototypeTests
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
                     bodies.VelocityBundles[i].LinearVelocity.Y += bodies.LocalInertiaBundles[i].InverseMass * impulse;
                 }
+                CacheBlaster.Blast();
                 var frameStart = Stopwatch.GetTimestamp();
                 solver.Update(dt, inverseDt);
                 var frameEnd = Stopwatch.GetTimestamp();
