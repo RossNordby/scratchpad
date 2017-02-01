@@ -13,7 +13,9 @@ namespace SolverPrototypeTests
             //LayoutTests.Test();
             //ContactPenetration1DOFTests.Test();
             //PenetrationConvergenceTests.Test();
-            ContactManifoldConvergenceTests.Test();
+            //ContactManifoldConvergenceTests.Test();
+
+            IslandCacheConvergence.Test();
         }
     }
 }

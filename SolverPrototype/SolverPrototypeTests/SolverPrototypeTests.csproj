@@ -55,6 +55,7 @@
   <ItemGroup>
     <Compile Include="CacheBlaster.cs" />
     <Compile Include="ContactManifoldConvergenceTests.cs" />
+    <Compile Include="IslandCacheConvergence.cs" />
     <Compile Include="PenetrationConvergenceTests.cs" />
     <Compile Include="BodyStackBuilder.cs" />
     <Compile Include="ContactPenetration1DOFTests.cs" />
