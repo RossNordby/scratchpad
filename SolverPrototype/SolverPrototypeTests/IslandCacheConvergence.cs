@@ -1,4 +1,6 @@
-﻿using System;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.ResourceManagement;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -9,7 +11,36 @@ namespace SolverPrototypeTests
 {
     public static class IslandCacheConvergence
     {
-
+        struct IslandBlob : SwapHeuristic
+        {
+            public void Reset()
+            {
+                islandIndex = 0;
+            }
+            int islandIndex;
+            public void Swap(int[] bodies, int islandCount)
+            {
+                //Find all bodies of a particular type.
+                //Put them all in the same spot, starting at the body with the lowest index.
+                int lowestIndex = -1;
+                var islandBodyIndices = new QuickList<int>(BufferPools<int>.Thread);
+                for (int i = bodies.Length - 1; i >= 0; --i)
+                {
+                    if (bodies[i] == islandIndex)
+                    {
+                        lowestIndex = i;
+                        islandBodyIndices.Add(i);
+                    }
+                }
+                var baseIndex = Math.Min(bodies.Length - islandBodyIndices.Count, lowestIndex);
+                for (int i = islandBodyIndices.Count - 1; i >= 0; --i)
+                {
+                    IslandCacheConvergence.Swap(ref bodies[baseIndex + i], ref bodies[islandBodyIndices.Elements[i]]);
+                }
+                islandBodyIndices.Dispose();
+                islandIndex = (islandIndex + 1) % islandCount;
+            }
+        }
 
         struct BlindLocal : SwapHeuristic
         {
@@ -136,8 +167,10 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            var test0 = new BlindLocal();
-            Test(10, 300, 1000, 1000000, ref test0);
+            var blindLocal = new BlindLocal();
+            Test(10, 30, 1000, 100000, ref blindLocal);
+            var islandBlob = new IslandBlob();
+            Test(10, 30, 1000, 100000, ref islandBlob);
         }
     }
 }
