@@ -42,9 +42,13 @@ namespace SolverPrototype
 
         struct ConstraintLocation
         {
-            //Note that the type id is omitted. To be useful, any access of a constraint pointer is expected to supply a generic type parameter.
-            //The type id can be retrieved from that efficiently. We may change this to store it later if typeless access patterns become common.
+            //Note that the type id is included, even though we can extract it from a type parameter.
+            //This is required for body memory swap induced reference changes- it is not efficient to include type metadata in the per-body connections,
+            //so instead we keep a type id cached.
+            //(You could pack these a bit- it's pretty reasonable to say you can't have more than 2^24 constraints of a given type and 2^8 constraint types...
+            //It's just not that valuable, until proven otherwise.)
             public int BatchIndex;
+            public int TypeId;
             public int IndexInTypeBatch;
         }
         IdPool handlePool = new IdPool();
@@ -92,7 +96,7 @@ namespace SolverPrototype
             }
             targetBatch.Handles.Add(bodyHandleA);
             targetBatch.Handles.Add(bodyHandleB);
-            targetBatch.Allocate(out constraintReference);
+            targetBatch.Allocate(out var typeId, out constraintReference);
 
             handleIndex = handlePool.Take();
             if (handleIndex >= HandlesToConstraints.Length)
@@ -101,7 +105,23 @@ namespace SolverPrototype
                 Debug.Assert(handleIndex < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
             }
             HandlesToConstraints[handleIndex].IndexInTypeBatch = constraintReference.IndexInTypeBatch;
+            HandlesToConstraints[handleIndex].TypeId = typeId;
             HandlesToConstraints[handleIndex].BatchIndex = targetBatchIndex;
+        }
+
+        /// <summary>
+        /// Changes the body reference of a constraint in response to a body memory move.
+        /// </summary>
+        /// <param name="constraintHandle">Handle of the constraint to modify.</param> 
+        /// <param name="bodyIndexInConstraint">Index of the modified body in the constraint body references list. For example, for a two body constraint this would be 0 or 1.</param>
+        /// <param name="newBodyLocation">Memory index that the moved body now inhabits.</param>
+        internal void UpdateForBodyMemoryMove(int constraintHandle, int bodyIndexInConstraint, int newBodyLocation)
+        {
+            ref var constraintLocation = ref HandlesToConstraints[constraintHandle];
+            //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
+            //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
+            //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
+            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, bodyIndexInConstraint, newBodyLocation);
         }
 
         //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal

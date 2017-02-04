@@ -38,6 +38,7 @@ namespace SolverPrototype
         /// </summary>
         /// <typeparam name="T">Type of the batch to grab.</typeparam>
         /// <returns>TypeBatch instance associated with the given type.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetTypeBatch<T>() where T : TypeBatch
         {
             var typeBatchIndex = TypeIndexToTypeBatchIndex[ConstraintTypeIds.GetId<T>()];
@@ -51,15 +52,16 @@ namespace SolverPrototype
         /// </summary>
         /// <param name="typeId">Id of the TypeBatch's type to retrieve.</param>
         /// <returns>TypeBatch instance associated with the given type.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public TypeBatch GetTypeBatch(int typeId)
         {
             var typeBatchIndex = TypeIndexToTypeBatchIndex[typeId];
             return TypeBatches.Elements[typeBatchIndex];
         }
 
-        public void Allocate<T>(out ConstraintReference<T> constraintPointer) where T : TypeBatch, new()
+        public void Allocate<T>(out int typeId, out ConstraintReference<T> constraintPointer) where T : TypeBatch, new()
         {
-            var typeId = ConstraintTypeIds.GetId<T>(); 
+            typeId = ConstraintTypeIds.GetId<T>(); 
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
             {
                 ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
@@ -105,7 +107,6 @@ namespace SolverPrototype
             }
 
         }
-
 
     }
 }

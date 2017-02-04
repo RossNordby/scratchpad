@@ -27,7 +27,7 @@ namespace SolverPrototype
     /// A constraint's body references. Stored separately from the iteration data since it is accessed by both the prestep and solve.
     /// Two address streams isn't much of a problem for prefetching.
     /// </summary>
-    public struct BodyReferences
+    public struct TwoBodyReferences
     {
         //Unfortunately, there does not exist any Vector<int>.Shift instruction yet, so we cannot efficiently derive the bundle and inner indices from the 'true' indices on the fly.
         //Instead, group references are preconstructed and cached in a nonvectorized way.

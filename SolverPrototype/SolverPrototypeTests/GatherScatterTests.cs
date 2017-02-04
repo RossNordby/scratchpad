@@ -12,7 +12,7 @@ namespace SolverPrototypeTests
         struct Context
         {
             public BodyVelocities[] BodyVelocities;
-            public BodyReferences[] BodyReferences;
+            public TwoBodyReferences[] BodyReferences;
             public int ConstraintCount;
         }
         struct ConstraintBodies
@@ -37,7 +37,7 @@ namespace SolverPrototypeTests
                 //Sorting the connections should increase the probability that at least one of the two bodies associated with a constraint will be in the cache already from earlier prefetches.
                 Array.Sort(connections, sortComparison);
             }
-            context.BodyReferences = new BodyReferences[constraintCount];
+            context.BodyReferences = new TwoBodyReferences[constraintCount];
             for (int iterationIndex = 0; iterationIndex < constraintCount; ++iterationIndex)
             {
                 var baseSourceIndex = iterationIndex << BundleIndexing.VectorShift;

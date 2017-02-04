@@ -6,7 +6,7 @@ namespace SolverPrototype
     /// <summary>
     /// Handles the solve iterations of a bunch of 1DOF two body inequality constraints.
     /// </summary>
-    public class ContactPenetrationTypeBatch : TypeBatch<BodyReferences, ContactData, Projection2Body1DOF, Vector<float>>
+    public class ContactPenetrationTypeBatch : TwoBodyTypeBatch<ContactData, Projection2Body1DOF, Vector<float>>
     {
 
         public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle)

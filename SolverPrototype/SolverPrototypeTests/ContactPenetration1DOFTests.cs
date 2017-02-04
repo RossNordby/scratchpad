@@ -45,7 +45,7 @@ namespace SolverPrototypeTests
 
             int constraintCount = bodyCount / 2;
             int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
-            var bodyReferences = new BodyReferences[constraintBundleCount];
+            var bodyReferences = new TwoBodyReferences[constraintBundleCount];
             var springSettings = new SpringSettings[constraintBundleCount];
             var projectionData = new Projection2Body1DOF[constraintBundleCount];
             var contactData = new ContactData[constraintBundleCount];

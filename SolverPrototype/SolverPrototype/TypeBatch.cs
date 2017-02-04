@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.ResourceManagement;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -15,6 +16,9 @@ namespace SolverPrototype
 
         public abstract int Allocate();
         public abstract void Remove(int index);
+
+        public abstract void GetConnectedBodyIndices(int indexInTypeBatch, ref QuickList<int> bodyIndices);
+        public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
 
         public abstract void Initialize();
         public abstract void Reset();
@@ -64,6 +68,7 @@ namespace SolverPrototype
             Array.Copy(old, array, old.Length);
             BufferPools<T>.Locking.Return(old);
         }
+        
         /// <summary>
         /// Allocates a slot in the batch.
         /// </summary>

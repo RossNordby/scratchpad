@@ -51,6 +51,7 @@
   <ItemGroup>
     <Compile Include="BatchReferencedHandles.cs" />
     <Compile Include="Bodies.cs" />
+    <Compile Include="BodyLayoutOptimizer.cs" />
     <Compile Include="ConstraintBatch.cs" />
     <Compile Include="ContactData.cs" />
     <Compile Include="ContactManifold4TypeBatch.cs" />
@@ -58,9 +59,11 @@
     <Compile Include="ContactPenetrationLimit4.cs" />
     <Compile Include="Matrix2x2Wide.cs" />
     <Compile Include="Matrix2x3Wide.cs" />
+    <Compile Include="Pow2Allocator.cs" />
     <Compile Include="Springiness.cs" />
     <Compile Include="TwistFriction.cs" />
     <Compile Include="TangentFriction.cs" />
+    <Compile Include="TwoBodyTypeBatch.cs" />
     <Compile Include="TypeBatch.cs" />
     <Compile Include="ContactPenetrationTypeBatch.cs" />
     <Compile Include="Solver.cs" />

@@ -118,7 +118,7 @@ namespace SolverPrototype
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref BodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
+        public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref TwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
         {
             velocitiesA = new BodyVelocities();
             velocitiesB = new BodyVelocities();
@@ -161,7 +161,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref BodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref TwoBodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
         {
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
             ref var baseInnerA = ref Unsafe.As<Vector<int>, int>(ref references.InnerIndexA);
@@ -203,7 +203,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GatherInertia(BodyInertias[] bodyInertias, ref BodyReferences references,
+        public static void GatherInertia(BodyInertias[] bodyInertias, ref TwoBodyReferences references,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
             //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.
