@@ -1,78 +1,11 @@
-﻿#define OWNERSHIPTRACKING
-using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.ResourceManagement;
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-using static SolverPrototype.SuballocatedBufferPool;
 
 namespace SolverPrototype
 {
-    /// <summary>
-    /// Allocates buffers of data from untyped backing arrays.
-    /// </summary>
-    public class SuballocatedBufferPool
-    {
-        byte[][] memoryForPowers;
-        Pow2Allocator allocator;
-        /// <summary>
-        /// Creates a new buffer pool.
-        /// </summary>
-        /// <param name="initialCapacityPerPowerInBytes">Maximum number of bytes to allocate in each power's pool initially. 
-        /// If the specified capacity is fractional at a given power, the capacity is truncated to the next lower block boundary.</param>
-        /// <param name="allocator">Backing allocator used to position buffers.</param>
-        public SuballocatedBufferPool(int initialCapacityPerPowerInBytes, Pow2Allocator allocator)
-        {
-            this.allocator = allocator;
-            memoryForPowers = new byte[allocator.LargestPower][];
-            for (int i = 0; i < memoryForPowers.Length; ++i)
-            {
-                //Don't really want to deal with both nulls and sizes as a special case, so we just create zero-count arrays if the capacity is to small to fit a whole block.
-                var blockCount = initialCapacityPerPowerInBytes >> i;
-                memoryForPowers[i] = new byte[blockCount << i];
-            }
-        }
-
-        public struct BufferRegion
-        {
-            internal readonly int Power;
-            internal readonly int Index;
-
-            /// <summary>
-            /// Gets the length of the buffer region.
-            /// </summary>
-            public int Length
-            {
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                get { return 1 << Power; }
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            internal BufferRegion(int power, int index)
-            {
-                Power = power;
-                Index = index;
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Allocate(int power, out BufferRegion region)
-        {
-            region = new BufferRegion(power, allocator.Allocate(power));
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Free(ref BufferRegion region)
-        {
-            allocator.Free(region.Power, region.Index);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref T GetStart<T>(ref BufferRegion region)
-        {
-            return ref Unsafe.As<byte, T>(ref memoryForPowers[region.Power][region.Index]);
-        }
-    }
-
     class ConstraintConnectivityGraph
     {
         //We need a per-body list of constraints because any movement of a body requires updating the connected constraints.
@@ -98,19 +31,183 @@ namespace SolverPrototype
         {
             public BufferRegion Region;
             public int Count;
+
+            //Note that we don't technically constrain the type to be a struct. It's not even a sufficient condition for safety, since structs can contain references.
+            //Rather than cluttering everything with a bunch of security theater, trust the user.
+            //Who knows, maybe they really want to put a managed reference type in an array such that the GC can no longer track it!
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Add<T>(SuballocatedBufferPool bufferPool, ref List list, ref T item)
+            {
+                //TODO: verify that this is just a shift...
+                if (list.Count == list.Region.GetLengthForType<T>())
+                {
+                    bufferPool.Resize(ref list.Region, list.Region.Power + 1);
+                }
+                Unsafe.Add(ref bufferPool.GetStart<T>(ref list.Region), list.Count) = item;
+                ++list.Count;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Add<T>(SuballocatedBufferPool bufferPool, ref List list, T item)
+            {
+                //TODO: Confirm internal inlining.
+                Add(bufferPool, ref list, ref item);
+            }
+            //Keeping with the quick-collection convention of 'fast' removes meaning that the last element is pulled into the removed slot, rather than preserving order.
+            //Note that we're using an extremely non-idiomatic comparison scheme here- we require that a type parameter be provided that specifies a struct
+            //implementor of the comparison interface. You could reasonably ask why:
+            //1) IEquatable doesn't give you the option to specify different forms of equatability, and can run into annoyances when an external type doesn't support it.
+            //2) Providing a comparison delegate incurs delegate call overhead.
+            //3) Using a struct comparer forces JIT specialization.
+            //This is basically working around a language expressiveness limitation.
+            //A little bit questionable, but this is in large part just a test to see how it works out.
+
+            //TODO: For larger types, it would also benefit from a ref parametered comparison. You could provide another overload that takes a ref item.
+            //If the user cares enough to choose the ref overload, they almost certainly want to provide a ref comparer.
+
+            //Also note that none of the removal functions bother to clear values to defaults.
+            //That means pointers to reference types could remain in the array- but don't worry everything is fine, because the GC can't see those references anyway.
+            //The backing array is byte[]. :) :) :         )
+
+            /// <summary>
+            /// Removes the first item from the list that is equal to the given item based on the specified comparer.
+            /// </summary>
+            /// <typeparam name="T">Type of the item to remove.</typeparam>
+            /// <typeparam name="TComparer">Comparer used to determine whether a list element is equal to the item to remove..</typeparam>
+            /// <param name="bufferPool">Buffer pool that the list was allocated from.</param>
+            /// <param name="list">List to remove from.</param>
+            /// <param name="item">Item to remove from the list.</param>
+            /// <returns>True if the item was present and removed, false otherwise.</returns>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static bool FastRemove<T, TComparer>(SuballocatedBufferPool bufferPool, ref List list, T item) where TComparer : struct, IEqualityComparer<T>
+            {
+                var comparer = default(TComparer);
+                ref var start = ref bufferPool.GetStart<T>(ref list.Region);
+                for (int i = 0; i < list.Count; ++i)
+                {
+                    if (comparer.Equals(item, Unsafe.Add(ref start, i)))
+                    {
+                        FastRemoveAt<T>(bufferPool, ref list, i);
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            /// <summary>
+            /// Removes an element at the given index.
+            /// </summary>
+            /// <typeparam name="T">Type of the removed element.</typeparam>
+            /// <param name="bufferPool">Buffer pool that the list was allocated from.</param>
+            /// <param name="list">List to remove from.</param>
+            /// <param name="index">Index to remove in terms of elements of the specified type.</param>
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void FastRemoveAt<T>(SuballocatedBufferPool bufferPool, ref List list, int index)
+            {
+                Debug.Assert(index >= 0 && index < list.Count);
+                --list.Count;
+                if (index != list.Count)
+                {
+                    //Have to swap the last element into the removed slot.
+                    ref var start = ref bufferPool.GetStart<T>(ref list.Region);
+                    Unsafe.Add(ref start, index) = Unsafe.Add(ref start, list.Count);
+                }
+            }
+
+        }
+        int initialConstraintCountPerBodyPower;
+        /// <summary>
+        /// Gets or sets the expected number of constraints associated with each body.
+        /// Note that this should be a power of 2; if a non-power of 2 is set, it will be interpreted as the next higher power of 2.
+        /// </summary>
+        public int ConstraintCountPerBodyEstimate
+        {
+            get
+            {
+                return 1 << initialConstraintCountPerBodyPower;
+            }
+            set
+            {
+                initialConstraintCountPerBodyPower = BufferPool.GetPoolIndex(value);
+            }
         }
         List[] constraintLists;
+        SuballocatedBufferPool bufferPool;
 
         public ConstraintConnectivityGraph(int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
         {
             ConstraintCountPerBodyEstimate = initialConstraintCountPerBodyEstimate;
-            var capacityEstimate = initialBodyCountEstimate * initialConstraintCountPerBodyEstimate;
-            allocator = new Allocator(capacityEstimate,
-                new PassthroughBufferPool<ulong>(), new PassthroughBufferPool<Allocator.Allocation>(), new PassthroughBufferPool<int>());
-            constraintLists = new
+            var capacityInBytes = initialBodyCountEstimate * initialConstraintCountPerBodyEstimate * sizeof(int);
+            var allocator = new Pow2Allocator(16, initialBodyCountEstimate);
+            //TODO: It's often the case that sharing a pool like this among many users will reduce the overall memory use.
+            //For now, for the sake of simplicity and guaranteeing thread access, the graph has its own allocator.
+            //I suspect that there will be many uses for such a non-locked 'bookkeeping' buffer pool. 
+            var bufferPool = new SuballocatedBufferPool(capacityInBytes, allocator);
+
+            constraintLists = new List[initialBodyCountEstimate];
         }
 
-        public void Allocate()
+        //Note that constraints only contain direct references to the memory locations of bodies, not to their handles.
+        //While we could get the handles from the memory locations, it is cheaper/simpler just to deal with the memory locations directly.
+        //To this end, the constraint lists are ordered according to the body memory order, not the handle order.
+        //Every time a body moves due to cache optimization or removal, these lists must be updated.
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SwapBodies(int oldLocation, int newLocation)
+        {
+            var temp = constraintLists[oldLocation];
+            constraintLists[oldLocation] = constraintLists[newLocation];
+            constraintLists[newLocation] = temp;
+        }
+
+        /// <summary>
+        /// Adds a list for a body to the given location.
+        /// </summary>
+        /// <param name="bodyIndex">Location to allocate a list.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddBodyList(int bodyIndex)
+        {
+            //Note that we trust the user to provide valid locations. The graph shouldn't do any of its own positioning- it is slaved to the body memory layout.
+            //This isn't a system that external users will be using under any normal circumstance, so trust should be okay.
+            if (constraintLists.Length > bodyIndex)
+            {
+                //Not enough room for this body! Resize required.
+                Array.Resize(ref constraintLists, BufferPool.GetPoolIndex(bodyIndex));
+            }
+            ref var list = ref constraintLists[bodyIndex];
+            bufferPool.Allocate(initialConstraintCountPerBodyPower, out list.Region);
+            list.Count = 0;
+        }
+
+        /// <summary>
+        /// Frees the list associated with a body at the given location.
+        /// </summary>
+        /// <param name="bodyIndex">Location to remove.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveBodyList(int bodyIndex)
+        {
+            bufferPool.Free(ref constraintLists[bodyIndex].Region);
+        }
+
+        /// <summary>
+        /// Adds a constraint to the specified body.
+        /// </summary>
+        /// <param name="bodyIndex">Index of the body to add the constraint handle to.</param>
+        /// <param name="constraintHandle">Constraint handle to add to the body's list.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddConstraint(int bodyIndex, int constraintHandle)
+        {
+            List.Add(bufferPool, ref constraintLists[bodyIndex], constraintHandle);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void RemoveConstraint(int bodyIndex, int constraintHandle)
+        {
+            List.FastRemove(bufferPool, ref constraintLists[bodyIndex], constraintHandle);
+        }
+
+        //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
+        //de-duping that code later.
     }
     /// <summary>
     /// Incrementally changes the layout of a set of bodies to minimize the cache misses associated with the solver and other systems that rely on connection following.

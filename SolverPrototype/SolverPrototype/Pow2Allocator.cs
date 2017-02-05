@@ -1,5 +1,4 @@
-﻿#define OWNERSHIPTRACKING
-using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.ResourceManagement;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;

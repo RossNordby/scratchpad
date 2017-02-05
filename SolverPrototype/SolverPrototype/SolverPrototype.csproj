@@ -17,7 +17,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;OWNERSHIPTRACKING</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -61,6 +61,7 @@
     <Compile Include="Matrix2x3Wide.cs" />
     <Compile Include="Pow2Allocator.cs" />
     <Compile Include="Springiness.cs" />
+    <Compile Include="SuballocatedBufferPool.cs" />
     <Compile Include="TwistFriction.cs" />
     <Compile Include="TangentFriction.cs" />
     <Compile Include="TwoBodyTypeBatch.cs" />
