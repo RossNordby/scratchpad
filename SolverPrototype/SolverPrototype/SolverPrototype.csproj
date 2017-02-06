@@ -62,6 +62,7 @@
     <Compile Include="Pow2Allocator.cs" />
     <Compile Include="Springiness.cs" />
     <Compile Include="SuballocatedBufferPool.cs" />
+    <Compile Include="SuballocatedList.cs" />
     <Compile Include="TwistFriction.cs" />
     <Compile Include="TangentFriction.cs" />
     <Compile Include="TwoBodyTypeBatch.cs" />

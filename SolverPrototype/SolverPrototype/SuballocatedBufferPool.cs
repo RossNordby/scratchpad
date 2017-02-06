@@ -47,8 +47,18 @@ namespace SolverPrototype
     /// </summary>
     public class SuballocatedBufferPool
     {
+        //TODO: Note that we just use unpinned managed arrays as backing memory at the moment. This may change later in favor of a pointer-compatible representation.
+        //One likely candidate is to simply pin the arrays that are created. These arrays will tend to be so large that the GC won't compact them anyway (barring an explicit order).
+        //We could also just pull some memory from an unmanaged heap. The memory source could just be abstracted to a provider- it doesn't really matter where it comes from, so long
+        //as it supports pinning (should we implement the pointer based approach).
         byte[][] memoryForPowers;
         Pow2Allocator allocator;
+
+        private SuballocatedBufferPool(Pow2Allocator allocator)
+        {
+            this.allocator = allocator;
+            memoryForPowers = new byte[allocator.LargestPower][];
+        }
         /// <summary>
         /// Creates a new buffer pool.
         /// </summary>
@@ -56,14 +66,26 @@ namespace SolverPrototype
         /// If the specified capacity is fractional at a given power, the capacity is truncated to the next lower block boundary.</param>
         /// <param name="allocator">Backing allocator used to position buffers.</param>
         public SuballocatedBufferPool(int initialCapacityPerPowerInBytes, Pow2Allocator allocator)
+            : this(allocator)
         {
-            //TODO: May be a point in extra heuristics, like maximum block count on top of maximum initial capacity.
-            this.allocator = allocator;
-            memoryForPowers = new byte[allocator.LargestPower][];
             for (int i = 0; i < memoryForPowers.Length; ++i)
             {
-                //Don't really want to deal with both nulls and sizes as a special case, so we just create zero-count arrays if the capacity is to small to fit a whole block.
                 var blockCount = initialCapacityPerPowerInBytes >> i;
+                memoryForPowers[i] = new byte[blockCount << i];
+            }
+        }
+        /// <summary>
+        /// Creates a new buffer pool.
+        /// </summary>
+        /// <param name="initialCapacityPerPowerInBytes">Function that returns the number of bytes preallocated for a given power.
+        /// If the specified capacity is fractional at a given power, the capacity is truncated to the next lower block boundary.</param>
+        /// <param name="allocator">Backing allocator used to position buffers.</param>
+        public SuballocatedBufferPool(Func<int, int> initialCapacityPerPowerInBytes, Pow2Allocator allocator)
+            : this(allocator)
+        {
+            for (int i = 0; i < memoryForPowers.Length; ++i)
+            {
+                var blockCount = initialCapacityPerPowerInBytes(i) >> i;
                 memoryForPowers[i] = new byte[blockCount << i];
             }
         }
@@ -86,6 +108,19 @@ namespace SolverPrototype
                 Array.Resize(ref memoryForPowers[region.Power], Math.Max(1 << region.Power, memoryForPowers[region.Power].Length * 2));
                 //Note that this resize invalidates any outstanding references or pointers.
                 return true;
+                //TODO: This kind of sneaky invalidation causes a lot of problems. We can't store a direct pointer or any equivalent representation,
+                //because it would potentially get the rug pulled out from beneath it. Options:
+                //1) Preallocate a huge amount and don't support resizes. Technically workable, but fragile and requires user awareness to specify preallocation. 
+                //Would rather not impose that.
+                //2) Rather than recreating the array and dropping the previous one, 'resize' simply allocates another set of blocks in a new array.
+                //Each new blockset would be the same size, so indexing for the purposes of freeing would be easy (shift and mask).
+                //In the limit, this approaches the BEPUutilities v1 BufferPool, which simply used a separate managed array for each 'block'.
+                //The advantage of the chained pools relative to the v1 approach would be fewer references (especially in the small array cases) 
+                //and a single backing type shared by all suballocators.
+                //3) Maintain outstanding bufferregion references, and push an update out to them when a resize occurs. 
+                //This gets complicated and pretty much destroys the entire point of the BufferRegion for purposes of efficient referenceless storage.
+
+                //I suspect we'll end up doing #2 at some point, along with moving to a pointer-backed representation for a cheaper GetStart<T>().
             }
             return false;
         }
@@ -99,9 +134,9 @@ namespace SolverPrototype
         {
             allocator.Free(region.Power, region.Index);
         }
-
+        
         /// <summary>
-        /// Gets a reference to the start of the region.
+        /// Gets a reference to the start of the region. Potentially invalidated by any allocation that induces a resize.
         /// </summary>
         /// <typeparam name="T">Type to interpret the data region as.</typeparam>
         /// <param name="region">Region to grab the reference of.</param>
@@ -120,10 +155,10 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref BufferRegion region, int newPower)
         {
-            var start = allocator.Allocate(newPower);
-            Buffer.BlockCopy(memoryForPowers[region.Power], region.Index, memoryForPowers[newPower], start, Math.Min(region.Length, 1 << newPower));
+            Allocate(newPower, out var newRegion);
+            Buffer.BlockCopy(memoryForPowers[region.Power], region.Index, memoryForPowers[newPower], newRegion.Index, Math.Min(region.Length, 1 << newPower));
             allocator.Free(region.Power, region.Index);
-            region = new BufferRegion(newPower, start);
+            region = newRegion;
         }
 
         //TODO: Would be nice to have a compaction or other form of reset to drop surplus memory that isn't being used anymore.
