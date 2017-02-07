@@ -34,7 +34,6 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Add<T>(SuballocatedBufferPool bufferPool, ref SuballocatedList list, ref T item)
         {
-            //TODO: verify that this is just a shift...
             if (list.Count == list.Region.GetLengthForType<T>())
             {
                 bufferPool.Resize(ref list.Region, list.Region.Power + 1);

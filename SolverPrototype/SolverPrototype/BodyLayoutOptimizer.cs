@@ -1,140 +1,13 @@
-﻿using BEPUutilities2.ResourceManagement;
-using System;
-using System.Collections.Generic;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.ResourceManagement;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
-    class ConstraintConnectivityGraph
+
+    struct BodyConstraintEntry
     {
-        int initialConstraintCountPerBodyPower;
-        /// <summary>
-        /// Gets or sets the expected number of constraints associated with each body.
-        /// Note that this should be a power of 2; if a non-power of 2 is set, it will be interpreted as the next higher power of 2.
-        /// </summary>
-        public int ConstraintCountPerBodyEstimate
-        {
-            get
-            {
-                return 1 << initialConstraintCountPerBodyPower;
-            }
-            set
-            {
-                initialConstraintCountPerBodyPower = BufferPool.GetPoolIndex(value);
-            }
-        }
 
-        //We need a per-body list of constraints because any movement of a body requires updating the connected constraints.
-        //Since we have that, we'll also use it to find adjacent bodies. Finding adjacent bodies is required for two purposes:
-        //1) Deactivating an island of low energy bodies.
-        //2) Optimizing the memory layout of bodies so that connected bodies tend to be adjacent or at least nearby.
-
-        //Conceptually, we could do something simple like a List<List<int>> for a per-body list of constraint handles.
-        //An obvious optimization to that is to pool the internal lists to avoid GC overhead, but there is another factor to consider beyond just garbage generation-
-        //heap complexity.
-
-        //The goal here is to reduce the cost of a GC. While the engine should never produce garbage itself during regular execution, the application using it might.
-        //The cost of a GC is partially related to the number of references it has to track down. An array of reference types requires examining every one of those references.
-        //So, if you have 16384 bodies with lists stored in QuickList<int>[] representation, the GC has at least 32768 references it needs to consider!
-        //In contrast, if you pack the representation into a single int[] with the lists suballocated from it, the GC doesn't need to scan it- ints aren't reference types.
-
-        //So we could use a custom allocator (like, say, the BEPUutilities Allocator), but there's a much simpler way that is no more wasteful than the QuickList representation 
-        //in terms of memory use- preallocated arrays that you can pull fixed size blocks out of. 
-
-        //We'll store references to these memory blocks and treat them like the arrays we'd use for a QuickList. This will be a little ugly due to the typelessness
-        //of the backing array, but hopefully in the future we can unify things a bit more.
-        SuballocatedList[] constraintLists;
-        SuballocatedBufferPool bufferPool;
-
-        public ConstraintConnectivityGraph(int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
-        {
-            ConstraintCountPerBodyEstimate = initialConstraintCountPerBodyEstimate;
-            var capacityInBytes = initialBodyCountEstimate * initialConstraintCountPerBodyEstimate * sizeof(int);
-            var allocator = new Pow2Allocator(16, initialBodyCountEstimate);
-            //TODO: It's often the case that sharing a pool like this among many users will reduce the overall memory use.
-            //For now, for the sake of simplicity and guaranteeing thread access, the graph has its own allocator.
-            //I suspect that there will be many uses for such a non-locked 'bookkeeping' buffer pool. 
-            bufferPool = new SuballocatedBufferPool(capacityInBytes, allocator);
-
-            constraintLists = new SuballocatedList[initialBodyCountEstimate];
-        }
-
-        //Note that constraints only contain direct references to the memory locations of bodies, not to their handles.
-        //While we could get the handles from the memory locations, it is cheaper/simpler just to deal with the memory locations directly.
-        //To this end, the constraint lists are ordered according to the body memory order, not the handle order.
-        //Every time a body moves due to cache optimization or removal, these lists must be updated.
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SwapBodies(int oldLocation, int newLocation)
-        {
-            var temp = constraintLists[oldLocation];
-            constraintLists[oldLocation] = constraintLists[newLocation];
-            constraintLists[newLocation] = temp;
-        }
-
-        /// <summary>
-        /// Adds a list for a body to the given location.
-        /// </summary>
-        /// <param name="bodyIndex">Location to allocate a list.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddBodyList(int bodyIndex)
-        {
-            //Note that we trust the user to provide valid locations. The graph shouldn't do any of its own positioning- it is slaved to the body memory layout.
-            //This isn't a system that external users will be using under any normal circumstance, so trust should be okay.
-            if (constraintLists.Length > bodyIndex)
-            {
-                //Not enough room for this body! Resize required.
-                Array.Resize(ref constraintLists, BufferPool.GetPoolIndex(bodyIndex));
-            }
-            SuballocatedList.Create(bufferPool, initialConstraintCountPerBodyPower, out constraintLists[bodyIndex]);
-        }
-
-        /// <summary>
-        /// Frees the list associated with a body at the given location.
-        /// </summary>
-        /// <param name="bodyIndex">Location to remove.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveBodyList(int bodyIndex)
-        {
-            bufferPool.Free(ref constraintLists[bodyIndex].Region);
-        }
-
-        /// <summary>
-        /// Adds a constraint to the specified body.
-        /// </summary>
-        /// <param name="bodyIndex">Index of the body to add the constraint handle to.</param>
-        /// <param name="constraintHandle">Constraint handle to add to the body's list.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddConstraint(int bodyIndex, int constraintHandle)
-        {
-            SuballocatedList.Add(bufferPool, ref constraintLists[bodyIndex], constraintHandle);
-        }
-
-        struct IntEqualityComparer : IEqualityComparer<int>
-        {
-            ///TODO: Does the JIT pay attention to this inline? It should be able to due to type specialization, but it is a corner case; double check.
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(int x, int y)
-            {
-                return x == y;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int GetHashCode(int i)
-            {
-                return i.GetHashCode();
-            }
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveConstraint(int bodyIndex, int constraintHandle)
-        { 
-            //This uses a linear search. That's fine; bodies will rarely have more than a handful of constraints associated with them.
-            //Attempting to use something like a hash set for fast removes would just introduce more constant overhead and slow it down on average.
-            ref var list = ref constraintLists[bodyIndex];
-            SuballocatedList.FastRemove<int, IntEqualityComparer>(bufferPool, ref list, constraintHandle);
-        }
-
-        //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
-        //de-duping that code later.
     }
     /// <summary>
     /// Incrementally changes the layout of a set of bodies to minimize the cache misses associated with the solver and other systems that rely on connection following.
@@ -143,10 +16,99 @@ namespace SolverPrototype
     {
         Bodies bodies;
         ConstraintConnectivityGraph graph;
-        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph)
+        Solver solver;
+        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver)
         {
             this.bodies = bodies;
             this.graph = graph;
+            this.solver = solver;
         }
+
+        int dumbBodyIndex = 0;
+        public void DumbIncrementalOptimize()
+        {
+            //All this does is look for any bodies which are to the right of a given body. If it finds one, it pulls it to be adjacent.
+            //This converges at the island level- that is, running this on a static topology of simulation islands will eventually result in 
+            //the islands being contiguous in memory, and at least some connected bodies being adjacent to each other.
+            //However, within the islands, it may continue to unnecessarily swap objects around as bodies 'fight' for ownership.
+            //One body doesn't know that another body has already claimed a body as a child, so this can't produce a coherent unique traversal order.
+
+            //This optimization routine requires much less overhead than other options, like full island traversals. We only request the connections of a single body,
+            //and the swap count is limited to the number of connected bodies.
+
+            //Note that this first implementation really does not care about performance. Just looking for the performance impact on the solver at this point.
+
+            if (dumbBodyIndex >= bodies.BodyCount)
+                dumbBodyIndex = 0;
+
+            //var connectedBodies = new QuickDictionary<int, QuickList<>>(BufferPools<int>.Locking);
+            //int slotIndex = dumbBodyIndex + 1;
+            //graph.GetConnectedBodies(dumbBodyIndex, ref connectedBodies);
+            //for (int i = 0; i < connectedBodies.Count; ++i)
+            //{
+            //    var neighborIndex = connectedBodies.Elements[i];
+            //    if (neighborIndex > slotIndex)
+            //    {
+            //        bodies.Swap(neighborIndex, slotIndex);
+            //        solver.UpdateForBodyMemoryMove()
+            //        ++slotIndex;
+            //    }
+
+            //}
+
+
+            //connectedBodies.Dispose();
+
+            ++dumbBodyIndex;
+        }
+
+        public void LazyIncrementalOptimize()
+        {
+            //This is similar to the dumb variant, but checks for parent-child agreement on positioning before swapping.
+            //At a given body, it looks through all bodies that it is connected to that are positioned to the left, looking for a body that it can call a parent.
+            //Another body is a parent when its first neighbor to the right in memory is the current body.
+            //Note that it is possible for a body to not have a 'parent' in this sense; 
+            //consider an island composed of single central body with many neighbors that do not connect to each other. 
+            //Only one of those neighbors will position itself next to the central body in memory, leaving the others at arbitrary locations in memory.
+            //So, while this approach converges in terms of parent-child relationships, it will not guarantee locality of an entire island.
+            //The main value here is in avoiding the unnecessary swaps of the dumb variant.
+        }
+
+        public void IslandOptimizeDFS()
+        {
+            //Simply grab an entire island by walking through the connection graph.
+            //This trivially guarantees island locality and a stable depth first traversal order.
+            //Beating this in terms of cache quality would likely require some pretty complex heuristics (root choice, branching choice...),
+            //but the traversal and swap time is an issue. Very large islands are not rare. 
+            //This is doubly true because multithreading this would be a pain (likely with little gain).
+
+            //On the upside, with a good choice of bodies, this will converge pretty quickly.
+
+
+        }
+        //TODO: Partial island optimization. True island optimization is probably not a good idea because islands can be arbitrarily large. However, there is value in the 
+        //extra guarantees it provides. You can compromise and achieve independence from island size by simply doing a partial island traversal. Traversing in simple DFS order
+        //until a number of bodies are accumulated. You should be able to get away even with fairly large maximum sizes- 64, 128... So only very large islands would suffer at all.
+
+        public void IslandOptimizeBFS()
+        {
+            //Same idea as the DFS version. This is just a sanity test; it should be significantly worse.
+            //1) While BFS can guarantee the contiguity of all children (and all bodies at that traversal distance), the solver operates on batches that
+            //do not include the same body twice. In other words, while BFS produces a decent result if the child-parent pairs were iterated in order,
+            //the solver is explicitly not doing that.
+            //2) Apart from the root and its first child, we never guarantee that any direct connections will be adjacent in memory. In fact, we make it harder by putting a bunch
+            //of other nodes in between them. While this doesn't guarantee that there won't be ANY adjacency, it doesn't do any better than randomly shuffling the island.
+
+
+        }
+
+        //Note that external systems which have to respond to body movements will generally be okay without their own synchronization in multithreaded cache optimization.
+        //For example, the constraint handle, type batch index, index in type batch, and body index in constraint do not change. If we properly synchronize
+        //the body accesses, then the changes to constraint bodies will be synchronized too.
+
+        //Of course, it may turn out that the overhead of the synchronization (a per body interlocked call) is so high relative to the actual 'work' being done that
+        //a single threaded implementation running at the same time as some other compatible stage just vastly outperforms it. It is very likely that the multithreaded version
+        //will be 2-6 times slower than the single threaded version per thread.
+
     }
 }

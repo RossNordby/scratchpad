@@ -15,30 +15,34 @@ namespace SolverPrototypeTests
         {
             public void Reset()
             {
-                islandIndex = 0;
+                bodyIndex = 0;
             }
-            int islandIndex;
+            int bodyIndex;
             public void Swap(int[] bodies, int islandCount)
             {
-                //Find all bodies of a particular type.
+                //Pick a body. Find all bodies of its type.
                 //Put them all in the same spot, starting at the body with the lowest index.
+                if (bodyIndex >= bodies.Length)
+                    bodyIndex = 0;
+                var bodyType = bodies[bodyIndex];
                 int lowestIndex = -1;
                 var islandBodyIndices = new QuickList<int>(BufferPools<int>.Thread);
                 for (int i = bodies.Length - 1; i >= 0; --i)
                 {
-                    if (bodies[i] == islandIndex)
+                    if (bodies[i] == bodyType)
                     {
                         lowestIndex = i;
                         islandBodyIndices.Add(i);
                     }
                 }
                 var baseIndex = Math.Min(bodies.Length - islandBodyIndices.Count, lowestIndex);
-                for (int i = islandBodyIndices.Count - 1; i >= 0; --i)
+                Array.Sort(islandBodyIndices.Elements, 0, islandBodyIndices.Count);
+                for (int i = 0; i < islandBodyIndices.Count; ++i)
                 {
                     IslandCacheConvergence.Swap(ref bodies[baseIndex + i], ref bodies[islandBodyIndices.Elements[i]]);
                 }
+                bodyIndex += islandBodyIndices.Count;
                 islandBodyIndices.Dispose();
-                islandIndex = (islandIndex + 1) % islandCount;
             }
         }
 

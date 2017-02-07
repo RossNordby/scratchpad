@@ -144,6 +144,8 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref T GetStart<T>(ref BufferRegion region)
         {
+            //This could be a good bit more efficient. It requires two bounds checks, an indirection...
+            //If we just had a direct pointer to pinned memory, the 'start' would simply be a void*->ref cast.
             return ref Unsafe.As<byte, T>(ref memoryForPowers[region.Power][region.Index]);
         }
 
