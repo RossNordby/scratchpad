@@ -16,8 +16,7 @@ namespace SolverPrototype
     /// </summary>
     public abstract class TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse> : TypeBatch<TwoBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>
     {
-
-        public sealed override void GetConnectedBodyIndices(int indexInTypeBatch, ref QuickList<int> bodyIndices)
+        public sealed override void GetConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator)
         {
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
 
@@ -26,8 +25,8 @@ namespace SolverPrototype
             ref var bundleIndexB = ref Unsafe.Add(ref bundleIndexA, 2 * Vector<int>.Count);
             ref var innerIndexB = ref Unsafe.Add(ref bundleIndexA, 3 * Vector<int>.Count);
 
-            bodyIndices.Add((bundleIndexA << BundleIndexing.VectorShift) | innerIndexA);
-            bodyIndices.Add((bundleIndexB << BundleIndexing.VectorShift) | innerIndexB);
+            enumerator.LoopBody((bundleIndexA << BundleIndexing.VectorShift) | innerIndexA);
+            enumerator.LoopBody((bundleIndexB << BundleIndexing.VectorShift) | innerIndexB);
         }
         public sealed override void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation)
         {

@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.ResourceManagement;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -45,9 +46,11 @@ namespace SolverPrototype
         //of the backing array, but hopefully in the future we can unify things a bit more.
         SuballocatedList[] constraintLists;
         SuballocatedBufferPool bufferPool;
+        Solver solver;
 
-        public ConstraintConnectivityGraph(int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
+        public ConstraintConnectivityGraph(Solver solver, int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
         {
+            this.solver = solver;
             ConstraintCountPerBodyEstimate = initialConstraintCountPerBodyEstimate;
             var capacityInBytes = initialBodyCountEstimate * initialConstraintCountPerBodyEstimate * sizeof(int);
             var allocator = new Pow2Allocator(16, initialBodyCountEstimate);
@@ -126,7 +129,7 @@ namespace SolverPrototype
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RemoveConstraint(int bodyIndex, int constraintHandle)
-        { 
+        {
             //This uses a linear search. That's fine; bodies will rarely have more than a handful of constraints associated with them.
             //Attempting to use something like a hash set for fast removes would just introduce more constant overhead and slow it down on average.
             ref var list = ref constraintLists[bodyIndex];
@@ -135,5 +138,63 @@ namespace SolverPrototype
 
         //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
         //de-duping that code later.
+
+        /// <summary>
+        /// The index of a connected body and the connection by which it was reached.
+        /// </summary>
+        public struct ConnectedBody
+        {
+            public int BodyIndex;
+            public int ConnectingConstraintHandle;
+            public int BodyIndexInConstraint;
+        }
+
+        //sooooooo idiomatic
+
+        struct ConstraintBodiesEnumerator<TInnerEnumerator> : IForEach<int> where TInnerEnumerator : IForEachRef<ConnectedBody>
+        {
+            public TInnerEnumerator InnerEnumerator;
+            public int ConstraintHandle;
+            public int IndexInConstraint;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void LoopBody(int connectedBodyIndex)
+            {
+                ConnectedBody connectedBody;
+                connectedBody.BodyIndex = connectedBodyIndex;
+                connectedBody.ConnectingConstraintHandle = ConstraintHandle;
+                connectedBody.BodyIndexInConstraint = IndexInConstraint++;
+                InnerEnumerator.LoopBody(ref connectedBody);
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Reset()
+            {
+                IndexInConstraint = 0;
+            }
+        }
+
+        /// <summary>
+        /// Enumerates all the bodies connected to a given body.
+        /// Bodies which are connected by more than one constraint will be reported multiple times alongside the connecting constraints.
+        /// </summary>
+        /// <typeparam name="TEnumerator">Type of the enumerator to execute on each connected body.</typeparam>
+        /// <param name="bodyIndex">Index of the body to enumerate the connections of. This body will not appear in the set of enumerated bodies, even if it is connected to itself somehow.</param>
+        /// <param name="enumerator">Enumerator instance to run on each connected body.</param>
+        public void EnumerateConnectedBodies<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEachRef<ConnectedBody>
+        {
+            ref var list = ref constraintLists[bodyIndex];
+            ref var start = ref bufferPool.GetStart<int>(ref list.Region);
+            ConstraintBodiesEnumerator<TEnumerator> constraintBodiesEnumerator;
+            constraintBodiesEnumerator.InnerEnumerator = enumerator;
+            constraintBodiesEnumerator.IndexInConstraint = 0;
+
+            for (int i = 0; i < list.Count; ++i)
+            {                
+                constraintBodiesEnumerator.ConstraintHandle = Unsafe.Add(ref start, i);
+                solver.EnumerateConnectedBodyIndices(constraintBodiesEnumerator.ConstraintHandle, ref constraintBodiesEnumerator);
+                constraintBodiesEnumerator.Reset();
+            }
+        }
     }
 }

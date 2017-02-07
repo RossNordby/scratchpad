@@ -124,6 +124,20 @@ namespace SolverPrototype
             batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, bodyIndexInConstraint, newBodyLocation);
         }
 
+        /// <summary>
+        /// Enumerates the set of body indices associated with a constraint in order of their references within the constraint.
+        /// </summary>
+        /// <param name="constraintHandle">Constraint to enumerate.</param>
+        /// <param name="enumerator">Enumerator to use.</param>
+        internal void EnumerateConnectedBodyIndices<TEnumerator>(int constraintHandle, ref TEnumerator enumerator) where TEnumerator : IForEach<int>
+        {
+            ref var constraintLocation = ref HandlesToConstraints[constraintHandle];
+            //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
+            //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
+            //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
+            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).GetConnectedBodyIndices(constraintLocation.IndexInTypeBatch, ref enumerator);
+        }
+
         //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal
         //should attempt to fill the entity reference gap left by the removal with a constraint from another batch if possible.
         //Unfortunately, this requires a way to look up the constraint that is holding a given reference. That makes the
