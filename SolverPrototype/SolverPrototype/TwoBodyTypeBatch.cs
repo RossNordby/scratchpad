@@ -31,7 +31,7 @@ namespace SolverPrototype
         public sealed override void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation)
         {
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
-            BundleIndexing.GetBundleIndices(indexInTypeBatch, out var bodyBundleIndex, out var bodyInnerIndex);
+            BundleIndexing.GetBundleIndices(newBodyLocation, out var bodyBundleIndex, out var bodyInnerIndex);
 
             //Note that this relies on the bodyreferences memory layout. It uses the stride of vectors to skip to the next body based on the bodyIndexInConstraint.
             ref var bundleIndex = ref GatherScatter.Get(ref BodyReferences[constraintBundleIndex].BundleIndexA, bodyInnerIndex + bodyIndexInConstraint * (Vector<int>.Count * 2));

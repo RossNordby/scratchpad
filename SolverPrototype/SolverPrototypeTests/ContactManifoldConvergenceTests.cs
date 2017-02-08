@@ -13,11 +13,19 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            const int bodyCount = 1024;
+            const int bodyCount = 8;
             var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, true, out var handleIndices);
 
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
             var solver = new Solver(bodies);
+            var graph = new ConstraintConnectivityGraph(solver);
+            var optimizer = new BodyLayoutOptimizer(bodies, graph, solver);
+
+            for (int i = 0; i < bodies.BodyCount; ++i)
+            {
+                graph.AddBodyList(i);
+            }
+
 
             int constraintCount = bodyCount - 1;
             int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
@@ -29,6 +37,8 @@ namespace SolverPrototypeTests
                 var bodyBIndex = bodies.BodyHandles[handleIndices[i + 1]];
 
                 solver.Allocate<ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, out var constraintReference, out constraintHandles[i]);
+                graph.AddConstraint(bodyAIndex, constraintHandles[i]);
+                graph.AddConstraint(bodyBIndex, constraintHandles[i]);
 
 
                 BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
@@ -73,6 +83,10 @@ namespace SolverPrototypeTests
 
             }
 
+            //Attempt cache optimization.
+            for (int i = 0; i < 1e7; ++i)
+                optimizer.DumbIncrementalOptimize();
+            Console.WriteLine("Finished optimizations!");
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;

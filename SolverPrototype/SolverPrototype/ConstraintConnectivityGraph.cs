@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
-    class ConstraintConnectivityGraph
+    public class ConstraintConnectivityGraph
     {
         int initialConstraintCountPerBodyPower;
         /// <summary>
@@ -84,7 +84,7 @@ namespace SolverPrototype
         {
             //Note that we trust the user to provide valid locations. The graph shouldn't do any of its own positioning- it is slaved to the body memory layout.
             //This isn't a system that external users will be using under any normal circumstance, so trust should be okay.
-            if (constraintLists.Length > bodyIndex)
+            if (bodyIndex > constraintLists.Length)
             {
                 //Not enough room for this body! Resize required.
                 Array.Resize(ref constraintLists, BufferPool.GetPoolIndex(bodyIndex));
@@ -154,17 +154,21 @@ namespace SolverPrototype
         struct ConstraintBodiesEnumerator<TInnerEnumerator> : IForEach<int> where TInnerEnumerator : IForEachRef<ConnectedBody>
         {
             public TInnerEnumerator InnerEnumerator;
+            public int SourceBodyIndex;
             public int ConstraintHandle;
             public int IndexInConstraint;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
-                ConnectedBody connectedBody;
-                connectedBody.BodyIndex = connectedBodyIndex;
-                connectedBody.ConnectingConstraintHandle = ConstraintHandle;
-                connectedBody.BodyIndexInConstraint = IndexInConstraint++;
-                InnerEnumerator.LoopBody(ref connectedBody);
+                if (SourceBodyIndex != connectedBodyIndex)
+                {
+                    ConnectedBody connectedBody;
+                    connectedBody.BodyIndex = connectedBodyIndex;
+                    connectedBody.ConnectingConstraintHandle = ConstraintHandle;
+                    connectedBody.BodyIndexInConstraint = IndexInConstraint++;
+                    InnerEnumerator.LoopBody(ref connectedBody);
+                }
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -187,6 +191,7 @@ namespace SolverPrototype
             ref var start = ref bufferPool.GetStart<int>(ref list.Region);
             ConstraintBodiesEnumerator<TEnumerator> constraintBodiesEnumerator;
             constraintBodiesEnumerator.InnerEnumerator = enumerator;
+            constraintBodiesEnumerator.SourceBodyIndex = bodyIndex;
             constraintBodiesEnumerator.IndexInConstraint = 0;
 
             for (int i = 0; i < list.Count; ++i)

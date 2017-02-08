@@ -1,6 +1,8 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
 using System.Runtime.CompilerServices;
+using static SolverPrototype.ConstraintConnectivityGraph;
+using System;
 
 namespace SolverPrototype
 {
@@ -12,7 +14,7 @@ namespace SolverPrototype
     /// <summary>
     /// Incrementally changes the layout of a set of bodies to minimize the cache misses associated with the solver and other systems that rely on connection following.
     /// </summary>
-    class BodyLayoutOptimizer
+    public class BodyLayoutOptimizer
     {
         Bodies bodies;
         ConstraintConnectivityGraph graph;
@@ -25,6 +27,38 @@ namespace SolverPrototype
         }
 
         int dumbBodyIndex = 0;
+
+        struct DumbIncrementalEnumerator : IForEachRef<ConnectedBody>
+        {
+            public Bodies bodies;
+            public ConstraintConnectivityGraph graph;
+            public Solver solver;
+            public int slotIndex;
+            public void LoopBody(ref ConnectedBody connection)
+            {
+                //Only pull bodies over that are to the right. This helps limit pointless fighting.
+                //With this condition, objects within an island will tend to move towards the position of the leftmost body.
+                //Without it, any progress towards island-level convergence could be undone by the next iteration.
+                if (connection.BodyIndex > slotIndex)
+                {
+                    //Note that we update the memory location immediately. This could affect the next loop iteration.
+                    //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
+
+                    //TODO: If we end up choosing to go with the dumb optimizer, you can almost certainly improve this implementation-
+                    //this version goes through all the effort of diving into the type batches for references, then does it all again to move stuff around.
+                    //A hardcoded swapping operation could do both at once, saving a few indirections.
+                    //It won't be THAT much faster- every single indirection is already cached- but it's probably still worth it.
+                    //(It's not like this implementation with all of its nested enumerators is particularly simple or clean.)
+                    var newLocation = slotIndex++;
+                    bodies.Swap(connection.BodyIndex, newLocation);
+                    //Note that graph.EnumerateConnectedBodies explicitly excludes the body whose constraints we are enumerating, 
+                    //so we don't have to worry about having the rug pulled by this list swap.
+                    //(Also, !(x > x) for many values of x.)
+                    graph.SwapBodies(connection.BodyIndex, newLocation);
+                    solver.UpdateForBodyMemoryMove(connection.ConnectingConstraintHandle, connection.BodyIndexInConstraint, newLocation);
+                }
+            }
+        }
         public void DumbIncrementalOptimize()
         {
             //All this does is look for any bodies which are to the right of a given body. If it finds one, it pulls it to be adjacent.
@@ -32,32 +66,23 @@ namespace SolverPrototype
             //the islands being contiguous in memory, and at least some connected bodies being adjacent to each other.
             //However, within the islands, it may continue to unnecessarily swap objects around as bodies 'fight' for ownership.
             //One body doesn't know that another body has already claimed a body as a child, so this can't produce a coherent unique traversal order.
+            //(In fact, it won't generally converge even with a single one dimensional chain of bodies.)
 
             //This optimization routine requires much less overhead than other options, like full island traversals. We only request the connections of a single body,
             //and the swap count is limited to the number of connected bodies.
 
             //Note that this first implementation really does not care about performance. Just looking for the performance impact on the solver at this point.
 
-            if (dumbBodyIndex >= bodies.BodyCount)
+            if (dumbBodyIndex >= bodies.BodyCount - 1)
                 dumbBodyIndex = 0;
+            
+            var enumerator = new DumbIncrementalEnumerator();
+            enumerator.bodies = bodies;
+            enumerator.graph = graph;
+            enumerator.solver = solver;
+            enumerator.slotIndex = dumbBodyIndex + 1;
+            graph.EnumerateConnectedBodies(dumbBodyIndex, ref enumerator);
 
-            //var connectedBodies = new QuickDictionary<int, QuickList<>>(BufferPools<int>.Locking);
-            //int slotIndex = dumbBodyIndex + 1;
-            //graph.GetConnectedBodies(dumbBodyIndex, ref connectedBodies);
-            //for (int i = 0; i < connectedBodies.Count; ++i)
-            //{
-            //    var neighborIndex = connectedBodies.Elements[i];
-            //    if (neighborIndex > slotIndex)
-            //    {
-            //        bodies.Swap(neighborIndex, slotIndex);
-            //        solver.UpdateForBodyMemoryMove()
-            //        ++slotIndex;
-            //    }
-
-            //}
-
-
-            //connectedBodies.Dispose();
 
             ++dumbBodyIndex;
         }
