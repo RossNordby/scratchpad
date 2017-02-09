@@ -13,8 +13,8 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            const int bodyCount = 8;
-            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, true, out var handleIndices);
+            const int bodyCount = 4096;
+            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, false, out var handleIndices);
 
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
             var solver = new Solver(bodies);
@@ -84,14 +84,18 @@ namespace SolverPrototypeTests
             }
 
             //Attempt cache optimization.
-            for (int i = 0; i < 1e7; ++i)
-                optimizer.DumbIncrementalOptimize();
-            Console.WriteLine("Finished optimizations!");
+            const int optimizationIterations = bodyCount * 16;
+            var startOptimization = Stopwatch.GetTimestamp();
+            //for (int i = 0; i < optimizationIterations; ++i)
+            //    optimizer.DumbIncrementalOptimize();
+            var endOptimization = Stopwatch.GetTimestamp();
+            var optimizationTime = (endOptimization - startOptimization) / (double)Stopwatch.Frequency;
+            Console.WriteLine($"Finished {optimizationIterations} optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / optimizationIterations}");
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
-            const int frameCount = 128;
+            const int frameCount = 16;
             solver.IterationCount = iterationCount;
 
 

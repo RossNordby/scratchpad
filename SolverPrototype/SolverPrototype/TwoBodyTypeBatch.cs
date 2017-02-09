@@ -1,11 +1,5 @@
-﻿using BEPUutilities2.Collections;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
@@ -25,6 +19,8 @@ namespace SolverPrototype
             ref var bundleIndexB = ref Unsafe.Add(ref bundleIndexA, 2 * Vector<int>.Count);
             ref var innerIndexB = ref Unsafe.Add(ref bundleIndexA, 3 * Vector<int>.Count);
 
+            //Note that the variables are ref locals! This is important for correctness, because every execution of LoopBody could result in a swap.
+            //Ref locals aren't the only solution, but if you ever change this, make sure you account for the potential mutation in the enumerator.
             enumerator.LoopBody((bundleIndexA << BundleIndexing.VectorShift) | innerIndexA);
             enumerator.LoopBody((bundleIndexB << BundleIndexing.VectorShift) | innerIndexB);
         }

@@ -84,10 +84,10 @@ namespace SolverPrototype
         {
             //Note that we trust the user to provide valid locations. The graph shouldn't do any of its own positioning- it is slaved to the body memory layout.
             //This isn't a system that external users will be using under any normal circumstance, so trust should be okay.
-            if (bodyIndex > constraintLists.Length)
+            if (bodyIndex >= constraintLists.Length)
             {
                 //Not enough room for this body! Resize required.
-                Array.Resize(ref constraintLists, BufferPool.GetPoolIndex(bodyIndex));
+                Array.Resize(ref constraintLists, 1 << BufferPool.GetPoolIndex(bodyIndex + 1));
             }
             SuballocatedList.Create(bufferPool, initialConstraintCountPerBodyPower, out constraintLists[bodyIndex]);
         }
