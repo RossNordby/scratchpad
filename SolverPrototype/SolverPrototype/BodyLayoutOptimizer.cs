@@ -3,6 +3,7 @@ using BEPUutilities2.ResourceManagement;
 using System.Runtime.CompilerServices;
 using static SolverPrototype.ConstraintConnectivityGraph;
 using System;
+using System.Diagnostics;
 
 namespace SolverPrototype
 {
@@ -24,6 +25,15 @@ namespace SolverPrototype
             this.bodies = bodies;
             this.graph = graph;
             this.solver = solver;
+
+            partialIslandDFSEnumerator = new PartialIslandDFSEnumerator
+            {
+                traversalStack = new QuickList<int>(new PassthroughBufferPool<int>()),
+                bodies = bodies,
+                graph = graph,
+                solver = solver,
+                maximumBodiesToVisit = 64
+            };
         }
 
         int dumbBodyIndex = 0;
@@ -75,7 +85,7 @@ namespace SolverPrototype
 
             if (dumbBodyIndex >= bodies.BodyCount - 1)
                 dumbBodyIndex = 0;
-            
+
             var enumerator = new DumbIncrementalEnumerator();
             enumerator.bodies = bodies;
             enumerator.graph = graph;
@@ -87,16 +97,79 @@ namespace SolverPrototype
             ++dumbBodyIndex;
         }
 
-        public void LazyIncrementalOptimize()
+        struct PartialIslandDFSEnumerator : IForEachRef<ConnectedBody>
         {
-            //This is similar to the dumb variant, but checks for parent-child agreement on positioning before swapping.
-            //At a given body, it looks through all bodies that it is connected to that are positioned to the left, looking for a body that it can call a parent.
-            //Another body is a parent when its first neighbor to the right in memory is the current body.
-            //Note that it is possible for a body to not have a 'parent' in this sense; 
-            //consider an island composed of single central body with many neighbors that do not connect to each other. 
-            //Only one of those neighbors will position itself next to the central body in memory, leaving the others at arbitrary locations in memory.
-            //So, while this approach converges in terms of parent-child relationships, it will not guarantee locality of an entire island.
-            //The main value here is in avoiding the unnecessary swaps of the dumb variant.
+            public Bodies bodies;
+            public ConstraintConnectivityGraph graph;
+            public Solver solver;
+            //We effectively do a full traversal over multiple frames. We have to store the stack for this to work.
+            public QuickList<int> traversalStack;
+            //The target index is just the last recorded exclusive endpoint of the island. In other words, it's the place where the next island body will be put.
+            public int targetIndex;
+            public int currentBodyIndex;
+            public int maximumBodiesToVisit;
+            public int visitedBodyCount;
+            public void LoopBody(ref ConnectedBody connection)
+            {
+                //Should this node be swapped into position? 
+                if (connection.BodyIndex > targetIndex)
+                {
+                    //Note that we update the memory location immediately. This could affect the next loop iteration.
+                    //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
+                    var newLocation = targetIndex++;
+                    bodies.Swap(connection.BodyIndex, newLocation);
+                    //Note that the target index is always greater than the currentBodyIndex, so we don't have to worry about the currentBodyIndex 
+                    //(whose constraints are are currently enumerating) being moved.
+                    Debug.Assert(newLocation > currentBodyIndex, "The target index should always progress ahead of the traversal. Did something get reset incorrectly?");
+                    graph.SwapBodies(connection.BodyIndex, newLocation);
+                    solver.UpdateForBodyMemoryMove(connection.ConnectingConstraintHandle, connection.BodyIndexInConstraint, newLocation);
+                    //Note that we mark the new location for traversal, since it was moved.
+                    traversalStack.Add(newLocation);
+                }
+                else if (connection.BodyIndex > currentBodyIndex)
+                {
+                    //While this body should not be swapped because it has already been swapped by an earlier traversal visit, 
+                    //it is still a candidate for continued traversal. It might have children that cannot be reached by other paths.
+                    traversalStack.Add(connection.BodyIndex);
+                }
+            }
+        }
+        PartialIslandDFSEnumerator partialIslandDFSEnumerator;
+
+        public void PartialIslandOptimizeDFS()
+        {
+            //With the observation that the full island DFS traversal is a decent cache optimization heuristic, attempt to do the same thing except spread over multiple frames.
+            //This can clearly get invalidated by changes to the topology between frames, but temporary suboptimality will not cause correctness problems.
+
+            //A few important implementation notes:
+            //1) The target index advances with every swap performed.
+            //2) "Visited" bodies are not explicitly tracked. Instead, the traversal will refuse to visit any bodies to the left of the current body.
+            //Further, no swaps will occur with any body to the left of the target index.
+            //Any body before the target index has already been swapped into position by an earlier traversal (heuristically speaking).
+            //3) Swaps are performed inline, eliminating the need for any temporary body storage (or long-term locks in the multithreaded implementation).
+            partialIslandDFSEnumerator.visitedBodyCount = 0;
+            //First, attempt to continue any previous traversals.
+            do
+            {
+                if (partialIslandDFSEnumerator.targetIndex >= bodies.BodyCount)
+                {
+                    //The target index has walked outside the bounds of the body set. While we could wrap around and continue, that would a different heuristic
+                    //for swapping and visitation- currently we use 'to the right' which isn't well defined on a ring.
+                    //Instead, for simplicity's sake, the target simply resets to the first index, and the traversal stack gets cleared.
+                    partialIslandDFSEnumerator.targetIndex = 0;
+                    partialIslandDFSEnumerator.traversalStack.Count = 0;
+                }
+                if (partialIslandDFSEnumerator.traversalStack.Count == 0)
+                {
+                    //There is no active traversal. Start one.
+                    partialIslandDFSEnumerator.traversalStack.Add(partialIslandDFSEnumerator.targetIndex++);
+                }
+                partialIslandDFSEnumerator.traversalStack.Pop(out partialIslandDFSEnumerator.currentBodyIndex);
+                //It's possible for the target index to fall behind if no swaps are needed. 
+                partialIslandDFSEnumerator.targetIndex = Math.Max(partialIslandDFSEnumerator.targetIndex, partialIslandDFSEnumerator.currentBodyIndex + 1);
+                graph.EnumerateConnectedBodies(partialIslandDFSEnumerator.currentBodyIndex, ref partialIslandDFSEnumerator);
+                ++partialIslandDFSEnumerator.visitedBodyCount;
+            } while (partialIslandDFSEnumerator.visitedBodyCount < partialIslandDFSEnumerator.maximumBodiesToVisit);
         }
 
         public void IslandOptimizeDFS()
@@ -111,9 +184,6 @@ namespace SolverPrototype
 
 
         }
-        //TODO: Partial island optimization. True island optimization is probably not a good idea because islands can be arbitrarily large. However, there is value in the 
-        //extra guarantees it provides. You can compromise and achieve independence from island size by simply doing a partial island traversal. Traversing in simple DFS order
-        //until a number of bodies are accumulated. You should be able to get away even with fairly large maximum sizes- 64, 128... So only very large islands would suffer at all.
 
         public void IslandOptimizeBFS()
         {

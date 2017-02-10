@@ -200,6 +200,10 @@ namespace SolverPrototype
                 solver.EnumerateConnectedBodyIndices(constraintBodiesEnumerator.ConstraintHandle, ref constraintBodiesEnumerator);
                 constraintBodiesEnumerator.Reset();
             }
+            //Note that we have to assume the enumerator contains state mutated by the internal loop bodies.
+            //If it's a value type, those mutations won't be reflected in the original reference. 
+            //Copy them back in.
+            enumerator = constraintBodiesEnumerator.InnerEnumerator;
         }
     }
 }

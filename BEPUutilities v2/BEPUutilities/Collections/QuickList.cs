@@ -343,6 +343,18 @@ namespace BEPUutilities2.Collections
             Elements[Count] = default(T);
         }
 
+        /// <summary>
+        /// Removes and outputs the last element in the list. Assumes positive count. User is responsible for guaranteeing correctness.
+        /// </summary>
+        /// <param name="element">Last element of the list.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Pop(out T element)
+        {
+            Validate();
+            Debug.Assert(count > 0, "It's up to the user to guarantee that the count is actually positive when using the unconditional pop.");
+            Count--;
+            element = Elements[Count];
+        }
 
         /// <summary>
         /// Removes and outputs the last element in the list if it exists.

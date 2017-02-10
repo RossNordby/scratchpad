@@ -13,8 +13,8 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            const int bodyCount = 4096;
-            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, false, out var handleIndices);
+            const int bodyCount = 5;
+            var bodies = BodyStackBuilder.BuildStackOfBodiesOnGround(bodyCount, true, out var handleIndices);
 
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
             var solver = new Solver(bodies);
@@ -86,16 +86,16 @@ namespace SolverPrototypeTests
             //Attempt cache optimization.
             const int optimizationIterations = bodyCount * 16;
             var startOptimization = Stopwatch.GetTimestamp();
-            //for (int i = 0; i < optimizationIterations; ++i)
-            //    optimizer.DumbIncrementalOptimize();
+            for (int i = 0; i < optimizationIterations; ++i)
+                optimizer.PartialIslandOptimizeDFS();
             var endOptimization = Stopwatch.GetTimestamp();
             var optimizationTime = (endOptimization - startOptimization) / (double)Stopwatch.Frequency;
             Console.WriteLine($"Finished {optimizationIterations} optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / optimizationIterations}");
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 8;
-            const int frameCount = 16;
+            const int iterationCount = 32;
+            const int frameCount = 128;
             solver.IterationCount = iterationCount;
 
 
@@ -128,8 +128,8 @@ namespace SolverPrototypeTests
                     GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
                     GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
 
-                    //if (i == 0)
-                    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
+                    if (i == 0)
+                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
@@ -150,7 +150,7 @@ namespace SolverPrototypeTests
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
             Console.WriteLine($"Time (ms): {(1e3 * totalTicks) / Stopwatch.Frequency}");
