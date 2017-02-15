@@ -113,15 +113,20 @@ namespace SolverPrototype
         /// Changes the body reference of a constraint in response to a body memory move.
         /// </summary>
         /// <param name="constraintHandle">Handle of the constraint to modify.</param> 
-        /// <param name="bodyIndexInConstraint">Index of the modified body in the constraint body references list. For example, for a two body constraint this would be 0 or 1.</param>
+        /// <param name="oldBodyLocation">Index of the body before the move.</param>
         /// <param name="newBodyLocation">Memory index that the moved body now inhabits.</param>
-        internal void UpdateForBodyMemoryMove(int constraintHandle, int bodyIndexInConstraint, int newBodyLocation)
+        internal void UpdateForBodyMemoryMove(int constraintHandle, int oldBodyLocation, int newBodyLocation)
         {
+            //Note that this function requires scanning the bodies in the constraint. This will tend to be fine since the vast majority of constraints have no more than 2 bodies.
+            //While it's possible to store the index of the body in the constraint to avoid this scan, storing that information requires collecting that information on add.
+            //That's not impossible by any means, but consider that this function will tend to be called in a deferred way- we have control over how many cache optimizations
+            //we perform. We do not, however, have any control over how many adds must be performed. Those must be performed immediately for correctness.
+            //In other words, doing a little more work here can reduce the overall work required, in addition to simplifying the storage requirements.
             ref var constraintLocation = ref HandlesToConstraints[constraintHandle];
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
-            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, bodyIndexInConstraint, newBodyLocation);
+            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, oldBodyLocation, newBodyLocation);
         }
 
         /// <summary>
@@ -135,7 +140,7 @@ namespace SolverPrototype
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
-            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).GetConnectedBodyIndices(constraintLocation.IndexInTypeBatch, ref enumerator);
+            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).EnumerateConnectedBodyIndices(constraintLocation.IndexInTypeBatch, ref enumerator);
         }
 
         //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal

@@ -10,7 +10,7 @@ namespace SolverPrototype
     /// </summary>
     public abstract class TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse> : TypeBatch<TwoBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>
     {
-        public sealed override void GetConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator)
+        public sealed override void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator)
         {
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
 
@@ -35,5 +35,7 @@ namespace SolverPrototype
             bundleIndex = bodyBundleIndex;
             innerIndex = bodyInnerIndex;
         }
+
+        
     }
 }

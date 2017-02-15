@@ -17,7 +17,7 @@ namespace SolverPrototype
         public abstract int Allocate();
         public abstract void Remove(int index);
         
-        public abstract void GetConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
+        public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
 
         public abstract void Initialize();

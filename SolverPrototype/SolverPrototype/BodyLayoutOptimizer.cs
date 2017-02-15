@@ -7,11 +7,6 @@ using System.Diagnostics;
 
 namespace SolverPrototype
 {
-
-    struct BodyConstraintEntry
-    {
-
-    }
     /// <summary>
     /// Incrementally changes the layout of a set of bodies to minimize the cache misses associated with the solver and other systems that rely on connection following.
     /// </summary>
@@ -34,6 +29,27 @@ namespace SolverPrototype
                 solver = solver,
                 maximumBodiesToVisit = 64
             };
+        }
+        struct SwapConstraintEnumerator : IForEach<BodyConstraintReference>
+        {
+            public Solver Solver;
+            public int NewLocation;
+            public void LoopBody(BodyConstraintReference constraint)
+            {
+                Solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, NewLocation);
+            }
+        }
+        static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int oldLocation, int newLocation)
+        {
+            //Enumerate the body's current set of constraints, changing the reference in each to the new location. 
+            SwapConstraintEnumerator enumerator;
+            enumerator.Solver = solver;
+            enumerator.NewLocation = newLocation;
+            graph.EnumerateConstraints(oldLocation, ref enumerator);
+
+            //Update the body and graph locations.
+            bodies.Swap(oldLocation, newLocation);
+            graph.SwapBodies(oldLocation, newLocation);
         }
 
         int dumbBodyIndex = 0;
@@ -60,12 +76,10 @@ namespace SolverPrototype
                     //It won't be THAT much faster- every single indirection is already cached- but it's probably still worth it.
                     //(It's not like this implementation with all of its nested enumerators is particularly simple or clean.)
                     var newLocation = slotIndex++;
-                    bodies.Swap(connection.BodyIndex, newLocation);
                     //Note that graph.EnumerateConnectedBodies explicitly excludes the body whose constraints we are enumerating, 
                     //so we don't have to worry about having the rug pulled by this list swap.
                     //(Also, !(x > x) for many values of x.)
-                    graph.SwapBodies(connection.BodyIndex, newLocation);
-                    solver.UpdateForBodyMemoryMove(connection.ConnectingConstraintHandle, connection.BodyIndexInConstraint, newLocation);
+                    SwapBodyLocation(bodies, graph, solver, connection.BodyIndex, newLocation);
                 }
             }
         }
@@ -117,12 +131,8 @@ namespace SolverPrototype
                     //Note that we update the memory location immediately. This could affect the next loop iteration.
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
                     var newLocation = targetIndex++;
-                    bodies.Swap(connection.BodyIndex, newLocation);
-                    //Note that the target index is always greater than the currentBodyIndex, so we don't have to worry about the currentBodyIndex 
-                    //(whose constraints are are currently enumerating) being moved.
                     Debug.Assert(newLocation > currentBodyIndex, "The target index should always progress ahead of the traversal. Did something get reset incorrectly?");
-                    graph.SwapBodies(connection.BodyIndex, newLocation);
-                    solver.UpdateForBodyMemoryMove(connection.ConnectingConstraintHandle, connection.BodyIndexInConstraint, newLocation);
+                    SwapBodyLocation(bodies, graph, solver, connection.BodyIndex, newLocation);
                     //Note that we mark the new location for traversal, since it was moved.
                     traversalStack.Add(newLocation);
                 }

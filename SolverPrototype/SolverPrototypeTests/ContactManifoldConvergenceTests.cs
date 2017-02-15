@@ -37,8 +37,8 @@ namespace SolverPrototypeTests
                 var bodyBIndex = bodies.BodyHandles[handleIndices[i + 1]];
 
                 solver.Allocate<ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, out var constraintReference, out constraintHandles[i]);
-                graph.AddConstraint(bodyAIndex, constraintHandles[i]);
-                graph.AddConstraint(bodyBIndex, constraintHandles[i]);
+                graph.AddConstraint(bodyAIndex, constraintHandles[i], 0);
+                graph.AddConstraint(bodyBIndex, constraintHandles[i], 1);
 
 
                 BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
@@ -87,7 +87,7 @@ namespace SolverPrototypeTests
             const int optimizationIterations = bodyCount * 16;
             var startOptimization = Stopwatch.GetTimestamp();
             for (int i = 0; i < optimizationIterations; ++i)
-                optimizer.PartialIslandOptimizeDFS();
+                optimizer.DumbIncrementalOptimize();
             var endOptimization = Stopwatch.GetTimestamp();
             var optimizationTime = (endOptimization - startOptimization) / (double)Stopwatch.Frequency;
             Console.WriteLine($"Finished {optimizationIterations} optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / optimizationIterations}");

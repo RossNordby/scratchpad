@@ -14,6 +14,14 @@ namespace SolverPrototype
         bool Equals(ref T x, ref T y);
         int GetHashCode(ref T i);
     }
+    public interface IPredicate<T>
+    {
+        bool Test(T item);
+    }
+    public interface IPredicateRef<T>
+    {
+        bool Test(ref T item);
+    }
 
     //Note that this design is probably not going to stick around in this form. While the idea of a referenceless storage representation is necessary, the 'hydrated' version
     //of this list is terribly inconvenient to use. Which is to say, there really isn't a hydrated representation, just operations on the dehydrated version.
@@ -75,22 +83,21 @@ namespace SolverPrototype
         //The backing array is byte[]. :) :) :         )
 
         /// <summary>
-        /// Removes the first item from the list that is equal to the given item based on the specified comparer.
+        /// Removes the first item from the list that satisfies the given predicate.
         /// </summary>
         /// <typeparam name="T">Type of the item to remove.</typeparam>
-        /// <typeparam name="TComparer">Comparer used to determine whether a list element is equal to the item to remove.</typeparam>
+        /// <typeparam name="TPredicate">Predicate used to determine whether to remove an item.</typeparam>
         /// <param name="bufferPool">Buffer pool that the list was allocated from.</param>
         /// <param name="list">List to remove from.</param>
         /// <param name="item">Item to remove from the list.</param>
         /// <returns>True if the item was present and removed, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool FastRemove<T, TComparer>(SuballocatedBufferPool bufferPool, ref SuballocatedList list, T item) where TComparer : struct, IEqualityComparer<T>
+        public static bool FastRemove<T, TPredicate>(SuballocatedBufferPool bufferPool, ref SuballocatedList list, ref TPredicate predicate) where TPredicate : struct, IPredicate<T>
         {
-            var comparer = default(TComparer);
             ref var start = ref bufferPool.GetStart<T>(ref list.Region);
             for (int i = 0; i < list.Count; ++i)
             {
-                if (comparer.Equals(item, Unsafe.Add(ref start, i)))
+                if (predicate.Test(Unsafe.Add(ref start, i)))
                 {
                     FastRemoveAt<T>(bufferPool, ref list, i);
                     return true;
@@ -98,33 +105,8 @@ namespace SolverPrototype
             }
             return false;
         }
+        
 
-        //If a user cares enough to use a ref parameter, they will almost certaintly also want the ref parametered equality comparison. That's sufficient to distinguish the overloads.
-
-        /// <summary>
-        /// Removes the first item from the list that is equal to the given item based on the specified comparer.
-        /// </summary>
-        /// <typeparam name="T">Type of the item to remove.</typeparam>
-        /// <typeparam name="TComparer">Comparer used to determine whether a list element is equal to the item to remove.</typeparam>
-        /// <param name="bufferPool">Buffer pool that the list was allocated from.</param>
-        /// <param name="list">List to remove from.</param>
-        /// <param name="item">Item to remove from the list.</param>
-        /// <returns>True if the item was present and removed, false otherwise.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static bool FastRemove<T, TComparer>(SuballocatedBufferPool bufferPool, ref SuballocatedList list, ref T item) where TComparer : struct, IEqualityComparerRef<T>
-        {
-            var comparer = default(TComparer);
-            ref var start = ref bufferPool.GetStart<T>(ref list.Region);
-            for (int i = 0; i < list.Count; ++i)
-            {
-                if (comparer.Equals(ref item, ref Unsafe.Add(ref start, i)))
-                {
-                    FastRemoveAt<T>(bufferPool, ref list, i);
-                    return true;
-                }
-            }
-            return false;
-        }
 
         /// <summary>
         /// Removes an element at the given index.
@@ -161,7 +143,7 @@ namespace SolverPrototype
         }
 
     }
-    
+
 
 
 }

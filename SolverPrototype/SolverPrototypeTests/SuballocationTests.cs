@@ -11,31 +11,21 @@ namespace SolverPrototypeTests
     {
         private static object debug;
 
-        public struct TestComparer : IEqualityComparerRef<int>, IEqualityComparer<int>
+        public struct TestPredicate : IPredicate<int>, IPredicateRef<int>
         {
+            public int ToCompare;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(ref int x, ref int y)
+            public bool Test(ref int x)
             {
-                return x == y;
+                return x == ToCompare;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(int x, int y)
+            public bool Test(int x)
             {
-                return x == y;
+                return x == ToCompare;
             }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int GetHashCode(ref int i)
-            {
-                return i;
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int GetHashCode(int i)
-            {
-                return i;
-            }
+            
         }
         public static void Test()
         {
@@ -64,13 +54,15 @@ namespace SolverPrototypeTests
                             //Remove an element that is actually present.
                             var toRemoveIndex = random.Next(list.Count);
                             var toRemove = Unsafe.Add(ref start, toRemoveIndex);
-                            var removed = SuballocatedList.FastRemove<int, TestComparer>(bufferPool, ref list, toRemove);
+                            var predicate = new TestPredicate { ToCompare = toRemove };
+                            var removed = SuballocatedList.FastRemove<int, TestPredicate>(bufferPool, ref list, ref predicate);
                             Debug.Assert(removed, "If we selected an element from the list, it should be removable.");
                         }
                         else
                         {
                             var toRemove = -(1 + random.Next(16));
-                            var removed = SuballocatedList.FastRemove<int, TestComparer>(bufferPool, ref list, toRemove);
+                            var predicate = new TestPredicate { ToCompare = toRemove };
+                            var removed = SuballocatedList.FastRemove<int, TestPredicate>(bufferPool, ref list, ref predicate);
                             Debug.Assert(!removed, "Shouldn't be able to remove things that were never added!");
                         }
                     }

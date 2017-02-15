@@ -2,6 +2,7 @@
 using BEPUutilities2.ResourceManagement;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
@@ -21,9 +22,10 @@ namespace SolverPrototype
             }
             set
             {
-                initialConstraintCountPerBodyPower = BufferPool.GetPoolIndex(value);
+                initialConstraintCountPerBodyPower = BufferPool.GetPoolIndex(value * Unsafe.SizeOf<BodyConstraintReference>());
             }
         }
+
 
         //We need a per-body list of constraints because any movement of a body requires updating the connected constraints.
         //Since we have that, we'll also use it to find adjacent bodies. Finding adjacent bodies is required for two purposes:
@@ -47,6 +49,14 @@ namespace SolverPrototype
         SuballocatedList[] constraintLists;
         SuballocatedBufferPool bufferPool;
         Solver solver;
+
+        //You could bitpack these two into 4 bytes, but the value of that is pretty darn questionable.
+        public struct BodyConstraintReference
+        {
+            public int ConnectingConstraintHandle;
+            public int BodyIndexInConstraint;
+        }
+
 
         public ConstraintConnectivityGraph(Solver solver, int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
         {
@@ -108,23 +118,17 @@ namespace SolverPrototype
         /// <param name="bodyIndex">Index of the body to add the constraint handle to.</param>
         /// <param name="constraintHandle">Constraint handle to add to the body's list.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddConstraint(int bodyIndex, int constraintHandle)
+        public void AddConstraint(int bodyIndex, int constraintHandle, int bodyIndexInConstraint)
         {
             SuballocatedList.Add(bufferPool, ref constraintLists[bodyIndex], constraintHandle);
         }
-
-        struct IntEqualityComparer : IEqualityComparer<int>
+        
+        struct RemovalPredicate : IPredicate<BodyConstraintReference>
         {
-            ///TODO: Does the JIT pay attention to this inline? It should be able to due to type specialization, but it is a corner case; double check.
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Equals(int x, int y)
+            public int ConstraintHandleToRemove;
+            public bool Test(BodyConstraintReference item)
             {
-                return x == y;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int GetHashCode(int i)
-            {
-                return i.GetHashCode();
+                return item.ConnectingConstraintHandle == ConstraintHandleToRemove;
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -133,7 +137,9 @@ namespace SolverPrototype
             //This uses a linear search. That's fine; bodies will rarely have more than a handful of constraints associated with them.
             //Attempting to use something like a hash set for fast removes would just introduce more constant overhead and slow it down on average.
             ref var list = ref constraintLists[bodyIndex];
-            SuballocatedList.FastRemove<int, IntEqualityComparer>(bufferPool, ref list, constraintHandle);
+            RemovalPredicate predicate;
+            predicate.ConstraintHandleToRemove = constraintHandle;
+            SuballocatedList.FastRemove<BodyConstraintReference, RemovalPredicate>(bufferPool, ref list, ref predicate);
         }
 
         //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
@@ -195,7 +201,7 @@ namespace SolverPrototype
             constraintBodiesEnumerator.IndexInConstraint = 0;
 
             for (int i = 0; i < list.Count; ++i)
-            {                
+            {
                 constraintBodiesEnumerator.ConstraintHandle = Unsafe.Add(ref start, i);
                 solver.EnumerateConnectedBodyIndices(constraintBodiesEnumerator.ConstraintHandle, ref constraintBodiesEnumerator);
                 constraintBodiesEnumerator.Reset();
@@ -204,6 +210,23 @@ namespace SolverPrototype
             //If it's a value type, those mutations won't be reflected in the original reference. 
             //Copy them back in.
             enumerator = constraintBodiesEnumerator.InnerEnumerator;
+        }
+
+        /// <summary>
+        /// Enumerates all the constraint handles connected to a given body.
+        /// </summary>
+        /// <typeparam name="TEnumerator">Type of the enumerator to execute on each constraint handle.</typeparam>
+        /// <param name="bodyIndex">Index of the body to enumerate the constraints of.</param>
+        /// <param name="enumerator">Enumerator to execute on each constraint handle.</param>
+        public void EnumerateConstraints<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<BodyConstraintReference>
+        {
+            ref var list = ref constraintLists[bodyIndex];
+            ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
+
+            for (int i = 0; i < list.Count; ++i)
+            {
+                enumerator.LoopBody(Unsafe.Add(ref start, i));
+            }
         }
     }
 }
