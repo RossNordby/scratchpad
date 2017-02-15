@@ -120,7 +120,10 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void AddConstraint(int bodyIndex, int constraintHandle, int bodyIndexInConstraint)
         {
-            SuballocatedList.Add(bufferPool, ref constraintLists[bodyIndex], constraintHandle);
+            BodyConstraintReference constraint;
+            constraint.ConnectingConstraintHandle = constraintHandle;
+            constraint.BodyIndexInConstraint = bodyIndexInConstraint;
+            SuballocatedList.Add(bufferPool, ref constraintLists[bodyIndex], constraint);
         }
         
         struct RemovalPredicate : IPredicate<BodyConstraintReference>
@@ -145,66 +148,45 @@ namespace SolverPrototype
         //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
         //de-duping that code later.
 
-        /// <summary>
-        /// The index of a connected body and the connection by which it was reached.
-        /// </summary>
-        public struct ConnectedBody
-        {
-            public int BodyIndex;
-            public int ConnectingConstraintHandle;
-            public int BodyIndexInConstraint;
-        }
 
         //sooooooo idiomatic
 
-        struct ConstraintBodiesEnumerator<TInnerEnumerator> : IForEach<int> where TInnerEnumerator : IForEachRef<ConnectedBody>
+        struct ConstraintBodiesEnumerator<TInnerEnumerator> : IForEach<int> where TInnerEnumerator : IForEach<int>
         {
             public TInnerEnumerator InnerEnumerator;
             public int SourceBodyIndex;
-            public int ConstraintHandle;
-            public int IndexInConstraint;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
                 if (SourceBodyIndex != connectedBodyIndex)
                 {
-                    ConnectedBody connectedBody;
-                    connectedBody.BodyIndex = connectedBodyIndex;
-                    connectedBody.ConnectingConstraintHandle = ConstraintHandle;
-                    connectedBody.BodyIndexInConstraint = IndexInConstraint++;
-                    InnerEnumerator.LoopBody(ref connectedBody);
+                    //Note that this may report the same body multiple times if it is connected multiple times! That's fine and potentially useful; let the user deal with it.
+                    InnerEnumerator.LoopBody(connectedBodyIndex);
                 }
             }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Reset()
-            {
-                IndexInConstraint = 0;
-            }
+            
         }
 
         /// <summary>
         /// Enumerates all the bodies connected to a given body.
-        /// Bodies which are connected by more than one constraint will be reported multiple times alongside the connecting constraints.
+        /// Bodies which are connected by more than one constraint will be reported multiple times.
         /// </summary>
         /// <typeparam name="TEnumerator">Type of the enumerator to execute on each connected body.</typeparam>
         /// <param name="bodyIndex">Index of the body to enumerate the connections of. This body will not appear in the set of enumerated bodies, even if it is connected to itself somehow.</param>
         /// <param name="enumerator">Enumerator instance to run on each connected body.</param>
-        public void EnumerateConnectedBodies<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEachRef<ConnectedBody>
+        public void EnumerateConnectedBodies<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<int>
         {
             ref var list = ref constraintLists[bodyIndex];
-            ref var start = ref bufferPool.GetStart<int>(ref list.Region);
+            ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
             ConstraintBodiesEnumerator<TEnumerator> constraintBodiesEnumerator;
             constraintBodiesEnumerator.InnerEnumerator = enumerator;
             constraintBodiesEnumerator.SourceBodyIndex = bodyIndex;
-            constraintBodiesEnumerator.IndexInConstraint = 0;
 
             for (int i = 0; i < list.Count; ++i)
             {
-                constraintBodiesEnumerator.ConstraintHandle = Unsafe.Add(ref start, i);
-                solver.EnumerateConnectedBodyIndices(constraintBodiesEnumerator.ConstraintHandle, ref constraintBodiesEnumerator);
-                constraintBodiesEnumerator.Reset();
+                var constraint = Unsafe.Add(ref start, i);
+                solver.EnumerateConnectedBodyIndices(constraint.ConnectingConstraintHandle, ref constraintBodiesEnumerator);
             }
             //Note that we have to assume the enumerator contains state mutated by the internal loop bodies.
             //If it's a value type, those mutations won't be reflected in the original reference. 

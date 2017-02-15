@@ -113,9 +113,9 @@ namespace SolverPrototype
         /// Changes the body reference of a constraint in response to a body memory move.
         /// </summary>
         /// <param name="constraintHandle">Handle of the constraint to modify.</param> 
-        /// <param name="oldBodyLocation">Index of the body before the move.</param>
+        /// <param name="bodyIndexInConstraint">Index of the moved body in the constraint.</param>
         /// <param name="newBodyLocation">Memory index that the moved body now inhabits.</param>
-        internal void UpdateForBodyMemoryMove(int constraintHandle, int oldBodyLocation, int newBodyLocation)
+        internal void UpdateForBodyMemoryMove(int constraintHandle, int bodyIndexInConstraint, int newBodyLocation)
         {
             //Note that this function requires scanning the bodies in the constraint. This will tend to be fine since the vast majority of constraints have no more than 2 bodies.
             //While it's possible to store the index of the body in the constraint to avoid this scan, storing that information requires collecting that information on add.
@@ -126,7 +126,7 @@ namespace SolverPrototype
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
-            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, oldBodyLocation, newBodyLocation);
+            batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, bodyIndexInConstraint, newBodyLocation);
         }
 
         /// <summary>

@@ -39,33 +39,37 @@ namespace SolverPrototype
                 Solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, NewLocation);
             }
         }
-        static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int oldLocation, int newLocation)
+        static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
         {
-            //Enumerate the body's current set of constraints, changing the reference in each to the new location. 
+            Debug.Assert(a != b, "Swapping a body with itself isn't meaningful. Whaddeyer doin?");
+            //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
+            //Note that references to both bodies must be changed- both bodies moved!
             SwapConstraintEnumerator enumerator;
             enumerator.Solver = solver;
-            enumerator.NewLocation = newLocation;
-            graph.EnumerateConstraints(oldLocation, ref enumerator);
+            enumerator.NewLocation = b;
+            graph.EnumerateConstraints(a, ref enumerator);
+            enumerator.NewLocation = a;
+            graph.EnumerateConstraints(b, ref enumerator);
 
             //Update the body and graph locations.
-            bodies.Swap(oldLocation, newLocation);
-            graph.SwapBodies(oldLocation, newLocation);
+            bodies.Swap(a, b);
+            graph.SwapBodies(a, b);
         }
 
         int dumbBodyIndex = 0;
 
-        struct DumbIncrementalEnumerator : IForEachRef<ConnectedBody>
+        struct DumbIncrementalEnumerator : IForEach<int>
         {
             public Bodies bodies;
             public ConstraintConnectivityGraph graph;
             public Solver solver;
             public int slotIndex;
-            public void LoopBody(ref ConnectedBody connection)
+            public void LoopBody(int connectedBodyIndex)
             {
                 //Only pull bodies over that are to the right. This helps limit pointless fighting.
                 //With this condition, objects within an island will tend to move towards the position of the leftmost body.
                 //Without it, any progress towards island-level convergence could be undone by the next iteration.
-                if (connection.BodyIndex > slotIndex)
+                if (connectedBodyIndex > slotIndex)
                 {
                     //Note that we update the memory location immediately. This could affect the next loop iteration.
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
@@ -79,7 +83,7 @@ namespace SolverPrototype
                     //Note that graph.EnumerateConnectedBodies explicitly excludes the body whose constraints we are enumerating, 
                     //so we don't have to worry about having the rug pulled by this list swap.
                     //(Also, !(x > x) for many values of x.)
-                    SwapBodyLocation(bodies, graph, solver, connection.BodyIndex, newLocation);
+                    SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
                 }
             }
         }
@@ -111,7 +115,7 @@ namespace SolverPrototype
             ++dumbBodyIndex;
         }
 
-        struct PartialIslandDFSEnumerator : IForEachRef<ConnectedBody>
+        struct PartialIslandDFSEnumerator : IForEach<int>
         {
             public Bodies bodies;
             public ConstraintConnectivityGraph graph;
@@ -123,24 +127,24 @@ namespace SolverPrototype
             public int currentBodyIndex;
             public int maximumBodiesToVisit;
             public int visitedBodyCount;
-            public void LoopBody(ref ConnectedBody connection)
+            public void LoopBody(int connectedBodyIndex)
             {
                 //Should this node be swapped into position? 
-                if (connection.BodyIndex > targetIndex)
+                if (connectedBodyIndex > targetIndex)
                 {
                     //Note that we update the memory location immediately. This could affect the next loop iteration.
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
                     var newLocation = targetIndex++;
                     Debug.Assert(newLocation > currentBodyIndex, "The target index should always progress ahead of the traversal. Did something get reset incorrectly?");
-                    SwapBodyLocation(bodies, graph, solver, connection.BodyIndex, newLocation);
+                    SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
                     //Note that we mark the new location for traversal, since it was moved.
                     traversalStack.Add(newLocation);
                 }
-                else if (connection.BodyIndex > currentBodyIndex)
+                else if (connectedBodyIndex > currentBodyIndex)
                 {
                     //While this body should not be swapped because it has already been swapped by an earlier traversal visit, 
                     //it is still a candidate for continued traversal. It might have children that cannot be reached by other paths.
-                    traversalStack.Add(connection.BodyIndex);
+                    traversalStack.Add(connectedBodyIndex);
                 }
             }
         }
