@@ -129,6 +129,7 @@ namespace SolverPrototype
         struct RemovalPredicate : IPredicate<BodyConstraintReference>
         {
             public int ConstraintHandleToRemove;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool Test(BodyConstraintReference item)
             {
                 return item.ConnectingConstraintHandle == ConstraintHandleToRemove;
@@ -175,6 +176,7 @@ namespace SolverPrototype
         /// <typeparam name="TEnumerator">Type of the enumerator to execute on each connected body.</typeparam>
         /// <param name="bodyIndex">Index of the body to enumerate the connections of. This body will not appear in the set of enumerated bodies, even if it is connected to itself somehow.</param>
         /// <param name="enumerator">Enumerator instance to run on each connected body.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnumerateConnectedBodies<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<int>
         {
             ref var list = ref constraintLists[bodyIndex];
@@ -200,6 +202,7 @@ namespace SolverPrototype
         /// <typeparam name="TEnumerator">Type of the enumerator to execute on each constraint handle.</typeparam>
         /// <param name="bodyIndex">Index of the body to enumerate the constraints of.</param>
         /// <param name="enumerator">Enumerator to execute on each constraint handle.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnumerateConstraints<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<BodyConstraintReference>
         {
             ref var list = ref constraintLists[bodyIndex];

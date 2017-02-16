@@ -24,6 +24,7 @@ namespace SolverPrototype
             enumerator.LoopBody((bundleIndexA << BundleIndexing.VectorShift) | innerIndexA);
             enumerator.LoopBody((bundleIndexB << BundleIndexing.VectorShift) | innerIndexB);
         }
+        
         public sealed override void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation)
         {
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);

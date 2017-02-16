@@ -27,13 +27,13 @@ namespace SolverPrototype
                 bodies = bodies,
                 graph = graph,
                 solver = solver,
-                maximumBodiesToVisit = 64
             };
         }
         struct SwapConstraintEnumerator : IForEach<BodyConstraintReference>
         {
             public Solver Solver;
             public int NewLocation;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(BodyConstraintReference constraint)
             {
                 Solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, NewLocation);
@@ -64,6 +64,7 @@ namespace SolverPrototype
             public ConstraintConnectivityGraph graph;
             public Solver solver;
             public int slotIndex;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
                 //Only pull bodies over that are to the right. This helps limit pointless fighting.
@@ -127,6 +128,7 @@ namespace SolverPrototype
             public int currentBodyIndex;
             public int maximumBodiesToVisit;
             public int visitedBodyCount;
+
             public void LoopBody(int connectedBodyIndex)
             {
                 //Should this node be swapped into position? 
@@ -150,7 +152,7 @@ namespace SolverPrototype
         }
         PartialIslandDFSEnumerator partialIslandDFSEnumerator;
 
-        public void PartialIslandOptimizeDFS()
+        public void PartialIslandOptimizeDFS(int maximumBodiesToVisit = 32)
         {
             //With the observation that the full island DFS traversal is a decent cache optimization heuristic, attempt to do the same thing except spread over multiple frames.
             //This can clearly get invalidated by changes to the topology between frames, but temporary suboptimality will not cause correctness problems.
@@ -162,6 +164,7 @@ namespace SolverPrototype
             //Any body before the target index has already been swapped into position by an earlier traversal (heuristically speaking).
             //3) Swaps are performed inline, eliminating the need for any temporary body storage (or long-term locks in the multithreaded implementation).
             partialIslandDFSEnumerator.visitedBodyCount = 0;
+            partialIslandDFSEnumerator.maximumBodiesToVisit = maximumBodiesToVisit;
             //First, attempt to continue any previous traversals.
             do
             {
