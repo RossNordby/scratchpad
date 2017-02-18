@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
@@ -60,8 +61,26 @@ namespace SolverPrototype
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-
+                unsafe
+                {
+                    Debug.Assert(Unsafe.AsPointer(ref bodyReferences) != null);
+                    Debug.Assert(Unsafe.AsPointer(ref projection) != null);
+                    Debug.Assert(bodyReferences.Count > 0);
+                }
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
+                unsafe
+                {
+                    Debug.Assert(Unsafe.AsPointer(ref bodyReferences) != null);
+                    Debug.Assert(Unsafe.AsPointer(ref projection) != null);
+                    Debug.Assert(bodyReferences.Count > 0);
+                    var aZero = Vector.Equals(inertiaA.InverseMass, Vector<float>.Zero);
+                    var bZero = Vector.Equals(inertiaB.InverseMass, Vector<float>.Zero);
+                    var bothZero = Vector.BitwiseAnd(aZero, bZero);
+                    for (int innerIndex = 0; innerIndex < bodyReferences.Count; ++innerIndex)
+                    {
+                        Debug.Assert(GatherScatter.Get(ref bothZero, innerIndex) == 0);
+                    }
+                }
                 ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep, dt, inverseDt, out projection.Penetration);
                 TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, out projection.Twist);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetA, ref prestep.Contact1.OffsetA, out var a01);
@@ -118,7 +137,7 @@ namespace SolverPrototype
                 var maximumTwistImpulse = projection.PremultipliedFrictionCoefficient * (
                     accumulatedImpulses.Penetration0 * projection.LeverArm0 +
                     accumulatedImpulses.Penetration1 * projection.LeverArm1 +
-                    accumulatedImpulses.Penetration2 * projection.LeverArm2 + 
+                    accumulatedImpulses.Penetration2 * projection.LeverArm2 +
                     accumulatedImpulses.Penetration3 * projection.LeverArm3);
                 var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
