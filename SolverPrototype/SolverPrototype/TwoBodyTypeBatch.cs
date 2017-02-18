@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
@@ -37,6 +38,10 @@ namespace SolverPrototype
             innerIndex = bodyInnerIndex;
         }
 
-        
+        protected override int GetConstraintCountInBundle(int indexInTypeBatch)
+        {
+            BundleIndexing.GetBundleIndices(indexInTypeBatch, out var bundleIndex, out var innerIndex);
+            return BodyReferences[bundleIndex].Count;
+        }
     }
 }

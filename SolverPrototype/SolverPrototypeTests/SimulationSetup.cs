@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using SolverPrototype;
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -21,6 +22,7 @@ namespace SolverPrototypeTests
             BundleIndexing.GetBundleIndices(bodyBIndex, out var bodyBBundleIndex, out var bodyBInnerIndex);
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
             ref var constraintBodies = ref constraintReference.TypeBatch.BodyReferences[constraintBundleIndex];
+            Debug.Assert(constraintBodies.Count < Vector<int>.Count);
             GatherScatter.Get(ref constraintBodies.BundleIndexA, constraintInnerIndex) = bodyABundleIndex;
             GatherScatter.Get(ref constraintBodies.InnerIndexA, constraintInnerIndex) = bodyAInnerIndex;
             GatherScatter.Get(ref constraintBodies.BundleIndexB, constraintInnerIndex) = bodyBBundleIndex;

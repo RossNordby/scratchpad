@@ -9,6 +9,8 @@ namespace SolverPrototype
 {
     public abstract class TypeBatch
     {
+        //TODO: Having this in the base class actually complicates the implementation of some special constraint types. Consider an 'articulation' subsolver that involves
+        //N bodies, for N > Vector<float>.Count * 2. You may want to do SIMD internally in such a case, so there would be no 'bundles' at this level. Worry about that later.
         protected int bundleCount;
         public int BundleCount => bundleCount;
         protected int constraintCount;
@@ -68,6 +70,8 @@ namespace SolverPrototype
             Array.Copy(old, array, old.Length);
             BufferPools<T>.Locking.Return(old);
         }
+        
+        protected abstract int GetConstraintCountInBundle(int indexInTypeBatch);
 
         /// <summary>
         /// Allocates a slot in the batch.
@@ -79,6 +83,9 @@ namespace SolverPrototype
             if (constraintCount == Projection.Length)
             {
                 IncreaseSize(ref BodyReferences);
+                //TODO: So long as increase size is using a non-clearing pool, we need to clear the body references to avoid pulling old counts. We rely on the counts.
+                //Would be a good idea to change this- it would be easy and cheap to clear the count every time a new bundle is created.
+                Array.Clear(BodyReferences, BundleCount, BodyReferences.Length - BundleCount);
                 IncreaseSize(ref PrestepData);
                 IncreaseSize(ref Projection);
                 IncreaseSize(ref AccumulatedImpulses);
@@ -86,6 +93,7 @@ namespace SolverPrototype
             var index = constraintCount++;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
+            Debug.Assert(GetConstraintCountInBundle(index) < Vector<int>.Count);
             return index;
         }
 
@@ -120,6 +128,9 @@ namespace SolverPrototype
         {
             Projection = BufferPools<TProjection>.Locking.Take(InitialCapacity);
             BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacity);
+            //TODO: So long as increase size is using a non-clearing pool, we need to clear the body references to avoid pulling old counts. We rely on the counts.
+            //Would be a good idea to change this- it would be easy and cheap to clear the count every time a new bundle is created.
+            Array.Clear(BodyReferences, 0, BodyReferences.Length);
             PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacity);
             AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacity);
         }
