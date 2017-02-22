@@ -14,9 +14,9 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            //SimulationSetup.BuildStackOfBodiesOnGround(32, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildStackOfBodiesOnGround(262144, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(24, 24, 24, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            //SimulationSetup.BuildLattice(48, 48, 48, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
 
             var optimizer = new BodyLayoutOptimizer(bodies, graph, solver);
@@ -73,8 +73,8 @@ namespace SolverPrototypeTests
                     GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
                     GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
 
-                    if (i == 0)
-                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
+                    //if (i == 0)
+                    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
@@ -95,7 +95,7 @@ namespace SolverPrototypeTests
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
             Console.WriteLine($"Time (ms): {(1e3 * totalTicks) / Stopwatch.Frequency}");

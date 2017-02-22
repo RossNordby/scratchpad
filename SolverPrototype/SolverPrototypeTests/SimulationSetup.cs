@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using SolverPrototype;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -124,14 +125,35 @@ namespace SolverPrototypeTests
 
 
 
+
             var right = new Vector3(1, 0, 0);
             var up = new Vector3(0, 1, 0);
             var forward = new Vector3(0, 0, -1);
             constraintHandles = new int[bodyCount - 1];
+
             for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
             {
                 constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], bodies, solver, graph, ref right, ref up, ref forward);
             }
+
+            //int[] constraintBodyStarts = new int[bodyHandles.Length - 1];
+            //List<int> tempBodyStarts = new List<int>();
+            //for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
+            //{
+            //    tempBodyStarts.Add(bodyHandles[bodyIndex]);
+            //}
+            //Random random = new Random(5);
+            //for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
+            //{
+            //    var index = random.Next(tempBodyStarts.Count);
+            //    constraintBodyStarts[bodyIndex] = tempBodyStarts[index];
+            //    tempBodyStarts.RemoveAt(index);
+            //}
+
+            //for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
+            //{
+            //    constraintHandles[bodyIndex] = CreateManifoldConstraint(constraintBodyStarts[bodyIndex], constraintBodyStarts[bodyIndex] + 1, bodies, solver, graph, ref right, ref up, ref forward);
+            //}
         }
 
         public static void BuildLattice(int width, int height, int length, bool scramble, out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph,
@@ -183,12 +205,12 @@ namespace SolverPrototypeTests
                         //The bottom rows are all kinematic, so don't create connections between them.
                         if (columnIndex > 0)
                         {
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - 1], bodyHandles[bodyAIndex],  bodies, solver, graph, ref forward, ref right, ref up);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - 1], bodyHandles[bodyAIndex], bodies, solver, graph, ref forward, ref right, ref up);
                         }
                         constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - width], bodyHandles[bodyAIndex], bodies, solver, graph, ref right, ref up, ref forward);
                         if (sliceIndex > 0)
                         {
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - height * width], bodyHandles[bodyAIndex],  bodies, solver, graph, ref right, ref forward, ref up);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - height * width], bodyHandles[bodyAIndex], bodies, solver, graph, ref right, ref forward, ref up);
                         }
 
 

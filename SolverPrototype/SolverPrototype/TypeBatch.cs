@@ -22,12 +22,20 @@ namespace SolverPrototype
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
 
+        /// <summary>
+        /// Sorts a subset of constraints in the type batch according to the location of bodies in memory. The goal is to maximize cache coherence.
+        /// </summary>
+        /// <param name="startIndex">Start of the sorting region.</param>
+        /// <param name="count">Number of constraints to sort.</param>
+        public abstract void SortByBodyLocation(int startIndex, int count);
+
         public abstract void Initialize();
         public abstract void Reset();
 
         public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle);
         public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
         public abstract void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
+
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -71,7 +79,6 @@ namespace SolverPrototype
             BufferPools<T>.Locking.Return(old);
         }
         
-        protected abstract int GetConstraintCountInBundle(int indexInTypeBatch);
 
         /// <summary>
         /// Allocates a slot in the batch.
@@ -93,8 +100,26 @@ namespace SolverPrototype
             var index = constraintCount++;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
-            Debug.Assert(GetConstraintCountInBundle(index) < Vector<int>.Count);
             return index;
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void Move(
+            ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle, 
+            int sourceInner, int targetBundle, int targetInner)
+        {
+            //Note that we do NOT copy the iteration data. It is regenerated each frame from scratch. 
+            //We may later decide that this is silly because someone might rely on it, but... it seems very unlikely. 
+            //Try to stop people from relying on it, and see if anyone ever complains.
+            GatherScatter.CopyLane(ref sourceReferencesBundle, sourceInner, ref BodyReferences[targetBundle], targetInner);
+            GatherScatter.CopyLane(ref sourcePrestepBundle, sourceInner, ref PrestepData[targetBundle], targetInner);
+            GatherScatter.CopyLane(ref sourceAccumulatedBundle, sourceInner, ref AccumulatedImpulses[targetBundle], targetInner);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void Move(int sourceBundle, int sourceInner, int targetBundle, int targetInner)
+        {
+            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, targetBundle, targetInner);
         }
 
         /// <summary>
@@ -113,12 +138,7 @@ namespace SolverPrototype
             {
                 //Need to swap.
                 BundleIndexing.GetBundleIndices(index, out var targetBundleIndex, out var targetInnerIndex);
-                //Note that we do NOT copy the iteration data. It is regenerated each frame from scratch. 
-                //We may later decide that this is silly because someone might rely on it, but... it seems very unlikely. 
-                //Try to stop people from relying on it, and see if anyone ever complains.
-                GatherScatter.CopyLane(ref BodyReferences[sourceBundleIndex], sourceInnerIndex, ref BodyReferences[targetBundleIndex], targetInnerIndex);
-                GatherScatter.CopyLane(ref PrestepData[sourceBundleIndex], sourceInnerIndex, ref PrestepData[targetBundleIndex], targetInnerIndex);
-                GatherScatter.CopyLane(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex, ref AccumulatedImpulses[targetBundleIndex], targetInnerIndex);
+                Move(sourceBundleIndex, sourceInnerIndex, targetBundleIndex, targetInnerIndex);
             }
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);
