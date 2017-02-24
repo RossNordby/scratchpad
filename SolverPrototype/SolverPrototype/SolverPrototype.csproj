@@ -94,6 +94,7 @@
     <Compile Include="BodyLayoutOptimizer.cs" />
     <Compile Include="ConstraintBatch.cs" />
     <Compile Include="ConstraintConnectivityGraph.cs" />
+    <Compile Include="ConstraintLayoutOptimizer.cs" />
     <Compile Include="ContactData.cs" />
     <Compile Include="ContactManifold4TypeBatch.cs" />
     <Compile Include="ContactPenetrationLimit.cs" />

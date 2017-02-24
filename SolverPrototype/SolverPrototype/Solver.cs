@@ -19,7 +19,7 @@ namespace SolverPrototype
 
     public class Solver
     {
-        QuickList<ConstraintBatch> batches;
+        internal QuickList<ConstraintBatch> batches;
 
         int iterationCount;
         /// <summary>

@@ -71,7 +71,7 @@ namespace SolverPrototype
 
                 //TODO: Note redundant calculation of bundle indices.
                 BundleIndexing.GetBundleIndices(constraintIndex, out var constraintBundle, out var constraintInner);
-                //TODO: Could do conditional caching if you're willing to 
+                //TODO: Could do conditional caching if you're willing to grab the index and do a separate loop afterwards.
                 GatherScatter.CopyLane(ref BodyReferences[constraintBundle], constraintInner, ref referencesCache, 0);
                 GatherScatter.CopyLane(ref AccumulatedImpulses[constraintBundle], constraintInner, ref accumulatedImpulseCache, 0);
                 GatherScatter.CopyLane(ref PrestepData[constraintBundle], constraintInner, ref prestepCache, 0);
