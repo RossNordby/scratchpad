@@ -16,9 +16,14 @@ namespace SolverPrototype
         protected int constraintCount;
         public int ConstraintCount => constraintCount;
 
-        public abstract int Allocate();
+        /// <summary>
+        /// The handles for the constraints in this type batch.
+        /// </summary>
+        public int[] Handles;
+
+        public abstract int Allocate(int handle);
         public abstract void Remove(int index);
-        
+
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
 
@@ -68,7 +73,8 @@ namespace SolverPrototype
         protected TProjection[] Projection;
         public TAccumulatedImpulse[] AccumulatedImpulses;
 
-        public static int InitialCapacity = 128;
+
+        public static int InitialCapacityInBundles = 128;
 
         static void IncreaseSize<T>(ref T[] array)
         {
@@ -78,13 +84,14 @@ namespace SolverPrototype
             Array.Copy(old, array, old.Length);
             BufferPools<T>.Locking.Return(old);
         }
-        
+
 
         /// <summary>
         /// Allocates a slot in the batch.
         /// </summary>
+        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
         /// <returns>Index of the slot in the batch.</returns>
-        public override int Allocate()
+        public override int Allocate(int handle)
         {
             Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == Projection.Length)
@@ -96,8 +103,10 @@ namespace SolverPrototype
                 IncreaseSize(ref PrestepData);
                 IncreaseSize(ref Projection);
                 IncreaseSize(ref AccumulatedImpulses);
+                IncreaseSize(ref Handles);
             }
             var index = constraintCount++;
+            Handles[index] = handle;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
             return index;
@@ -106,7 +115,7 @@ namespace SolverPrototype
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Move(
-            ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle, 
+            ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
             int sourceInner, int targetBundle, int targetInner)
         {
             //Note that we do NOT copy the iteration data. It is regenerated each frame from scratch. 
@@ -120,6 +129,31 @@ namespace SolverPrototype
         protected void Move(int sourceBundle, int sourceInner, int targetBundle, int targetInner)
         {
             Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, targetBundle, targetInner);
+        }
+
+        public void Scramble(Random random)
+        {
+            //This is a pure debug function used to compare cache optimization strategies. Performance doesn't matter. 
+            TPrestepData aPrestep = default(TPrestepData);
+            TAccumulatedImpulse aAccumulated = default(TAccumulatedImpulse);
+            TBodyReferences aBodyReferences = default(TBodyReferences);
+            int aHandle;
+
+            for (int a = ConstraintCount - 1; a >= 1; --a)
+            {
+                BundleIndexing.GetBundleIndices(a, out var aBundle, out var aInner);
+                GatherScatter.CopyLane(ref BodyReferences[aBundle], aInner, ref aBodyReferences, 0);
+                GatherScatter.CopyLane(ref PrestepData[aBundle], aInner, ref aPrestep, 0);
+                GatherScatter.CopyLane(ref AccumulatedImpulses[aBundle], aInner, ref aAccumulated, 0);
+                aHandle = Handles[a];
+                
+                var b = random.Next(a);
+                BundleIndexing.GetBundleIndices(b, out var bBundle, out var bInner);
+                Move(bBundle, bInner, aBundle, aInner);
+                Handles[a] = Handles[b];
+                Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, bBundle, bInner);
+                Handles[b] = aHandle;
+            }
         }
 
         /// <summary>
@@ -146,13 +180,14 @@ namespace SolverPrototype
 
         public override void Initialize()
         {
-            Projection = BufferPools<TProjection>.Locking.Take(InitialCapacity);
-            BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacity);
+            Projection = BufferPools<TProjection>.Locking.Take(InitialCapacityInBundles);
+            BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacityInBundles);
             //TODO: So long as increase size is using a non-clearing pool, we need to clear the body references to avoid pulling old counts. We rely on the counts.
             //Would be a good idea to change this- it would be easy and cheap to clear the count every time a new bundle is created.
             Array.Clear(BodyReferences, 0, BodyReferences.Length);
-            PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacity);
-            AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacity);
+            PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacityInBundles);
+            AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacityInBundles);
+            Handles = BufferPools<int>.Locking.Take(InitialCapacityInBundles * Vector<float>.Count);
         }
 
         public override void Reset()
@@ -161,10 +196,12 @@ namespace SolverPrototype
             BufferPools<TBodyReferences>.Locking.Return(BodyReferences);
             BufferPools<TPrestepData>.Locking.Return(PrestepData);
             BufferPools<TAccumulatedImpulse>.Locking.Return(AccumulatedImpulses);
+            BufferPools<int>.Locking.Return(Handles);
             Projection = null;
             BodyReferences = null;
             AccumulatedImpulses = null;
             AccumulatedImpulses = null;
+            Handles = null;
         }
 
 

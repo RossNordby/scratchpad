@@ -70,7 +70,7 @@ namespace SolverPrototype
             constraintPointer.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
         }
 
-        public void Allocate<T>(int bodyHandleA, int bodyHandleB, out ConstraintReference<T> constraintReference, out int handleIndex) where T : TypeBatch, new()
+        public void Allocate<T>(int bodyHandleA, int bodyHandleB, out ConstraintReference<T> constraintReference, out int handle) where T : TypeBatch, new()
         {
             int targetBatchIndex = -1;
             for (int i = 0; i < batches.Count; ++i)
@@ -96,17 +96,17 @@ namespace SolverPrototype
             }
             targetBatch.Handles.Add(bodyHandleA);
             targetBatch.Handles.Add(bodyHandleB);
-            targetBatch.Allocate(out var typeId, out constraintReference);
+            handle = handlePool.Take();
+            targetBatch.Allocate(handle, out var typeId, out constraintReference);
 
-            handleIndex = handlePool.Take();
-            if (handleIndex >= HandlesToConstraints.Length)
+            if (handle >= HandlesToConstraints.Length)
             {
                 Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);
-                Debug.Assert(handleIndex < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
+                Debug.Assert(handle < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
             }
-            HandlesToConstraints[handleIndex].IndexInTypeBatch = constraintReference.IndexInTypeBatch;
-            HandlesToConstraints[handleIndex].TypeId = typeId;
-            HandlesToConstraints[handleIndex].BatchIndex = targetBatchIndex;
+            HandlesToConstraints[handle].IndexInTypeBatch = constraintReference.IndexInTypeBatch;
+            HandlesToConstraints[handle].TypeId = typeId;
+            HandlesToConstraints[handle].BatchIndex = targetBatchIndex;
         }
 
         /// <summary>

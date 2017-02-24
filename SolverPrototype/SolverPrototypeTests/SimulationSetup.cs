@@ -136,24 +136,7 @@ namespace SolverPrototypeTests
                 constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], bodies, solver, graph, ref right, ref up, ref forward);
             }
 
-            //int[] constraintBodyStarts = new int[bodyHandles.Length - 1];
-            //List<int> tempBodyStarts = new List<int>();
-            //for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
-            //{
-            //    tempBodyStarts.Add(bodyHandles[bodyIndex]);
-            //}
-            //Random random = new Random(5);
-            //for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
-            //{
-            //    var index = random.Next(tempBodyStarts.Count);
-            //    constraintBodyStarts[bodyIndex] = tempBodyStarts[index];
-            //    tempBodyStarts.RemoveAt(index);
-            //}
 
-            //for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
-            //{
-            //    constraintHandles[bodyIndex] = CreateManifoldConstraint(constraintBodyStarts[bodyIndex], constraintBodyStarts[bodyIndex] + 1, bodies, solver, graph, ref right, ref up, ref forward);
-            //}
         }
 
         public static void BuildLattice(int width, int height, int length, bool scramble, out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph,

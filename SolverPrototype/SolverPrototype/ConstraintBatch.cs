@@ -59,7 +59,7 @@ namespace SolverPrototype
             return TypeBatches.Elements[typeBatchIndex];
         }
 
-        public void Allocate<T>(out int typeId, out ConstraintReference<T> constraintPointer) where T : TypeBatch, new()
+        public void Allocate<T>(int handle, out int typeId, out ConstraintReference<T> constraintPointer) where T : TypeBatch, new()
         {
             typeId = ConstraintTypeIds.GetId<T>(); 
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
@@ -82,7 +82,7 @@ namespace SolverPrototype
                     constraintPointer.TypeBatch = Unsafe.As<T>(TypeBatches.Elements[typeBatchIndex]);
                 }
             }
-            constraintPointer.IndexInTypeBatch = constraintPointer.TypeBatch.Allocate();
+            constraintPointer.IndexInTypeBatch = constraintPointer.TypeBatch.Allocate(handle);
         }
 
         public void Remove<T>(int indexInTypeBatch) where T : TypeBatch
