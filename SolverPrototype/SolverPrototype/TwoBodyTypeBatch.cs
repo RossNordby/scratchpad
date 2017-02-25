@@ -39,7 +39,7 @@ namespace SolverPrototype
             innerIndex = bodyInnerIndex;
         }
 
-        public sealed override void SortByBodyLocation(int startIndex, int constraintCount)
+        public sealed override void SortByBodyLocation(int startIndex, int count, ConstraintLocation[] handlesToConstraints)
         {
             int GetSortKey(int constraintIndex)
             {
@@ -61,7 +61,9 @@ namespace SolverPrototype
             TPrestepData prestepCache = default(TPrestepData);
             TAccumulatedImpulse accumulatedImpulseCache = default(TAccumulatedImpulse);
             //Under the assumption that the sort region is going to be pretty small and often nearly sorted, use insertion sort.
-            for (int constraintIndex = startIndex + 1; constraintIndex < constraintCount; ++constraintIndex)
+            var endIndex = startIndex + count;
+            Debug.Assert(endIndex <= constraintCount, "Bad startIndex or count; the caller is responsible for validating the input.");
+            for (int constraintIndex = startIndex + 1; constraintIndex < endIndex; ++constraintIndex)
             {
                 //TODO: It may be possible to significantly improve the worst case by scanning with SIMD. Compare whole bundles simultaneously.
                 //This would be primarily useful for large movements where it may need to swap across many bundles. Not sure if our sort region is large enough to ever get a win.
@@ -75,31 +77,30 @@ namespace SolverPrototype
                 GatherScatter.CopyLane(ref BodyReferences[constraintBundle], constraintInner, ref referencesCache, 0);
                 GatherScatter.CopyLane(ref AccumulatedImpulses[constraintBundle], constraintInner, ref accumulatedImpulseCache, 0);
                 GatherScatter.CopyLane(ref PrestepData[constraintBundle], constraintInner, ref prestepCache, 0);
+                var handleCache = Handles[constraintIndex];
                 int targetIndex = constraintIndex;
-                for (int compareIndex = constraintIndex - 1; compareIndex >= startIndex; ++compareIndex)
+                for (int compareIndex = constraintIndex - 1; compareIndex >= startIndex; --compareIndex)
                 {
                     var comparisonKey = GetSortKey(compareIndex);
                     if (comparisonKey < sortKey)
                     {
                         //The target index we set last is as far as we had to go.
-                        targetIndex = compareIndex + 1;
                         break;
                     }
                     else
                     {
                         //This constraint is still larger than the constraint being checked for swap potential.
 
-                        //TODO: Note redundant calculation of bundle indices.
-                        BundleIndexing.GetBundleIndices(compareIndex, out var sourceBundle, out var sourceInner);
-                        BundleIndexing.GetBundleIndices(compareIndex + 1, out var targetBundle, out var targetInner);
-                        Move(sourceBundle, sourceInner, targetBundle, targetInner);
+                        //TODO: Note redundant calculation of bundle indices. Could save one execution by sharing with the getsortkey, and the other by using a 'previous' cache.
+                        Move(compareIndex, compareIndex + 1, handlesToConstraints);
+                        targetIndex = compareIndex;
                     }
                 }
                 if (targetIndex < constraintIndex)
                 {
                     //The cached element was overwritten and a new slot was found for it. Copy the cached data into it.
                     BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-                    Move(ref referencesCache, ref prestepCache, ref accumulatedImpulseCache, 0, targetBundle, targetInner);
+                    Move(ref referencesCache, ref prestepCache, ref accumulatedImpulseCache, 0, handleCache, targetBundle, targetInner, targetIndex, handlesToConstraints);
                 }
             }
         }

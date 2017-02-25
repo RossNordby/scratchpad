@@ -60,9 +60,11 @@ namespace SolverPrototype
         /// <remarks>
         /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
         /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CopyLane<T>(ref T sourceBundle, int sourceInnerIndex, ref T targetBundle, int targetInnerIndex)
         {
-            var sizeInInts = Unsafe.SizeOf<T>() >> 2;
+            //Note the truncation. Currently used for some types that don't have a size evenly divisible by the Vector<int>.Count * sizeof(int).
+            var sizeInInts = (Unsafe.SizeOf<T>() >> (2 + Vector<int>.Count)) << Vector<int>.Count;
             ref var sourceBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref sourceBundle), sourceInnerIndex);
             ref var targetBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref targetBundle), targetInnerIndex);
             for (int i = 0; i < sizeInInts; i += Vector<int>.Count)

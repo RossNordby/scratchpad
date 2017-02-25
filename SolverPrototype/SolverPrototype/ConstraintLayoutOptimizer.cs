@@ -50,7 +50,7 @@ namespace SolverPrototype
         public void Update(int maximumRegionSize, int regionCount)
         {
             //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
-            if (solver.batches.Count == 0)
+            if (solver.Batches.Count == 0)
                 return;
             targets.Count = 0;
 
@@ -58,12 +58,12 @@ namespace SolverPrototype
 
             int GetStartIndex(int batchIndex, int typeBatchIndex)
             {
-                return shouldOffset ? Math.Min(maximumRegionSize / 2, Math.Max(0, solver.batches[batchIndex].TypeBatches[typeBatchIndex].ConstraintCount - maximumRegionSize)) : 0;
+                return shouldOffset ? Math.Min(maximumRegionSize / 2, Math.Max(0, solver.Batches[batchIndex].TypeBatches[typeBatchIndex].ConstraintCount - maximumRegionSize)) : 0;
             }
             bool WrapBatch(ref Optimization o)
             {
-                Debug.Assert(solver.batches.Count >= 0);
-                if (o.BatchIndex >= solver.batches.Count)
+                Debug.Assert(solver.Batches.Count >= 0);
+                if (o.BatchIndex >= solver.Batches.Count)
                 {
                     //Wrap around.
                     o = new Optimization();
@@ -74,8 +74,8 @@ namespace SolverPrototype
             }
             bool WrapTypeBatch(ref Optimization o)
             {
-                Debug.Assert(o.BatchIndex <= solver.batches.Count, "Should only attempt to wrap type batch indices if the batch index is known to be valid.");
-                if (o.TypeBatchIndex >= solver.batches[o.BatchIndex].TypeBatches.Count)
+                Debug.Assert(o.BatchIndex <= solver.Batches.Count, "Should only attempt to wrap type batch indices if the batch index is known to be valid.");
+                if (o.TypeBatchIndex >= solver.Batches[o.BatchIndex].TypeBatches.Count)
                 {
                     ++o.BatchIndex;
                     if (!WrapBatch(ref o))
@@ -89,9 +89,9 @@ namespace SolverPrototype
             }
             void WrapConstraint(ref Optimization o)
             {
-                Debug.Assert(o.BatchIndex <= solver.batches.Count && o.TypeBatchIndex <= solver.batches[o.BatchIndex].TypeBatches.Count,
+                Debug.Assert(o.BatchIndex <= solver.Batches.Count && o.TypeBatchIndex <= solver.Batches[o.BatchIndex].TypeBatches.Count,
                     "Should only attempt to wrap constraint index if the type batch and batch indices are known to be valid.");
-                if (o.Index >= solver.batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].ConstraintCount)
+                if (o.Index >= solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].ConstraintCount)
                 {
                     ++o.TypeBatchIndex;
                     if (!WrapTypeBatch(ref o))
@@ -112,10 +112,21 @@ namespace SolverPrototype
 
             do
             {
+
                 //Add the initial target for optimization. It's already been validated- either by the initial test, or by the previous wrap.
                 targets.Add(ref nextTarget);
                 nextTarget.Index += maximumRegionSize;
                 WrapConstraint(ref nextTarget);
+
+                //If the next target overlaps with the first target, the collection has wrapped around all constraints. Apparently more regions were requested
+                //than are available. Stop collection.
+                ref var firstTarget = ref targets.Elements[0];
+                if (nextTarget.BatchIndex == firstTarget.BatchIndex &&
+                    nextTarget.TypeBatchIndex == firstTarget.TypeBatchIndex &&
+                    nextTarget.Index < firstTarget.Index + maximumRegionSize)
+                {
+                    break;
+                }
             }
             while (targets.Count < regionCount);
 
@@ -137,9 +148,9 @@ namespace SolverPrototype
             //Note that having the set of optimizations computed up front makes multithreading the loop trivial.
             for (int i = 0; i < targets.Count; ++i)
             {
-                ref var optimization = ref targets.Elements[i];
-                var typeBatch = solver.batches[optimization.BatchIndex].TypeBatches.Elements[optimization.TypeBatchIndex];
-                typeBatch.SortByBodyLocation(optimization.Index, Math.Min(typeBatch.ConstraintCount - optimization.Index, maximumRegionSize));
+                ref var target = ref targets.Elements[i];
+                var typeBatch = solver.Batches[target.BatchIndex].TypeBatches.Elements[target.TypeBatchIndex];
+                typeBatch.SortByBodyLocation(target.Index, Math.Min(typeBatch.ConstraintCount - target.Index, maximumRegionSize), solver.HandlesToConstraints);
             }
         }
     }

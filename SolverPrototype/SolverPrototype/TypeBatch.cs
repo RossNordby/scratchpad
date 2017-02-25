@@ -22,17 +22,20 @@ namespace SolverPrototype
         public int[] Handles;
 
         public abstract int Allocate(int handle);
-        public abstract void Remove(int index);
+        public abstract void Remove(int index, ConstraintLocation[] handlesToConstraints);
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
+
+        public abstract void Scramble(Random random, ConstraintLocation[] handlesToConstraints);
 
         /// <summary>
         /// Sorts a subset of constraints in the type batch according to the location of bodies in memory. The goal is to maximize cache coherence.
         /// </summary>
         /// <param name="startIndex">Start of the sorting region.</param>
         /// <param name="count">Number of constraints to sort.</param>
-        public abstract void SortByBodyLocation(int startIndex, int count);
+        /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that needs to be updated in response to swaps.</param>
+        public abstract void SortByBodyLocation(int startIndex, int count, ConstraintLocation[] handlesToConstraints);
 
         public abstract void Initialize();
         public abstract void Reset();
@@ -114,24 +117,51 @@ namespace SolverPrototype
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void Move(
-            ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
-            int sourceInner, int targetBundle, int targetInner)
+        protected void CopyConstraintData(
+             ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle, int sourceInner,
+             ref TBodyReferences targetReferencesBundle, ref TPrestepData targetPrestepBundle, ref TAccumulatedImpulse targetAccumulatedBundle, int targetInner)
         {
             //Note that we do NOT copy the iteration data. It is regenerated each frame from scratch. 
             //We may later decide that this is silly because someone might rely on it, but... it seems very unlikely. 
             //Try to stop people from relying on it, and see if anyone ever complains.
-            GatherScatter.CopyLane(ref sourceReferencesBundle, sourceInner, ref BodyReferences[targetBundle], targetInner);
-            GatherScatter.CopyLane(ref sourcePrestepBundle, sourceInner, ref PrestepData[targetBundle], targetInner);
-            GatherScatter.CopyLane(ref sourceAccumulatedBundle, sourceInner, ref AccumulatedImpulses[targetBundle], targetInner);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void Move(int sourceBundle, int sourceInner, int targetBundle, int targetInner)
-        {
-            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, targetBundle, targetInner);
+            GatherScatter.CopyLane(ref sourceReferencesBundle, sourceInner, ref targetReferencesBundle, targetInner);
+            GatherScatter.CopyLane(ref sourcePrestepBundle, sourceInner, ref targetPrestepBundle, targetInner);
+            GatherScatter.CopyLane(ref sourceAccumulatedBundle, sourceInner, ref targetAccumulatedBundle, targetInner);
         }
 
-        public void Scramble(Random random)
+        /// <summary>
+        /// Overwrites all the data in the target constraint slot with source data.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void Move(
+            ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
+            int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ConstraintLocation[] handlesToConstraints)
+        {
+            CopyConstraintData(
+                ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, sourceInner,
+                ref BodyReferences[targetBundle], ref PrestepData[targetBundle], ref AccumulatedImpulses[targetBundle], targetInner);
+            Handles[targetIndex] = sourceHandle;
+            handlesToConstraints[sourceHandle].IndexInTypeBatch = targetIndex;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void Move(int sourceBundle, int sourceInner, int sourceIndex, int targetBundle, int targetInner, int targetIndex,
+             ConstraintLocation[] handlesToConstraints)
+        {
+            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, Handles[sourceIndex],
+                targetBundle, targetInner, targetIndex, handlesToConstraints);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected void Move(int sourceIndex, int targetIndex,
+            ConstraintLocation[] handlesToConstraints)
+        {
+            BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
+            BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
+            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, Handles[sourceIndex],
+                targetBundle, targetInner, targetIndex, handlesToConstraints);
+        }
+
+
+        public sealed override void Scramble(Random random, ConstraintLocation[] handlesToConstraints)
         {
             //This is a pure debug function used to compare cache optimization strategies. Performance doesn't matter. 
             TPrestepData aPrestep = default(TPrestepData);
@@ -146,13 +176,11 @@ namespace SolverPrototype
                 GatherScatter.CopyLane(ref PrestepData[aBundle], aInner, ref aPrestep, 0);
                 GatherScatter.CopyLane(ref AccumulatedImpulses[aBundle], aInner, ref aAccumulated, 0);
                 aHandle = Handles[a];
-                
+
                 var b = random.Next(a);
                 BundleIndexing.GetBundleIndices(b, out var bBundle, out var bInner);
-                Move(bBundle, bInner, aBundle, aInner);
-                Handles[a] = Handles[b];
-                Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, bBundle, bInner);
-                Handles[b] = aHandle;
+                Move(bBundle, bInner, b, aBundle, aInner, a, handlesToConstraints);
+                Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, aHandle, bBundle, bInner, b, handlesToConstraints);
             }
         }
 
@@ -160,7 +188,8 @@ namespace SolverPrototype
         /// Removes a constraint from the batch.
         /// </summary>
         /// <param name="index">Index of the constraint to remove.</param>
-        public override void Remove(int index)
+        /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that could be modified by a swap on removal.</param>
+        public override void Remove(int index, ConstraintLocation[] handlesToConstraints)
         {
             Debug.Assert(index >= 0 && index < constraintCount, "Can only remove elements that are actually in the batch!");
             var lastIndex = constraintCount - 1;
@@ -172,7 +201,8 @@ namespace SolverPrototype
             {
                 //Need to swap.
                 BundleIndexing.GetBundleIndices(index, out var targetBundleIndex, out var targetInnerIndex);
-                Move(sourceBundleIndex, sourceInnerIndex, targetBundleIndex, targetInnerIndex);
+                Move(sourceBundleIndex, sourceInnerIndex, lastIndex, targetBundleIndex, targetInnerIndex, index, handlesToConstraints);
+                Handles[index] = Handles[lastIndex];
             }
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);

@@ -29,6 +29,18 @@ namespace SolverPrototype
                 solver = solver,
             };
         }
+
+        //TODO: Note that there are a few ways we can do multithreading. The naive way is to just apply locks on all the nodes affected by an optimization candidate.
+        //That'll work reasonably well, though a major fraction of the total execution time will be tied up in those locks. Might not scale particularly well 
+        //in the context of a big multiprocessor server.
+        //At the cost of convergence speed, you can instead choose to optimize region by region. 
+        //An optimizing thread can be given a subset of all bodies with guaranteed exclusive access by scheduling.
+        //While that thread can't necessarily swap bodies to where the locking version would, it can make progress toward the goal over time.
+        //Rather than 'pulling', it would 'push'- find a parent to the left, and go as far to the left towards it as possible.
+        //You'd have to be a bit tricky to ensure that all bodies will move towards it (rather than just one that continually gets swapped around), and the end behavior
+        //could be a little different, but it might end up being faster overall due to the lack of contention.
+        //The same concept could apply to the broad phase optimizer too, though it's a little easier there (and the naive locking requirements are more complex per swap, too).
+
         struct SwapConstraintEnumerator : IForEach<BodyConstraintReference>
         {
             public Solver Solver;

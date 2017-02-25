@@ -65,7 +65,7 @@ namespace SolverPrototypeTests
         }
 
 
-        public static void Scramble(Bodies bodies)
+        public static void ScrambleBodies(Bodies bodies)
         {
             //Having every single body in order is pretty unrealistic. In a real application, churn and general lack of care will result in 
             //scrambled body versus constraint memory access patterns. That's a big increase in cache misses.
@@ -80,7 +80,20 @@ namespace SolverPrototypeTests
             }
 
         }
-        public static void BuildStackOfBodiesOnGround(int bodyCount, bool scramble,
+
+        public static void ScrambleConstraints(Solver solver)
+        {
+            Random random = new Random(5);
+            for (int i = 0; i < solver.Batches.Count; ++i)
+            {
+                for (int j = 0; j < solver.Batches[i].TypeBatches.Count; ++j)
+                {
+                    solver.Batches[i].TypeBatches[j].Scramble(random, solver.HandlesToConstraints);
+                }
+            }
+        }
+
+        public static void BuildStackOfBodiesOnGround(int bodyCount, bool scrambleBodies, bool scrambleConstraints,
             out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph, out int[] bodyHandles, out int[] constraintHandles)
         {
             bodies = new Bodies();
@@ -112,8 +125,8 @@ namespace SolverPrototypeTests
                 bodyHandles[i] = handleIndex;
 
             }
-            if (scramble)
-                Scramble(bodies);
+            if (scrambleBodies)
+                ScrambleBodies(bodies);
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
             solver = new Solver(bodies, initialCapacity: bodyCount * 3);
             graph = new ConstraintConnectivityGraph(solver, bodyCount, 6);
@@ -135,11 +148,14 @@ namespace SolverPrototypeTests
             {
                 constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], bodies, solver, graph, ref right, ref up, ref forward);
             }
-
-
+            
+            if (scrambleConstraints)
+            {
+                ScrambleConstraints(solver);
+            }
         }
 
-        public static void BuildLattice(int width, int height, int length, bool scramble, out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph,
+        public static void BuildLattice(int width, int height, int length, bool scrambleBodies, bool scrambleConstraints, out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph,
             out int[] bodyHandles, out int[] constraintHandles)
         {
             var bodyCount = width * height * length;
@@ -156,8 +172,8 @@ namespace SolverPrototypeTests
                     }
                 }
             }
-            if (scramble)
-                Scramble(bodies);
+            if (scrambleBodies)
+                ScrambleBodies(bodies);
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
             int constraintCount = (width - 1) * (height - 1) * (length - 1) +
                 width * height;
@@ -203,6 +219,11 @@ namespace SolverPrototypeTests
             //Secretly, the constraint handles are just handle[i] = i, and storing them is a little silly.
             Array.Resize(ref constraintHandles, constraintIndex);
 
+
+            if (scrambleConstraints)
+            {
+                ScrambleConstraints(solver);
+            }
         }
     }
 }

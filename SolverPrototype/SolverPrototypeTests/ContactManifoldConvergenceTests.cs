@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace SolverPrototypeTests
@@ -14,28 +15,56 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            SimulationSetup.BuildStackOfBodiesOnGround(262144, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            var size = Unsafe.SizeOf<ContactManifold4PrestepData>() / 4 + Unsafe.SizeOf<Vector<float>>() / 4 + Unsafe.SizeOf<TwoBodyReferences>() / 4;
+            const int bodyCount = 16384;
+            SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.BuildLattice(48, 48, 48, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
 
-            var optimizer = new BodyLayoutOptimizer(bodies, graph, solver);
+            var bodyOptimizer = new BodyLayoutOptimizer(bodies, graph, solver);
+            var constraintOptimizer = new ConstraintLayoutOptimizer(solver);
 
+            int constraintCount = 0;
+            for (int i = 0; i < solver.Batches.Count; ++i)
+            {
+                for (int j = 0; j < solver.Batches[i].TypeBatches.Count; ++j)
+                {
+                    constraintCount += solver.Batches[i].TypeBatches[j].ConstraintCount;
+                }
+            }
+            const int constraintsPerOptimizationRegion = 64;
+            const int regionsPerConstraintOptimizationIteration = 32;
+            int constraintOptimizationIterations = Math.Max(1,
+                (int)(1* 2 * ((long)constraintCount * constraintCount /
+                ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
+
+            constraintOptimizer.Update(32, 1); //prejit
+            var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
+            var timer = Stopwatch.StartNew();
+            for (int i = 0; i < constraintOptimizationIterations; ++i)
+            {
+                constraintOptimizer.Update(constraintsPerOptimizationRegion, regionsPerConstraintOptimizationIteration);
+            }
+            timer.Stop();
+            Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
+                $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
+            //return;
 
 
             //Attempt cache optimization.
-            int optimizationIterations = bodyHandles.Length * 16;
+            int bodyOptimizationIterations = bodyHandles.Length * 16;
             //optimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
             //optimizer.DumbIncrementalOptimize(); //prejit
-            var startOptimization = Stopwatch.GetTimestamp();
-            for (int i = 0; i < optimizationIterations; ++i)
+            timer.Restart();
+            for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
                 //optimizer.PartialIslandOptimizeDFS(64);
                 //optimizer.DumbIncrementalOptimize();
             }
-            var endOptimization = Stopwatch.GetTimestamp();
-            var optimizationTime = (endOptimization - startOptimization) / (double)Stopwatch.Frequency;
-            Console.WriteLine($"Finished {optimizationIterations} optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / optimizationIterations}");
+            timer.Stop();
+            var optimizationTime = timer.Elapsed.TotalSeconds;
+            Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
@@ -47,7 +76,7 @@ namespace SolverPrototypeTests
             //prejit
             solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
-            long totalTicks = 0;
+            timer.Reset();
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = bodies.GetBodyEnergyHeuristic();
@@ -88,17 +117,16 @@ namespace SolverPrototypeTests
                     bodies.VelocityBundles[i].LinearVelocity.Y += bodies.LocalInertiaBundles[i].InverseMass * impulse;
                 }
                 CacheBlaster.Blast();
-                var frameStart = Stopwatch.GetTimestamp();
+                timer.Start();
                 solver.Update(dt, inverseDt);
-                var frameEnd = Stopwatch.GetTimestamp();
-                totalTicks += frameEnd - frameStart;
+                timer.Stop();
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
                 //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
-            Console.WriteLine($"Time (ms): {(1e3 * totalTicks) / Stopwatch.Frequency}");
+            Console.WriteLine($"Time (ms): {(1e3 * timer.Elapsed.TotalSeconds)}");
 
         }
 

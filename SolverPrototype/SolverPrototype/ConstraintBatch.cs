@@ -85,14 +85,14 @@ namespace SolverPrototype
             constraintPointer.IndexInTypeBatch = constraintPointer.TypeBatch.Allocate(handle);
         }
 
-        public void Remove<T>(int indexInTypeBatch) where T : TypeBatch
+        public void Remove<T>(int indexInTypeBatch, ConstraintLocation[] handlesToConstraints) where T : TypeBatch
         {
             var constraintTypeId = ConstraintTypeIds.GetId<T>();
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
 
             var typeBatchIndex = TypeIndexToTypeBatchIndex[constraintTypeId];
             var typeBatch = TypeBatches.Elements[typeBatchIndex];
-            typeBatch.Remove(indexInTypeBatch);
+            typeBatch.Remove(indexInTypeBatch, handlesToConstraints);
             if (typeBatch.ConstraintCount == 0)
             {
                 TypeIndexToTypeBatchIndex[constraintTypeId] = -1;
