@@ -16,7 +16,7 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             var size = Unsafe.SizeOf<ContactManifold4PrestepData>() / 4 + Unsafe.SizeOf<Vector<float>>() / 4 + Unsafe.SizeOf<TwoBodyReferences>() / 4;
-            const int bodyCount = 32768;
+            const int bodyCount = 8192;
             SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.BuildLattice(48, 48, 48, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
@@ -37,7 +37,7 @@ namespace SolverPrototypeTests
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 1;
             int constraintOptimizationIterations = Math.Max(1,
-                (int)(1* 2 * ((long)constraintCount * constraintCount /
+                (int)(256 * 2 * ((long)constraintCount * constraintCount /
                 ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
             constraintOptimizer.Update(2, 1); //prejit

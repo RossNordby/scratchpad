@@ -60,12 +60,12 @@ namespace SolverPrototype
         }
         public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints)
         {
-
-            //These buffers could be handled more cleanly. You only really need to grab them once externally, and there's no need to use the old type-redundant system.
-            //That would also allow pointers.
             int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
             if ((constraintCount & BundleIndexing.VectorMask) != 0)
                 ++bundleCount;
+
+            //TODO: Replace these buffer pools with new buffer pools once they're ready. Probably passed in from above to guarantee thread safety.
+            //(New pools are typeless, so no issue there. The pointer backing means we'll probably have to shift the below to blockcopies, but that's fine.)
             var sourceIndices = BufferPools<int>.Locking.Take(constraintCount);
             var sortKeys = BufferPools<int>.Locking.Take(constraintCount);
             var handlesCache = BufferPools<int>.Locking.Take(constraintCount);
@@ -89,10 +89,7 @@ namespace SolverPrototype
                 sortKeys[i] = GetSortKey(baseIndex + i);
             }
 
-            //TODO: Try insertion sort. The sort regions are often small, and after an initial chaotic period, they are often mostly sorted.
             Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
-
-            //TODO: There's a possibility that doing a coherent read -> incoherent scatter would be better than doing an incoherent gather -> coherent scatter.
 
             //Push the cached data into its proper sorted position.
             for (int i = 0; i < constraintCount; ++i)

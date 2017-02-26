@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -64,10 +65,13 @@ namespace SolverPrototype
         public static void CopyLane<T>(ref T sourceBundle, int sourceInnerIndex, ref T targetBundle, int targetInnerIndex)
         {
             //Note the truncation. Currently used for some types that don't have a size evenly divisible by the Vector<int>.Count * sizeof(int).
-            var sizeInInts = (Unsafe.SizeOf<T>() >> (2 + Vector<int>.Count)) << Vector<int>.Count;
+            var sizeInInts = (Unsafe.SizeOf<T>() >> (2 + BundleIndexing.VectorShift)) << BundleIndexing.VectorShift;
+
             ref var sourceBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref sourceBundle), sourceInnerIndex);
             ref var targetBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref targetBundle), targetInnerIndex);
-            for (int i = 0; i < sizeInInts; i += Vector<int>.Count)
+
+            targetBase = sourceBase;
+            for (int i = Vector<int>.Count; i < sizeInInts; i += Vector<int>.Count)
             {
                 Unsafe.Add(ref targetBase, i) = Unsafe.Add(ref sourceBase, i);
             }
