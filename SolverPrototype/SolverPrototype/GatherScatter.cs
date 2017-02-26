@@ -59,21 +59,54 @@ namespace SolverPrototype
         /// <param name="targetBundle">Target bundle of the data to copy.</param>
         /// <param name="targetInnerIndex">Index of the lane within the target bundle.</param>
         /// <remarks>
-        /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
+        /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector that isn't yet unrolled.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CopyLane<T>(ref T sourceBundle, int sourceInnerIndex, ref T targetBundle, int targetInnerIndex)
         {
             //Note the truncation. Currently used for some types that don't have a size evenly divisible by the Vector<int>.Count * sizeof(int).
-            var sizeInInts = (Unsafe.SizeOf<T>() >> (2 + BundleIndexing.VectorShift)) << BundleIndexing.VectorShift;
+            var sizeInInts = (Unsafe.SizeOf<T>() >> 2) & ~BundleIndexing.VectorMask;
 
             ref var sourceBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref sourceBundle), sourceInnerIndex);
             ref var targetBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref targetBundle), targetInnerIndex);
 
             targetBase = sourceBase;
-            for (int i = Vector<int>.Count; i < sizeInInts; i += Vector<int>.Count)
+            //Would be nice if this just auto-unrolled based on the size, considering the jit considers all the relevant bits to be constants!
+            //Unfortunately, as of this writing, the jit doesn't.
+            //for (int i = Vector<int>.Count; i < sizeInInts; i += Vector<int>.Count)
+            //{
+            //    Unsafe.Add(ref targetBase, i) = Unsafe.Add(ref sourceBase, i);
+            //}
+
+            //To compensate for the compiler, here we go:
+            int offset = Vector<int>.Count;
+            //8 wide unroll empirically chosen.
+            while (offset + Vector<int>.Count * 8 <= sizeInInts)
             {
-                Unsafe.Add(ref targetBase, i) = Unsafe.Add(ref sourceBase, i);
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+            }
+            if (offset + 4 * Vector<int>.Count <= sizeInInts)
+            {
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+            }
+            if (offset + 2 * Vector<int>.Count <= sizeInInts)
+            {
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset); offset += Vector<int>.Count;
+            }
+            if (offset + Vector<int>.Count <= sizeInInts)
+            {
+                Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset);
             }
         }
 
@@ -90,6 +123,9 @@ namespace SolverPrototype
         /// </remarks>
         public static void SwapLanes<T>(ref T bundleA, int innerIndexA, ref T bundleB, int innerIndexB)
         {
+            Debug.Assert((Unsafe.SizeOf<T>() & BundleIndexing.VectorMask) == 0,
+                "This implementation doesn't truncate the count under the assumption that the type is evenly divisible by the bundle size." +
+                "If you later use SwapLanes with a type that breaks this assumption, introduce a truncation as in CopyLanes.");
             var sizeInInts = Unsafe.SizeOf<T>() >> 2;
             ref var aBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref bundleA), innerIndexA);
             ref var bBase = ref Unsafe.Add(ref Unsafe.As<T, int>(ref bundleB), innerIndexB);

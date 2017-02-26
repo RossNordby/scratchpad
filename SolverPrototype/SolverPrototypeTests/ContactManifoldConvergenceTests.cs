@@ -16,15 +16,31 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             var size = Unsafe.SizeOf<ContactManifold4PrestepData>() / 4 + Unsafe.SizeOf<Vector<float>>() / 4 + Unsafe.SizeOf<TwoBodyReferences>() / 4;
-            const int bodyCount = 8192;
-            SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            //const int bodyCount = 32768;
+            //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            //SimulationSetup.BuildLattice(48, 48, 48, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(48, 48, 48, true, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
 
             var bodyOptimizer = new BodyLayoutOptimizer(bodies, graph, solver);
             var constraintOptimizer = new ConstraintLayoutOptimizer(solver);
 
+
+            //Attempt cache optimization.
+            int bodyOptimizationIterations = bodyHandles.Length * 16;
+            //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
+            //bodyOptimizer.DumbIncrementalOptimize(); //prejit
+            var timer = Stopwatch.StartNew();
+            for (int i = 0; i < bodyOptimizationIterations; ++i)
+            {
+                //bodyOptimizer.PartialIslandOptimizeDFS(64);
+                bodyOptimizer.DumbIncrementalOptimize();
+            }
+            timer.Stop();
+            var optimizationTime = timer.Elapsed.TotalSeconds;
+            Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
+
+            //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
             int constraintCount = 0;
             for (int i = 0; i < solver.Batches.Count; ++i)
             {
@@ -33,16 +49,16 @@ namespace SolverPrototypeTests
                     constraintCount += solver.Batches[i].TypeBatches[j].ConstraintCount;
                 }
             }
-            const int bundlesPerOptimizationRegion = 256;
+            const int bundlesPerOptimizationRegion = 16384;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 1;
-            int constraintOptimizationIterations = Math.Max(1,
-                (int)(256 * 2 * ((long)constraintCount * constraintCount /
+            int constraintOptimizationIterations = Math.Max(16,
+                (int)(1 * 2 * ((long)constraintCount * constraintCount /
                 ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            constraintOptimizer.Update(2, 1); //prejit
+            //constraintOptimizer.Update(2, 1); //prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
-            var timer = Stopwatch.StartNew();
+            timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
                 constraintOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration);
@@ -50,22 +66,8 @@ namespace SolverPrototypeTests
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
-            return;
 
 
-            //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 16;
-            //optimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
-            //optimizer.DumbIncrementalOptimize(); //prejit
-            timer.Restart();
-            for (int i = 0; i < bodyOptimizationIterations; ++i)
-            {
-                //optimizer.PartialIslandOptimizeDFS(64);
-                //optimizer.DumbIncrementalOptimize();
-            }
-            timer.Stop();
-            var optimizationTime = timer.Elapsed.TotalSeconds;
-            Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
             //By construction, none of the constraints share any bodies, so we can solve it all.
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;

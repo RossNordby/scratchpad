@@ -94,13 +94,18 @@ namespace SolverPrototype
             //Push the cached data into its proper sorted position.
             for (int i = 0; i < constraintCount; ++i)
             {
-                BundleIndexing.GetBundleIndices(sourceIndices[i], out var sourceBundle, out var sourceInner);
+                var sourceIndex = sourceIndices[i];
                 var targetIndex = baseIndex + i;
+                //Note that we do not bother checking whether the source and target are the same.
+                //The cost of the branch is large enough in comparison to the frequency of its usefulness that it only helps in practically static situations.
+                //Also, its maximum benefit is quite small.
+                BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
                 BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
 
                 Move(ref referencesCache[sourceBundle], ref prestepCache[sourceBundle], ref accumulatedImpulseCache[sourceBundle],
-                    sourceInner, handlesCache[sourceIndices[i]],
+                    sourceInner, handlesCache[sourceIndex],
                     targetBundle, targetInner, targetIndex, handlesToConstraints);
+
             }
 
 
