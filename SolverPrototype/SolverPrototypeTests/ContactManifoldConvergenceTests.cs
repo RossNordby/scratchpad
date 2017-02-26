@@ -16,7 +16,7 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             var size = Unsafe.SizeOf<ContactManifold4PrestepData>() / 4 + Unsafe.SizeOf<Vector<float>>() / 4 + Unsafe.SizeOf<TwoBodyReferences>() / 4;
-            const int bodyCount = 16384;
+            const int bodyCount = 32768;
             SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.BuildLattice(48, 48, 48, false, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
@@ -33,23 +33,24 @@ namespace SolverPrototypeTests
                     constraintCount += solver.Batches[i].TypeBatches[j].ConstraintCount;
                 }
             }
-            const int constraintsPerOptimizationRegion = 64;
-            const int regionsPerConstraintOptimizationIteration = 32;
+            const int bundlesPerOptimizationRegion = 256;
+            int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
+            const int regionsPerConstraintOptimizationIteration = 1;
             int constraintOptimizationIterations = Math.Max(1,
                 (int)(1* 2 * ((long)constraintCount * constraintCount /
                 ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            constraintOptimizer.Update(32, 1); //prejit
+            constraintOptimizer.Update(2, 1); //prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                constraintOptimizer.Update(constraintsPerOptimizationRegion, regionsPerConstraintOptimizationIteration);
+                constraintOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration);
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
-            //return;
+            return;
 
 
             //Attempt cache optimization.

@@ -32,10 +32,10 @@ namespace SolverPrototype
         /// <summary>
         /// Sorts a subset of constraints in the type batch according to the location of bodies in memory. The goal is to maximize cache coherence.
         /// </summary>
-        /// <param name="startIndex">Start of the sorting region.</param>
-        /// <param name="count">Number of constraints to sort.</param>
+        /// <param name="bundleStartIndex">Start of the sorting region.</param>
+        /// <param name="constraintCount">Number of constraints (not bundles!) to sort.</param>
         /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that needs to be updated in response to swaps.</param>
-        public abstract void SortByBodyLocation(int startIndex, int count, ConstraintLocation[] handlesToConstraints);
+        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints);
 
         public abstract void Initialize();
         public abstract void Reset();

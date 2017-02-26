@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -15,9 +16,9 @@ namespace SolverPrototype
         struct Optimization
         {
             /// <summary>
-            /// Index of the target constraint to optimize.
+            /// Index of the target constraint bundle to optimize.
             /// </summary>
-            public int Index;
+            public int BundleIndex;
             /// <summary>
             /// Index of the last optimized type batch.
             /// </summary>
@@ -47,18 +48,23 @@ namespace SolverPrototype
             this.solver = solver;
         }
 
-        public void Update(int maximumRegionSize, int regionCount)
+        public void Update(int maximumRegionSizeInBundles, int regionCount)
         {
+            //Note that we require that all regions are bundle aligned. This is important for the typebatch sorting process, which tends to use bulk copies from bundle arrays to cache.
+            //If not bundle aligned, those bulk copies would become complex due to the constraint AOSOA layout.
+            Debug.Assert((maximumRegionSizeInBundles & 1) == 0, "Region size in bundles should be divisible by two to allow offsets.");
             //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
             if (solver.Batches.Count == 0)
                 return;
             targets.Count = 0;
 
+
             var nextTarget = shouldOffset ? nextTargetWithOffset : nextTargetWithoutOffset;
 
-            int GetStartIndex(int batchIndex, int typeBatchIndex)
+            int GetStartBundleIndex(int batchIndex, int typeBatchIndex)
             {
-                return shouldOffset ? Math.Min(maximumRegionSize / 2, Math.Max(0, solver.Batches[batchIndex].TypeBatches[typeBatchIndex].ConstraintCount - maximumRegionSize)) : 0;
+                return shouldOffset ? Math.Min(maximumRegionSizeInBundles / 2,
+                    Math.Max(0, solver.Batches[batchIndex].TypeBatches[typeBatchIndex].BundleCount - maximumRegionSizeInBundles)) : 0;
             }
             bool WrapBatch(ref Optimization o)
             {
@@ -67,7 +73,7 @@ namespace SolverPrototype
                 {
                     //Wrap around.
                     o = new Optimization();
-                    o.Index = GetStartIndex(0, 0);
+                    o.BundleIndex = GetStartBundleIndex(0, 0);
                     return true;
                 }
                 return false;
@@ -81,22 +87,22 @@ namespace SolverPrototype
                     if (!WrapBatch(ref o))
                     {
                         o.TypeBatchIndex = 0;
-                        o.Index = GetStartIndex(o.BatchIndex, 0);
+                        o.BundleIndex = GetStartBundleIndex(o.BatchIndex, 0);
                     }
                     return true;
                 }
                 return false;
             }
-            void WrapConstraint(ref Optimization o)
+            void WrapBundle(ref Optimization o)
             {
                 Debug.Assert(o.BatchIndex <= solver.Batches.Count && o.TypeBatchIndex <= solver.Batches[o.BatchIndex].TypeBatches.Count,
                     "Should only attempt to wrap constraint index if the type batch and batch indices are known to be valid.");
-                if (o.Index >= solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].ConstraintCount)
+                if (o.BundleIndex >= solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].BundleCount)
                 {
                     ++o.TypeBatchIndex;
                     if (!WrapTypeBatch(ref o))
                     {
-                        o.Index = GetStartIndex(o.BatchIndex, o.TypeBatchIndex);
+                        o.BundleIndex = GetStartBundleIndex(o.BatchIndex, o.TypeBatchIndex);
                     }
                 }
             }
@@ -106,7 +112,7 @@ namespace SolverPrototype
             {
                 if (!WrapTypeBatch(ref nextTarget))
                 {
-                    WrapConstraint(ref nextTarget);
+                    WrapBundle(ref nextTarget);
                 }
             }
 
@@ -115,15 +121,15 @@ namespace SolverPrototype
 
                 //Add the initial target for optimization. It's already been validated- either by the initial test, or by the previous wrap.
                 targets.Add(ref nextTarget);
-                nextTarget.Index += maximumRegionSize;
-                WrapConstraint(ref nextTarget);
+                nextTarget.BundleIndex += maximumRegionSizeInBundles;
+                WrapBundle(ref nextTarget);
 
                 //If the next target overlaps with the first target, the collection has wrapped around all constraints. Apparently more regions were requested
                 //than are available. Stop collection.
                 ref var firstTarget = ref targets.Elements[0];
                 if (nextTarget.BatchIndex == firstTarget.BatchIndex &&
                     nextTarget.TypeBatchIndex == firstTarget.TypeBatchIndex &&
-                    nextTarget.Index < firstTarget.Index + maximumRegionSize)
+                    nextTarget.BundleIndex < firstTarget.BundleIndex + maximumRegionSizeInBundles)
                 {
                     break;
                 }
@@ -144,13 +150,14 @@ namespace SolverPrototype
             shouldOffset = !shouldOffset;
 
 
+            var maximumRegionSizeInConstraints = maximumRegionSizeInBundles * Vector<int>.Count;
             //Now that we have a set of scheduled optimizations, execute them. 
             //Note that having the set of optimizations computed up front makes multithreading the loop trivial.
             for (int i = 0; i < targets.Count; ++i)
             {
                 ref var target = ref targets.Elements[i];
                 var typeBatch = solver.Batches[target.BatchIndex].TypeBatches.Elements[target.TypeBatchIndex];
-                typeBatch.SortByBodyLocation(target.Index, Math.Min(typeBatch.ConstraintCount - target.Index, maximumRegionSize), solver.HandlesToConstraints);
+                typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints);
             }
         }
     }

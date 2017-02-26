@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BEPUutilities2.ResourceManagement;
+using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -39,70 +40,80 @@ namespace SolverPrototype
             innerIndex = bodyInnerIndex;
         }
 
-        public sealed override void SortByBodyLocation(int startIndex, int count, ConstraintLocation[] handlesToConstraints)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        int GetSortKey(int constraintIndex)
         {
-            int GetSortKey(int constraintIndex)
-            {
-                BundleIndexing.GetBundleIndices(constraintIndex, out var bundleIndex, out var innerIndex);
-                ref var bundleReferences = ref BodyReferences[bundleIndex];
-                Debug.Assert(bundleIndex < bundleCount && innerIndex < bundleReferences.Count);
-                //We sort based on the body references within the constraint. 
-                //Sort based on the smaller body index in a constraint. Note that it is impossible for there to be two references to the same body within a constraint batch, 
-                //so there's no need to worry about the case where the comparison is equal.
-                //TODO: Even without any other higher level optimizations, this does some unnecessary recasting. We can walk by stride.
-                var bodyIndexA = (GatherScatter.Get(ref bundleReferences.BundleIndexA, innerIndex) << BundleIndexing.VectorShift) | GatherScatter.Get(ref bundleReferences.InnerIndexA, innerIndex);
-                var bodyIndexB = (GatherScatter.Get(ref bundleReferences.BundleIndexB, innerIndex) << BundleIndexing.VectorShift) | GatherScatter.Get(ref bundleReferences.InnerIndexB, innerIndex);
-                return bodyIndexA < bodyIndexB ? bodyIndexA : bodyIndexB;
-            }
-            //We'll cache the element being swapped down on the stack in the first lane of these instances.
-            //You could be a little more efficient here- this will zero out Vector<float>.Count times more memory than we actually use.
-            //You could stackalloc sizeof(TPrestepData etc) bytes and treat it as a copyable lane instead. That's getting into some pretty questionable territory!
-            TwoBodyReferences referencesCache = default(TwoBodyReferences);
-            TPrestepData prestepCache = default(TPrestepData);
-            TAccumulatedImpulse accumulatedImpulseCache = default(TAccumulatedImpulse);
-            //Under the assumption that the sort region is going to be pretty small and often nearly sorted, use insertion sort.
-            var endIndex = startIndex + count;
-            Debug.Assert(endIndex <= constraintCount, "Bad startIndex or count; the caller is responsible for validating the input.");
-            for (int constraintIndex = startIndex + 1; constraintIndex < endIndex; ++constraintIndex)
-            {
-                //TODO: It may be possible to significantly improve the worst case by scanning with SIMD. Compare whole bundles simultaneously.
-                //This would be primarily useful for large movements where it may need to swap across many bundles. Not sure if our sort region is large enough to ever get a win.
-                //Only do that after you have a fully scalar version working, and only if the performance of optimization is at least remotely concerning.
-                //Note that the swaps will likely dominate the initial search completely.
-                var sortKey = GetSortKey(constraintIndex);
+            BundleIndexing.GetBundleIndices(constraintIndex, out var bundleIndex, out var innerIndex);
+            ref var bundleReferences = ref BodyReferences[bundleIndex];
+            Debug.Assert(bundleIndex < base.bundleCount && innerIndex < bundleReferences.Count);
+            //We sort based on the body references within the constraint. 
+            //Sort based on the smaller body index in a constraint. Note that it is impossible for there to be two references to the same body within a constraint batch, 
+            //so there's no need to worry about the case where the comparison is equal.
+            ref var bundleIndexA = ref GatherScatter.Get(ref bundleReferences.BundleIndexA, innerIndex);
+            ref var innerIndexA = ref Unsafe.Add(ref bundleIndexA, Vector<int>.Count);
+            ref var bundleIndexB = ref Unsafe.Add(ref bundleIndexA, 2 * Vector<int>.Count);
+            ref var innerIndexB = ref Unsafe.Add(ref bundleIndexA, 3 * Vector<int>.Count);
+            var bodyIndexA = (bundleIndexA << BundleIndexing.VectorShift) | innerIndexA;
+            var bodyIndexB = (bundleIndexB << BundleIndexing.VectorShift) | innerIndexB;
+            return bodyIndexA < bodyIndexB ? bodyIndexA : bodyIndexB;
+        }
+        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints)
+        {
 
-                //TODO: Note redundant calculation of bundle indices.
-                BundleIndexing.GetBundleIndices(constraintIndex, out var constraintBundle, out var constraintInner);
-                //TODO: Could do conditional caching if you're willing to grab the index and do a separate loop afterwards.
-                GatherScatter.CopyLane(ref BodyReferences[constraintBundle], constraintInner, ref referencesCache, 0);
-                GatherScatter.CopyLane(ref AccumulatedImpulses[constraintBundle], constraintInner, ref accumulatedImpulseCache, 0);
-                GatherScatter.CopyLane(ref PrestepData[constraintBundle], constraintInner, ref prestepCache, 0);
-                var handleCache = Handles[constraintIndex];
-                int targetIndex = constraintIndex;
-                for (int compareIndex = constraintIndex - 1; compareIndex >= startIndex; --compareIndex)
-                {
-                    var comparisonKey = GetSortKey(compareIndex);
-                    if (comparisonKey < sortKey)
-                    {
-                        //The target index we set last is as far as we had to go.
-                        break;
-                    }
-                    else
-                    {
-                        //This constraint is still larger than the constraint being checked for swap potential.
+            //These buffers could be handled more cleanly. You only really need to grab them once externally, and there's no need to use the old type-redundant system.
+            //That would also allow pointers.
+            int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
+            if ((constraintCount & BundleIndexing.VectorMask) != 0)
+                ++bundleCount;
+            var sourceIndices = BufferPools<int>.Locking.Take(constraintCount);
+            var sortKeys = BufferPools<int>.Locking.Take(constraintCount);
+            var handlesCache = BufferPools<int>.Locking.Take(constraintCount);
+            var referencesCache = BufferPools<TwoBodyReferences>.Locking.Take(bundleCount);
+            var prestepCache = BufferPools<TPrestepData>.Locking.Take(bundleCount);
+            var accumulatedImpulseCache = BufferPools<TAccumulatedImpulse>.Locking.Take(bundleCount);
 
-                        //TODO: Note redundant calculation of bundle indices. Could save one execution by sharing with the getsortkey, and the other by using a 'previous' cache.
-                        Move(compareIndex, compareIndex + 1, handlesToConstraints);
-                        targetIndex = compareIndex;
-                    }
-                }
-                if (targetIndex < constraintIndex)
-                {
-                    //The cached element was overwritten and a new slot was found for it. Copy the cached data into it.
-                    BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-                    Move(ref referencesCache, ref prestepCache, ref accumulatedImpulseCache, 0, handleCache, targetBundle, targetInner, targetIndex, handlesToConstraints);
-                }
+            //Cache the unsorted data.
+            Array.Copy(BodyReferences, bundleStartIndex, referencesCache, 0, bundleCount);
+            Array.Copy(PrestepData, bundleStartIndex, prestepCache, 0, bundleCount);
+            Array.Copy(AccumulatedImpulses, bundleStartIndex, accumulatedImpulseCache, 0, bundleCount);
+            Array.Copy(Handles, bundleStartIndex * Vector<int>.Count, handlesCache, 0, constraintCount);
+
+            //First, compute the proper order of the constraints in this region by sorting their keys.
+            //This minimizes the number of swaps that must be applied to the actual bundle data.
+            //Avoiding swaps of actual data is very valuable- a single constraint can be hundreds of bytes, and the accesses to a slot tend to require some complex addressing.
+            var baseIndex = bundleStartIndex * Vector<int>.Count;
+            for (int i = 0; i < constraintCount; ++i)
+            {
+                sourceIndices[i] = i;
+                sortKeys[i] = GetSortKey(baseIndex + i);
             }
+
+            //TODO: Try insertion sort. The sort regions are often small, and after an initial chaotic period, they are often mostly sorted.
+            Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
+
+            //TODO: There's a possibility that doing a coherent read -> incoherent scatter would be better than doing an incoherent gather -> coherent scatter.
+
+            //Push the cached data into its proper sorted position.
+            for (int i = 0; i < constraintCount; ++i)
+            {
+                BundleIndexing.GetBundleIndices(sourceIndices[i], out var sourceBundle, out var sourceInner);
+                var targetIndex = baseIndex + i;
+                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
+
+                Move(ref referencesCache[sourceBundle], ref prestepCache[sourceBundle], ref accumulatedImpulseCache[sourceBundle],
+                    sourceInner, handlesCache[sourceIndices[i]],
+                    targetBundle, targetInner, targetIndex, handlesToConstraints);
+            }
+
+
+
+            BufferPools<int>.Locking.Return(sourceIndices);
+            BufferPools<int>.Locking.Return(sortKeys);
+            BufferPools<int>.Locking.Return(handlesCache);
+            BufferPools<TwoBodyReferences>.Locking.Return(referencesCache);
+            BufferPools<TPrestepData>.Locking.Return(prestepCache);
+            BufferPools<TAccumulatedImpulse>.Locking.Return(accumulatedImpulseCache);
         }
     }
 }
