@@ -20,7 +20,7 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            const int elementCount = 32768;
+            const int elementCount = 262144;
             int[] keys = new int[elementCount];
             int[] indexMap = new int[elementCount];
             Random random = new Random(5);

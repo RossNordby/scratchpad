@@ -16,25 +16,6 @@ namespace SolverPrototype
             a = b;
             b = temp;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static bool InsertionIteration<T, TComparer>(ref T keys, ref int indexMap, int l, ref int previousIndex, ref int index, ref TComparer comparer) where TComparer : IComparerRef<T>
-        {
-            ref var previous = ref Unsafe.Add(ref indexMap, previousIndex);
-            ref var current = ref Unsafe.Add(ref indexMap, index);
-            if (comparer.Compare(ref Unsafe.Add(ref keys, current), ref Unsafe.Add(ref keys, previous)) == -1)
-            {
-                Swap(ref previous, ref current);
-                if (previousIndex == l)
-                    return false;
-                index = previousIndex;
-                --previousIndex;
-                return true;
-            }
-            return false;
-
-
-        }
         public static void MappedSort<T, TComparer>(ref T keys, ref int indexMap, int l, int r, ref TComparer comparer) where TComparer : IComparerRef<T>
         {
             if (r - l <= 30)
@@ -42,11 +23,25 @@ namespace SolverPrototype
                 //The area to address is very small. Use insertion sort.
                 for (int i = l + 1; i <= r; ++i)
                 {
-                    //TODO: This could be better. Performs two way swaps at every step rather than 
-                    //simply moving everything up one and then later moving the displaced element down.
-                    var index = i;
-                    var previousIndex = index - 1;
-                    while (InsertionIteration(ref keys, ref indexMap, l, ref previousIndex, ref index, ref comparer)) ;
+                    var originalIndexMap = Unsafe.Add(ref indexMap, i);
+                    ref var original = ref Unsafe.Add(ref keys, originalIndexMap);
+                    var targetIndex = i;
+                    for (int compareIndex = i - 1; compareIndex >= l; --compareIndex)
+                    {
+                        if (comparer.Compare(ref original, ref Unsafe.Add(ref keys, Unsafe.Add(ref indexMap, compareIndex))) < 0)
+                        {
+                            //Move the index up.
+                            Unsafe.Add(ref indexMap, compareIndex + 1) = Unsafe.Add(ref indexMap, compareIndex);
+                            targetIndex = compareIndex;
+                        }
+                        else
+                            break;
+                    }
+                    if (targetIndex != i)
+                    {
+                        //Move the original index down.
+                        Unsafe.Add(ref indexMap, targetIndex) = originalIndexMap;
+                    }
                 }
             }
             else
