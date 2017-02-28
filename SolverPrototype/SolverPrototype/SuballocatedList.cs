@@ -5,6 +5,11 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
+    public interface IComparerRef<T>
+    {
+        int Compare(ref T a, ref T b);
+    }
+
     /// <summary>
     /// Requires a type expose equality and hashcode functions with ref parameters. Ref equivalent of IEqualityComparer.
     /// </summary>
@@ -105,7 +110,7 @@ namespace SolverPrototype
             }
             return false;
         }
-        
+
 
 
         /// <summary>

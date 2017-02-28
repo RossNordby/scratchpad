@@ -19,7 +19,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 32768;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(48, 48, 48, true, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32, 32, 32, true, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
 
             var bodyOptimizer = new BodyLayoutOptimizer(bodies, graph, solver);
@@ -49,12 +49,13 @@ namespace SolverPrototypeTests
                     constraintCount += solver.Batches[i].TypeBatches[j].ConstraintCount;
                 }
             }
-            const int bundlesPerOptimizationRegion = 16384;
+            const int bundlesPerOptimizationRegion = 256;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 1;
-            int constraintOptimizationIterations = Math.Max(16,
-                (int)(1 * 2 * ((long)constraintCount * constraintCount /
-                ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
+            int constraintOptimizationIterations = 16384;
+            //int constraintOptimizationIterations = Math.Max(16,
+            //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
+            //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
             //constraintOptimizer.Update(2, 1); //prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
