@@ -104,6 +104,7 @@
     <Compile Include="Matrix2x3Wide.cs" />
     <Compile Include="Pow2Allocator.cs" />
     <Compile Include="Quicksort.cs" />
+    <Compile Include="RadixSort.cs" />
     <Compile Include="Springiness.cs" />
     <Compile Include="SuballocatedBufferPool.cs" />
     <Compile Include="SuballocatedList.cs" />
