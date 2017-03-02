@@ -22,7 +22,7 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            const int elementCount = 262144;
+            const int elementCount = 16384;
             int[] keys = new int[elementCount];
             int[] indexMap = new int[elementCount];
             Random random = new Random(5);
@@ -58,10 +58,10 @@ namespace SolverPrototypeTests
             var valuesScratch = new int[elementCount];
             var bucketCounts = new int[1024];
             Array.Clear(bucketCounts, 0, bucketCounts.Length);
-            RadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], 1); //prejit
+            LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], 1); //prejit
             timer.Restart();
             Array.Clear(bucketCounts, 0, bucketCounts.Length);
-            RadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount); //prejit
+            LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount); //prejit
             timer.Stop();
             Console.WriteLine($"RadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 

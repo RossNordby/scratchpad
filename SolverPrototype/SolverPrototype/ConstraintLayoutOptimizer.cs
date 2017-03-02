@@ -12,6 +12,7 @@ namespace SolverPrototype
 {
     public class ConstraintLayoutOptimizer
     {
+        Bodies bodies;
         Solver solver;
         struct Optimization
         {
@@ -43,8 +44,9 @@ namespace SolverPrototype
         /// </summary>
         bool shouldOffset;
 
-        public ConstraintLayoutOptimizer(Solver solver)
+        public ConstraintLayoutOptimizer(Bodies bodies, Solver solver)
         {
+            this.bodies = bodies;
             this.solver = solver;
         }
 
@@ -157,7 +159,7 @@ namespace SolverPrototype
             {
                 ref var target = ref targets.Elements[i];
                 var typeBatch = solver.Batches[target.BatchIndex].TypeBatches.Elements[target.TypeBatchIndex];
-                typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints);
+                typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount);
             }
         }
     }

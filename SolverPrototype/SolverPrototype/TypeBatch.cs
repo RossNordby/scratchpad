@@ -35,7 +35,8 @@ namespace SolverPrototype
         /// <param name="bundleStartIndex">Start of the sorting region.</param>
         /// <param name="constraintCount">Number of constraints (not bundles!) to sort.</param>
         /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that needs to be updated in response to swaps.</param>
-        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints);
+        /// <param name="bodyCount">Number of bodies in the body set.</param>
+        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount);
 
         public abstract void Initialize();
         public abstract void Reset();

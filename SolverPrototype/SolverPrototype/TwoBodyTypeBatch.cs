@@ -58,7 +58,7 @@ namespace SolverPrototype
             var bodyIndexB = (bundleIndexB << BundleIndexing.VectorShift) | innerIndexB;
             return bodyIndexA < bodyIndexB ? bodyIndexA : bodyIndexB;
         }
-        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints)
+        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount)
         {
             int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
             if ((constraintCount & BundleIndexing.VectorMask) != 0)
@@ -89,7 +89,42 @@ namespace SolverPrototype
                 sortKeys[i] = GetSortKey(baseIndex + i);
             }
 
-            Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
+
+            var keysScratch = BufferPools<int>.Locking.Take(constraintCount);
+            var valuesScratch = BufferPools<int>.Locking.Take(constraintCount);
+            //Choose the sort based on the number of elements. Radix sorts on smaller ranges can be significantly faster.
+            //if (bodyCount < (1 << 16))
+            //{
+            //    var bucketCounts = BufferPools<int>.Locking.Take(512);
+            //    Array.Clear(bucketCounts, 0, 512);
+            //    RadixSort.SortU16(ref sortKeys[0], ref sourceIndices[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], constraintCount);
+            //    BufferPools<int>.Locking.Return(bucketCounts);
+            //}
+            //else if (bodyCount < (1 << 24))
+            //{
+            //    var bucketCounts = BufferPools<int>.Locking.Take(768);
+            //    Array.Clear(bucketCounts, 0, 768);
+            //    RadixSort.SortU24(ref sortKeys[0], ref sourceIndices[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], constraintCount);
+            //    BufferPools<int>.Locking.Return(bucketCounts);
+            //    //The 24 bit variant outputs to the scratch parameters, so swap things around.
+            //    var tempKeys = sortKeys;
+            //    var tempIndices = sourceIndices;
+            //    sortKeys = keysScratch;
+            //    sourceIndices = valuesScratch;
+            //    keysScratch = tempKeys;
+            //    valuesScratch = tempIndices;
+            //}
+            //else
+            {
+                var bucketCounts = BufferPools<int>.Locking.Take(1024);
+                Array.Clear(bucketCounts, 0, 1024);
+                LSBRadixSort.SortU32(ref sortKeys[0], ref sourceIndices[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], constraintCount);
+                BufferPools<int>.Locking.Return(bucketCounts);
+            }
+            BufferPools<int>.Locking.Return(keysScratch);
+            BufferPools<int>.Locking.Return(valuesScratch);
+
+            //Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
 
             //Push the cached data into its proper sorted position.
             for (int i = 0; i < constraintCount; ++i)

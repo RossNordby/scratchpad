@@ -17,6 +17,14 @@ namespace SolverPrototype
             b = temp;
         }
 
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Swap<TKey, TValues>(ref TKey keys, ref TValues values, int a, int b)
+        {
+            Swap(ref Unsafe.Add(ref keys, a), ref Unsafe.Add(ref keys, b));
+            Swap(ref Unsafe.Add(ref values, a), ref Unsafe.Add(ref values, b));
+        }
+
         public static void MappedSort<T, TComparer>(ref T keys, ref int indexMap, int l, int r, ref TComparer comparer) where TComparer : IComparerRef<T>
         {
             if (r - l <= 30)
@@ -160,14 +168,6 @@ namespace SolverPrototype
                 MappedSort(ref keys, ref indexMap, l, j, ref comparer);
                 MappedSort(ref keys, ref indexMap, i, r, ref comparer);
             }
-        }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Swap<TKey, TValues>(ref TKey keys, ref TValues values, int a, int b)
-        {
-            Swap(ref Unsafe.Add(ref keys, a), ref Unsafe.Add(ref keys, b));
-            Swap(ref Unsafe.Add(ref values, a), ref Unsafe.Add(ref values, b));
         }
 
 
