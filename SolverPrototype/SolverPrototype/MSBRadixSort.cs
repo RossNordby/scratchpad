@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -18,17 +19,11 @@ namespace SolverPrototype
             b = temp;
         }
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Swap<TKey, TValues>(ref TKey keys, ref TValues values, int a, int b)
-        {
-            Swap(ref Unsafe.Add(ref keys, a), ref Unsafe.Add(ref keys, b));
-            Swap(ref Unsafe.Add(ref values, a), ref Unsafe.Add(ref values, b));
-        }
+        
 
         public static void SortU32<T>(ref int keys, ref T values, ref int bucketCounts, ref int bucketOriginalStartIndices, int keyCount, int shift)
         {
-            if (keyCount < 30)
+            if (keyCount < 32)
             {
                 //There aren't many keys remaining. Use insertion sort.
                 for (int i = 1; i < keyCount; ++i)
@@ -61,10 +56,16 @@ namespace SolverPrototype
             const int bucketCount = 256;
             //Each section of the bucketCounts cover 256 slots, representing all possible values for a byte.
             //The bucketCounts array passed into the root function must contain enough space to hold every level of the recursion, which is at maximum 1024 entries for 32 bit sorts.
+            //Note that we have to clear the buckets here, since the previous values aren't guaranteed to be zero.
+            //TODO: would be nice to do this faster. Hard to do with refs alone, but if we had more info about the datasource we could do initblock or something.
+            for (int i = 0; i < bucketCount; ++i)
+            {
+                Unsafe.Add(ref bucketCounts, i) = 0;
+            }
             for (int i = 0; i < keyCount; ++i)
             {
                 var key = Unsafe.Add(ref keys, i);
-                ++Unsafe.Add(ref bucketCounts, key & 0xFF);
+                ++Unsafe.Add(ref bucketCounts, (key >> shift) & 0xFF);
             }
 
             //Convert the bucket counts to partial sums.
@@ -78,7 +79,7 @@ namespace SolverPrototype
                 Unsafe.Add(ref bucketOriginalStartIndices, i) = previousSum;
                 bucketSlotCount = previousSum;
             }
-
+            
             //Note that the bucketCounts array is now really a startIndices array. We'll increment the bucketCounts version of the array as we perform swaps.
             //Walk through each bucket's region in the array, and walk through each element within each bucket. For each element, push it to the target bucket.
             //Rather than writing the displaced element into the local bucket, check where it should go. Repeat until an element that fits the current bucket is found.
@@ -93,6 +94,7 @@ namespace SolverPrototype
                 while (bucketStartIndex < nextStartIndex)
                 {
                     var localKey = Unsafe.Add(ref keys, bucketStartIndex);
+                    var localValue = Unsafe.Add(ref values, bucketStartIndex);
                     while (true)
                     {
                         var targetBucketIndex = (localKey >> shift) & 0xFF;
@@ -101,29 +103,42 @@ namespace SolverPrototype
                             //The local key belongs to the local bucket. We can stop the swaps.
                             //Put the local key into the local bucket.
                             Unsafe.Add(ref keys, bucketStartIndex) = localKey;
+                            Unsafe.Add(ref values, bucketStartIndex) = localValue;
                             ++bucketStartIndex;
                             break;
                         }
                         ref var targetBucketStartIndex = ref Unsafe.Add(ref bucketCounts, targetBucketIndex);
-                        ref var targetSlot = ref Unsafe.Add(ref keys, targetBucketStartIndex);
-                        var swappedKey = targetSlot;
-                        targetSlot = localKey;
-                        localKey = swappedKey;
+                        Debug.Assert((targetBucketIndex < 255 && targetBucketStartIndex < Unsafe.Add(ref bucketCounts, targetBucketIndex + 1)) ||
+                            (targetBucketIndex == 255 && targetBucketStartIndex < keyCount));
+                        ref var targetKeySlot = ref Unsafe.Add(ref keys, targetBucketStartIndex);
+                        ref var targetValueSlot = ref Unsafe.Add(ref values, targetBucketStartIndex);
+                        Swap(ref targetKeySlot, ref localKey);
+                        Swap(ref targetValueSlot, ref localValue);
                         ++targetBucketStartIndex;
                     }
                 }
             }
+            
 
             //Now every bucket contains the elements that belong to it. There may still be sorting to do.
-            if (shift < 24)
+            if (shift > 0)
             {
                 //There is at least one more level of sorting potentially required.
-                var newShift = shift + 8;
+                var newShift = shift - 8;
+                ref var nextLevelBucketCounts = ref Unsafe.Add(ref bucketCounts, bucketCount);
+
+                var previousEnd = 0;
                 for (int i = 0; i < bucketCount; ++i)
                 {
-                    SortU32(ref keys, ref values, ref Unsafe.Add(ref bucketCounts, bucketCount), ref bucketOriginalStartIndices, keyCount, newShift);
+                    var bucketEnd = Unsafe.Add(ref bucketCounts, i);
+                    var count = bucketEnd - previousEnd;
+                    if (count > 0)
+                        SortU32(ref Unsafe.Add(ref keys, previousEnd), ref Unsafe.Add(ref values, previousEnd), ref nextLevelBucketCounts, ref bucketOriginalStartIndices, count, newShift);
+                    previousEnd = bucketEnd;
                 }
             }
         }
+        
+
     }
 }

@@ -29,16 +29,21 @@ namespace SolverPrototypeTests
             for (int i =0; i < elementCount; ++i)
             {
                 indexMap[i] = i;
+                //keys[i] = i;
                 keys[i] = random.Next();
             }
             var keys2 = new int[elementCount];
             var indexMap2 = new int[elementCount];
             var keys3 = new int[elementCount];
             var indexMap3 = new int[elementCount];
+            var keys4 = new int[elementCount];
+            var indexMap4 = new int[elementCount];
             Array.Copy(indexMap, indexMap2, elementCount);
             Array.Copy(keys, keys2, elementCount);
             Array.Copy(indexMap, indexMap3, elementCount);
             Array.Copy(keys, keys3, elementCount);
+            Array.Copy(indexMap, indexMap4, elementCount);
+            Array.Copy(keys, keys4, elementCount);
 
 
             var comparer = new Comparer();
@@ -53,6 +58,11 @@ namespace SolverPrototypeTests
                 mappedResult[i] = keys[indexMap[i]];
             }
 
+            Array.Sort(keys2, indexMap2, 0, 1); //prejit
+            timer.Restart();
+            Array.Sort(keys2, indexMap2, 0, elementCount);
+            timer.Stop();
+            Console.WriteLine($"Array.Sort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
             var keysScratch = new int[elementCount];
             var valuesScratch = new int[elementCount];
@@ -61,16 +71,18 @@ namespace SolverPrototypeTests
             LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], 1); //prejit
             timer.Restart();
             Array.Clear(bucketCounts, 0, bucketCounts.Length);
-            LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount); //prejit
+            LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount);
             timer.Stop();
-            Console.WriteLine($"RadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+            Console.WriteLine($"LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
-
-            Array.Sort(keys2, indexMap2, 0, 1); //prejit
+            var originalIndices = new int[256];
+            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
             timer.Restart();
-            Array.Sort(keys2, indexMap2, 0, elementCount);
+            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
             timer.Stop();
-            Console.WriteLine($"Array.Sort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+            Console.WriteLine($"MSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+
+
         }
     }
 }
