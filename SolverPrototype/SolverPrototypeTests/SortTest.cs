@@ -1,4 +1,5 @@
-﻿using SolverPrototype;
+﻿using BEPUutilities2.ResourceManagement;
+using SolverPrototype;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -22,15 +23,16 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            const int elementCount = 16384;
+            const int elementCount = 4096;
+            const int elementExclusiveUpperBound = 1<<29;
             int[] keys = new int[elementCount];
             int[] indexMap = new int[elementCount];
             Random random = new Random(5);
             for (int i =0; i < elementCount; ++i)
             {
                 indexMap[i] = i;
-                //keys[i] = i;
-                keys[i] = random.Next();
+                keys[i] = i;
+                keys[i] = random.Next(elementExclusiveUpperBound);
             }
             var keys2 = new int[elementCount];
             var indexMap2 = new int[elementCount];
@@ -76,9 +78,11 @@ namespace SolverPrototypeTests
             Console.WriteLine($"LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
             var originalIndices = new int[256];
-            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
+            //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
+            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], 1, BufferPool.GetPoolIndex(elementExclusiveUpperBound)); //prejit
             timer.Restart();
-            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
+            //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
+            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], elementCount, BufferPool.GetPoolIndex(elementExclusiveUpperBound));
             timer.Stop();
             Console.WriteLine($"MSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
