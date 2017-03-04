@@ -403,9 +403,11 @@ namespace SolverPrototype
                     }
                 }
 
-                //Put the pivot into the last slot.
-                Swap(ref keys, ref values, pivotIndex, r);
-                
+                var pivotValue = Unsafe.Add(ref values, pivotIndex);
+                //We cached the pivot key and value. Push the value in 'r' to the pivot's location, leaving r unused for the moment.
+                Unsafe.Add(ref keys, pivotIndex) = Unsafe.Add(ref keys, r);
+                Unsafe.Add(ref values, pivotIndex) = Unsafe.Add(ref values, r);
+
                 int i = l - 1; //Start one below the partitioning area, because don't know if the first index is actually claimable.
                 int j = r; //The last element of the partition holds the pivot, which is excluded from the swapping process. Same logic as for i.
                 while (true)
@@ -420,7 +422,7 @@ namespace SolverPrototype
                     while (true)
                     {
                         --j;
-                        if (comparer.Compare(ref pivot, ref Unsafe.Add(ref keys, j)) >= 0 || j == l)
+                        if (comparer.Compare(ref pivot, ref Unsafe.Add(ref keys, j)) >= 0 || j <= i)
                             break;
 
                     }
@@ -434,12 +436,19 @@ namespace SolverPrototype
                     //So swap them.
                     Swap(ref keys, ref values, i, j);
                 }
-                //The pivot at r has not been swapped.
+                //The pivot has not been reintroduced.
                 //Since the loop has terminated, we know that i has reached the the '>=pivot' side of the partition.
-                //So, swap the pivot and the first element of the greater-than-pivot side to guarantee sorting.
-                Swap(ref keys, ref values, i, r);
+                //So, push the first element of the greater-than-pivot side into r and the pivot into the first greater element's slot to guarantee sorting.
+                ref var firstGreaterKeySlot = ref Unsafe.Add(ref keys, i);
+                ref var firstGreaterValueSlot = ref Unsafe.Add(ref values, i);
+                Unsafe.Add(ref keys, r) = firstGreaterKeySlot;
+                Unsafe.Add(ref values, r) = firstGreaterValueSlot;
+                firstGreaterKeySlot = pivot;
+                firstGreaterValueSlot = pivotValue;
                 j = i - 1; //Sort's parameters take an inclusive bound, so push j back.
                 i = i + 1; //The pivot takes i's spot, and the pivot should not be included in sorting, so push i up.
+                Debug.Assert(i <= r);
+                Debug.Assert(j >= l);
                 Sort2(ref keys, ref values, l, j, ref comparer);
                 Sort2(ref keys, ref values, i, r, ref comparer);
             }

@@ -58,6 +58,14 @@ namespace SolverPrototype
             var bodyIndexB = (bundleIndexB << BundleIndexing.VectorShift) | innerIndexB;
             return bodyIndexA < bodyIndexB ? bodyIndexA : bodyIndexB;
         }
+        struct IntComparer : IComparerRef<int>
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public int Compare(ref int a, ref int b)
+            {
+                return a > b ? 1 : a < b ? -1 : 0;
+            }
+        }
         public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount)
         {
             int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
@@ -89,42 +97,16 @@ namespace SolverPrototype
                 sortKeys[i] = GetSortKey(baseIndex + i);
             }
 
+            //TODO: Later on, if you switch to pointer or ambiguously backed memory, you'll have to use a different sort.
+            //If some form of span.sort doesn't exist yet, we'll need to use our own little sort implementation. The following works reasonably well,
+            //though it is a little slower than the default sort in some scrambled cases. This isn't a big concern.
+            //TODO: You may want to actually change the way the optimizer handles sorting. Rather than doing a bunch of independent sorts, it could do a cooperative sort.
+            //It would be slower in terms of raw coverage, but it would converge faster. The key there would be an efficient and parallel merge operation.
+            //Subarrays could be sorted by any available means.
+            //var comparer = default(IntComparer);
+            //Quicksort.Sort2(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
 
-            var keysScratch = BufferPools<int>.Locking.Take(constraintCount);
-            var valuesScratch = BufferPools<int>.Locking.Take(constraintCount);
-            //Choose the sort based on the number of elements. Radix sorts on smaller ranges can be significantly faster.
-            //if (bodyCount < (1 << 16))
-            //{
-            //    var bucketCounts = BufferPools<int>.Locking.Take(512);
-            //    Array.Clear(bucketCounts, 0, 512);
-            //    RadixSort.SortU16(ref sortKeys[0], ref sourceIndices[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], constraintCount);
-            //    BufferPools<int>.Locking.Return(bucketCounts);
-            //}
-            //else if (bodyCount < (1 << 24))
-            //{
-            //    var bucketCounts = BufferPools<int>.Locking.Take(768);
-            //    Array.Clear(bucketCounts, 0, 768);
-            //    RadixSort.SortU24(ref sortKeys[0], ref sourceIndices[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], constraintCount);
-            //    BufferPools<int>.Locking.Return(bucketCounts);
-            //    //The 24 bit variant outputs to the scratch parameters, so swap things around.
-            //    var tempKeys = sortKeys;
-            //    var tempIndices = sourceIndices;
-            //    sortKeys = keysScratch;
-            //    sourceIndices = valuesScratch;
-            //    keysScratch = tempKeys;
-            //    valuesScratch = tempIndices;
-            //}
-            //else
-            {
-                var bucketCounts = BufferPools<int>.Locking.Take(1024);
-                Array.Clear(bucketCounts, 0, 1024);
-                LSBRadixSort.SortU32(ref sortKeys[0], ref sourceIndices[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], constraintCount);
-                BufferPools<int>.Locking.Return(bucketCounts);
-            }
-            BufferPools<int>.Locking.Return(keysScratch);
-            BufferPools<int>.Locking.Return(valuesScratch);
-
-            //Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
+            Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
 
             //Push the cached data into its proper sorted position.
             for (int i = 0; i < constraintCount; ++i)
