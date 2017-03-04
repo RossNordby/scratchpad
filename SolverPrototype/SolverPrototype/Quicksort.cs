@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -316,6 +317,131 @@ namespace SolverPrototype
                 }
                 Sort(ref keys, ref values, l, j, ref comparer);
                 Sort(ref keys, ref values, i, r, ref comparer);
+            }
+        }
+
+        public static void Sort2<TKey, TValue, TComparer>(ref TKey keys, ref TValue values, int l, int r, ref TComparer comparer) where TComparer : IComparerRef<TKey>
+        {
+            if (r - l <= 32)
+            {
+                //The area to address is very small. Use insertion sort.
+                for (int i = l + 1; i <= r; ++i)
+                {
+                    var originalKey = Unsafe.Add(ref keys, i);
+                    var originalValue = Unsafe.Add(ref values, i);
+                    int compareIndex;
+                    for (compareIndex = i - 1; compareIndex >= l; --compareIndex)
+                    {
+                        if (comparer.Compare(ref originalKey, ref Unsafe.Add(ref keys, compareIndex)) < 0)
+                        {
+                            //Move the element up one slot.
+                            var upperSlotIndex = compareIndex + 1;
+                            Unsafe.Add(ref keys, upperSlotIndex) = Unsafe.Add(ref keys, compareIndex);
+                            Unsafe.Add(ref values, upperSlotIndex) = Unsafe.Add(ref values, compareIndex);
+                        }
+                        else
+                            break;
+                    }
+                    var targetIndex = compareIndex + 1;
+                    if (targetIndex != i)
+                    {
+                        //Move the original index down.
+                        Unsafe.Add(ref keys, targetIndex) = originalKey;
+                        Unsafe.Add(ref values, targetIndex) = originalValue;
+                    }
+                }
+            }
+            else
+            {
+                //Use MO3 to find a pivot to compensate for the common already-sorted case and to slightly improve worst-case behavior.
+                var first = Unsafe.Add(ref keys, l);
+                int middleIndex = (l + r) / 2;
+                var middle = Unsafe.Add(ref keys, middleIndex);
+                var last = Unsafe.Add(ref keys, r);
+                int pivotIndex;
+                TKey pivot;
+                if (comparer.Compare(ref first, ref middle) <= 0 && comparer.Compare(ref first, ref last) <= 0)
+                {
+                    //first is lowest.
+                    if (comparer.Compare(ref middle, ref last) <= 0)
+                    {
+                        pivotIndex = middleIndex;
+                        pivot = middle;
+                    }
+                    else
+                    {
+                        pivotIndex = r;
+                        pivot = last;
+                    }
+                }
+                else if (comparer.Compare(ref middle, ref last) <= 0)
+                {
+                    //middle is lowest.
+                    if (comparer.Compare(ref first, ref last) <= 0)
+                    {
+                        pivotIndex = l;
+                        pivot = first;
+                    }
+                    else
+                    {
+                        pivotIndex = r;
+                        pivot = last;
+                    }
+                }
+                else
+                {
+                    //last is lowest.
+                    if (comparer.Compare(ref first, ref middle) <= 0)
+                    {
+                        pivotIndex = l;
+                        pivot = first;
+                    }
+                    else
+                    {
+                        pivotIndex = middleIndex;
+                        pivot = middle;
+                    }
+                }
+
+                //Put the pivot into the last slot.
+                Swap(ref keys, ref values, pivotIndex, r);
+                
+                int i = l - 1; //Start one below the partitioning area, because don't know if the first index is actually claimable.
+                int j = r; //The last element of the partition holds the pivot, which is excluded from the swapping process. Same logic as for i.
+                while (true)
+                {
+                    //Claim the chunk of the list which is partitioned on the left and right sides.
+                    while (true)
+                    {
+                        ++i;
+                        if (comparer.Compare(ref Unsafe.Add(ref keys, i), ref pivot) >= 0)
+                            break;
+                    }
+                    while (true)
+                    {
+                        --j;
+                        if (comparer.Compare(ref pivot, ref Unsafe.Add(ref keys, j)) >= 0 || j == l)
+                            break;
+
+                    }
+                    //If the claims have met, then the partition is complete.
+                    if (i >= j)
+                    {
+                        break;
+                    }
+                    //By the claiming above and because we did not yet break out of the loop,
+                    //the value associated with i is >= the pivot, and the value associated with j is <= the pivot.
+                    //So swap them.
+                    Swap(ref keys, ref values, i, j);
+                }
+                //The pivot at r has not been swapped.
+                //Since the loop has terminated, we know that i has reached the the '>=pivot' side of the partition.
+                //So, swap the pivot and the first element of the greater-than-pivot side to guarantee sorting.
+                Swap(ref keys, ref values, i, r);
+                j = i - 1; //Sort's parameters take an inclusive bound, so push j back.
+                i = i + 1; //The pivot takes i's spot, and the pivot should not be included in sorting, so push i up.
+                Sort2(ref keys, ref values, l, j, ref comparer);
+                Sort2(ref keys, ref values, i, r, ref comparer);
             }
         }
     }

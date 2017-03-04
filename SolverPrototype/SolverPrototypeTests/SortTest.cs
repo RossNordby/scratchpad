@@ -23,69 +23,72 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            const int elementCount = 4096;
+            const int elementCount = 262144;
             const int elementExclusiveUpperBound = 1<<29;
-            int[] keys = new int[elementCount];
-            int[] indexMap = new int[elementCount];
-            Random random = new Random(5);
-            for (int i =0; i < elementCount; ++i)
+            for (int iteration = 0; iteration < 16; ++iteration)
             {
-                indexMap[i] = i;
-                keys[i] = i;
-                keys[i] = random.Next(elementExclusiveUpperBound);
+                GC.Collect(3, GCCollectionMode.Forced, true);
+                int[] keys = new int[elementCount];
+                int[] indexMap = new int[elementCount];
+                Random random = new Random(5);
+                for (int i = 0; i < elementCount; ++i)
+                {
+                    indexMap[i] = i;
+                    keys[i] = i;
+                    keys[i] = random.Next(elementExclusiveUpperBound);
+                }
+                var keys2 = new int[elementCount];
+                var indexMap2 = new int[elementCount];
+                var keys3 = new int[elementCount];
+                var indexMap3 = new int[elementCount];
+                var keys4 = new int[elementCount];
+                var indexMap4 = new int[elementCount];
+                Array.Copy(indexMap, indexMap2, elementCount);
+                Array.Copy(keys, keys2, elementCount);
+                Array.Copy(indexMap, indexMap3, elementCount);
+                Array.Copy(keys, keys3, elementCount);
+                Array.Copy(indexMap, indexMap4, elementCount);
+                Array.Copy(keys, keys4, elementCount);
+
+
+                var comparer = new Comparer();
+                Quicksort.Sort2(ref keys[0], ref indexMap[0], 0, 0, ref comparer); //prejit
+                var timer = Stopwatch.StartNew();
+                Quicksort.Sort2(ref keys[0], ref indexMap[0], 0, elementCount - 1, ref comparer);
+                timer.Stop();
+                Console.WriteLine($"QSort2 time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+                int[] mappedResult = new int[elementCount];
+                for (int i = 0; i < elementCount; ++i)
+                {
+                    mappedResult[i] = keys[indexMap[i]];
+                }
+
+                Array.Sort(keys2, indexMap2, 0, 1); //prejit
+                timer.Restart();
+                Array.Sort(keys2, indexMap2, 0, elementCount);
+                timer.Stop();
+                Console.WriteLine($"Array.Sort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+
+                var keysScratch = new int[elementCount];
+                var valuesScratch = new int[elementCount];
+                var bucketCounts = new int[1024];
+                Array.Clear(bucketCounts, 0, bucketCounts.Length);
+                LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], 1); //prejit
+                timer.Restart();
+                Array.Clear(bucketCounts, 0, bucketCounts.Length);
+                LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount);
+                timer.Stop();
+                Console.WriteLine($"LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+
+                var originalIndices = new int[256];
+                //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
+                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], 1, BufferPool.GetPoolIndex(elementExclusiveUpperBound)); //prejit
+                timer.Restart();
+                //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
+                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], elementCount, BufferPool.GetPoolIndex(elementExclusiveUpperBound));
+                timer.Stop();
+                Console.WriteLine($"MSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
             }
-            var keys2 = new int[elementCount];
-            var indexMap2 = new int[elementCount];
-            var keys3 = new int[elementCount];
-            var indexMap3 = new int[elementCount];
-            var keys4 = new int[elementCount];
-            var indexMap4 = new int[elementCount];
-            Array.Copy(indexMap, indexMap2, elementCount);
-            Array.Copy(keys, keys2, elementCount);
-            Array.Copy(indexMap, indexMap3, elementCount);
-            Array.Copy(keys, keys3, elementCount);
-            Array.Copy(indexMap, indexMap4, elementCount);
-            Array.Copy(keys, keys4, elementCount);
-
-
-            var comparer = new Comparer();
-            Quicksort.Sort(ref keys[0], ref indexMap[0], 0, 0, ref comparer); //prejit
-            var timer = Stopwatch.StartNew();
-            Quicksort.Sort(ref keys[0], ref indexMap[0], 0, elementCount - 1, ref comparer);
-            timer.Stop();
-            Console.WriteLine($"QSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
-            int[] mappedResult = new int[elementCount];
-            for (int i = 0; i < elementCount; ++i)
-            {
-                mappedResult[i] = keys[indexMap[i]];
-            }
-
-            Array.Sort(keys2, indexMap2, 0, 1); //prejit
-            timer.Restart();
-            Array.Sort(keys2, indexMap2, 0, elementCount);
-            timer.Stop();
-            Console.WriteLine($"Array.Sort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
-
-            var keysScratch = new int[elementCount];
-            var valuesScratch = new int[elementCount];
-            var bucketCounts = new int[1024];
-            Array.Clear(bucketCounts, 0, bucketCounts.Length);
-            LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], 1); //prejit
-            timer.Restart();
-            Array.Clear(bucketCounts, 0, bucketCounts.Length);
-            LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount);
-            timer.Stop();
-            Console.WriteLine($"LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
-
-            var originalIndices = new int[256];
-            //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
-            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], 1, BufferPool.GetPoolIndex(elementExclusiveUpperBound)); //prejit
-            timer.Restart();
-            //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
-            MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], elementCount, BufferPool.GetPoolIndex(elementExclusiveUpperBound));
-            timer.Stop();
-            Console.WriteLine($"MSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
-
 
         }
     }
