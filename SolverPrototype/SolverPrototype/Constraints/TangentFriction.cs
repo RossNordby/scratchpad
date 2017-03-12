@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype
+namespace SolverPrototype.Constraints
 {
     //For in depth explanations of constraints, check the Inequality1DOF.cs implementation.
     //The details are omitted for brevity in other implementations.

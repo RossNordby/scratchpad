@@ -3,7 +3,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace SolverPrototype
+namespace SolverPrototype.Constraints
 {
  
     public struct TwoBody1DOFJacobians

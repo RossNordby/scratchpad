@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
+using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -194,19 +195,6 @@ namespace SolverPrototype
             }
         }
 
-        //This is a pure debug thing. Remember, it modifies the state of the simulation...
-        public float GetVelocityChangeHeuristic()
-        {
-            float accumulatedChanges = 0;
-            foreach (var batch in Batches)
-            {
-                for (int i = 0; i < batch.TypeBatches.Count; ++i)
-                {
-                    //Replace unsafe cast with virtual call once we have other types that handle.
-                    accumulatedChanges += Unsafe.As<TypeBatch, ContactPenetrationTypeBatch>(ref batch.TypeBatches.Elements[i]).GetVelocityChangeHeuristic(bodies.VelocityBundles);
-                }
-            }
-            return accumulatedChanges;
-        }
+      
     }
 }

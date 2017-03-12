@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype
+namespace SolverPrototype.Constraints
 {
     public abstract class TypeBatch
     {

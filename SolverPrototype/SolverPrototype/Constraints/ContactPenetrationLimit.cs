@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype
+namespace SolverPrototype.Constraints
 {
     /// <summary>
     /// Handles the solve iterations of a bunch of 1DOF two body inequality constraints.

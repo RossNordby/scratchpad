@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
+using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;

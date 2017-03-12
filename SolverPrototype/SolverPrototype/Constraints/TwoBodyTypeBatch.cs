@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype
+namespace SolverPrototype.Constraints
 {
     //Not a big fan of complex generic-filled inheritance hierarchies, but this is the shortest evolutionary step to removing duplicates.
     //There are some other options if this inheritance hierarchy gets out of control.

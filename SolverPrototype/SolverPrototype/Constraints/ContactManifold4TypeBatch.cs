@@ -2,7 +2,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype
+namespace SolverPrototype.Constraints
 {
     public struct ManifoldContactData
     {
@@ -12,6 +12,8 @@ namespace SolverPrototype
     }
     public struct ContactManifold4PrestepData
     {
+        //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.
+        //If you modify this layout, be sure to update the associated ContactManifold4Constraint.
         //In a convex manifold, all contacts share the same normal.
         public Vector3Wide Normal;
         public ManifoldContactData Contact0;
