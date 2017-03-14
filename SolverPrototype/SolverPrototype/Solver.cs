@@ -130,9 +130,8 @@ namespace SolverPrototype
         /// <typeparam name="TTypeBatch">Type of the batch containing the slot.</typeparam>
         /// <param name="constraintReference">Reference of the constraint being updated.</param>
         /// <param name="description">Description to apply to the slot.</param>
-        public void ApplyDescription<TDescription, TDescriptionBuilder, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, ref TDescription description)
-            where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch, new()
-            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TTypeBatch>
+        public void ApplyDescription<TDescription, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
         {
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
             description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, ref description);
@@ -145,9 +144,8 @@ namespace SolverPrototype
         /// <typeparam name="TTypeBatch">Type of the batch containing the slot.</typeparam>
         /// <param name="constraintReference">Handle of the constraint being updated.</param>
         /// <param name="description">Description to apply to the slot.</param>
-        public void ApplyDescription<TDescription, TDescriptionBuilder, TTypeBatch>(int constraintHandle, ref TDescription description)
-            where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch, new()
-            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TTypeBatch>
+        public void ApplyDescription<TDescription, TTypeBatch>(int constraintHandle, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
         {
             GetConstraintReference<TTypeBatch>(constraintHandle, out var constraintReference);
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
@@ -157,24 +155,24 @@ namespace SolverPrototype
         /// <summary>
         /// Allocates a constraint slot and sets up a constraint with the specified description.
         /// </summary>
-        /// <typeparam name="T">Type of the TypeBatch to allocate in.</typeparam>
+        /// <typeparam name="TDescription">Type of the constraint description to add.</typeparam>
+        /// <typeparam name="TTypeBatch">Type of the TypeBatch to allocate in.</typeparam>
         /// <param name="bodyHandleA">First body of the pair.</param>
         /// <param name="bodyHandleB">Second body of the pair.</param>
         /// <param name="constraintReference">Reference to the allocated slot.</param>
         /// <param name="handle">Allocated constraint handle.</param>
-        public void Add<TDescription, TDescriptionBuilder, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TDescription description,
+        public void Add<TDescription, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TDescription description,
             out ConstraintReference<TTypeBatch> constraintReference, out int handle)
-            where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch, new()
-            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TTypeBatch>
+            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
         {
             Allocate(bodyHandleA, bodyHandleB, out constraintReference, out handle);
 
-            ApplyDescription<TDescription, TDescriptionBuilder, TTypeBatch>(ref constraintReference, ref description);
+            ApplyDescription(ref constraintReference, ref description);
 
         }
 
-        public void GetDescription<TConstraintDescription, TDescriptionBuilder, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, out TConstraintDescription description)
-            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch
+        public void GetDescription<TConstraintDescription, TTypeBatch, TDescriptionBuilder>(ref ConstraintReference<TTypeBatch> constraintReference, out TConstraintDescription description)
+            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch
             where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TConstraintDescription, TTypeBatch>
         {
             //We want to maintain the simple api of an out parameter, but we don't want to pay for the zeroing of the full description required to call methods on it.

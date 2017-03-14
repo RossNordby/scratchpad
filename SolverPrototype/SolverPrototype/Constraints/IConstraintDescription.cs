@@ -39,11 +39,9 @@ namespace SolverPrototype.Constraints
     /// Note that one batch may have multiple description types associated with it, each one potentially offering a different subset of properties or translation logic.
     /// </remarks>
     /// <typeparam name="TDescription">Type of the description object.</typeparam>
-    /// <typeparam name="TDescriptionBuilder">Type responsible for building a description from typebatch information.</typeparam>
     /// <typeparam name="TBatch">Batch associated with the constraint description.</typeparam>
-    public interface IConstraintDescription<TDescription, TDescriptionBuilder, TBatch>
-        where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TBatch>
-        where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TBatch>
+    public interface IConstraintDescription<TDescription, TBatch>
+        where TDescription : IConstraintDescription<TDescription, TBatch>
         where TBatch : TypeBatch
     {
         /// <summary>

@@ -49,11 +49,10 @@ namespace SolverPrototypeTests
             //TODO: c'mon roslyn you could infer those type parameters if you really put the effort in!
             //Would be nice to figure out a way around this. The best solution might actually look like improving roslyn's inference...
             //There probably exists some unsafe-cast-based solution too, but it would be nice to have some degree of compile time safety!
-            solver.Add<ContactManifold4Constraint, ContactManifold4Constraint.Builder, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
+            solver.Add<ContactManifold4Constraint, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
             graph.AddConstraint(bodyAIndex, handle, 0);
             graph.AddConstraint(bodyBIndex, handle, 1);
-
-            solver.GetDescription<ContactManifold4Constraint, ContactManifold4Constraint.Builder, ContactManifold4TypeBatch>(ref reference, out var test);
+            
             return handle;
         }
 

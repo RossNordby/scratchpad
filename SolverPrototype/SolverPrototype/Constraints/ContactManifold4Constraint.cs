@@ -18,7 +18,7 @@ namespace SolverPrototype.Constraints
         public float MaximumRecoveryVelocity;
     }
 
-    public struct ContactManifold4Constraint : IConstraintDescription<ContactManifold4Constraint, ContactManifold4Constraint.Builder, ContactManifold4TypeBatch>
+    public struct ContactManifold4Constraint : IConstraintDescription<ContactManifold4Constraint, ContactManifold4TypeBatch>
     {
 
         //TODO: In a 'real' use case, we will likely split the description for contact manifolds into two parts: mutable contact data and initialize-once spring/friction data.
