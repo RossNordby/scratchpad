@@ -80,7 +80,7 @@ namespace SolverPrototype
         /// <param name="bodyHandleB">Second body of the pair.</param>
         /// <param name="constraintReference">Reference to the allocated slot.</param>
         /// <param name="handle">Allocated constraint handle.</param>
-        public void Allocate<T>(int bodyHandleA, int bodyHandleB, out ConstraintReference<T> constraintReference, out int handle) where T : TypeBatch, new()
+        public unsafe void Allocate<T>(int bodyHandleA, int bodyHandleB, out ConstraintReference<T> constraintReference, out int handle) where T : TypeBatch, new()
         {
             int targetBatchIndex = -1;
             for (int i = 0; i < Batches.Count; ++i)
@@ -107,7 +107,10 @@ namespace SolverPrototype
             targetBatch.Handles.Add(bodyHandleA);
             targetBatch.Handles.Add(bodyHandleB);
             handle = handlePool.Take();
-            targetBatch.Allocate(handle, out var typeId, out constraintReference);
+            var bodyReferences = stackalloc int[2];
+            bodyReferences[0] = bodyHandleA;
+            bodyReferences[1] = bodyHandleB;
+            targetBatch.Allocate(handle, ref bodyReferences[0], out var typeId, out constraintReference);
 
             if (handle >= HandlesToConstraints.Length)
             {

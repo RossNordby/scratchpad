@@ -21,7 +21,7 @@ namespace SolverPrototype.Constraints
         /// </summary>
         public int[] Handles;
 
-        public abstract int Allocate(int handle);
+        public abstract int Allocate(int handle, ref int bodyReferences);
         public abstract void Remove(int index, ConstraintLocation[] handlesToConstraints);
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
@@ -95,6 +95,7 @@ namespace SolverPrototype.Constraints
             BufferPools<T>.Locking.Return(old);
         }
 
+        protected abstract void SetBodyReferences(int index, ref int bodyReferences);
 
         /// <summary>
         /// Allocates a slot in the batch.
@@ -120,8 +121,7 @@ namespace SolverPrototype.Constraints
             Handles[index] = handle;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
-            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetLane(ref BodyReferences[bundleIndex], innerIndex, ref bodyReferences);
+            SetBodyReferences(index, ref bodyReferences);
             return index;
         }
 
@@ -216,6 +216,9 @@ namespace SolverPrototype.Constraints
             }
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);
+            //This is a little defensive; in the event that the body set actually scales down, you don't want to end up with invalid pointers in some lanes.
+            //TODO: This may need to change depending on how we handle kinematic/static/inactive storage and encoding.
+            GatherScatter.ClearLane<TBodyReferences, int>(ref BodyReferences[sourceBundleIndex], sourceInnerIndex);
         }
 
         public override void Initialize()

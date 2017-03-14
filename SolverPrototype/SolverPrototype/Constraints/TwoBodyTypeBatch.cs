@@ -40,6 +40,12 @@ namespace SolverPrototype.Constraints
             innerIndex = bodyInnerIndex;
         }
 
+        protected sealed override void SetBodyReferences(int index, ref int bodyReferences)
+        {
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            GatherScatter.SetBodyReferencesLane(ref BodyReferences[bundleIndex].BundleIndexA, innerIndex, ref bodyReferences, 2);
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int GetSortKey(int constraintIndex)

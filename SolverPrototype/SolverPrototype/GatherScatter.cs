@@ -139,7 +139,8 @@ namespace SolverPrototype
         }
 
         /// <summary>
-        /// Clears a bundle lane using the default value of the specified type. The bundle must be a contiguous block of Vector types, all sharing the same type.
+        /// Clears a bundle lane using the default value of the specified type. The bundle must be a contiguous block of Vector types, all sharing the same type,
+        /// and the first vector must start at the address pointed to by the bundle reference.
         /// </summary>
         /// <typeparam name="TOuter">Type containing one or more Vectors.</typeparam>
         /// <typeparam name="TVector">Type of the vectors to clear.</typeparam>
@@ -299,7 +300,7 @@ namespace SolverPrototype
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
+        public static void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
         {
             ref var targetLane = ref Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
 
@@ -315,8 +316,45 @@ namespace SolverPrototype
             Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inertia.InverseMass;
 
         }
+
+        /// <summary>
+        /// Sets a lane of a container of vectors, assuming that the vectors are contiguous.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to copy into the container lane.</typeparam>
+        /// <param name="startVector">First vector of the contiguous vector region to set a lane within.</param>
+        /// <param name="innerIndex">Index of the lane within the vectors.</param>
+        /// <param name="values">Reference to a contiguous set of values to copy into the vector lane slots.</param>
+        /// <param name="valueCount">Number of values to iterate over.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
+        public static void SetLane<T>(ref Vector<T> startVector, int innerIndex, ref T values, int valueCount) where T : struct
+        {
+            ref var lane = ref Get(ref startVector, innerIndex);
+            lane = values;
+            //Even if the jit recognizes the count as constant, it doesn't unroll anything. Could do it manually, like we did in CopyLane, but 
+            //SetLane is typically not as performance sensitive.
+            for (int vectorIndex = Vector<T>.Count; vectorIndex < valueCount; ++vectorIndex)
+            {
+                //The multiplication should become a shift; the jit recognizes the count as constant.
+                Unsafe.Add(ref lane, vectorIndex * Vector<T>.Count) = Unsafe.Add(ref values, vectorIndex);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SetBodyReferencesLane(ref Vector<int> start, int innerIndex, ref int bodyReferences, int bodyCount)
+        {
+            ref var targetLane = ref Get(ref start, innerIndex);
+            var stride = Vector<int>.Count * 2;
+            for (int i = 0; i < bodyCount; ++i)
+            {
+                BundleIndexing.GetBundleIndices(Unsafe.Add(ref bodyReferences, i), out var bodyBundleIndex, out var bodyInnerIndex);
+                //Body references, by convention, are stored in bundle-inner-bundle-inner interleaved order.
+                Unsafe.Add(ref targetLane, i * stride) = bodyBundleIndex;
+                Unsafe.Add(ref targetLane, i * stride + Vector<int>.Count) = bodyInnerIndex;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
         {
             ref var sourceLane = ref Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
 
