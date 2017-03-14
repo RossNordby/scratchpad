@@ -17,10 +17,10 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             var size = Unsafe.SizeOf<ContactManifold4PrestepData>() / 4 + Unsafe.SizeOf<Vector<float>>() / 4 + Unsafe.SizeOf<TwoBodyReferences>() / 4;
-            //const int bodyCount = 32768;
-            //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            const int bodyCount = 8;
+            SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 32, 32, true, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            //SimulationSetup.BuildLattice(32, 8, 32, true, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
 
             var bodyOptimizer = new BodyLayoutOptimizer(bodies, graph, solver);
@@ -74,7 +74,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
-            const int frameCount = 16;
+            const int frameCount = 256;
             solver.IterationCount = iterationCount;
 
 
@@ -108,8 +108,8 @@ namespace SolverPrototypeTests
                     GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
                     GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
 
-                    //if (i == 0)
-                    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
+                    if (i == 0)
+                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
@@ -129,7 +129,7 @@ namespace SolverPrototypeTests
                 var energyAfter = bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
             Console.WriteLine($"Time (ms): {(1e3 * timer.Elapsed.TotalSeconds)}");

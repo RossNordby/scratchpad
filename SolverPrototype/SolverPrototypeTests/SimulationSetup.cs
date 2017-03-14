@@ -13,12 +13,8 @@ namespace SolverPrototypeTests
     {
         static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Bodies bodies, Solver solver, ConstraintConnectivityGraph graph, ref Vector3 right, ref Vector3 up, ref Vector3 forward)
         {
-            solver.Allocate<ContactManifold4TypeBatch>(bodyAHandle, bodyBHandle, out var constraintReference, out var constraintHandle);
             var bodyAIndex = bodies.BodyHandles[bodyAHandle];
-            var bodyBIndex = bodies.BodyHandles[bodyBHandle];
-            graph.AddConstraint(bodyAIndex, constraintHandle, 0);
-            graph.AddConstraint(bodyBIndex, constraintHandle, 1);
-               
+            var bodyBIndex = bodies.BodyHandles[bodyBHandle];               
 
             var description = new ContactManifold4Constraint
             {
@@ -53,7 +49,9 @@ namespace SolverPrototypeTests
             //Would be nice to figure out a way around this. The best solution might actually look like improving roslyn's inference...
             //There probably exists some unsafe-cast-based solution too, but it would be nice to have some degree of compile time safety!
             solver.Add<ContactManifold4Constraint, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
-            return constraintHandle;
+            graph.AddConstraint(bodyAIndex, handle, 0);
+            graph.AddConstraint(bodyBIndex, handle, 1);
+            return handle;
         }
 
 

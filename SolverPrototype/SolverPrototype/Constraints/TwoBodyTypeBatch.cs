@@ -40,10 +40,24 @@ namespace SolverPrototype.Constraints
             innerIndex = bodyInnerIndex;
         }
 
-        protected sealed override void SetBodyReferences(int index, ref int bodyReferences)
+        protected sealed override void AddBodyReferences(int index, ref int bodyReferences)
         {
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetBodyReferencesLane(ref BodyReferences[bundleIndex].BundleIndexA, innerIndex, ref bodyReferences, 2);
+            ref var bundle = ref BodyReferences[bundleIndex];
+            GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, ref bodyReferences, 2);
+            bundle.Count++;
+            Debug.Assert(bundle.Count <= Vector<int>.Count, "The caller should guarantee that any one bundle is not added to beyond capacity.");
+           
+        }
+        protected sealed override void RemoveBodyReferences(int bundleIndex, int innerIndex)
+        {
+            ref var bundle = ref BodyReferences[bundleIndex];
+            Debug.Assert(bundle.Count > 0, "The caller should guarantee that any one bundle isn't over-removed from.");
+            //This is a little defensive; in the event that the body set actually scales down, you don't want to end up with invalid pointers in some lanes.
+            //TODO: This may need to change depending on how we handle kinematic/static/inactive storage and encoding.
+            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex);      
+            bundle.Count--;
+
         }
 
 
