@@ -18,31 +18,25 @@ namespace SolverPrototypeTests
             var bodyBIndex = bodies.BodyHandles[bodyBHandle];
             graph.AddConstraint(bodyAIndex, constraintHandle, 0);
             graph.AddConstraint(bodyBIndex, constraintHandle, 1);
+               
 
-
-            BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
-            BundleIndexing.GetBundleIndices(bodyBIndex, out var bodyBBundleIndex, out var bodyBInnerIndex);
-            BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
-            ref var constraintBodies = ref constraintReference.TypeBatch.BodyReferences[constraintBundleIndex];
-            Debug.Assert(constraintBodies.Count < Vector<int>.Count);
-            GatherScatter.Get(ref constraintBodies.BundleIndexA, constraintInnerIndex) = bodyABundleIndex;
-            GatherScatter.Get(ref constraintBodies.InnerIndexA, constraintInnerIndex) = bodyAInnerIndex;
-            GatherScatter.Get(ref constraintBodies.BundleIndexB, constraintInnerIndex) = bodyBBundleIndex;
-            GatherScatter.Get(ref constraintBodies.InnerIndexB, constraintInnerIndex) = bodyBInnerIndex;
-            var constraintBundleBaseIndex = constraintBundleIndex << BundleIndexing.VectorShift;
-            ++constraintBodies.Count;
-
-            ref var prestep = ref constraintReference.TypeBatch.PrestepData[constraintBundleIndex];
-
-            GatherScatter.Get(ref prestep.SpringSettings.NaturalFrequency, constraintInnerIndex) = (float)(Math.PI * 2 * 60);
-            GatherScatter.Get(ref prestep.SpringSettings.DampingRatio, constraintInnerIndex) = 100f;
-            GatherScatter.Get(ref prestep.SpringSettings.MaximumRecoveryVelocity, constraintInnerIndex) = 1f;
-            //Normal goes from B to A by convention.
-            GatherScatter.Get(ref prestep.Normal.Y, constraintInnerIndex) = -1;
+            var description = new ContactManifold4Constraint
+            {
+                Normal = new Vector3(0, 1, 0),
+                SpringSettings = new SpringSettingsAOS
+                {
+                    NaturalFrequency = (float)(Math.PI * 2 * 60),
+                    DampingRatio = 100f,
+                    MaximumRecoveryVelocity = 1f
+                },
+                FrictionCoefficient = 1,
+                TangentX = new Vector3(1, 0, 0),
+                TangentY = new Vector3(0, 0, 1),
+            };
 
             for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
             {
-                ref var contact = ref Unsafe.Add(ref prestep.Contact0, contactIndex);
+                ref var contact = ref Unsafe.Add(ref description.Contact0, contactIndex);
 
                 var x = (contactIndex & 1) - 0.5f;
                 var z = ((contactIndex & 2) >> 1) - 0.5f;
@@ -50,20 +44,15 @@ namespace SolverPrototypeTests
                 var localOffsetB = new Vector3(x, -0.5f, z);
                 var worldOffsetA = localOffsetA.X * right + localOffsetA.Y * up + localOffsetA.Z * forward;
                 var worldOffsetB = localOffsetB.X * right + localOffsetB.Y * up + localOffsetB.Z * forward;
-                GatherScatter.Get(ref contact.OffsetA.X, constraintInnerIndex) = worldOffsetA.X;
-                GatherScatter.Get(ref contact.OffsetA.Y, constraintInnerIndex) = worldOffsetA.Y;
-                GatherScatter.Get(ref contact.OffsetA.Z, constraintInnerIndex) = worldOffsetA.Z;
-                GatherScatter.Get(ref contact.OffsetB.X, constraintInnerIndex) = worldOffsetB.X;
-                GatherScatter.Get(ref contact.OffsetB.Y, constraintInnerIndex) = worldOffsetB.Y;
-                GatherScatter.Get(ref contact.OffsetB.Z, constraintInnerIndex) = worldOffsetB.Z;
-                GatherScatter.Get(ref contact.PenetrationDepth, constraintInnerIndex) = 0.00f;
+                contact.OffsetA = worldOffsetA;
+                contact.OffsetB = worldOffsetB;
+                contact.PenetrationDepth = 0.00f;
             }
-
-            GatherScatter.Get(ref prestep.FrictionCoefficient, constraintInnerIndex) = 1;
-            GatherScatter.Get(ref prestep.TangentX.X, constraintInnerIndex) = 1;
-            GatherScatter.Get(ref prestep.TangentY.Z, constraintInnerIndex) = 1;
-
-            solver.Add(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
+            
+            //TODO: c'mon roslyn you could infer those type parameters if you really put the effort in!
+            //Would be nice to figure out a way around this. The best solution might actually look like improving roslyn's inference...
+            //There probably exists some unsafe-cast-based solution too, but it would be nice to have some degree of compile time safety!
+            solver.Add<ContactManifold4Constraint, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
             return constraintHandle;
         }
 
@@ -151,7 +140,7 @@ namespace SolverPrototypeTests
             {
                 constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], bodies, solver, graph, ref right, ref up, ref forward);
             }
-            
+
             if (scrambleConstraints)
             {
                 ScrambleConstraints(solver);
