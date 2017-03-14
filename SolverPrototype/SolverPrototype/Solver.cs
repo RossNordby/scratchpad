@@ -125,12 +125,14 @@ namespace SolverPrototype
         /// <summary>
         /// Applies a description to a constraint slot.
         /// </summary>
-        /// <typeparam name="TConstraintDescription">Type of the description to apply.</typeparam>
+        /// <typeparam name="TDescription">Type of the description to apply.</typeparam>
+        /// <typeparam name="TDescriptionBuilder">Type of the description builder associated with the description type.</typeparam>
         /// <typeparam name="TTypeBatch">Type of the batch containing the slot.</typeparam>
         /// <param name="constraintReference">Reference of the constraint being updated.</param>
         /// <param name="description">Description to apply to the slot.</param>
-        public void ApplyDescription<TConstraintDescription, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, ref TConstraintDescription description)
-            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch
+        public void ApplyDescription<TDescription, TDescriptionBuilder, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch, new()
+            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TTypeBatch>
         {
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
             description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, ref description);
@@ -139,12 +141,13 @@ namespace SolverPrototype
         /// <summary>
         /// Applies a description to a constraint slot.
         /// </summary>
-        /// <typeparam name="TConstraintDescription">Type of the description to apply.</typeparam>
+        /// <typeparam name="TDescription">Type of the description to apply.</typeparam>
         /// <typeparam name="TTypeBatch">Type of the batch containing the slot.</typeparam>
         /// <param name="constraintReference">Handle of the constraint being updated.</param>
         /// <param name="description">Description to apply to the slot.</param>
-        public void ApplyDescription<TConstraintDescription, TTypeBatch>(int constraintHandle, ref TConstraintDescription description)
-            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch
+        public void ApplyDescription<TDescription, TDescriptionBuilder, TTypeBatch>(int constraintHandle, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch, new()
+            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TTypeBatch>
         {
             GetConstraintReference<TTypeBatch>(constraintHandle, out var constraintReference);
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
@@ -159,25 +162,27 @@ namespace SolverPrototype
         /// <param name="bodyHandleB">Second body of the pair.</param>
         /// <param name="constraintReference">Reference to the allocated slot.</param>
         /// <param name="handle">Allocated constraint handle.</param>
-        public void Add<TConstraintDescription, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TConstraintDescription constraintDescription,
+        public void Add<TDescription, TDescriptionBuilder, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TDescription description,
             out ConstraintReference<TTypeBatch> constraintReference, out int handle)
-            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+            where TDescription : IConstraintDescription<TDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch, new()
+            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TDescription, TTypeBatch>
         {
             Allocate(bodyHandleA, bodyHandleB, out constraintReference, out handle);
 
-            ApplyDescription(ref constraintReference, ref constraintDescription);
+            ApplyDescription<TDescription, TDescriptionBuilder, TTypeBatch>(ref constraintReference, ref description);
 
         }
 
-        public void GetDescription<TConstraintDescription, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, out TConstraintDescription description)
-            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch
+        public void GetDescription<TConstraintDescription, TDescriptionBuilder, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, out TConstraintDescription description)
+            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TDescriptionBuilder, TTypeBatch> where TTypeBatch : TypeBatch
+            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TConstraintDescription, TTypeBatch>
         {
             //We want to maintain the simple api of an out parameter, but we don't want to pay for the zeroing of the full description required to call methods on it.
             //So, instead, IConstraintDescription includes a generic parameter pointing to a decoder type.
             //We init the decoder type (which tends to have zero length, so no init overhead) and use it as a type specialized factory delegate.
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-            //description.FillDescription(constraintReference.TypeBatch, bundleIndex, innerIndex);
-            description = default(TConstraintDescription);
+            default(TDescriptionBuilder).BuildDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, out description);
+
         }
 
         /// <summary>
