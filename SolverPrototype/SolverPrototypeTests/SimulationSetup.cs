@@ -18,7 +18,8 @@ namespace SolverPrototypeTests
 
             var description = new ContactManifold4Constraint
             {
-                Normal = new Vector3(0, 1, 0),
+                //By convention, normal faces from B to A.
+                Normal = new Vector3(0, -1, 0),
                 SpringSettings = new SpringSettingsAOS
                 {
                     NaturalFrequency = (float)(Math.PI * 2 * 60),
