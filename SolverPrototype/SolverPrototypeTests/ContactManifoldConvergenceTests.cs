@@ -90,6 +90,7 @@ namespace SolverPrototypeTests
                 for (int i = 0; i < constraintHandles.Length; ++i)
                 {
                     solver.GetConstraintReference<ContactManifold4TypeBatch>(constraintHandles[i], out var constraint);
+                    
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
                     ref var bodyReferences = ref constraint.TypeBatch.BodyReferences[bundleIndex];
                     var velocityA =

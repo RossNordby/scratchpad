@@ -65,6 +65,12 @@ namespace SolverPrototype.Constraints
         }
 
     }
+    //You are allowed to squint at this triple-class separation.
+    //This is only really here because there are cases (e.g. adding a constraint) where it is necessary to have knowledge of TBodyReferences so that the caller (the solver, generally)
+    //can communicate to the type batch in a type safe way. The alternative would have been including the TPrestepData, TProjection, and TAccumulatedImpulse, which just gets excessive.
+    //Avoiding generic type knowledge would likely have involved some goofy safe-but-Unsafe casting.
+    //We might have some issues with this in the future if we have fully unconstrained body reference counts in a constraint. It's wise to avoid that.
+
     public abstract class TypeBatch<TBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse> : TypeBatch
     {
         public TBodyReferences[] BodyReferences;
@@ -94,8 +100,9 @@ namespace SolverPrototype.Constraints
         /// Allocates a slot in the batch.
         /// </summary>
         /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
+        /// <param name="bodyReferences">Reference to the beginning of a list of references with count equal to the type batch's expected number of involved bodies.</param>
         /// <returns>Index of the slot in the batch.</returns>
-        public override int Allocate(int handle)
+        public override int Allocate(int handle, ref int bodyReferences)
         {
             Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == Projection.Length)
@@ -113,6 +120,8 @@ namespace SolverPrototype.Constraints
             Handles[index] = handle;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            GatherScatter.SetLane(ref BodyReferences[bundleIndex], innerIndex, ref bodyReferences);
             return index;
         }
 

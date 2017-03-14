@@ -23,7 +23,7 @@ namespace SolverPrototype.Constraints
         /// <param name="bundleIndex">Index of the source constraint's bundle.</param>
         /// <param name="innerIndex">Index of the source constraint within its bundle.</param>
         /// <param name="description">Description of the constraint.</param>
-        void BuildDescription(TBatch batch, int bundleIndex, int innerIndex, out TDescription description);
+        void FillDescription(TBatch batch, int bundleIndex, int innerIndex);
         /// <summary>
         /// Changes the batch-held memory at a given location to match the given description.
         /// </summary>

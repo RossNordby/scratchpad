@@ -62,6 +62,8 @@ namespace SolverPrototypeTests
             GatherScatter.Get(ref prestep.FrictionCoefficient, constraintInnerIndex) = 1;
             GatherScatter.Get(ref prestep.TangentX.X, constraintInnerIndex) = 1;
             GatherScatter.Get(ref prestep.TangentY.Z, constraintInnerIndex) = 1;
+
+            solver.Add(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
             return constraintHandle;
         }
 
