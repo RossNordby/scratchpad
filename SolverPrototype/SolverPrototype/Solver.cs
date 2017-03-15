@@ -8,7 +8,9 @@ using System.Runtime.CompilerServices;
 namespace SolverPrototype
 {
     /// <summary>
-    /// Reference to a particular constraint in a type batch.
+    /// Direct reference to a particular constraint in a type batch. 
+    /// The index may be invalidated by removal of other constraints in the type batch. Removals can occur by user request or by batch compression.
+    /// The user is responsible for guaranteeing safe usage. For long term references that potentially span removals, use the constraint's handle.
     /// </summary>
     /// <typeparam name="T">Type of the batch referenced.</typeparam>
     public struct ConstraintReference<T>
@@ -56,12 +58,15 @@ namespace SolverPrototype
         IdPool handlePool = new IdPool();
         public ConstraintLocation[] HandlesToConstraints;
 
-        public Solver(Bodies bodies, int iterationCount = 5, int initialCapacity = 128)
+        public TypeBatchAllocation TypeBatchAllocation { get; private set; }
+        
+        public Solver(Bodies bodies, int iterationCount = 5, int initialCapacity = 1024, int minimumCapacityPerTypeBatch = 64, int initialTypeCountEstimate = 32)
         {
             this.iterationCount = iterationCount;
             this.bodies = bodies;
             Batches = new QuickList<ConstraintBatch>(new PassthroughBufferPool<ConstraintBatch>());
             HandlesToConstraints = new ConstraintLocation[initialCapacity];
+            TypeBatchAllocation = new TypeBatchAllocation(initialTypeCountEstimate, minimumCapacityPerTypeBatch);
         }
 
 
@@ -110,7 +115,7 @@ namespace SolverPrototype
             var bodyReferences = stackalloc int[2];
             bodyReferences[0] = bodyHandleA;
             bodyReferences[1] = bodyHandleB;
-            targetBatch.Allocate(handle, ref bodyReferences[0], out var typeId, out constraintReference);
+            targetBatch.Allocate(handle, ref bodyReferences[0], TypeBatchAllocation, out var typeId, out constraintReference);
 
             if (handle >= HandlesToConstraints.Length)
             {

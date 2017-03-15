@@ -21,7 +21,7 @@ namespace SolverPrototype
 
             internal static Pool<T> Pool;
         }
-        
+
 
         static HashSet<Type> registeredBatchTypes = new HashSet<Type>();
 
@@ -35,7 +35,7 @@ namespace SolverPrototype
         /// </summary>
         /// <typeparam name="T">Type to look up the id of.</typeparam>
         /// <returns>Id of the given type.</returns>
-        /// <remarks>Not thread safe with calls to Reset or Register. All changes to registration should be be performed outside of any usage.</remarks>
+        /// <remarks>Not thread safe with calls to Reset, Register, or ChangeMinimumCapacity. All changes to registration should be be performed outside of any usage.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int GetId<T>() where T : TypeBatch
         {
@@ -44,14 +44,15 @@ namespace SolverPrototype
         }
 
         /// <summary>
-        /// Gets a batch of the specified type.
+        /// Gets an unintialized batch of the specified type.
         /// </summary>
         /// <typeparam name="T">Type of the batch to grab.</typeparam>
-        /// <returns>Batch of the specified type.</returns>
-        public static T Take<T>()
+        /// <returns>Uninitialized batch of the specified type.</returns>
+        public static T Take<T>() where T : TypeBatch
         {
             ValidateType<T>();
-            return Ids<T>.Pool.LockingTake();
+            var batch = Ids<T>.Pool.LockingTake();
+            return batch;
         }
         /// <summary>
         /// Returns a batch to its pool.
@@ -69,6 +70,7 @@ namespace SolverPrototype
         public static void Clear()
         {
             //Gross? Gross. But better than leaving unreachable reference types floating around forever.
+            //TODO: Watch out with native compilation; might have to find a non-reflective approach.
             foreach (var type in registeredBatchTypes)
             {
                 Type.GetType("Ids`1").MakeGenericType(type).GetField("Pool").SetValue(null, null);
@@ -80,6 +82,7 @@ namespace SolverPrototype
         /// Registers a type in the id set.
         /// </summary>
         /// <typeparam name="T">Type to register.</typeparam>
+        /// When a type batch is requested, its capacity will be the larger of this value and the requested capacity.</param>
         /// <returns>Id associated with the type.</returns>
         public static int Register<T>() where T : TypeBatch, new()
         {
@@ -91,8 +94,10 @@ namespace SolverPrototype
             Ids<T>.Id = index;
             //The new constraint results in constructors being invoked with reflection at the moment, but we shouldn't be creating new type batches frequently.
             //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.
-            Ids<T>.Pool = new Pool<T>(() => new T(), batch => batch.Initialize(), batch => batch.Reset());
+            //Note that the initializer is handled by the user of the Take function. This allows a caller to choose the allocator rather than using a static one.
+            Ids<T>.Pool = new Pool<T>(() => new T(), cleaner: batch => batch.Reset());
             return index;
         }
+        
     }
 }

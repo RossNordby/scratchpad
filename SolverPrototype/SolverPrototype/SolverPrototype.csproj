@@ -102,12 +102,14 @@
     <Compile Include="Constraints\ContactPenetrationLimit4.cs" />
     <Compile Include="Constraints\IConstraintDescription.cs" />
     <Compile Include="IForEachRef.cs" />
+    <Compile Include="TypeBatchAllocation.cs" />
     <Compile Include="Matrix2x2Wide.cs" />
     <Compile Include="Matrix2x3Wide.cs" />
     <Compile Include="MSBRadixSort.cs" />
     <Compile Include="Pow2Allocator.cs" />
     <Compile Include="Quicksort.cs" />
     <Compile Include="LSBRadixSort.cs" />
+    <Compile Include="Simulation.cs" />
     <Compile Include="Springiness.cs" />
     <Compile Include="SuballocatedBufferPool.cs" />
     <Compile Include="SuballocatedList.cs" />

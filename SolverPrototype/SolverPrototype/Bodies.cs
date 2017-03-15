@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
-{   
+{
     /// <summary>
     /// Body data is stored in AOSOA for the integration step.
     /// From the solver's perspective, some form of gather is required for velocities regardless of the layout, so it might as well be optimal for some other stage.
@@ -90,15 +90,15 @@ namespace SolverPrototype
 
 
 
-        public unsafe Bodies(int initialCapacityInBundles = 1024)
+        public unsafe Bodies(int initialCapacity = 4096)
         {
+            var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
             VelocityBundles = new BodyVelocities[initialCapacityInBundles];
             LocalInertiaBundles = new BodyInertias[initialCapacityInBundles];
-
-            int initialBodyCapacity = initialCapacityInBundles << BundleIndexing.VectorShift;
-            IdPool = new IdPool(initialBodyCapacity);
-            BodyHandles = new int[initialBodyCapacity];
-            IndicesToHandleIndices = new int[initialBodyCapacity];
+            
+            IdPool = new IdPool(initialCapacity);
+            BodyHandles = new int[initialCapacity];
+            IndicesToHandleIndices = new int[initialCapacity];
             //Initialize all the indices to -1.
             InitializeIndices(BodyHandles, 0, BodyHandles.Length);
             InitializeIndices(IndicesToHandleIndices, 0, IndicesToHandleIndices.Length);

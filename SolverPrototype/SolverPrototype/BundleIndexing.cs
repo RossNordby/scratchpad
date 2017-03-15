@@ -51,6 +51,11 @@ namespace SolverPrototype
             bundleIndex = linearIndex >> VectorShift;
             indexInBundle = linearIndex & VectorMask;
         }
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetBundleCount(int elementCount)
+        {
+            return (elementCount >> VectorShift) + ((elementCount & VectorMask) > 0 ? 1 : 0);
+        }
     }
 }

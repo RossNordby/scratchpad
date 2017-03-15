@@ -38,7 +38,7 @@ namespace SolverPrototype.Constraints
         /// <param name="bodyCount">Number of bodies in the body set.</param>
         public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount);
 
-        public abstract void Initialize();
+        public abstract void Initialize(int initialCapacityInBundles);
         public abstract void Reset();
 
         public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle);
@@ -83,8 +83,6 @@ namespace SolverPrototype.Constraints
         protected TProjection[] Projection;
         public TAccumulatedImpulse[] AccumulatedImpulses;
 
-
-        public static int InitialCapacityInBundles = 128;
 
         static void IncreaseSize<T>(ref T[] array)
         {
@@ -220,16 +218,16 @@ namespace SolverPrototype.Constraints
             RemoveBodyReferences(sourceBundleIndex, sourceInnerIndex);
         }
 
-        public override void Initialize()
+        public override void Initialize(int initialCapacityInBundles)
         {
-            Projection = BufferPools<TProjection>.Locking.Take(InitialCapacityInBundles);
-            BodyReferences = BufferPools<TBodyReferences>.Locking.Take(InitialCapacityInBundles);
+            Projection = BufferPools<TProjection>.Locking.Take(initialCapacityInBundles);
+            BodyReferences = BufferPools<TBodyReferences>.Locking.Take(initialCapacityInBundles);
             //TODO: So long as increase size is using a non-clearing pool, we need to clear the body references to avoid pulling old counts. We rely on the counts.
             //Would be a good idea to change this- it would be easy and cheap to clear the count every time a new bundle is created.
             Array.Clear(BodyReferences, 0, BodyReferences.Length);
-            PrestepData = BufferPools<TPrestepData>.Locking.Take(InitialCapacityInBundles);
-            AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(InitialCapacityInBundles);
-            Handles = BufferPools<int>.Locking.Take(InitialCapacityInBundles * Vector<float>.Count);
+            PrestepData = BufferPools<TPrestepData>.Locking.Take(initialCapacityInBundles);
+            AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(initialCapacityInBundles);
+            Handles = BufferPools<int>.Locking.Take(initialCapacityInBundles * Vector<float>.Count);
         }
 
         public override void Reset()
