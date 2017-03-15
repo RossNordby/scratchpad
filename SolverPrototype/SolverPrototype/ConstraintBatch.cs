@@ -10,7 +10,7 @@ namespace SolverPrototype
     /// <summary>
     /// Contains a set of constraints which share no body references.
     /// </summary>
-    public partial class ConstraintBatch
+    public class ConstraintBatch
     {
         internal BatchReferencedHandles Handles;
         public int[] TypeIndexToTypeBatchIndex;
@@ -62,7 +62,7 @@ namespace SolverPrototype
 
         T CreateNewTypeBatch<T>(int typeId, TypeBatchAllocation typeBatchAllocation) where T : TypeBatch, new()
         {
-            var batch = ConstraintTypeIds.Take<T>();
+            var batch = typeBatchAllocation.Take<T>();
             //TODO: should pass an allocator associated with the TypeBatchAllocation into the initializer rather than using the static pools; helps avoid contention cross-simulation.
             batch.Initialize(typeBatchAllocation[typeId]);
             TypeBatches.Add(batch);
@@ -77,7 +77,6 @@ namespace SolverPrototype
                 ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
                 TypeIndexToTypeBatchIndex[typeId] = TypeBatches.Count;
                 constraintPointer.TypeBatch = CreateNewTypeBatch<T>(typeId, typeBatchAllocation);
-                TypeBatches.Add(constraintPointer.TypeBatch = ConstraintTypeIds.Take<T>());
             }
             else
             {
@@ -104,7 +103,7 @@ namespace SolverPrototype
             //and it is rare that a new type batch will be created that actually needs to be enormous.)
         }
 
-        public void Remove<T>(int indexInTypeBatch, ConstraintLocation[] handlesToConstraints) where T : TypeBatch
+        public void Remove<T>(int indexInTypeBatch, ConstraintLocation[] handlesToConstraints, TypeBatchAllocation typeBatchAllocation) where T : TypeBatch
         {
             var constraintTypeId = ConstraintTypeIds.GetId<T>();
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
@@ -121,7 +120,7 @@ namespace SolverPrototype
                     //If we swapped anything into the removed slot, we should update the type index to type batch mapping.
                     TypeIndexToTypeBatchIndex[constraintTypeId] = typeBatchIndex;
                 }
-                ConstraintTypeIds.Return(typeBatch);
+                typeBatchAllocation.Return(typeBatch);
 
             }
 
