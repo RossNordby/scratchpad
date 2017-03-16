@@ -20,8 +20,7 @@ namespace SolverPrototype
             internal static int Id;
         }
 
-
-        static HashSet<Type> registeredBatchTypes = new HashSet<Type>();
+        static List<Type> registeredBatchTypes = new List<Type>();
 
         [Conditional("DEBUG")]
         static void ValidateType<T>()
@@ -40,15 +39,29 @@ namespace SolverPrototype
             ValidateType<T>();
             return Ids<T>.Id;
         }
-        
+
         /// <summary>
-        /// Clears all type id registrations.
+        /// Gets the type associated with a given type id.
         /// </summary>
-        public static void Clear()
+        /// <param name="typeId">Type id to check the type of.</param>
+        /// <returns>Type associated with the given type id.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Type GetType(int typeId)
         {
-            registeredBatchTypes.Clear();
+            Debug.Assert(typeId >= 0 && typeId < registeredBatchTypes.Count);
+            return registeredBatchTypes[typeId];
         }
 
+        /// <summary>
+        /// Gets the id associated with a given type. This is a slow path. Use the generic path whenever possible.
+        /// </summary>
+        /// <param name="type">Type to look up the index of.</param>
+        /// <returns>Id of the given type if it was registered. -1 otherwise.</returns>
+        public static int GetId(Type type)
+        {
+            return registeredBatchTypes.IndexOf(type);
+        }
+        
         /// <summary>
         /// Registers a type in the id set.
         /// </summary>
@@ -58,13 +71,23 @@ namespace SolverPrototype
         public static int Register<T>() where T : TypeBatch, new()
         {
             var index = registeredBatchTypes.Count;
-            if (!registeredBatchTypes.Add(typeof(T)))
+            var newType = typeof(T);
+            if (registeredBatchTypes.Contains(newType))
             {
                 throw new ArgumentException("Type is already registered; cannot reregister.");
             }
+            registeredBatchTypes.Add(newType);
             Ids<T>.Id = index;
             return index;
         }
         
+        /// <summary>
+        /// Clears all type id registrations.
+        /// </summary>
+        public static void Clear()
+        {
+            registeredBatchTypes.Clear();
+        }
+
     }
 }

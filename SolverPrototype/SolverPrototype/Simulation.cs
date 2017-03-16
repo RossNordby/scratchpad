@@ -66,40 +66,35 @@ namespace SolverPrototype
         /// Allocates a constraint slot and sets up a constraint with the specified description.
         /// </summary>
         /// <typeparam name="TDescription">Type of the constraint description to add.</typeparam>
-        /// <typeparam name="TTypeBatch">Type of the TypeBatch to allocate in.</typeparam>
         /// <param name="bodyHandles">First body handle in a list of body handles used by the constraint.</param>
         /// <param name="bodyCount">Number of bodies used by the constraint.</param>
-        /// <param name="constraintReference">Reference to the allocated slot.</param>
-        /// <param name="constraintHandle">Allocated constraint handle.</param>
-        public unsafe void Add<TDescription, TTypeBatch>(ref int bodyHandles, int bodyCount, ref TDescription description,
-            out ConstraintReference<TTypeBatch> constraintReference, out int constraintHandle)
-            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        /// <returns>Allocated constraint handle.</returns>
+        public int Add<TDescription>(ref int bodyHandles, int bodyCount, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription>
         {
-            Solver.Add(ref bodyHandles, bodyCount, ref description, out constraintReference, out constraintHandle);
+            Solver.Add(ref bodyHandles, bodyCount, ref description, out int constraintHandle);
             for (int i = 0; i < bodyCount; ++i)
             {
                 ConstraintGraph.AddConstraint(Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, i)], constraintHandle, i);
             }
+            return constraintHandle;
         }
 
         /// <summary>
         /// Allocates a two-body constraint slot and sets up a constraint with the specified description.
         /// </summary>
         /// <typeparam name="TDescription">Type of the constraint description to add.</typeparam>
-        /// <typeparam name="TTypeBatch">Type of the TypeBatch to allocate in.</typeparam>
         /// <param name="bodyHandleA">First body of the pair.</param>
         /// <param name="bodyHandleB">Second body of the pair.</param>
-        /// <param name="constraintReference">Reference to the allocated slot.</param>
-        /// <param name="constraintHandle">Allocated constraint handle.</param>
-        public unsafe void Add<TDescription, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TDescription description,
-            out ConstraintReference<TTypeBatch> constraintReference, out int constraintHandle)
-            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        /// <returns>Allocated constraint handle.</returns>
+        public unsafe int Add<TDescription>(int bodyHandleA, int bodyHandleB, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription>
         {
             //Don't really want to take a dependency on the stack layout of parameters, so...
             var bodyReferences = stackalloc int[2];
             bodyReferences[0] = bodyHandleA;
             bodyReferences[1] = bodyHandleB;
-            Add(ref bodyReferences[0], 2, ref description, out constraintReference, out constraintHandle);
+            return Add(ref bodyReferences[0], 2, ref description);
         }
 
         struct ConstraintGraphRemovalEnumerator : IForEach<int>

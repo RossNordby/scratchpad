@@ -13,13 +13,11 @@ namespace SolverPrototype
     /// The index may be invalidated by removal of other constraints in the type batch. Removals can occur by user request or by batch compression.
     /// The user is responsible for guaranteeing safe usage. For long term references that potentially span removals, use the constraint's handle.
     /// </summary>
-    /// <typeparam name="T">Type of the batch referenced.</typeparam>
-    public struct ConstraintReference<T>
+    public struct ConstraintReference
     {
-        public T TypeBatch;
+        public TypeBatch TypeBatch;
         public int IndexInTypeBatch;
     }
-
 
     public struct ConstraintLocation
     {
@@ -70,7 +68,6 @@ namespace SolverPrototype
             TypeBatchAllocation = new TypeBatchAllocation(initialTypeCountEstimate, minimumCapacityPerTypeBatch);
         }
 
-
         /// <summary>
         /// Gets a direct reference to the constraint associated with a handle.
         /// The reference is temporary; any constraint removals that affect the referenced type batch may invalidate the index.
@@ -79,10 +76,10 @@ namespace SolverPrototype
         /// <param name="handle">Handle index of the constraint.</param>
         /// <param name="reference">Temporary direct reference to the type batch and index in the type batch associated with the constraint handle.
         /// May be invalidated by constraint removals.</param>
-        public void GetConstraintReference<T>(int handle, out ConstraintReference<T> reference) where T : TypeBatch
+        public void GetConstraintReference(int handle, out ConstraintReference reference)
         {
             ref var constraintLocation = ref HandlesToConstraints[handle];
-            reference.TypeBatch = Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch<T>();
+            reference.TypeBatch = Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId);
             reference.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
         }
 
@@ -92,9 +89,10 @@ namespace SolverPrototype
         /// <typeparam name="T">Type of the TypeBatch to allocate in.</typeparam>
         /// <param name="bodyHandles">Reference to the start of a list of body handles.</param>
         /// <param name="bodyCount">Number of bodies in the body handles list.</param>
-        /// <param name="constraintReference">Reference to the allocated slot.</param>
-        /// <param name="handle">Allocated constraint handle.</param>
-        public unsafe void Allocate<T>(ref int bodyHandles, int bodyCount, out ConstraintReference<T> constraintReference, out int handle) where T : TypeBatch, new()
+        /// <param name="typeId">Id of the TypeBatch type to allocate in.</param>
+        /// <param name="reference">Direct reference to the constraint type batch and index in the type batch.</param>
+        /// <returns>Allocated constraint handle.</returns>
+        public int Allocate(ref int bodyHandles, int bodyCount, int typeId, out ConstraintReference reference)
         {
             int targetBatchIndex = -1;
             //Find the first batch that references none of the bodies that this constraint needs.
@@ -134,46 +132,44 @@ namespace SolverPrototype
             {
                 targetBatch.BodyHandles.Add(Unsafe.Add(ref bodyHandles, j));
             }
-            handle = handlePool.Take();
-            targetBatch.Allocate(handle, ref bodyHandles, TypeBatchAllocation, out var typeId, out constraintReference);
+            var handle = handlePool.Take();
+            targetBatch.Allocate(handle, ref bodyHandles, TypeBatchAllocation, typeId, out reference);
 
             if (handle >= HandlesToConstraints.Length)
             {
                 Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);
                 Debug.Assert(handle < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
             }
-            HandlesToConstraints[handle].IndexInTypeBatch = constraintReference.IndexInTypeBatch;
+            HandlesToConstraints[handle].IndexInTypeBatch = reference.IndexInTypeBatch;
             HandlesToConstraints[handle].TypeId = typeId;
             HandlesToConstraints[handle].BatchIndex = targetBatchIndex;
+            return handle;
         }
-
 
         /// <summary>
         /// Applies a description to a constraint slot.
         /// </summary>
         /// <typeparam name="TDescription">Type of the description to apply.</typeparam>
-        /// <typeparam name="TDescriptionBuilder">Type of the description builder associated with the description type.</typeparam>
-        /// <typeparam name="TTypeBatch">Type of the batch containing the slot.</typeparam>
         /// <param name="constraintReference">Reference of the constraint being updated.</param>
         /// <param name="description">Description to apply to the slot.</param>
-        public void ApplyDescription<TDescription, TTypeBatch>(ref ConstraintReference<TTypeBatch> constraintReference, ref TDescription description)
-            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        public void ApplyDescription<TDescription>(ref ConstraintReference constraintReference, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription>
         {
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
             description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, ref description);
         }
 
+
         /// <summary>
         /// Applies a description to a constraint slot.
         /// </summary>
         /// <typeparam name="TDescription">Type of the description to apply.</typeparam>
-        /// <typeparam name="TTypeBatch">Type of the batch containing the slot.</typeparam>
         /// <param name="constraintReference">Handle of the constraint being updated.</param>
         /// <param name="description">Description to apply to the slot.</param>
-        public void ApplyDescription<TDescription, TTypeBatch>(int constraintHandle, ref TDescription description)
-            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        public void ApplyDescription<TDescription>(int constraintHandle, ref TDescription description)
+            where TDescription : IConstraintDescription<TDescription>
         {
-            GetConstraintReference<TTypeBatch>(constraintHandle, out var constraintReference);
+            GetConstraintReference(constraintHandle, out var constraintReference);
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
             description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, ref description);
         }
@@ -187,12 +183,11 @@ namespace SolverPrototype
         /// <param name="bodyCount">Number of bodies in the body handles list.</param>
         /// <param name="constraintReference">Reference to the allocated slot.</param>
         /// <param name="handle">Allocated constraint handle.</param>
-        public void Add<TDescription, TTypeBatch>(ref int bodyHandles, int bodyCount, ref TDescription description,
-            out ConstraintReference<TTypeBatch> constraintReference, out int handle)
-            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        public void Add<TDescription>(ref int bodyHandles, int bodyCount, ref TDescription description, out int handle)
+            where TDescription : IConstraintDescription<TDescription>
         {
-            Allocate(ref bodyHandles, bodyCount, out constraintReference, out handle);
-            ApplyDescription(ref constraintReference, ref description);
+            handle = Allocate(ref bodyHandles, bodyCount, description.ConstraintTypeId, out var reference);
+            ApplyDescription(ref reference, ref description);
 
         }
 
@@ -208,17 +203,32 @@ namespace SolverPrototype
 
         }
 
-        public void GetDescription<TConstraintDescription, TTypeBatch, TDescriptionBuilder>(ref ConstraintReference<TTypeBatch> constraintReference, out TConstraintDescription description)
-            where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch
-            where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TConstraintDescription, TTypeBatch>
+        public void GetDescription<TConstraintDescription, TTypeBatch>(ref ConstraintReference constraintReference, out TConstraintDescription description)
+            where TConstraintDescription : IConstraintDescription<TConstraintDescription>
+            where TTypeBatch : TypeBatch
         {
-            //We want to maintain the simple api of an out parameter, but we don't want to pay for the zeroing of the full description required to call methods on it.
-            //So, instead, IConstraintDescription includes a generic parameter pointing to a decoder type.
-            //We init the decoder type (which tends to have zero length, so no init overhead) and use it as a type specialized factory delegate.
+            //Note that the inlining behavior of the BuildDescription function is critical for efficiency here.
+            //If the compiler can prove that the BuildDescription function never references any of the instance fields, it will elide the (potentially expensive) initialization.
+            //The BuildDescription and ConstraintTypeId members are basically static. It would be nice if C# could express that a little more cleanly with no overhead.
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-            default(TDescriptionBuilder).BuildDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, out description);
+            default(TConstraintDescription).BuildDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, out description);
 
         }
+
+        public void GetDescription<TConstraintDescription>(int handle, out TConstraintDescription description)
+            where TConstraintDescription : IConstraintDescription<TConstraintDescription>
+        {
+            //Note that the inlining behavior of the BuildDescription function is critical for efficiency here.
+            //If the compiler can prove that the BuildDescription function never references any of the instance fields, it will elide the (potentially expensive) initialization.
+            //The BuildDescription and ConstraintTypeId members are basically static. It would be nice if C# could express that a little more cleanly with no overhead.
+            ref var location = ref HandlesToConstraints[handle];
+            var dummy = default(TConstraintDescription);
+            var typeBatch = Batches.Elements[location.BatchIndex].GetTypeBatch(dummy.ConstraintTypeId);
+            BundleIndexing.GetBundleIndices(location.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
+            dummy.BuildDescription(typeBatch, bundleIndex, innerIndex, out description);
+
+        }
+
 
 
         /// <summary>

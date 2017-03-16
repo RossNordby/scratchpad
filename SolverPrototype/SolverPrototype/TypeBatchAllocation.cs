@@ -23,15 +23,17 @@ namespace SolverPrototype
             }
         }
         int[] capacities;
-        Pool[] pools;
+        Pool<TypeBatch>[] pools;
 
         public TypeBatchAllocation(int initialTypeCountEstimate, int minimumCapacity)
         {
             capacities = new int[initialTypeCountEstimate];
-            pools = new Pool[initialTypeCountEstimate];
+            pools = new Pool<TypeBatch>[initialTypeCountEstimate];
             this.minimumCapacity = minimumCapacity;
         }
 
+        //TODO: There is really no good reason why you couldn't have all the types defined up front. It would avoid all the last-second resizing. Not exactly a big issue,
+        //but something to think about if this every gets to be any more cumbersome.
         void Validate(int typeId)
         {
             Debug.Assert(typeId >= 0, "Type ids are nonnegative!");
@@ -87,35 +89,34 @@ namespace SolverPrototype
         /// Requests an initialized TypeBatch of the specified type. Not thread safe.
         /// </summary>
         /// <returns>TypeBatch of the specified type.</returns>
-        public T Take<T>() where T : TypeBatch, new()
+        public TypeBatch Take(int typeId)
         {
-            var id = ConstraintTypeIds.GetId<T>();
-            Validate(id);
-            if (pools[id] == null)
+            Validate(typeId);
+            if (pools[typeId] == null)
             {
                 //The new constraint results in constructors being invoked with reflection at the moment, but we shouldn't be creating new type batches frequently.
-                //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.
-                pools[id] = new Pool<T>(() => new T(), cleaner: batch => batch.Reset());
+                //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.                
+                pools[typeId] = new Pool<TypeBatch>(() => (TypeBatch)Activator.CreateInstance(ConstraintTypeIds.GetType(typeId)), cleaner: batch => batch.Reset());
             }
-            var typeBatch = Unsafe.As<Pool, Pool<T>>(ref pools[id]).Take();
+            var typeBatch = pools[typeId].Take();
             //We didn't initialize it in the pool; do so here. (The pool COULD use an initializer, but, well, I didn't do that.)
             //TODO: In the future, the initialization would ideally take a memory source to pull from rather than just using a static BufferPool source.
             //This TypeBatchAllocation class would have a reference to that memory source so we could very conveniently pass it into the initialization.
-            typeBatch.Initialize(BundleIndexing.GetBundleCount(Math.Max(minimumCapacity, capacities[id])));
+            typeBatch.Initialize(BundleIndexing.GetBundleCount(Math.Max(minimumCapacity, capacities[typeId])));
             return typeBatch;
         }
 
         /// <summary>
         /// Returns a type batch to the pool. Not thread safe.
         /// </summary>
-        /// <typeparam name="T">Type of the batch to return.</typeparam>
+        /// <param name="typeId">Type id of the TypeBatch to return.</param>
         /// <param name="typeBatch">Batch to return.</param>
-        public void Return<T>(T typeBatch) where T : TypeBatch
+        public void Return(TypeBatch typeBatch, int typeId)
         {
-            var id = ConstraintTypeIds.GetId<T>();
-            Validate(id);
-            Debug.Assert(pools[id] != null, "Can't return something to a pool that doesn't exist.");
-            Unsafe.As<Pool, Pool<T>>(ref pools[id]).Return(typeBatch);
+            Validate(typeId);
+            Debug.Assert(pools[typeId] != null, "Can't return something to a pool that doesn't exist.");
+            Debug.Assert(typeBatch.GetType() == ConstraintTypeIds.GetType(typeId), "Type of returned type batch and the type implied by the type id must match.");
+            pools[typeId].Return(typeBatch);
         }
 
         /// <summary>

@@ -4,19 +4,11 @@ using System.Diagnostics;
 
 namespace BEPUutilities2.ResourceManagement
 {
-    public abstract class Pool
-    {
-        /// <summary>
-        /// Clears all elements from the pool.
-        /// </summary>
-        public abstract void Clear();
-    }
-
     /// <summary>
     /// Manages a cache of a type of resource.
     /// </summary>
     /// <typeparam name="T">Type of object to pool.</typeparam>
-    public class Pool<T> : Pool
+    public class Pool<T>
     {
         Stack<T> stack = new Stack<T>();
         SpinLock spinLock = new SpinLock();
@@ -83,7 +75,7 @@ namespace BEPUutilities2.ResourceManagement
         /// <summary>
         /// Clears all elements from the pool.
         /// </summary>
-        public override void Clear()
+        public void Clear()
         {
             stack.Clear();
         }

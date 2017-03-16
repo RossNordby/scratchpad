@@ -85,10 +85,12 @@ namespace SolverPrototypeTests
                 //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
                 for (int i = 0; i < constraintHandles.Length; ++i)
                 {
-                    simulation.Solver.GetConstraintReference<ContactManifold4TypeBatch>(constraintHandles[i], out var constraint);
+                    simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
+                    var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
+
                     
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-                    ref var bodyReferences = ref constraint.TypeBatch.BodyReferences[bundleIndex];
+                    ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];
                     var velocityA =
                         GatherScatter.Get(
                             ref simulation.Bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex)].LinearVelocity.Y,
@@ -98,11 +100,11 @@ namespace SolverPrototypeTests
                             ref simulation.Bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
                             GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
                     var penetrationChange = dt * (velocityA - velocityB);
-                    ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
+                    ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
                     penetrationDepth += penetrationChange;
-                    GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact1.PenetrationDepth, innerIndex) += penetrationChange;
-                    GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
-                    GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact1.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
 
                     if (i == 0)
                         Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");

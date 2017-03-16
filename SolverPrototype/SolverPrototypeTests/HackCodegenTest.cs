@@ -38,7 +38,7 @@ namespace SolverPrototypeTests
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static int Oi2(int a, int b)
         {
-            //Good news it actually doesn't do the localsinit!
+            //Good news it actually doesn't do the localsinit if the jit can know that the 'static' function isn't actually accessing any of the data!
             //var dummy = default(SomeStructWithDataAndFunctions);
             var dummy = new SomeStructWithDataAndFunctions();
             a -= 4;

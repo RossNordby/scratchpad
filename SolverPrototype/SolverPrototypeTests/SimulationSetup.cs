@@ -45,11 +45,10 @@ namespace SolverPrototypeTests
                 contact.OffsetB = worldOffsetB;
                 contact.PenetrationDepth = 0.00f;
             }
+            
+            var handle = simulation.Add(bodyAIndex, bodyBIndex, ref description);
 
-            //TODO: c'mon roslyn you could infer those type parameters if you really put the effort in!
-            //Would be nice to figure out a way around this. The best solution might actually look like improving roslyn's inference...
-            //There probably exists some unsafe-cast-based solution too, but it would be nice to have some degree of compile time safety!
-            simulation.Add<ContactManifold4Constraint, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
+            simulation.Solver.GetDescription<ContactManifold4Constraint>(handle, out var testDescription);
             return handle;
         }
 
@@ -63,7 +62,7 @@ namespace SolverPrototypeTests
             //That is, move the memory location of bodies (and constraints, within type batches) to maximize the number of accesses to already-cached bodies.
 
             Random random = new Random(5);
-            for (int i = simulation.Bodies.BodyCount - 1; i >= 0; --i)
+            for (int i = simulation.Bodies.BodyCount - 1; i >= 1; --i)
             {
                 //This helper function handles the updates that have to be performed across all body-sensitive systems.
                 BodyLayoutOptimizer.SwapBodyLocation(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
