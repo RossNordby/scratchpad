@@ -11,10 +11,10 @@ namespace SolverPrototypeTests
 {
     static class SimulationSetup
     {
-        static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Bodies bodies, Solver solver, ConstraintConnectivityGraph graph, ref Vector3 right, ref Vector3 up, ref Vector3 forward)
+        static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Simulation simulation, ref Vector3 right, ref Vector3 up, ref Vector3 forward)
         {
-            var bodyAIndex = bodies.HandleToIndex[bodyAHandle];
-            var bodyBIndex = bodies.HandleToIndex[bodyBHandle];
+            var bodyAIndex = simulation.Bodies.HandleToIndex[bodyAHandle];
+            var bodyBIndex = simulation.Bodies.HandleToIndex[bodyBHandle];
 
             var description = new ContactManifold4Constraint
             {
@@ -49,15 +49,12 @@ namespace SolverPrototypeTests
             //TODO: c'mon roslyn you could infer those type parameters if you really put the effort in!
             //Would be nice to figure out a way around this. The best solution might actually look like improving roslyn's inference...
             //There probably exists some unsafe-cast-based solution too, but it would be nice to have some degree of compile time safety!
-            solver.Add<ContactManifold4Constraint, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
-            graph.AddConstraint(bodyAIndex, handle, 0);
-            graph.AddConstraint(bodyBIndex, handle, 1);
-            
+            simulation.Add<ContactManifold4Constraint, ContactManifold4TypeBatch>(bodyAIndex, bodyBIndex, ref description, out var reference, out var handle);
             return handle;
         }
 
 
-        public static void ScrambleBodies(Bodies bodies)
+        public static void ScrambleBodies(Simulation simulation)
         {
             //Having every single body in order is pretty unrealistic. In a real application, churn and general lack of care will result in 
             //scrambled body versus constraint memory access patterns. That's a big increase in cache misses.
@@ -66,9 +63,10 @@ namespace SolverPrototypeTests
             //That is, move the memory location of bodies (and constraints, within type batches) to maximize the number of accesses to already-cached bodies.
 
             Random random = new Random(5);
-            for (int i = bodies.BodyCount - 1; i >= 0; --i)
+            for (int i = simulation.Bodies.BodyCount - 1; i >= 0; --i)
             {
-                bodies.Swap(i, random.Next(i));
+                //This helper function handles the updates that have to be performed across all body-sensitive systems.
+                BodyLayoutOptimizer.SwapBodyLocation(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
             }
 
         }
@@ -86,14 +84,18 @@ namespace SolverPrototypeTests
         }
 
         public static void BuildStackOfBodiesOnGround(int bodyCount, bool scrambleBodies, bool scrambleConstraints,
-            out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph, out int[] bodyHandles, out int[] constraintHandles)
+            out Simulation simulation, out int[] bodyHandles, out int[] constraintHandles)
         {
-            bodies = new Bodies();
+            simulation = new Simulation(
+                initialBodyCapacity: bodyCount,
+                initialConstraintCapacity: bodyCount - 1,
+                minimumCapacityPerTypeBatch: bodyCount / 2,
+                initialConstraintCountPerBodyEstimate: 2);
             bodyHandles = new int[bodyCount];
             //Body 0 is a stationary kinematic acting as the ground.
             {
                 var description = new BodyDescription();
-                var handleIndex = bodies.Add(ref description);
+                var handleIndex = simulation.Add(ref description);
                 bodyHandles[0] = handleIndex;
             }
 
@@ -113,22 +115,13 @@ namespace SolverPrototypeTests
                         InverseMass = 1
                     },
                 };
-                var handleIndex = bodies.Add(ref description);
+                var handleIndex = simulation.Add(ref description);
                 bodyHandles[i] = handleIndex;
 
             }
             if (scrambleBodies)
-                ScrambleBodies(bodies);
+                ScrambleBodies(simulation);
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
-            solver = new Solver(bodies, initialCapacity: bodyCount * 3);
-            graph = new ConstraintConnectivityGraph(solver, bodyCount, 6);
-
-            for (int i = 0; i < bodies.BodyCount; ++i)
-            {
-                graph.AddBodyList(i);
-            }
-
-
 
 
             var right = new Vector3(1, 0, 0);
@@ -138,20 +131,24 @@ namespace SolverPrototypeTests
 
             for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
             {
-                constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], bodies, solver, graph, ref right, ref up, ref forward);
+                constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], simulation, ref right, ref up, ref forward);
             }
 
             if (scrambleConstraints)
             {
-                ScrambleConstraints(solver);
+                ScrambleConstraints(simulation.Solver);
             }
         }
 
-        public static void BuildLattice(int width, int height, int length, bool scrambleBodies, bool scrambleConstraints, out Bodies bodies, out Solver solver, out ConstraintConnectivityGraph graph,
+        public static void BuildLattice(int width, int height, int length, bool scrambleBodies, bool scrambleConstraints, out Simulation simulation,
             out int[] bodyHandles, out int[] constraintHandles)
         {
             var bodyCount = width * height * length;
-            bodies = new Bodies((int)Math.Ceiling(bodyCount / (double)Vector<int>.Count));
+            simulation = new Simulation(
+                initialBodyCapacity: (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
+                initialConstraintCapacity: bodyCount * 3,
+                minimumCapacityPerTypeBatch: (bodyCount * 3) / 6,
+                initialConstraintCountPerBodyEstimate: 6);
             bodyHandles = new int[bodyCount];
             for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
             {
@@ -160,22 +157,13 @@ namespace SolverPrototypeTests
                     for (int columnIndex = 0; columnIndex < width; ++columnIndex)
                     {
                         var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 } };
-                        bodyHandles[sliceIndex * (height * width) + rowIndex * width + columnIndex] = bodies.Add(ref bodyDescription);
+                        bodyHandles[sliceIndex * (height * width) + rowIndex * width + columnIndex] = simulation.Add(ref bodyDescription);
                     }
                 }
             }
             if (scrambleBodies)
-                ScrambleBodies(bodies);
+                ScrambleBodies(simulation);
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
-            int constraintCount = (width - 1) * (height - 1) * (length - 1) +
-                width * height;
-            solver = new Solver(bodies, initialCapacity: bodyCount * 3);
-            graph = new ConstraintConnectivityGraph(solver, bodyCount, 6);
-
-            for (int i = 0; i < bodies.BodyCount; ++i)
-            {
-                graph.AddBodyList(i);
-            }
 
 
 
@@ -196,12 +184,12 @@ namespace SolverPrototypeTests
                         //The bottom rows are all kinematic, so don't create connections between them.
                         if (columnIndex > 0)
                         {
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - 1], bodyHandles[bodyAIndex], bodies, solver, graph, ref forward, ref right, ref up);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - 1], bodyHandles[bodyAIndex], simulation, ref forward, ref right, ref up);
                         }
-                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - width], bodyHandles[bodyAIndex], bodies, solver, graph, ref right, ref up, ref forward);
+                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - width], bodyHandles[bodyAIndex], simulation, ref right, ref up, ref forward);
                         if (sliceIndex > 0)
                         {
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - height * width], bodyHandles[bodyAIndex], bodies, solver, graph, ref right, ref forward, ref up);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - height * width], bodyHandles[bodyAIndex], simulation, ref right, ref forward, ref up);
                         }
 
 
@@ -214,7 +202,7 @@ namespace SolverPrototypeTests
 
             if (scrambleConstraints)
             {
-                ScrambleConstraints(solver);
+                ScrambleConstraints(simulation.Solver);
             }
         }
     }

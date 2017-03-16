@@ -8,6 +8,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            HackCodegenTest.Test();
             //VectorAccessTests.Test();
             //GatherScatterTests.Test();
             //LayoutTests.Test();

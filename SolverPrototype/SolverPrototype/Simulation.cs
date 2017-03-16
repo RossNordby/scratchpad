@@ -102,10 +102,22 @@ namespace SolverPrototype
             Add(ref bodyReferences[0], 2, ref description, out constraintReference, out constraintHandle);
         }
 
-
-        public void RemoveConstraint()
+        struct ConstraintGraphRemovalEnumerator : IForEach<int>
         {
-            Solver.Remove();
+            internal ConstraintConnectivityGraph graph;
+            internal int constraintHandle;
+            public void LoopBody(int bodyIndex)
+            {
+                graph.RemoveConstraint(bodyIndex, constraintHandle);
+            }
+        }
+        public void RemoveConstraint(int constraintHandle)
+        {
+            ConstraintGraphRemovalEnumerator enumerator;
+            enumerator.graph = ConstraintGraph;
+            enumerator.constraintHandle = constraintHandle;
+            Solver.EnumerateConnectedBodyIndices(constraintHandle, ref enumerator);
+            Solver.Remove(constraintHandle);
         }
 
         /// <summary>

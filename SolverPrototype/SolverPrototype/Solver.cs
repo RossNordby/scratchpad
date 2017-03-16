@@ -4,6 +4,7 @@ using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
@@ -146,6 +147,7 @@ namespace SolverPrototype
             HandlesToConstraints[handle].BatchIndex = targetBatchIndex;
         }
 
+
         /// <summary>
         /// Applies a description to a constraint slot.
         /// </summary>
@@ -194,6 +196,18 @@ namespace SolverPrototype
 
         }
 
+        /// <summary>
+        /// Removes the constraint associated with the given handle. Note that this may invalidate any outstanding direct constraint references (TypeBatch-index pairs)
+        /// by reordering the constraints within the TypeBatch subject to removal.
+        /// </summary>
+        /// <param name="handle">Handle of the constraint to remove from the solver.</param>
+        public void Remove(int handle)
+        {
+            ref var constraintLocation = ref HandlesToConstraints[handle];
+            Batches[constraintLocation.BatchIndex].Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, HandlesToConstraints, TypeBatchAllocation);
+
+        }
+
         public void GetDescription<TConstraintDescription, TTypeBatch, TDescriptionBuilder>(ref ConstraintReference<TTypeBatch> constraintReference, out TConstraintDescription description)
             where TConstraintDescription : IConstraintDescription<TConstraintDescription, TTypeBatch> where TTypeBatch : TypeBatch
             where TDescriptionBuilder : struct, IConstraintDescriptionBuilder<TConstraintDescription, TTypeBatch>
@@ -206,13 +220,14 @@ namespace SolverPrototype
 
         }
 
+
         /// <summary>
         /// Changes the body reference of a constraint in response to a body memory move.
         /// </summary>
         /// <param name="constraintHandle">Handle of the constraint to modify.</param> 
         /// <param name="bodyIndexInConstraint">Index of the moved body in the constraint.</param>
         /// <param name="newBodyLocation">Memory index that the moved body now inhabits.</param>
-        internal void UpdateForBodyMemoryMove(int constraintHandle, int bodyIndexInConstraint, int newBodyLocation)
+        public void UpdateForBodyMemoryMove(int constraintHandle, int bodyIndexInConstraint, int newBodyLocation)
         {
             //Note that this function requires scanning the bodies in the constraint. This will tend to be fine since the vast majority of constraints have no more than 2 bodies.
             //While it's possible to store the index of the body in the constraint to avoid this scan, storing that information requires collecting that information on add.

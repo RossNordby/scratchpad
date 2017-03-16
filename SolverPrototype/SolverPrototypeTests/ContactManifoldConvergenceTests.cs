@@ -19,12 +19,9 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 8, 32, true, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32, 8, 32, true, true, out var simulation, out var bodyHandles, out var constraintHandles);
 
-
-            var bodyOptimizer = new BodyLayoutOptimizer(bodies, graph, solver);
-            var constraintOptimizer = new ConstraintLayoutOptimizer(bodies, solver);
-
+            
 
             //Attempt cache optimization.
             int bodyOptimizationIterations = bodyHandles.Length * 16;
@@ -34,7 +31,7 @@ namespace SolverPrototypeTests
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
                 //bodyOptimizer.PartialIslandOptimizeDFS(64);
-                bodyOptimizer.DumbIncrementalOptimize();
+                simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
@@ -42,11 +39,11 @@ namespace SolverPrototypeTests
 
             //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
             int constraintCount = 0;
-            for (int i = 0; i < solver.Batches.Count; ++i)
+            for (int i = 0; i < simulation.Solver.Batches.Count; ++i)
             {
-                for (int j = 0; j < solver.Batches[i].TypeBatches.Count; ++j)
+                for (int j = 0; j < simulation.Solver.Batches[i].TypeBatches.Count; ++j)
                 {
-                    constraintCount += solver.Batches[i].TypeBatches[j].ConstraintCount;
+                    constraintCount += simulation.Solver.Batches[i].TypeBatches[j].ConstraintCount;
                 }
             }
             const int bundlesPerOptimizationRegion = 256;
@@ -57,12 +54,12 @@ namespace SolverPrototypeTests
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            constraintOptimizer.Update(2, 1); //prejit
+            simulation.ConstraintLayoutOptimizer.Update(2, 1); //prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                constraintOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration);
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
@@ -74,31 +71,31 @@ namespace SolverPrototypeTests
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
             const int frameCount = 256;
-            solver.IterationCount = iterationCount;
+            simulation.Solver.IterationCount = iterationCount;
 
 
             //prejit
-            solver.Update(dt, inverseDt);
+            simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                var energyBefore = bodies.GetBodyEnergyHeuristic();
+                var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
                 //Update the penetration depths associated with the constraints.
                 //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
                 for (int i = 0; i < constraintHandles.Length; ++i)
                 {
-                    solver.GetConstraintReference<ContactManifold4TypeBatch>(constraintHandles[i], out var constraint);
+                    simulation.Solver.GetConstraintReference<ContactManifold4TypeBatch>(constraintHandles[i], out var constraint);
                     
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
                     ref var bodyReferences = ref constraint.TypeBatch.BodyReferences[bundleIndex];
                     var velocityA =
                         GatherScatter.Get(
-                            ref bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex)].LinearVelocity.Y,
+                            ref simulation.Bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex)].LinearVelocity.Y,
                             GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex));
                     var velocityB =
                         GatherScatter.Get(
-                            ref bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
+                            ref simulation.Bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
                             GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
                     var penetrationChange = dt * (velocityA - velocityB);
                     ref var penetrationDepth = ref GatherScatter.Get(ref constraint.TypeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
@@ -114,18 +111,18 @@ namespace SolverPrototypeTests
 
 
                 //Apply some gravity so we can simulate sorta-kinda stacking.
-                var bodyBundleCount = bodies.BodyCount >> BundleIndexing.VectorShift;
+                var bodyBundleCount = simulation.Bodies.BodyCount >> BundleIndexing.VectorShift;
                 var impulse = new Vector<float>(-10 * dt);
                 for (int i = 0; i < bodyBundleCount; ++i)
                 {
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
-                    bodies.VelocityBundles[i].LinearVelocity.Y += bodies.LocalInertiaBundles[i].InverseMass * impulse;
+                    simulation.Bodies.VelocityBundles[i].LinearVelocity.Y += simulation.Bodies.LocalInertiaBundles[i].InverseMass * impulse;
                 }
                 CacheBlaster.Blast();
                 timer.Start();
-                solver.Update(dt, inverseDt);
+                simulation.Solver.Update(dt, inverseDt);
                 timer.Stop();
-                var energyAfter = bodies.GetBodyEnergyHeuristic();
+                var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
                 Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");

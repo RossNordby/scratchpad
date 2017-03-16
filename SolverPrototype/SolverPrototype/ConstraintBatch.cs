@@ -69,7 +69,7 @@ namespace SolverPrototype
             return batch;
         }
         public void Allocate<T>(int handle, ref int bodyReferences, TypeBatchAllocation typeBatchAllocation, out int typeId, out ConstraintReference<T> constraintPointer) where T : TypeBatch, new()
-        {        
+        {
             typeId = ConstraintTypeIds.GetId<T>();
 
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
@@ -106,6 +106,11 @@ namespace SolverPrototype
         public void Remove<T>(int indexInTypeBatch, ConstraintLocation[] handlesToConstraints, TypeBatchAllocation typeBatchAllocation) where T : TypeBatch
         {
             var constraintTypeId = ConstraintTypeIds.GetId<T>();
+            Remove(constraintTypeId, indexInTypeBatch, handlesToConstraints, typeBatchAllocation);
+        }
+
+        public void Remove(int constraintTypeId, int indexInTypeBatch, ConstraintLocation[] handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
+        {
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
 
             var typeBatchIndex = TypeIndexToTypeBatchIndex[constraintTypeId];

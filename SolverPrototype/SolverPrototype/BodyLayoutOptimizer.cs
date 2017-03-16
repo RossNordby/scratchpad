@@ -51,7 +51,7 @@ namespace SolverPrototype
                 Solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, NewLocation);
             }
         }
-        static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
+        public static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
         {
             Debug.Assert(a != b, "Swapping a body with itself isn't meaningful. Whaddeyer doin?");
             //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
