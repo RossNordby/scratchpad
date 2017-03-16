@@ -59,7 +59,7 @@ namespace SolverPrototype
         public ConstraintLocation[] HandlesToConstraints;
 
         public TypeBatchAllocation TypeBatchAllocation { get; private set; }
-        
+
         public Solver(Bodies bodies, int iterationCount = 5, int initialCapacity = 1024, int minimumCapacityPerTypeBatch = 64, int initialTypeCountEstimate = 32)
         {
             this.iterationCount = iterationCount;
@@ -70,31 +70,50 @@ namespace SolverPrototype
         }
 
 
-        public void GetConstraintReference<T>(int handleIndex, out ConstraintReference<T> constraintPointer) where T : TypeBatch
+        /// <summary>
+        /// Gets a direct reference to the constraint associated with a handle.
+        /// The reference is temporary; any constraint removals that affect the referenced type batch may invalidate the index.
+        /// </summary>
+        /// <typeparam name="T">Type of the type batch being referred to.</typeparam>
+        /// <param name="handle">Handle index of the constraint.</param>
+        /// <param name="reference">Temporary direct reference to the type batch and index in the type batch associated with the constraint handle.
+        /// May be invalidated by constraint removals.</param>
+        public void GetConstraintReference<T>(int handle, out ConstraintReference<T> reference) where T : TypeBatch
         {
-            ref var constraintLocation = ref HandlesToConstraints[handleIndex];
-            constraintPointer.TypeBatch = Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch<T>();
-            constraintPointer.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
+            ref var constraintLocation = ref HandlesToConstraints[handle];
+            reference.TypeBatch = Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch<T>();
+            reference.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
         }
 
         /// <summary>
-        /// Allocates a slot in a type batch for a two body constraint.
+        /// Allocates a slot in a type batch for a constraint.
         /// </summary>
         /// <typeparam name="T">Type of the TypeBatch to allocate in.</typeparam>
-        /// <param name="bodyHandleA">First body of the pair.</param>
-        /// <param name="bodyHandleB">Second body of the pair.</param>
+        /// <param name="bodyHandles">Reference to the start of a list of body handles.</param>
+        /// <param name="bodyCount">Number of bodies in the body handles list.</param>
         /// <param name="constraintReference">Reference to the allocated slot.</param>
         /// <param name="handle">Allocated constraint handle.</param>
-        public unsafe void Allocate<T>(int bodyHandleA, int bodyHandleB, out ConstraintReference<T> constraintReference, out int handle) where T : TypeBatch, new()
+        public unsafe void Allocate<T>(ref int bodyHandles, int bodyCount, out ConstraintReference<T> constraintReference, out int handle) where T : TypeBatch, new()
         {
             int targetBatchIndex = -1;
+            //Find the first batch that references none of the bodies that this constraint needs.
             for (int i = 0; i < Batches.Count; ++i)
             {
                 var batch = Batches[i];
-                if (!batch.Handles.Contains(bodyHandleA) &&
-                    !batch.Handles.Contains(bodyHandleB))
+
+                bool canFit = true;
+                for (int j = 0; j < bodyCount; ++j)
+                {
+                    if (batch.BodyHandles.Contains(Unsafe.Add(ref bodyHandles, j)))
+                    {
+                        canFit = false;
+                        break;
+                    }
+                }
+                if (canFit)
                 {
                     targetBatchIndex = i;
+                    break;
                 }
             }
             ConstraintBatch targetBatch;
@@ -109,13 +128,13 @@ namespace SolverPrototype
             {
                 targetBatch = Batches.Elements[targetBatchIndex];
             }
-            targetBatch.Handles.Add(bodyHandleA);
-            targetBatch.Handles.Add(bodyHandleB);
+            //Add all the constraint's body handles to the batch we found (or created) to block future references to the same bodies.
+            for (int j = 0; j < bodyCount; ++j)
+            {
+                targetBatch.BodyHandles.Add(Unsafe.Add(ref bodyHandles, j));
+            }
             handle = handlePool.Take();
-            var bodyReferences = stackalloc int[2];
-            bodyReferences[0] = bodyHandleA;
-            bodyReferences[1] = bodyHandleB;
-            targetBatch.Allocate(handle, ref bodyReferences[0], TypeBatchAllocation, out var typeId, out constraintReference);
+            targetBatch.Allocate(handle, ref bodyHandles, TypeBatchAllocation, out var typeId, out constraintReference);
 
             if (handle >= HandlesToConstraints.Length)
             {
@@ -162,16 +181,15 @@ namespace SolverPrototype
         /// </summary>
         /// <typeparam name="TDescription">Type of the constraint description to add.</typeparam>
         /// <typeparam name="TTypeBatch">Type of the TypeBatch to allocate in.</typeparam>
-        /// <param name="bodyHandleA">First body of the pair.</param>
-        /// <param name="bodyHandleB">Second body of the pair.</param>
+        /// <param name="bodyHandles">Reference to the start of a list of body handles.</param>
+        /// <param name="bodyCount">Number of bodies in the body handles list.</param>
         /// <param name="constraintReference">Reference to the allocated slot.</param>
         /// <param name="handle">Allocated constraint handle.</param>
-        public void Add<TDescription, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TDescription description,
+        public void Add<TDescription, TTypeBatch>(ref int bodyHandles, int bodyCount, ref TDescription description,
             out ConstraintReference<TTypeBatch> constraintReference, out int handle)
             where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
         {
-            Allocate(bodyHandleA, bodyHandleB, out constraintReference, out handle);
-
+            Allocate(ref bodyHandles, bodyCount, out constraintReference, out handle);
             ApplyDescription(ref constraintReference, ref description);
 
         }

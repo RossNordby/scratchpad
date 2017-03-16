@@ -12,13 +12,13 @@ namespace SolverPrototype
     /// </summary>
     public class ConstraintBatch
     {
-        internal BatchReferencedHandles Handles;
+        internal BatchReferencedHandles BodyHandles;
         public int[] TypeIndexToTypeBatchIndex;
         public QuickList<TypeBatch> TypeBatches;
 
         public ConstraintBatch(int initialReferencedHandlesEstimate = 128 * 64, int initialTypeCountEstimate = 32)
         {
-            Handles = new BatchReferencedHandles((initialReferencedHandlesEstimate >> 6) + ((initialReferencedHandlesEstimate & 63) > 0 ? 1 : 0));
+            BodyHandles = new BatchReferencedHandles((initialReferencedHandlesEstimate >> 6) + ((initialReferencedHandlesEstimate & 63) > 0 ? 1 : 0));
             ResizeTypeMap(initialTypeCountEstimate);
             TypeBatches = new QuickList<TypeBatch>(new PassthroughBufferPool<TypeBatch>());
         }

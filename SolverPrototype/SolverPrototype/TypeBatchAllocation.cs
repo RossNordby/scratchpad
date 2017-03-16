@@ -99,6 +99,8 @@ namespace SolverPrototype
             }
             var typeBatch = Unsafe.As<Pool, Pool<T>>(ref pools[id]).Take();
             //We didn't initialize it in the pool; do so here. (The pool COULD use an initializer, but, well, I didn't do that.)
+            //TODO: In the future, the initialization would ideally take a memory source to pull from rather than just using a static BufferPool source.
+            //This TypeBatchAllocation class would have a reference to that memory source so we could very conveniently pass it into the initialization.
             typeBatch.Initialize(BundleIndexing.GetBundleCount(Math.Max(minimumCapacity, capacities[id])));
             return typeBatch;
         }

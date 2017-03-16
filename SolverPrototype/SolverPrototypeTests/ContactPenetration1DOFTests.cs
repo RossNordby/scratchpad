@@ -53,8 +53,8 @@ namespace SolverPrototypeTests
             var accumulatedImpulses = new Vector<float>[constraintBundleCount];
             for (int i = 0; i < constraintCount; ++i)
             {
-                var bodyAIndex = bodies.BodyHandles[handleIndices[i * 2]];
-                var bodyBIndex = bodies.BodyHandles[handleIndices[i * 2 + 1]];
+                var bodyAIndex = bodies.HandleToIndex[handleIndices[i * 2]];
+                var bodyBIndex = bodies.HandleToIndex[handleIndices[i * 2 + 1]];
                 BundleIndexing.GetBundleIndices(bodyAIndex, out var bodyABundleIndex, out var bodyAInnerIndex);
                 BundleIndexing.GetBundleIndices(bodyBIndex, out var bodyBBundleIndex, out var bodyBInnerIndex);
                 BundleIndexing.GetBundleIndices(i, out var constraintBundleIndex, out var constraintInnerIndex);

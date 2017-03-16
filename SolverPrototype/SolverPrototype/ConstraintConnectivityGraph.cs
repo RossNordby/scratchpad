@@ -103,13 +103,17 @@ namespace SolverPrototype
         }
 
         /// <summary>
-        /// Frees the list associated with a body at the given location.
+        /// Frees the list associated with a body at the given location and returns true if the freed list was empty.
         /// </summary>
         /// <param name="bodyIndex">Location to remove.</param>
+        /// <returns>True if the freed list was empty, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveBodyList(int bodyIndex)
+        public bool RemoveBodyList(int bodyIndex)
         {
-            bufferPool.Free(ref constraintLists[bodyIndex].Region);
+            ref var list = ref constraintLists[bodyIndex];
+            var empty = list.Count == 0;
+            bufferPool.Free(ref list.Region);
+            return empty;
         }
 
         /// <summary>

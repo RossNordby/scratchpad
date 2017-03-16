@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -31,9 +32,9 @@ namespace SolverPrototype
         /// Per type estimates can be assigned within the Solver.TypeBatchAllocation.</param>
         /// <param name="initialConstraintCountPerBodyEstimate">Expected number of constraints connected to any one body. If this number is exceeded for a body, a resize of the body's list will be performed, but all affected resources are pooled.</param>
         public Simulation(
-            int initialBodyCapacity = 4096, 
-            int initialConstraintCapacity = 4096, 
-            int minimumCapacityPerTypeBatch = 64, 
+            int initialBodyCapacity = 4096,
+            int initialConstraintCapacity = 4096,
+            int minimumCapacityPerTypeBatch = 64,
             int initialConstraintCountPerBodyEstimate = 8)
         {
             Bodies = new Bodies(initialBodyCapacity);
@@ -41,6 +42,70 @@ namespace SolverPrototype
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, initialBodyCapacity, initialConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
+        }
+
+        public int Add(ref BodyDescription bodyDescription)
+        {
+            var handle = Bodies.Add(ref bodyDescription);
+            ConstraintGraph.AddBodyList(Bodies.HandleToIndex[handle]);
+            return handle;
+        }
+
+        public void RemoveBody(int bodyHandle)
+        {
+            if (!ConstraintGraph.RemoveBodyList(Bodies.HandleToIndex[bodyHandle]))
+            {
+                //Removing bodies that are still in use is insidious enough, and body changes are relatively rare enough, 
+                //that we'll block it with an actual exception rather than an assert.
+                throw new InvalidOperationException("Cannot remove a body that still has constraints associated with it.");
+            }
+            Bodies.Remove(bodyHandle);
+        }
+
+        /// <summary>
+        /// Allocates a constraint slot and sets up a constraint with the specified description.
+        /// </summary>
+        /// <typeparam name="TDescription">Type of the constraint description to add.</typeparam>
+        /// <typeparam name="TTypeBatch">Type of the TypeBatch to allocate in.</typeparam>
+        /// <param name="bodyHandles">First body handle in a list of body handles used by the constraint.</param>
+        /// <param name="bodyCount">Number of bodies used by the constraint.</param>
+        /// <param name="constraintReference">Reference to the allocated slot.</param>
+        /// <param name="constraintHandle">Allocated constraint handle.</param>
+        public unsafe void Add<TDescription, TTypeBatch>(ref int bodyHandles, int bodyCount, ref TDescription description,
+            out ConstraintReference<TTypeBatch> constraintReference, out int constraintHandle)
+            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        {
+            Solver.Add(ref bodyHandles, bodyCount, ref description, out constraintReference, out constraintHandle);
+            for (int i = 0; i < bodyCount; ++i)
+            {
+                ConstraintGraph.AddConstraint(Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, i)], constraintHandle, i);
+            }
+        }
+
+        /// <summary>
+        /// Allocates a two-body constraint slot and sets up a constraint with the specified description.
+        /// </summary>
+        /// <typeparam name="TDescription">Type of the constraint description to add.</typeparam>
+        /// <typeparam name="TTypeBatch">Type of the TypeBatch to allocate in.</typeparam>
+        /// <param name="bodyHandleA">First body of the pair.</param>
+        /// <param name="bodyHandleB">Second body of the pair.</param>
+        /// <param name="constraintReference">Reference to the allocated slot.</param>
+        /// <param name="constraintHandle">Allocated constraint handle.</param>
+        public unsafe void Add<TDescription, TTypeBatch>(int bodyHandleA, int bodyHandleB, ref TDescription description,
+            out ConstraintReference<TTypeBatch> constraintReference, out int constraintHandle)
+            where TDescription : IConstraintDescription<TDescription, TTypeBatch> where TTypeBatch : TypeBatch, new()
+        {
+            //Don't really want to take a dependency on the stack layout of parameters, so...
+            var bodyReferences = stackalloc int[2];
+            bodyReferences[0] = bodyHandleA;
+            bodyReferences[1] = bodyHandleB;
+            Add(ref bodyReferences[0], 2, ref description, out constraintReference, out constraintHandle);
+        }
+
+
+        public void RemoveConstraint()
+        {
+            Solver.Remove();
         }
 
         /// <summary>

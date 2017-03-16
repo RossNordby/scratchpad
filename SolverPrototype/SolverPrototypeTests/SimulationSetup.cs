@@ -13,8 +13,8 @@ namespace SolverPrototypeTests
     {
         static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Bodies bodies, Solver solver, ConstraintConnectivityGraph graph, ref Vector3 right, ref Vector3 up, ref Vector3 forward)
         {
-            var bodyAIndex = bodies.BodyHandles[bodyAHandle];
-            var bodyBIndex = bodies.BodyHandles[bodyBHandle];
+            var bodyAIndex = bodies.HandleToIndex[bodyAHandle];
+            var bodyBIndex = bodies.HandleToIndex[bodyBHandle];
 
             var description = new ContactManifold4Constraint
             {

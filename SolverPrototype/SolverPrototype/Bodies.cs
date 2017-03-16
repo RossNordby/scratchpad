@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.ResourceManagement;
 using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -68,14 +69,14 @@ namespace SolverPrototype
     public class Bodies
     {
         /// <summary>
-        /// Remaps a body handle index to the actual array index of the body.
+        /// Remaps a body handle to the actual array index of the body.
         /// The backing array index may change in response to cache optimization.
         /// </summary>
-        public int[] BodyHandles;
+        public int[] HandleToIndex;
         /// <summary>
-        /// Remaps a body index to its handle index.
+        /// Remaps a body index to its handle.
         /// </summary>
-        public int[] IndicesToHandleIndices;
+        public int[] IndexToHandle;
 
         public BodyVelocities[] VelocityBundles;
         public BodyInertias[] LocalInertiaBundles;
@@ -88,20 +89,18 @@ namespace SolverPrototype
         public IdPool IdPool;
         public int BodyCount;
 
-
-
         public unsafe Bodies(int initialCapacity = 4096)
         {
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
             VelocityBundles = new BodyVelocities[initialCapacityInBundles];
             LocalInertiaBundles = new BodyInertias[initialCapacityInBundles];
-            
+
             IdPool = new IdPool(initialCapacity);
-            BodyHandles = new int[initialCapacity];
-            IndicesToHandleIndices = new int[initialCapacity];
+            HandleToIndex = new int[initialCapacity];
+            IndexToHandle = new int[initialCapacity];
             //Initialize all the indices to -1.
-            InitializeIndices(BodyHandles, 0, BodyHandles.Length);
-            InitializeIndices(IndicesToHandleIndices, 0, IndicesToHandleIndices.Length);
+            InitializeIndices(HandleToIndex, 0, HandleToIndex.Length);
+            InitializeIndices(IndexToHandle, 0, IndexToHandle.Length);
         }
 
         unsafe static void InitializeIndices(int[] array, int start, int count)
@@ -114,33 +113,34 @@ namespace SolverPrototype
 
         public unsafe int Add(ref BodyDescription bodyDescription)
         {
-            if (BodyCount == BodyHandles.Length)
+            if (BodyCount == HandleToIndex.Length)
             {
                 //Out of room; need to resize.
-                var newSize = BodyHandles.Length << 1;
+                var newSize = HandleToIndex.Length << 1;
                 Array.Resize(ref VelocityBundles, newSize);
                 Array.Resize(ref LocalInertiaBundles, newSize);
-                Array.Resize(ref IndicesToHandleIndices, newSize);
-                Array.Resize(ref BodyHandles, newSize);
+                Array.Resize(ref IndexToHandle, newSize);
+                Array.Resize(ref HandleToIndex, newSize);
 
-                InitializeIndices(BodyHandles, BodyCount, BodyCount);
-                InitializeIndices(IndicesToHandleIndices, BodyCount, BodyCount);
+                InitializeIndices(HandleToIndex, BodyCount, BodyCount);
+                InitializeIndices(IndexToHandle, BodyCount, BodyCount);
             }
-            var handleIndex = IdPool.Take();
+            var handle = IdPool.Take();
             var index = BodyCount++;
-            BodyHandles[handleIndex] = index;
-            IndicesToHandleIndices[index] = handleIndex;
+            HandleToIndex[handle] = index;
+            IndexToHandle[index] = handle;
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
             GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
             GatherScatter.SetLane(ref VelocityBundles[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
 
-            return handleIndex;
+            return handle;
         }
 
-        public void Remove(int handleIndex)
+        public void Remove(int handle)
         {
-            var index = BodyHandles[handleIndex];
+            ValidateExistingHandle(handle);
+            var index = HandleToIndex[handle];
             if (index == -1)
             {
                 throw new ArgumentException("Handle index not associated with any body; cannot remove.");
@@ -156,39 +156,64 @@ namespace SolverPrototype
                 VelocityBundles[index] = VelocityBundles[lastIndex];
                 LocalInertiaBundles[index] = LocalInertiaBundles[lastIndex];
                 //Point the body handles at the new location.
-                var lastHandleIndex = IndicesToHandleIndices[lastIndex];
-                BodyHandles[lastHandleIndex] = index;
-                IndicesToHandleIndices[index] = lastHandleIndex;
-                IndicesToHandleIndices[lastIndex] = -1;
+                var lastHandle = IndexToHandle[lastIndex];
+                HandleToIndex[lastHandle] = index;
+                IndexToHandle[index] = lastHandle;
+                IndexToHandle[lastIndex] = -1;
             }
-            IdPool.Return(handleIndex);
-            BodyHandles[handleIndex] = -1;
+            IdPool.Return(handle);
+            HandleToIndex[handle] = -1;
+        }
+
+        [Conditional("DEBUG")]
+        void ValidateHandle(int handle)
+        {
+            Debug.Assert(handle >= 0, "Handles must be nonnegative.");
+            Debug.Assert(handle >= HandleToIndex.Length || HandleToIndex[handle] < 0 || IndexToHandle[HandleToIndex[handle]] == handle,
+                "If a handle exists, both directions should match.");
+        }
+        [Conditional("DEBUG")]
+        void ValidateExistingHandle(int handle)
+        {
+            Debug.Assert(handle >= 0, "Handles must be nonnegative.");
+            Debug.Assert(handle < HandleToIndex.Length && HandleToIndex[handle] >= 0 && IndexToHandle[HandleToIndex[handle]] == handle,
+                "If a handle exists, both directions should match.");
+        }
+        public bool Contains(int handle)
+        {
+            ValidateHandle(handle);
+            return handle < HandleToIndex.Length && HandleToIndex[handle] >= 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void GetBundleIndices(int handleIndex, out int bundleIndex, out int innerIndex)
+        void GetBundleIndices(int handle, out int bundleIndex, out int innerIndex)
         {
-            var index = BodyHandles[handleIndex];
+            ValidateExistingHandle(handle);
+            var index = HandleToIndex[handle];
             BundleIndexing.GetBundleIndices(index, out bundleIndex, out innerIndex);
         }
-        public void SetVelocity(int handleIndex, ref BodyVelocity velocity)
+        public void SetVelocity(int handle, ref BodyVelocity velocity)
         {
-            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GatherScatter.SetLane(ref VelocityBundles[bundleIndex], innerIndex, ref velocity);
         }
-        public void GetVelocity(int handleIndex, out BodyVelocity velocity)
+        public void GetVelocity(int handle, out BodyVelocity velocity)
         {
-            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GatherScatter.GetLane(ref VelocityBundles[bundleIndex], innerIndex, out velocity);
         }
-        public void SetLocalInertia(int handleIndex, ref BodyInertia inertia)
+        public void SetLocalInertia(int handle, ref BodyInertia inertia)
         {
-            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, ref inertia);
         }
-        public void GetLocalInertia(int handleIndex, ref BodyInertia inertia)
+        public void GetLocalInertia(int handle, ref BodyInertia inertia)
         {
-            GetBundleIndices(handleIndex, out var bundleIndex, out var innerIndex);
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GatherScatter.GetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, out inertia);
         }
 
@@ -222,11 +247,11 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Swap(int slotA, int slotB)
         {
-            BodyHandles[IndicesToHandleIndices[slotA]] = slotB;
-            BodyHandles[IndicesToHandleIndices[slotB]] = slotA;
-            var oldHandleIndexA = IndicesToHandleIndices[slotA];
-            IndicesToHandleIndices[slotA] = IndicesToHandleIndices[slotB];
-            IndicesToHandleIndices[slotB] = oldHandleIndexA;
+            HandleToIndex[IndexToHandle[slotA]] = slotB;
+            HandleToIndex[IndexToHandle[slotB]] = slotA;
+            var oldHandleA = IndexToHandle[slotA];
+            IndexToHandle[slotA] = IndexToHandle[slotB];
+            IndexToHandle[slotB] = oldHandleA;
             BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
             BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
             GatherScatter.SwapLanes(ref VelocityBundles[bundleA], innerA, ref VelocityBundles[bundleB], innerB);
