@@ -40,14 +40,32 @@ namespace SolverPrototype.Constraints
             innerIndex = bodyInnerIndex;
         }
 
-        protected sealed override void AddBodyReferences(int index, ref int bodyReferences)
+        protected unsafe sealed override void AddBodyReferences(int index, int* bodyIndices)
         {
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
-            GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, ref bodyReferences, 2);
+            GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, ref bodyIndices[0], 2);
             bundle.Count++;
             Debug.Assert(bundle.Count <= Vector<int>.Count, "The caller should guarantee that any one bundle is not added to beyond capacity.");
-           
+#if DEBUG
+            for (int i = 0; i < bundle.Count - 1; ++i)
+            {
+                var aIndex = (bundle.BundleIndexA[i] << BundleIndexing.VectorShift) | bundle.InnerIndexA[i];
+                var bIndex = (bundle.BundleIndexB[i] << BundleIndexing.VectorShift) | bundle.InnerIndexB[i];
+                for (int j = i + 1; j < bundle.Count; ++j)
+                {
+                    var aIndex2 = (bundle.BundleIndexA[j] << BundleIndexing.VectorShift) | bundle.InnerIndexA[j];
+                    var bIndex2 = (bundle.BundleIndexB[j] << BundleIndexing.VectorShift) | bundle.InnerIndexB[j];
+                    Debug.Assert(!(
+                        aIndex == bIndex || aIndex2 == bIndex2 ||
+                        aIndex == aIndex2 || aIndex == bIndex2 ||
+                        bIndex == aIndex2 || bIndex == bIndex2), 
+                        "A bundle should not share any body references. If an add causes redundant body references, something upstream broke.");
+                }
+
+            }
+#endif
+
         }
         protected sealed override void RemoveBodyReferences(int bundleIndex, int innerIndex)
         {
@@ -55,7 +73,7 @@ namespace SolverPrototype.Constraints
             Debug.Assert(bundle.Count > 0, "The caller should guarantee that any one bundle isn't over-removed from.");
             //This is a little defensive; in the event that the body set actually scales down, you don't want to end up with invalid pointers in some lanes.
             //TODO: This may need to change depending on how we handle kinematic/static/inactive storage and encoding.
-            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex);      
+            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex);
             bundle.Count--;
 
         }
@@ -105,7 +123,7 @@ namespace SolverPrototype.Constraints
             Array.Copy(BodyReferences, bundleStartIndex, referencesCache, 0, bundleCount);
             Array.Copy(PrestepData, bundleStartIndex, prestepCache, 0, bundleCount);
             Array.Copy(AccumulatedImpulses, bundleStartIndex, accumulatedImpulseCache, 0, bundleCount);
-            Array.Copy(Handles, bundleStartIndex * Vector<int>.Count, handlesCache, 0, constraintCount);
+            Array.Copy(IndexToHandle, bundleStartIndex * Vector<int>.Count, handlesCache, 0, constraintCount);
 
             //First, compute the proper order of the constraints in this region by sorting their keys.
             //This minimizes the number of swaps that must be applied to the actual bundle data.

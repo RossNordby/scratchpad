@@ -92,7 +92,7 @@ namespace SolverPrototype
         /// <param name="typeId">Id of the TypeBatch type to allocate in.</param>
         /// <param name="reference">Direct reference to the constraint type batch and index in the type batch.</param>
         /// <returns>Allocated constraint handle.</returns>
-        public int Allocate(ref int bodyHandles, int bodyCount, int typeId, out ConstraintReference reference)
+        public unsafe int Allocate(ref int bodyHandles, int bodyCount, int typeId, out ConstraintReference reference)
         {
             int targetBatchIndex = -1;
             //Find the first batch that references none of the bodies that this constraint needs.
@@ -128,12 +128,16 @@ namespace SolverPrototype
                 targetBatch = Batches.Elements[targetBatchIndex];
             }
             //Add all the constraint's body handles to the batch we found (or created) to block future references to the same bodies.
+            //Also, convert the handle into a memory index. Constraints store a direct memory reference for performance reasons.
+            var bodyIndices = stackalloc int[bodyCount];
             for (int j = 0; j < bodyCount; ++j)
             {
-                targetBatch.BodyHandles.Add(Unsafe.Add(ref bodyHandles, j));
+                var bodyHandle = Unsafe.Add(ref bodyHandles, j);
+                targetBatch.BodyHandles.Add(bodyHandle);
+                bodyIndices[j] = bodies.HandleToIndex[bodyHandle];
             }
             var handle = handlePool.Take();
-            targetBatch.Allocate(handle, ref bodyHandles, TypeBatchAllocation, typeId, out reference);
+            targetBatch.Allocate(handle, bodyIndices, TypeBatchAllocation, typeId, out reference);
 
             if (handle >= HandlesToConstraints.Length)
             {

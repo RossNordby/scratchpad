@@ -19,9 +19,15 @@ namespace SolverPrototype.Constraints
         /// <summary>
         /// The handles for the constraints in this type batch.
         /// </summary>
-        public int[] Handles;
+        public int[] IndexToHandle;
 
-        public abstract int Allocate(int handle, ref int bodyReferences);
+        /// <summary>
+        /// Allocates a slot in the batch.
+        /// </summary>
+        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
+        /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
+        /// <returns>Index of the slot in the batch.</returns>
+        public unsafe abstract int Allocate(int handle, int* bodyIndices);
         public abstract void Remove(int index, ConstraintLocation[] handlesToConstraints);
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
@@ -93,16 +99,16 @@ namespace SolverPrototype.Constraints
             BufferPools<T>.Locking.Return(old);
         }
 
-        protected abstract void AddBodyReferences(int index, ref int bodyReferences);
+        protected unsafe abstract void AddBodyReferences(int index, int* bodyIndices);
         protected abstract void RemoveBodyReferences(int bundleIndex, int innerIndex);
 
         /// <summary>
         /// Allocates a slot in the batch.
         /// </summary>
         /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
-        /// <param name="bodyReferences">Reference to the beginning of a list of references with count equal to the type batch's expected number of involved bodies.</param>
+        /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
         /// <returns>Index of the slot in the batch.</returns>
-        public override int Allocate(int handle, ref int bodyReferences)
+        public unsafe override int Allocate(int handle, int* bodyIndices)
         {
             Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == Projection.Length)
@@ -114,13 +120,13 @@ namespace SolverPrototype.Constraints
                 IncreaseSize(ref PrestepData);
                 IncreaseSize(ref Projection);
                 IncreaseSize(ref AccumulatedImpulses);
-                IncreaseSize(ref Handles);
+                IncreaseSize(ref IndexToHandle);
             }
             var index = constraintCount++;
-            Handles[index] = handle;
+            IndexToHandle[index] = handle;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
-            AddBodyReferences(index, ref bodyReferences);
+            AddBodyReferences(index, bodyIndices);
             return index;
         }
 
@@ -149,14 +155,14 @@ namespace SolverPrototype.Constraints
             CopyConstraintData(
                 ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, sourceInner,
                 ref BodyReferences[targetBundle], ref PrestepData[targetBundle], ref AccumulatedImpulses[targetBundle], targetInner);
-            Handles[targetIndex] = sourceHandle;
+            IndexToHandle[targetIndex] = sourceHandle;
             handlesToConstraints[sourceHandle].IndexInTypeBatch = targetIndex;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Move(int sourceBundle, int sourceInner, int sourceIndex, int targetBundle, int targetInner, int targetIndex,
              ConstraintLocation[] handlesToConstraints)
         {
-            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, Handles[sourceIndex],
+            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, IndexToHandle[sourceIndex],
                 targetBundle, targetInner, targetIndex, handlesToConstraints);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -165,7 +171,7 @@ namespace SolverPrototype.Constraints
         {
             BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
             BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, Handles[sourceIndex],
+            Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, IndexToHandle[sourceIndex],
                 targetBundle, targetInner, targetIndex, handlesToConstraints);
         }
 
@@ -184,7 +190,7 @@ namespace SolverPrototype.Constraints
                 GatherScatter.CopyLane(ref BodyReferences[aBundle], aInner, ref aBodyReferences, 0);
                 GatherScatter.CopyLane(ref PrestepData[aBundle], aInner, ref aPrestep, 0);
                 GatherScatter.CopyLane(ref AccumulatedImpulses[aBundle], aInner, ref aAccumulated, 0);
-                aHandle = Handles[a];
+                aHandle = IndexToHandle[a];
 
                 var b = random.Next(a);
                 BundleIndexing.GetBundleIndices(b, out var bBundle, out var bInner);
@@ -211,7 +217,7 @@ namespace SolverPrototype.Constraints
                 //Need to swap.
                 BundleIndexing.GetBundleIndices(index, out var targetBundleIndex, out var targetInnerIndex);
                 Move(sourceBundleIndex, sourceInnerIndex, lastIndex, targetBundleIndex, targetInnerIndex, index, handlesToConstraints);
-                Handles[index] = Handles[lastIndex];
+                IndexToHandle[index] = IndexToHandle[lastIndex];
             }
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);
@@ -227,7 +233,7 @@ namespace SolverPrototype.Constraints
             Array.Clear(BodyReferences, 0, BodyReferences.Length);
             PrestepData = BufferPools<TPrestepData>.Locking.Take(initialCapacityInBundles);
             AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(initialCapacityInBundles);
-            Handles = BufferPools<int>.Locking.Take(initialCapacityInBundles * Vector<float>.Count);
+            IndexToHandle = BufferPools<int>.Locking.Take(initialCapacityInBundles * Vector<float>.Count);
         }
 
         public override void Reset()
@@ -236,12 +242,12 @@ namespace SolverPrototype.Constraints
             BufferPools<TBodyReferences>.Locking.Return(BodyReferences);
             BufferPools<TPrestepData>.Locking.Return(PrestepData);
             BufferPools<TAccumulatedImpulse>.Locking.Return(AccumulatedImpulses);
-            BufferPools<int>.Locking.Return(Handles);
+            BufferPools<int>.Locking.Return(IndexToHandle);
             Projection = null;
             BodyReferences = null;
             AccumulatedImpulses = null;
             AccumulatedImpulses = null;
-            Handles = null;
+            IndexToHandle = null;
         }
 
 

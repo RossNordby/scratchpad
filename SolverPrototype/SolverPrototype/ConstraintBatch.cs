@@ -68,7 +68,8 @@ namespace SolverPrototype
             TypeBatches.Add(batch);
             return batch;
         }
-        public void Allocate(int handle, ref int bodyReferences, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
+
+        public unsafe void Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
         {
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
             {
@@ -90,7 +91,7 @@ namespace SolverPrototype
                     reference.TypeBatch = TypeBatches.Elements[typeBatchIndex];
                 }
             }
-            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, ref bodyReferences); 
+            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices); 
             //TODO: We could adjust the typeBatchAllocation capacities in response to the allocated index.
             //If it exceeds the current capacity, we could ensure the new size is still included.
             //The idea here would be to avoid resizes later by ensuring that the historically encountered size is always used to initialize.

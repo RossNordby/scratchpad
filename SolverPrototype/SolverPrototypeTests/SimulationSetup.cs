@@ -13,9 +13,6 @@ namespace SolverPrototypeTests
     {
         static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Simulation simulation, ref Vector3 right, ref Vector3 up, ref Vector3 forward)
         {
-            var bodyAIndex = simulation.Bodies.HandleToIndex[bodyAHandle];
-            var bodyBIndex = simulation.Bodies.HandleToIndex[bodyBHandle];
-
             var description = new ContactManifold4Constraint
             {
                 //By convention, normal faces from B to A.
@@ -46,7 +43,7 @@ namespace SolverPrototypeTests
                 contact.PenetrationDepth = 0.00f;
             }
             
-            var handle = simulation.Add(bodyAIndex, bodyBIndex, ref description);
+            var handle = simulation.Add(bodyAHandle, bodyBHandle, ref description);
 
             simulation.Solver.GetDescription<ContactManifold4Constraint>(handle, out var testDescription);
             return handle;
@@ -160,11 +157,10 @@ namespace SolverPrototypeTests
                     }
                 }
             }
+            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
+            
             if (scrambleBodies)
                 ScrambleBodies(simulation);
-            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
-
-
 
             var right = new Vector3(1, 0, 0);
             var up = new Vector3(0, 1, 0);
