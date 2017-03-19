@@ -53,6 +53,7 @@ namespace SolverPrototype
 
         public void RemoveBody(int bodyHandle)
         {
+            Bodies.ValidateExistingHandle(bodyHandle);
             if (!ConstraintGraph.RemoveBodyList(Bodies.HandleToIndex[bodyHandle]))
             {
                 //Removing bodies that are still in use is insidious enough, and body changes are relatively rare enough, 
@@ -75,6 +76,7 @@ namespace SolverPrototype
             Solver.Add(ref bodyHandles, bodyCount, ref description, out int constraintHandle);
             for (int i = 0; i < bodyCount; ++i)
             {
+                Bodies.ValidateExistingHandle(Unsafe.Add(ref bodyHandles, i));
                 ConstraintGraph.AddConstraint(Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, i)], constraintHandle, i);
             }
             return constraintHandle;

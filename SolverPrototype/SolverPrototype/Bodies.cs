@@ -166,18 +166,18 @@ namespace SolverPrototype
         }
 
         [Conditional("DEBUG")]
-        void ValidateHandle(int handle)
+        internal void ValidateHandle(int handle)
         {
             Debug.Assert(handle >= 0, "Handles must be nonnegative.");
             Debug.Assert(handle >= HandleToIndex.Length || HandleToIndex[handle] < 0 || IndexToHandle[HandleToIndex[handle]] == handle,
                 "If a handle exists, both directions should match.");
         }
         [Conditional("DEBUG")]
-        void ValidateExistingHandle(int handle)
+        internal void ValidateExistingHandle(int handle)
         {
             Debug.Assert(handle >= 0, "Handles must be nonnegative.");
             Debug.Assert(handle < HandleToIndex.Length && HandleToIndex[handle] >= 0 && IndexToHandle[HandleToIndex[handle]] == handle,
-                "If a handle exists, both directions should match.");
+                "This body handle doesn't seem to exist, or the mappings are out of sync. If a handle exists, both directions should match.");
         }
         public bool Contains(int handle)
         {
@@ -210,7 +210,7 @@ namespace SolverPrototype
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, ref inertia);
         }
-        public void GetLocalInertia(int handle, ref BodyInertia inertia)
+        public void GetLocalInertia(int handle, out BodyInertia inertia)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);

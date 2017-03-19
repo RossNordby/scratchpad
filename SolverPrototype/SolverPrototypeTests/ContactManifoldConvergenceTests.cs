@@ -19,9 +19,12 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 8, 32, true, true, out var simulation, out var bodyHandles, out var constraintHandles);
-
+            SimulationSetup.BuildLattice(32, 8, 32, out var simulation, out var bodyHandles, out var constraintHandles);
             
+            SimulationSetup.ScrambleBodies(simulation);
+            SimulationSetup.ScrambleConstraints(simulation.Solver);
+
+            SimulationSetup.AddRemoveChurn(simulation, 100000);
 
             //Attempt cache optimization.
             int bodyOptimizationIterations = bodyHandles.Length * 16;
