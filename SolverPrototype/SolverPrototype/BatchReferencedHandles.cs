@@ -81,6 +81,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Remove(int handleIndex)
         {
+            Debug.Assert((packedHandles[handleIndex >> shift] & (1ul << (handleIndex & mask))) > 0, "If you remove a handle, it should be present.");
             packedHandles[handleIndex >> shift] &= ~(1ul << (handleIndex & mask));
         }
     }

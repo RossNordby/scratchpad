@@ -16,6 +16,8 @@ namespace SolverPrototype.Constraints
         protected int constraintCount;
         public int ConstraintCount => constraintCount;
 
+        public abstract int BodiesPerConstraint { get;}
+
         /// <summary>
         /// The handles for the constraints in this type batch.
         /// </summary>

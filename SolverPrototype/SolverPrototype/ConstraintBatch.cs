@@ -69,6 +69,25 @@ namespace SolverPrototype
             return batch;
         }
 
+        /// <summary>
+        /// Gets whether the batch could hold the specified body handles.
+        /// </summary>
+        /// <param name="constraintBodyHandles">List of body handles to check for in the batch.</param>
+        /// <param name="constraintBodyHandleCount">Number of bodies referenced by the constraint.</param>
+        /// <returns>True if the body handles are not already present in the batch, false otherwise.</returns>
+        public unsafe bool CanFit(ref int constraintBodyHandles, int constraintBodyHandleCount)
+        {
+            for (int i = 0; i < constraintBodyHandleCount; ++i)
+            {
+                var bodyHandle = Unsafe.Add(ref constraintBodyHandles, i);
+                if (BodyHandles.Contains(bodyHandle))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public unsafe void Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
         {
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
@@ -91,7 +110,7 @@ namespace SolverPrototype
                     reference.TypeBatch = TypeBatches.Elements[typeBatchIndex];
                 }
             }
-            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices); 
+            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices);
             //TODO: We could adjust the typeBatchAllocation capacities in response to the allocated index.
             //If it exceeds the current capacity, we could ensure the new size is still included.
             //The idea here would be to avoid resizes later by ensuring that the historically encountered size is always used to initialize.
@@ -101,13 +120,37 @@ namespace SolverPrototype
             //(While resizes will definitely occur, remember that it only really matters for *new* type batches- 
             //and it is rare that a new type batch will be created that actually needs to be enormous.)
         }
-        
-        public void Remove(int constraintTypeId, int indexInTypeBatch, ConstraintLocation[] handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
+
+
+        unsafe struct BodyHandleRemover : IForEach<int>
+        {
+            public Bodies Bodies;
+            public ConstraintBatch Batch;
+            public BodyHandleRemover(Bodies bodies, ConstraintBatch batch)
+            {
+                Bodies = bodies;
+                Batch = batch;
+            }
+
+            public void LoopBody(int bodyIndex)
+            {
+                Batch.BodyHandles.Remove(Bodies.IndexToHandle[bodyIndex]);
+            }
+        }
+
+
+        public unsafe void Remove(int constraintTypeId, int indexInTypeBatch, Bodies bodies, ConstraintLocation[] handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
         {
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
 
             var typeBatchIndex = TypeIndexToTypeBatchIndex[constraintTypeId];
             var typeBatch = TypeBatches.Elements[typeBatchIndex];
+            //Before we remove the constraint, we should locate the set the body indices referenced by the constraint and convert them into handles so that
+            //they can be removed from the constraint batch's body handle set.
+            var bodiesPerConstraint = typeBatch.BodiesPerConstraint;
+            var handleRemover = new BodyHandleRemover(bodies, this);
+            typeBatch.EnumerateConnectedBodyIndices(indexInTypeBatch, ref handleRemover);
+
             typeBatch.Remove(indexInTypeBatch, handlesToConstraints);
             if (typeBatch.ConstraintCount == 0)
             {

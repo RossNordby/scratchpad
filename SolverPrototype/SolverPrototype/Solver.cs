@@ -98,18 +98,7 @@ namespace SolverPrototype
             //Find the first batch that references none of the bodies that this constraint needs.
             for (int i = 0; i < Batches.Count; ++i)
             {
-                var batch = Batches[i];
-
-                bool canFit = true;
-                for (int j = 0; j < bodyCount; ++j)
-                {
-                    if (batch.BodyHandles.Contains(Unsafe.Add(ref bodyHandles, j)))
-                    {
-                        canFit = false;
-                        break;
-                    }
-                }
-                if (canFit)
+                if (Batches.Elements[i].CanFit(ref bodyHandles, bodyCount))
                 {
                     targetBatchIndex = i;
                     break;
@@ -220,7 +209,7 @@ namespace SolverPrototype
             //(Could cache the batch index, but that's splitting some very fine hairs.)
             var constraintLocation = HandlesToConstraints[handle];
             var batch = Batches[constraintLocation.BatchIndex];
-            batch.Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, HandlesToConstraints, TypeBatchAllocation);
+            batch.Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, bodies, HandlesToConstraints, TypeBatchAllocation);
             if (batch.TypeBatches.Count == 0)
             {
                 //No more constraints exist within the batch; we may be able to get rid of this batch.
@@ -241,9 +230,13 @@ namespace SolverPrototype
                 //Note the use of the cached batch index rather than the ref.
                 if (constraintLocation.BatchIndex == Batches.Count - 1)
                 {
-                    //Note that we do not actually remove the batch. It's still there. The backing array of the Batches list acts as a pool. When a new batch is required,
-                    //it first checks the backing array to see if a batch was already allocated for it. In effect, adding and removing batches behaves like a stack.
-                    --Batches.Count;
+                    //Note that when we remove an empty batch, it may reveal another empty batch. If that happens, remove the revealed batch(es) too.
+                    while (Batches.Count > 0 && Batches.Elements[Batches.Count - 1].TypeBatches.Count == 0)
+                    {
+                        //Note that we do not actually null out the batch slot. It's still there. The backing array of the Batches list acts as a pool. When a new batch is required,
+                        //the add function first checks the backing array to see if a batch was already allocated for it. In effect, adding and removing batches behaves like a stack.
+                        --Batches.Count;
+                    }
                 }
             }
 
