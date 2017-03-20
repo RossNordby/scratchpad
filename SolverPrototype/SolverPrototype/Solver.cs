@@ -203,7 +203,16 @@ namespace SolverPrototype
         public void Remove(int handle)
         {
             ref var constraintLocation = ref HandlesToConstraints[handle];
-            Batches[constraintLocation.BatchIndex].Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, HandlesToConstraints, TypeBatchAllocation);
+            var batch = Batches[constraintLocation.BatchIndex];
+            batch.Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, HandlesToConstraints, TypeBatchAllocation);
+            if (batch.TypeBatches.Count == 0)
+            {
+                //No more constraints exist within the batch; there's no reason to keep this batch around anymore.
+                //Note that we're using an order-preserving removal. Batch order is used during batch compression;
+                //constraints in higher batches attempt to move to lower batches when possible.
+                //In terms of performance, it would be extremely strange for there to be more than a couple dozen batches, so the order preservation doesn't matter.
+                Batches.RemoveAt(constraintLocation.BatchIndex);
+            }
 
         }
 

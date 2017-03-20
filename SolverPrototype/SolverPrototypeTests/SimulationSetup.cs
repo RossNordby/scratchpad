@@ -358,6 +358,7 @@ namespace SolverPrototypeTests
                     {
                         //Remove a constraint.
                         var batch = simulation.Solver.Batches[random.Next(simulation.Solver.Batches.Count)];
+                        Debug.Assert(batch.TypeBatches.Count > 0, "Any batch that exists should have a type batch in it, otherwise why is the batch still around?");
                         var typeBatch = batch.TypeBatches[random.Next(batch.TypeBatches.Count)];
                         var indexInTypeBatch = random.Next(typeBatch.ConstraintCount);
                         var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
