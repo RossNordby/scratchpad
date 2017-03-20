@@ -106,13 +106,19 @@ namespace SolverPrototype
         /// Frees the list associated with a body at the given location and returns true if the freed list was empty.
         /// </summary>
         /// <param name="bodyIndex">Location to remove.</param>
+        /// <param name="replacementIndex">If nonnegative, the index to pull a replacement list from.</param>
         /// <returns>True if the freed list was empty, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool RemoveBodyList(int bodyIndex)
+        public bool RemoveBodyList(int bodyIndex, int replacementIndex)
         {
             ref var list = ref constraintLists[bodyIndex];
             var empty = list.Count == 0;
             bufferPool.Free(ref list.Region);
+
+            if (replacementIndex >= 0)
+            {
+                constraintLists[bodyIndex] = constraintLists[replacementIndex];
+            }
             return empty;
         }
 
@@ -129,7 +135,7 @@ namespace SolverPrototype
             constraint.BodyIndexInConstraint = bodyIndexInConstraint;
             SuballocatedList.Add(bufferPool, ref constraintLists[bodyIndex], constraint);
         }
-        
+
         struct RemovalPredicate : IPredicate<BodyConstraintReference>
         {
             public int ConstraintHandleToRemove;
@@ -170,7 +176,7 @@ namespace SolverPrototype
                     InnerEnumerator.LoopBody(connectedBodyIndex);
                 }
             }
-            
+
         }
 
         /// <summary>
@@ -189,7 +195,9 @@ namespace SolverPrototype
             constraintBodiesEnumerator.InnerEnumerator = enumerator;
             constraintBodiesEnumerator.SourceBodyIndex = bodyIndex;
 
-            for (int i = 0; i < list.Count; ++i)
+            //Note reverse iteration. This is useful when performing O(1) removals where the last element is put into the position of the removed element.
+            //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
+            for (int i = list.Count - 1; i >= 0; --i)
             {
                 var constraint = Unsafe.Add(ref start, i);
                 solver.EnumerateConnectedBodyIndices(constraint.ConnectingConstraintHandle, ref constraintBodiesEnumerator);
@@ -212,10 +220,36 @@ namespace SolverPrototype
             ref var list = ref constraintLists[bodyIndex];
             ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
 
-            for (int i = 0; i < list.Count; ++i)
+            //Note reverse iteration. This is useful when performing O(1) removals where the last element is put into the position of the removed element.
+            //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
+            for (int i = list.Count - 1; i >= 0; --i)
             {
                 enumerator.LoopBody(Unsafe.Add(ref start, i));
             }
+        }
+        /// <summary>
+        /// Checks whether a body is referenced by the given constraint handle.
+        /// </summary>
+        /// <param name="bodyIndex">Body to check for a constraint.</param>
+        /// <param name="constraintHandle">Constraint handle to look for in the body's constraint list.</param>
+        /// <returns>True if the body is connected to the constraint, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool BodyIsConstrainedBy(int bodyIndex, int constraintHandle)
+        {
+            //This is a special case that bypasses the IForEach enumerators. It's not strictly necessary, but it is pretty convenient.
+            //It's unclear how valuable this actually is- this shouldn't be a particularly common operation. We actually only added it for debugging purposes.
+            //The only functional benefit it has over the IForEach variants is that it will early out. But you could create an early-outing enumerator.
+            ref var list = ref constraintLists[bodyIndex];
+            ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
+
+            //Note reverse iteration. This is useful when performing O(1) removals where the last element is put into the position of the removed element.
+            //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
+            for (int i = list.Count - 1; i >= 0; --i)
+            {
+                if (Unsafe.Add(ref start, i).ConnectingConstraintHandle == constraintHandle)
+                    return true;
+            }
+            return false;
         }
     }
 }

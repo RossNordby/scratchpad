@@ -1,6 +1,7 @@
 ﻿using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -54,13 +55,21 @@ namespace SolverPrototype
         public void RemoveBody(int bodyHandle)
         {
             Bodies.ValidateExistingHandle(bodyHandle);
-            if (!ConstraintGraph.RemoveBodyList(Bodies.HandleToIndex[bodyHandle]))
+
+            if (Bodies.Remove(bodyHandle, out var removedIndex, out var movedBodyOriginalIndex))
             {
-                //Removing bodies that are still in use is insidious enough, and body changes are relatively rare enough, 
-                //that we'll block it with an actual exception rather than an assert.
-                throw new InvalidOperationException("Cannot remove a body that still has constraints associated with it.");
+                //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
+                //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
+                BodyLayoutOptimizer.BodyMoveConstraintEnumerator enumerator;
+                enumerator.Solver = Solver;
+                enumerator.NewLocation = removedIndex;
+                ConstraintGraph.EnumerateConstraints(movedBodyOriginalIndex, ref enumerator);
             }
-            Bodies.Remove(bodyHandle);
+
+            var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(removedIndex, movedBodyOriginalIndex);
+            Debug.Assert(constraintListWasEmpty, "Removing a body without first removing its constraints results in orphaned constraints that will break stuff. Don't do it!");
+         
+
         }
 
         /// <summary>

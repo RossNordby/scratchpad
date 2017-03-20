@@ -137,32 +137,43 @@ namespace SolverPrototype
             return handle;
         }
 
-        public void Remove(int handle)
+        /// <summary>
+        /// Removes a body from the set and returns whether a move occurred. If another body took its place, the move is output.
+        /// </summary>
+        /// <param name="handle">Handle of the body to remove.</param>
+        /// <param name="removedIndex">Former index of the body that was removed.</param>
+        /// <param name="movedBodyOriginalIndex">Original index of the body that was moved into the removed body's slot. -1 if no body had to be moved.</param>
+        /// <returns>True if a body was moved, false otherwise.</returns>
+        public bool Remove(int handle, out int removedIndex, out int movedBodyOriginalIndex)
         {
             ValidateExistingHandle(handle);
-            var index = HandleToIndex[handle];
-            if (index == -1)
-            {
-                throw new ArgumentException("Handle index not associated with any body; cannot remove.");
-            }
+            removedIndex = HandleToIndex[handle];
+
             //Move the last body into the removed slot.
             //This does introduce disorder- there may be value in a second overload that preserves order, but it would require large copies.
             //In the event that so many adds and removals are performed at once that they destroy contiguity, it may be better to just
             //explicitly sort after the fact rather than attempt to retain contiguity incrementally. Handle it as a batch, in other words.
-            if (BodyCount > 0)
+            bool bodyMoved = BodyCount > 0;
+            if (bodyMoved)
             {
-                var lastIndex = --BodyCount;
+                movedBodyOriginalIndex = --BodyCount;
                 //Copy the memory state of the last element down.
-                VelocityBundles[index] = VelocityBundles[lastIndex];
-                LocalInertiaBundles[index] = LocalInertiaBundles[lastIndex];
+                VelocityBundles[removedIndex] = VelocityBundles[movedBodyOriginalIndex];
+                LocalInertiaBundles[removedIndex] = LocalInertiaBundles[movedBodyOriginalIndex];
                 //Point the body handles at the new location.
-                var lastHandle = IndexToHandle[lastIndex];
-                HandleToIndex[lastHandle] = index;
-                IndexToHandle[index] = lastHandle;
-                IndexToHandle[lastIndex] = -1;
+                var lastHandle = IndexToHandle[movedBodyOriginalIndex];
+                HandleToIndex[lastHandle] = removedIndex;
+                IndexToHandle[removedIndex] = lastHandle;
+                IndexToHandle[movedBodyOriginalIndex] = -1;
+                
+            }
+            else
+            {
+                movedBodyOriginalIndex = -1;
             }
             IdPool.Return(handle);
             HandleToIndex[handle] = -1;
+            return bodyMoved;
         }
 
         [Conditional("DEBUG")]

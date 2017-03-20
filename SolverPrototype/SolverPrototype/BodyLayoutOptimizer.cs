@@ -41,7 +41,7 @@ namespace SolverPrototype
         //could be a little different, but it might end up being faster overall due to the lack of contention.
         //The same concept could apply to the broad phase optimizer too, though it's a little easier there (and the naive locking requirements are more complex per swap, too).
 
-        struct SwapConstraintEnumerator : IForEach<BodyConstraintReference>
+        internal struct BodyMoveConstraintEnumerator : IForEach<BodyConstraintReference>
         {
             public Solver Solver;
             public int NewLocation;
@@ -51,12 +51,13 @@ namespace SolverPrototype
                 Solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, NewLocation);
             }
         }
+
         public static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
         {
             Debug.Assert(a != b, "Swapping a body with itself isn't meaningful. Whaddeyer doin?");
             //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
             //Note that references to both bodies must be changed- both bodies moved!
-            SwapConstraintEnumerator enumerator;
+            BodyMoveConstraintEnumerator enumerator;
             enumerator.Solver = solver;
             enumerator.NewLocation = b;
             graph.EnumerateConstraints(a, ref enumerator);

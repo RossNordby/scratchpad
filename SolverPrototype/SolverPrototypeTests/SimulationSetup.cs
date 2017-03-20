@@ -246,6 +246,23 @@ namespace SolverPrototypeTests
                 RemoveConstraint(simulation, constraint.ConnectingConstraintHandle, handleToEntryIndex, removedConstraints);
             }
         }
+        struct ConstraintChecker : IForEach<ConstraintConnectivityGraph.BodyConstraintReference>
+        {
+            Simulation simulation;
+            int[] handleToEntryIndex;
+            List<RemovedConstraint> removedConstraints;
+            public ConstraintChecker(Simulation simulation, int[] handleToEntryIndex, List<RemovedConstraint> removedConstraints)
+            {
+                this.simulation = simulation;
+                this.handleToEntryIndex = handleToEntryIndex;
+                this.removedConstraints = removedConstraints;
+
+            }
+            public void LoopBody(ConstraintConnectivityGraph.BodyConstraintReference constraint)
+            {
+                Console.WriteLine($"Existing constraint: {constraint.ConnectingConstraintHandle}");
+            }
+        }
 
         static void RemoveConstraint(Simulation simulation, int constraintHandle, int[] handleToEntry, List<RemovedConstraint> removedConstraints)
         {
@@ -257,6 +274,46 @@ namespace SolverPrototypeTests
             simulation.Solver.GetDescription(constraintHandle, out ContactManifold4Constraint description);
             simulation.RemoveConstraint(constraintHandle);
             removedConstraints.Add(new RemovedConstraint { Description = description, BodyA = bodyIndexEnumerator.EntryIndexA, BodyB = bodyIndexEnumerator.EntryIndexB });
+        }
+
+        struct ConstraintBodyValidationEnumerator : IForEach<int>
+        {
+            public Simulation Simulation;
+            public int ConstraintHandle;
+            public void LoopBody(int bodyIndex)
+            {
+                //The body in this constraint should both:
+                //1) have a handle associated with it, and 
+                //2) the constraint graph list for the body should include the constraint handle.
+                Debug.Assert(Simulation.Bodies.IndexToHandle[bodyIndex] >= 0);
+                Debug.Assert(Simulation.ConstraintGraph.BodyIsConstrainedBy(bodyIndex, ConstraintHandle));
+            }
+        }
+
+        [Conditional("DEBUG")]
+        static void ValidateConstraints(Simulation simulation)
+        {
+            for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
+            {
+                var batch = simulation.Solver.Batches[batchIndex];
+                for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
+                {
+                    var typeBatch = batch.TypeBatches[typeBatchIndex];
+                    for (int indexInTypeBatch = 0; indexInTypeBatch < typeBatch.ConstraintCount; ++indexInTypeBatch)
+                    {
+                        var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
+                        var constraintLocation = simulation.Solver.HandlesToConstraints[constraintHandle];
+                        Debug.Assert(
+                            constraintLocation.IndexInTypeBatch == indexInTypeBatch &&
+                            batch.TypeIndexToTypeBatchIndex[constraintLocation.TypeId] == typeBatchIndex &&
+                            constraintLocation.BatchIndex == batchIndex, "The constraint location stored by the solver should agree with the actual type batch entries.");
+                        ConstraintBodyValidationEnumerator enumerator;
+                        enumerator.ConstraintHandle = constraintHandle;
+                        enumerator.Simulation = simulation;
+                        typeBatch.EnumerateConnectedBodyIndices(indexInTypeBatch, ref enumerator);
+                    }
+                }
+            }
         }
 
         public static void AddRemoveChurn(Simulation simulation, int iterations)
@@ -300,12 +357,14 @@ namespace SolverPrototypeTests
                     if (random.NextDouble() < constraintRemovalProbability)
                     {
                         //Remove a constraint.
-                        var randomBatch = simulation.Solver.Batches[random.Next(simulation.Solver.Batches.Count)];
-                        var randomTypeBatch = randomBatch.TypeBatches[random.Next(randomBatch.TypeBatches.Count)];
-                        var indexInTypeBatch = random.Next(randomTypeBatch.ConstraintCount);
-                        var randomConstraintHandle = randomTypeBatch.IndexToHandle[indexInTypeBatch];
+                        var batch = simulation.Solver.Batches[random.Next(simulation.Solver.Batches.Count)];
+                        var typeBatch = batch.TypeBatches[random.Next(batch.TypeBatches.Count)];
+                        var indexInTypeBatch = random.Next(typeBatch.ConstraintCount);
+                        var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
 
-                        RemoveConstraint(simulation, randomConstraintHandle, handleToEntry, removedConstraints);
+                        RemoveConstraint(simulation, constraintHandle, handleToEntry, removedConstraints);
+                        Console.WriteLine($"Removed constraint, former handle: {constraintHandle}");
+                        ValidateConstraints(simulation);
                     }
                     else if (removedConstraints.Count > 0)
                     {
@@ -321,11 +380,13 @@ namespace SolverPrototypeTests
                             if ((handleA = bodyEntries[constraint.BodyA].Handle) >= 0 && (handleB = bodyEntries[constraint.BodyB].Handle) >= 0)
                             {
                                 //The constraint is addable.
-                                simulation.Add(handleA, handleB, ref constraint.Description);
+                                var constraintHandle = simulation.Add(handleA, handleB, ref constraint.Description);
+                                Console.WriteLine($"Added constraint, handle: {constraintHandle}");
                                 break;
                             }
                         } while (attemptCount < 10);
 
+                        ValidateConstraints(simulation);
                     }
                 }
                 else
@@ -339,11 +400,15 @@ namespace SolverPrototypeTests
                         //All constraints associated with the body have to be removed first.
                         var constraintRemover = new ConstraintRemover(simulation, handleToEntry, removedConstraints);
                         simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintRemover);
+                        var constraintChecker = new ConstraintChecker(simulation, handleToEntry, removedConstraints);
+                        simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintChecker);
                         var handle = simulation.Bodies.IndexToHandle[removedBodyIndex];
-                        simulation.Bodies.Remove(handle);
+                        simulation.RemoveBody(handle);
                         bodyEntries[handleToEntry[handle]].Handle = -1;
                         removedBodies.Add(handleToEntry[handle]);
                         handleToEntry[handle] = -1;
+                        Console.WriteLine($"Removed body, former handle: {handle}");
+                        ValidateConstraints(simulation);
                     }
                     else if (removedBodies.Count > 0)
                     {
@@ -354,6 +419,8 @@ namespace SolverPrototypeTests
                         var bodyHandle = simulation.Add(ref bodyEntries[toAdd].Description);
                         handleToEntry[bodyHandle] = toAdd;
                         bodyEntries[toAdd].Handle = bodyHandle;
+                        Console.WriteLine($"Added body, handle: {bodyHandle}");
+                        ValidateConstraints(simulation);
                     }
                 }
             }
@@ -376,7 +443,7 @@ namespace SolverPrototypeTests
             {
                 foreach (var typeBatch in batch.TypeBatches)
                 {
-                    newConstraintCount+= typeBatch.ConstraintCount;
+                    newConstraintCount += typeBatch.ConstraintCount;
                 }
             }
             Debug.Assert(newConstraintCount == originalConstraintCount);
