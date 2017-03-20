@@ -70,6 +70,8 @@ namespace SolverPrototype.Constraints
             SolveIteration(bodyVelocities, 0, bundleCount);
         }
 
+        [Conditional("DEBUG")]
+        public abstract void ValidateBundleCounts();
     }
     //You are allowed to squint at this triple-class separation.
     //This is only really here because there are cases (e.g. adding a constraint) where it is necessary to have knowledge of TBodyReferences so that the caller (the solver, generally)
@@ -217,7 +219,6 @@ namespace SolverPrototype.Constraints
                 //Need to swap.
                 BundleIndexing.GetBundleIndices(index, out var targetBundleIndex, out var targetInnerIndex);
                 Move(sourceBundleIndex, sourceInnerIndex, lastIndex, targetBundleIndex, targetInnerIndex, index, handlesToConstraints);
-                IndexToHandle[index] = IndexToHandle[lastIndex];
             }
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);

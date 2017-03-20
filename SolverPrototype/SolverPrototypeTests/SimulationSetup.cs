@@ -234,16 +234,21 @@ namespace SolverPrototypeTests
             Simulation simulation;
             int[] handleToEntryIndex;
             List<RemovedConstraint> removedConstraints;
+            int iterations;
             public ConstraintRemover(Simulation simulation, int[] handleToEntryIndex, List<RemovedConstraint> removedConstraints)
             {
                 this.simulation = simulation;
                 this.handleToEntryIndex = handleToEntryIndex;
                 this.removedConstraints = removedConstraints;
+                iterations = 0;
 
             }
             public void LoopBody(ConstraintConnectivityGraph.BodyConstraintReference constraint)
             {
                 RemoveConstraint(simulation, constraint.ConnectingConstraintHandle, handleToEntryIndex, removedConstraints);
+                Console.WriteLine($"Removed constraint (handle: {constraint.ConnectingConstraintHandle}) for a body removal.");
+                ValidateConstraints(simulation);
+                iterations++;
             }
         }
         struct ConstraintChecker : IForEach<ConstraintConnectivityGraph.BodyConstraintReference>
@@ -274,6 +279,7 @@ namespace SolverPrototypeTests
             simulation.Solver.GetDescription(constraintHandle, out ContactManifold4Constraint description);
             simulation.RemoveConstraint(constraintHandle);
             removedConstraints.Add(new RemovedConstraint { Description = description, BodyA = bodyIndexEnumerator.EntryIndexA, BodyB = bodyIndexEnumerator.EntryIndexB });
+
         }
 
         struct ConstraintBodyValidationEnumerator : IForEach<int>
@@ -296,6 +302,11 @@ namespace SolverPrototypeTests
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
             {
                 var batch = simulation.Solver.Batches[batchIndex];
+                if (batchIndex == simulation.Solver.Batches.Count - 1)
+                {
+                    Debug.Assert(batch.TypeBatches.Count > 0, "While a lower indexed batch may have zero elements (especially while batch compression isn't active), " +
+                        "there should never be an empty batch at the end of the list.");
+                }
                 for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
                 {
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
@@ -312,6 +323,7 @@ namespace SolverPrototypeTests
                         enumerator.Simulation = simulation;
                         typeBatch.EnumerateConnectedBodyIndices(indexInTypeBatch, ref enumerator);
                     }
+                    typeBatch.ValidateBundleCounts();
                 }
             }
         }
@@ -357,15 +369,21 @@ namespace SolverPrototypeTests
                     if (random.NextDouble() < constraintRemovalProbability)
                     {
                         //Remove a constraint.
-                        var batch = simulation.Solver.Batches[random.Next(simulation.Solver.Batches.Count)];
-                        Debug.Assert(batch.TypeBatches.Count > 0, "Any batch that exists should have a type batch in it, otherwise why is the batch still around?");
-                        var typeBatch = batch.TypeBatches[random.Next(batch.TypeBatches.Count)];
-                        var indexInTypeBatch = random.Next(typeBatch.ConstraintCount);
-                        var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
+                        var batchIndex = random.Next(simulation.Solver.Batches.Count);
+                        var batch = simulation.Solver.Batches[batchIndex];
+                        Debug.Assert(batchIndex < simulation.Solver.Batches.Count - 1 || batch.TypeBatches.Count > 0,
+                            "While a lower index batch may end up empty due to a lack of active batch compression, " +
+                            "the last batch should get removed if it becomes empty since there is no danger of pointer invaldiation.");
+                        if (batch.TypeBatches.Count > 0)
+                        {
+                            var typeBatch = batch.TypeBatches[random.Next(batch.TypeBatches.Count)];
+                            var indexInTypeBatch = random.Next(typeBatch.ConstraintCount);
+                            var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
 
-                        RemoveConstraint(simulation, constraintHandle, handleToEntry, removedConstraints);
-                        Console.WriteLine($"Removed constraint, former handle: {constraintHandle}");
-                        ValidateConstraints(simulation);
+                            RemoveConstraint(simulation, constraintHandle, handleToEntry, removedConstraints);
+                            Console.WriteLine($"Removed constraint, former handle: {constraintHandle}");
+                            ValidateConstraints(simulation);
+                        }
                     }
                     else if (removedConstraints.Count > 0)
                     {

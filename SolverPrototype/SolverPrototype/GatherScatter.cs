@@ -149,16 +149,39 @@ namespace SolverPrototype
         /// <remarks>
         /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
         /// </remarks>
-        internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex) where TVector : struct
         {
-            var sizeInInts = Unsafe.SizeOf<TOuter>() >> 2;
+            //Note the truncation. This is used on some types that aren't evenly divisible.
+            //This should be folded into a single constant by the jit.
+            var sizeInElements = (Unsafe.SizeOf<TOuter>() / (Vector<TVector>.Count * Unsafe.SizeOf<TVector>())) * Unsafe.SizeOf<TVector>();
             ref var laneBase = ref Unsafe.Add(ref Unsafe.As<TOuter, TVector>(ref bundle), innerIndex);
-            for (int i = 0; i < sizeInInts; i += Vector<int>.Count)
+            for (int i = 0; i < sizeInElements; i += Vector<int>.Count)
             {
                 Unsafe.Add(ref laneBase, i) = default(TVector);
             }
         }
-
+        /// <summary>
+        /// Clears a bundle lane using the default value of the specified type. The bundle must be a contiguous block of Vector types, all sharing the same type,
+        /// and the first vector must start at the address pointed to by the bundle reference.
+        /// </summary>
+        /// <typeparam name="TOuter">Type containing one or more Vectors.</typeparam>
+        /// <typeparam name="TVector">Type of the vectors to clear.</typeparam>
+        /// <param name="bundle">Target bundle to clear a lane in.</param>
+        /// <param name="innerIndex">Index of the lane within the target bundle to clear.</param>
+        /// <param name="count">Number of elements in the lane to clear.</param>
+        /// <remarks>
+        /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
+        /// </remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex, int count) where TVector : struct
+        {
+            ref var laneBase = ref Unsafe.Add(ref Unsafe.As<TOuter, TVector>(ref bundle), innerIndex);
+            for (int i = 0; i < count; ++i)
+            {
+                Unsafe.Add(ref laneBase, i * Vector<TVector>.Count) = default(TVector);
+            }
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref TwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)

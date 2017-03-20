@@ -119,9 +119,23 @@ namespace SolverPrototype
             if (targetBatchIndex == -1)
             {
                 //No batch available. Have to create a new one.
-                targetBatch = new ConstraintBatch();
+                //Note that we have no explicit pooling. Instead, we just use the array backing the batches list as the pool. 
+                //Batches grow and shrink like a stack since the removals only ever occur when an empty batch is in the very last slot.
+                //So, all we have to do is check the backing array slot- if there's already a batch there, use it.
                 targetBatchIndex = Batches.Count;
-                Batches.Add(targetBatch);
+                if (Batches.Elements.Length > Batches.Count && Batches.Elements[targetBatchIndex] != null)
+                {
+                    //Reusable batch found! 
+                    targetBatch = Batches.Elements[targetBatchIndex];
+                    Debug.Assert(targetBatch.TypeBatches.Count == 0);
+                    ++Batches.Count;
+                }
+                else
+                {
+                    //No reusable batch found. Create a new one.
+                    targetBatch = new ConstraintBatch();
+                    Batches.Add(targetBatch);
+                }
             }
             else
             {
@@ -202,16 +216,35 @@ namespace SolverPrototype
         /// <param name="handle">Handle of the constraint to remove from the solver.</param>
         public void Remove(int handle)
         {
-            ref var constraintLocation = ref HandlesToConstraints[handle];
+            //Note that we don't use a ref var here. Have to be careful; we make use of the constraint location after removal. Direct ref would be invalidated.
+            //(Could cache the batch index, but that's splitting some very fine hairs.)
+            var constraintLocation = HandlesToConstraints[handle];
             var batch = Batches[constraintLocation.BatchIndex];
             batch.Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, HandlesToConstraints, TypeBatchAllocation);
             if (batch.TypeBatches.Count == 0)
             {
-                //No more constraints exist within the batch; there's no reason to keep this batch around anymore.
-                //Note that we're using an order-preserving removal. Batch order is used during batch compression;
-                //constraints in higher batches attempt to move to lower batches when possible.
-                //In terms of performance, it would be extremely strange for there to be more than a couple dozen batches, so the order preservation doesn't matter.
-                Batches.RemoveAt(constraintLocation.BatchIndex);
+                //No more constraints exist within the batch; we may be able to get rid of this batch.
+                //Merely having no constraints is insufficient. We would really rather not remove a batch if there are batches 'above' it:
+                //the handle->constraint mapping involves a batch index. If we removed this batch, it would move every other batch down one step.
+                //Which means, in order to retain correctness, we would have to change the batch index on every single constraint in every single batch 
+                //of a higher index.
+
+                //That's not feasible in the worst case.
+
+                //Instead, we will only remove the batch if it is the *last* batch. We then rely on deferred batch compression to move constraints into lower
+                //batches over time. Since it only handles a limited number of constraints at a time, it doesn't have the same risk of frame hitching.
+                //So, even if a low-index batch gets zeroed out, constraints from higher batches will filter down, leaving the highest index constraint potentially empty instead.
+
+                //This is a pretty safe thing to do. It is extremely difficult for a low index batch to end up empty while a higher index batch is still very full.
+                //In fact, almost every instance where a batch goes empty will involve the highest index batch. If it isn't, it's going to be very high, and there won't be 
+                //many constraints above it. Deferred compression will handle it easily.
+                //Note the use of the cached batch index rather than the ref.
+                if (constraintLocation.BatchIndex == Batches.Count - 1)
+                {
+                    //Note that we do not actually remove the batch. It's still there. The backing array of the Batches list acts as a pool. When a new batch is required,
+                    //it first checks the backing array to see if a batch was already allocated for it. In effect, adding and removing batches behaves like a stack.
+                    --Batches.Count;
+                }
             }
 
         }

@@ -44,6 +44,7 @@ namespace SolverPrototype.Constraints
         {
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
+            Debug.Assert(bundle.Count >= 0, "The bundle count has to be nonnegative; if it went negative, then something went wrong earlier.");
             GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, ref bodyIndices[0], 2);
             bundle.Count++;
             Debug.Assert(bundle.Count <= Vector<int>.Count, "The caller should guarantee that any one bundle is not added to beyond capacity.");
@@ -59,7 +60,7 @@ namespace SolverPrototype.Constraints
                     Debug.Assert(!(
                         aIndex == bIndex || aIndex2 == bIndex2 ||
                         aIndex == aIndex2 || aIndex == bIndex2 ||
-                        bIndex == aIndex2 || bIndex == bIndex2), 
+                        bIndex == aIndex2 || bIndex == bIndex2),
                         "A bundle should not share any body references. If an add causes redundant body references, something upstream broke.");
                 }
 
@@ -73,7 +74,8 @@ namespace SolverPrototype.Constraints
             Debug.Assert(bundle.Count > 0, "The caller should guarantee that any one bundle isn't over-removed from.");
             //This is a little defensive; in the event that the body set actually scales down, you don't want to end up with invalid pointers in some lanes.
             //TODO: This may need to change depending on how we handle kinematic/static/inactive storage and encoding.
-            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex);
+            //Note the use of an explicit count. We don't directly control the memory size of TwoBodyReferences, but we don't want the clear to touch the count slot. 
+            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex, 2);
             bundle.Count--;
 
         }
@@ -171,6 +173,20 @@ namespace SolverPrototype.Constraints
             BufferPools<TwoBodyReferences>.Locking.Return(referencesCache);
             BufferPools<TPrestepData>.Locking.Return(prestepCache);
             BufferPools<TAccumulatedImpulse>.Locking.Return(accumulatedImpulseCache);
+        }
+
+        public override void ValidateBundleCounts()
+        {
+            //This is a pure debug function. Performance does not matter.
+            for (int i = 0; i < bundleCount - 1; ++i)
+            {
+                Debug.Assert(BodyReferences[i].Count == Vector<float>.Count, "All bundles prior to the last bundle should be full.");
+            }
+            if (bundleCount > 0)
+                Debug.Assert(BodyReferences[bundleCount - 1].Count == constraintCount - (bundleCount - 1) * Vector<float>.Count, "The last bundle should contain the remainder.");
+            else
+                Debug.Assert(constraintCount == 0);
+            Debug.Assert(bundleCount == BodyReferences.Length || BodyReferences[bundleCount].Count == 0, "Body references beyond the end should have 0 count.");
         }
     }
 }
