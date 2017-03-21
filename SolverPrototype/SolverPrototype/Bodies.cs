@@ -153,19 +153,22 @@ namespace SolverPrototype
             //This does introduce disorder- there may be value in a second overload that preserves order, but it would require large copies.
             //In the event that so many adds and removals are performed at once that they destroy contiguity, it may be better to just
             //explicitly sort after the fact rather than attempt to retain contiguity incrementally. Handle it as a batch, in other words.
-            bool bodyMoved = BodyCount > 0;
+            --BodyCount;
+            bool bodyMoved = removedIndex < BodyCount;
             if (bodyMoved)
             {
-                movedBodyOriginalIndex = --BodyCount;
+                movedBodyOriginalIndex = BodyCount;
                 //Copy the memory state of the last element down.
-                VelocityBundles[removedIndex] = VelocityBundles[movedBodyOriginalIndex];
-                LocalInertiaBundles[removedIndex] = LocalInertiaBundles[movedBodyOriginalIndex];
+                BundleIndexing.GetBundleIndices(removedIndex, out var targetBundle, out var targetInner);
+                BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
+                GatherScatter.CopyLane(ref VelocityBundles[sourceBundle], sourceInner, ref VelocityBundles[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref LocalInertiaBundles[sourceBundle], sourceInner, ref LocalInertiaBundles[targetBundle], targetInner);
                 //Point the body handles at the new location.
                 var lastHandle = IndexToHandle[movedBodyOriginalIndex];
                 HandleToIndex[lastHandle] = removedIndex;
                 IndexToHandle[removedIndex] = lastHandle;
                 IndexToHandle[movedBodyOriginalIndex] = -1;
-                
+
             }
             else
             {

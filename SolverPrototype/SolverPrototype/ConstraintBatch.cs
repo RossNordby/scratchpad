@@ -88,8 +88,18 @@ namespace SolverPrototype
             return true;
         }
 
-        public unsafe void Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
+        public unsafe void Allocate(int handle, ref int bodyHandles, int bodyCount, Bodies bodies, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
         {
+            Debug.Assert(CanFit(ref bodyHandles, bodyCount));
+            //Add all the constraint's body handles to the batch we found (or created) to block future references to the same bodies.
+            //Also, convert the handle into a memory index. Constraints store a direct memory reference for performance reasons.
+            var bodyIndices = stackalloc int[bodyCount];
+            for (int j = 0; j < bodyCount; ++j)
+            {
+                var bodyHandle = Unsafe.Add(ref bodyHandles, j);
+                BodyHandles.Add(bodyHandle);
+                bodyIndices[j] = bodies.HandleToIndex[bodyHandle];
+            }
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
             {
                 ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
