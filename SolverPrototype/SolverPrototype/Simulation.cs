@@ -112,6 +112,7 @@ namespace SolverPrototype
         {
             internal ConstraintConnectivityGraph graph;
             internal int constraintHandle;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int bodyIndex)
             {
                 graph.RemoveConstraint(bodyIndex, constraintHandle);
