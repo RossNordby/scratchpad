@@ -95,7 +95,7 @@ namespace SolverPrototype
             if (pools[typeId] == null)
             {
                 //The new constraint results in constructors being invoked with reflection at the moment, but we shouldn't be creating new type batches frequently.
-                //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.                
+                //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.               
                 pools[typeId] = new Pool<TypeBatch>(() => (TypeBatch)Activator.CreateInstance(ConstraintTypeIds.GetType(typeId)), cleaner: batch => batch.Reset());
             }
             var typeBatch = pools[typeId].Take();

@@ -46,10 +46,11 @@ namespace SolverPrototype.Constraints
         {
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
-            Debug.Assert(bundle.Count >= 0, "The bundle count has to be nonnegative; if it went negative, then something went wrong earlier.");
-            GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, ref bodyIndices[0], 2);
-            bundle.Count++;
-            Debug.Assert(bundle.Count <= Vector<int>.Count, "The caller should guarantee that any one bundle is not added to beyond capacity.");
+            Debug.Assert(innerIndex == 0 || bundle.Count == innerIndex,
+                "Either this bundle hasn't been initialized yet (and so has unknown count), or it should match the new inner index.");
+            //Since we only ever add constraints at the very end, the count is based on the inner index.
+            bundle.Count = innerIndex + 1;
+            GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, bodyIndices, 2);
 #if DEBUG
             for (int i = 0; i < bundle.Count - 1; ++i)
             {

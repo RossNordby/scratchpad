@@ -63,19 +63,20 @@ namespace SolverPrototype
         }
         
         /// <summary>
-        /// Registers a type in the id set.
+        /// Registers a type in the id set. If the type was already registered, the existing id is returned.
         /// </summary>
         /// <typeparam name="T">Type to register.</typeparam>
-        /// When a type batch is requested, its capacity will be the larger of this value and the requested capacity.</param>
         /// <returns>Id associated with the type.</returns>
         public static int Register<T>() where T : TypeBatch, new()
         {
-            var index = registeredBatchTypes.Count;
             var newType = typeof(T);
-            if (registeredBatchTypes.Contains(newType))
+            var index = registeredBatchTypes.IndexOf(newType);
+            if (index > -1)
             {
-                throw new ArgumentException("Type is already registered; cannot reregister.");
+                Debug.Assert(Ids<T>.Id == index);
+                return index;
             }
+            index = registeredBatchTypes.Count;
             registeredBatchTypes.Add(newType);
             Ids<T>.Id = index;
             return index;

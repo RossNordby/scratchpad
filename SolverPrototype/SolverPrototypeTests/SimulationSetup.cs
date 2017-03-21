@@ -248,7 +248,7 @@ namespace SolverPrototypeTests
             public void LoopBody(ConstraintConnectivityGraph.BodyConstraintReference constraint)
             {
                 RemoveConstraint(simulation, constraint.ConnectingConstraintHandle, handleToEntryIndex, removedConstraints);
-                Debug.WriteLine($"Removed constraint (handle: {constraint.ConnectingConstraintHandle}) for a body removal.");
+                WriteLine($"Removed constraint (handle: {constraint.ConnectingConstraintHandle}) for a body removal.");
                 iterations++;
             }
         }
@@ -297,7 +297,13 @@ namespace SolverPrototypeTests
             }
         }
 
-
+        [Conditional("DEBUG")]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void WriteLine(string message)
+        {
+            //Debug.WriteLine(message);
+        }
+    
         [Conditional("DEBUG")]
         static void Validate(Simulation simulation, List<RemovedConstraint> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
         {
@@ -351,6 +357,7 @@ namespace SolverPrototypeTests
             list.RemoveAt(lastIndex);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ChurnAddBody(Simulation simulation, BodyEntry[] bodyEntries, int[] handleToEntry, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
         {
             //Add a body.
@@ -360,10 +367,11 @@ namespace SolverPrototypeTests
             var bodyHandle = simulation.Add(ref bodyEntries[toAdd].Description);
             handleToEntry[bodyHandle] = toAdd;
             bodyEntries[toAdd].Handle = bodyHandle;
-            Debug.WriteLine($"Added body, handle: {bodyHandle}");
+            WriteLine($"Added body, handle: {bodyHandle}");
             Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ChurnRemoveBody(Simulation simulation, BodyEntry[] bodyEntries, int[] handleToEntry, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
         {
             //Remove a body.
@@ -372,7 +380,7 @@ namespace SolverPrototypeTests
             var constraintRemover = new ConstraintRemover(simulation, handleToEntry, removedConstraints);
             simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintRemover);
 #if DEBUG
-            var constraintChecker = new ConstraintChecker(simulation, handleToEntry);
+            var constraintChecker = new ZeroConstraintChecker(simulation, handleToEntry);
             simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintChecker);
 #endif
             var handle = simulation.Bodies.IndexToHandle[removedBodyIndex];
@@ -380,10 +388,11 @@ namespace SolverPrototypeTests
             bodyEntries[handleToEntry[handle]].Handle = -1;
             removedBodies.Add(handleToEntry[handle]);
             handleToEntry[handle] = -1;
-            Debug.WriteLine($"Removed body, former handle: {handle}");
+            WriteLine($"Removed body, former handle: {handle}");
             Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ChurnAddConstraint(Simulation simulation, BodyEntry[] bodyEntries, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
         {
             //Add a constraint.
@@ -399,7 +408,7 @@ namespace SolverPrototypeTests
                 {
                     //The constraint is addable.
                     var constraintHandle = simulation.Add(handleA, handleB, ref constraint.Description);
-                    Debug.WriteLine($"Added constraint, handle: {constraintHandle}");
+                    WriteLine($"Added constraint, handle: {constraintHandle}");
                     FastRemoveAt(removedConstraints, constraintIndex);
                     break;
                 }
@@ -407,6 +416,7 @@ namespace SolverPrototypeTests
             Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static void ChurnRemoveConstraint(Simulation simulation, BodyEntry[] bodyEntries, int[] handleToEntry, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
         {
             //Remove a constraint.
@@ -422,7 +432,7 @@ namespace SolverPrototypeTests
                 var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
 
                 RemoveConstraint(simulation, constraintHandle, handleToEntry, removedConstraints);
-                Debug.WriteLine($"Removed constraint, former handle: {constraintHandle}");
+                WriteLine($"Removed constraint, former handle: {constraintHandle}");
                 Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
             }
         }

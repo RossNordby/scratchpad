@@ -130,10 +130,9 @@ namespace SolverPrototype
             {
                 targetBatch = Batches.Elements[targetBatchIndex];
             }
-
             var handle = handlePool.Take();
             targetBatch.Allocate(handle, ref bodyHandles, bodyCount, bodies, TypeBatchAllocation, typeId, out reference);
-
+           
             if (handle >= HandlesToConstraints.Length)
             {
                 Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);

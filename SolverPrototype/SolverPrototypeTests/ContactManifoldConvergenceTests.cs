@@ -19,15 +19,18 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(8, 8, 8, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.AddRemoveChurn(simulation, 100000);
+            SimulationSetup.BuildLattice(32, 32, 32, out simulation, out bodyHandles, out constraintHandles);
 
+            //SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
             //SimulationSetup.ScrambleBodies(simulation);
             //SimulationSetup.ScrambleConstraints(simulation.Solver);
 
 
-            SimulationSetup.AddRemoveChurn(simulation, 1);
+            //SimulationSetup.AddRemoveChurn(simulation, 1);
             GC.Collect(3, GCCollectionMode.Forced, true);
-            const int churnIterations = 3000000;
+            const int churnIterations = 30000000;
             var churnTime = SimulationSetup.AddRemoveChurn(simulation, churnIterations);
             Console.WriteLine($"Per add/remove upper bound: {churnTime * 1e6 / churnIterations} us");
 

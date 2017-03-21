@@ -18,7 +18,7 @@ namespace SolverPrototype
 
         public ConstraintBatch(int initialReferencedHandlesEstimate = 128 * 64, int initialTypeCountEstimate = 32)
         {
-            BodyHandles = new BatchReferencedHandles((initialReferencedHandlesEstimate >> 6) + ((initialReferencedHandlesEstimate & 63) > 0 ? 1 : 0));
+            BodyHandles = new BatchReferencedHandles(initialReferencedHandlesEstimate);
             ResizeTypeMap(initialTypeCountEstimate);
             TypeBatches = new QuickList<TypeBatch>(new PassthroughBufferPool<TypeBatch>());
         }
@@ -63,8 +63,6 @@ namespace SolverPrototype
         TypeBatch CreateNewTypeBatch(int typeId, TypeBatchAllocation typeBatchAllocation)
         {
             var batch = typeBatchAllocation.Take(typeId);
-            //TODO: should pass an allocator associated with the TypeBatchAllocation into the initializer rather than using the static pools; helps avoid contention cross-simulation.
-            batch.Initialize(typeBatchAllocation[typeId]);
             TypeBatches.Add(batch);
             return batch;
         }
@@ -130,18 +128,21 @@ namespace SolverPrototype
             //(While resizes will definitely occur, remember that it only really matters for *new* type batches- 
             //and it is rare that a new type batch will be created that actually needs to be enormous.)
         }
-
+        
 
         unsafe struct BodyHandleRemover : IForEach<int>
         {
             public Bodies Bodies;
             public ConstraintBatch Batch;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public BodyHandleRemover(Bodies bodies, ConstraintBatch batch)
             {
                 Bodies = bodies;
                 Batch = batch;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int bodyIndex)
             {
                 Batch.BodyHandles.Remove(Bodies.IndexToHandle[bodyIndex]);

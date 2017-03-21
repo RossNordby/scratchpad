@@ -115,12 +115,9 @@ namespace SolverPrototype.Constraints
         public unsafe override int Allocate(int handle, int* bodyIndices)
         {
             Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
-            if (constraintCount == Projection.Length)
+            if (constraintCount == IndexToHandle.Length)
             {
                 IncreaseSize(ref BodyReferences);
-                //TODO: So long as increase size is using a non-clearing pool, we need to clear the body references to avoid pulling old counts. We rely on the counts.
-                //Would be a good idea to change this- it would be easy and cheap to clear the count every time a new bundle is created.
-                Array.Clear(BodyReferences, BundleCount, BodyReferences.Length - BundleCount);
                 IncreaseSize(ref PrestepData);
                 IncreaseSize(ref Projection);
                 IncreaseSize(ref AccumulatedImpulses);
@@ -231,9 +228,6 @@ namespace SolverPrototype.Constraints
         {
             Projection = BufferPools<TProjection>.Locking.Take(initialCapacityInBundles);
             BodyReferences = BufferPools<TBodyReferences>.Locking.Take(initialCapacityInBundles);
-            //TODO: So long as increase size is using a non-clearing pool, we need to clear the body references to avoid pulling old counts. We rely on the counts.
-            //Would be a good idea to change this- it would be easy and cheap to clear the count every time a new bundle is created.
-            Array.Clear(BodyReferences, 0, BodyReferences.Length);
             PrestepData = BufferPools<TPrestepData>.Locking.Take(initialCapacityInBundles);
             AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(initialCapacityInBundles);
             IndexToHandle = BufferPools<int>.Locking.Take(initialCapacityInBundles * Vector<float>.Count);

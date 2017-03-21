@@ -18,16 +18,17 @@ namespace SolverPrototype
         /// This can grow up to the number of (bodies / 8) bytes in the worst case, but that is much, much smaller than using a dictionary or set.
         /// 16384 bodies would only take 2KB. Even if you have 1000 batches all at that size, it's a pretty unconcerning amount of storage.
         /// (And to be clear, 1000 batches is a crazy pathological number. Most simulations will have less than 20 batches.)
+        /// This is sufficiently irrelevant that we don't even bother pooling these arrays independently from the owning batches, so they can all become worst case sized.
         /// </remarks>
         ulong[] packedHandles;
 
         const int shift = 6;
         const int mask = 63;
 
-        public BatchReferencedHandles(int initialCapacityInBundles)
+        public BatchReferencedHandles(int initialCapacityInConstraints)
         {
             //Remember; the bundles are 64 bodies wide. A default of 128 supports up to 8192 handles without needing resizing...
-            packedHandles = new ulong[initialCapacityInBundles];
+            packedHandles = new ulong[(initialCapacityInConstraints >> shift) + ((initialCapacityInConstraints & mask) > 0 ? 1 : 0)];
         }
 
 
