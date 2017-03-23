@@ -90,6 +90,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BatchCompressor.cs" />
     <Compile Include="BatchReferencedHandles.cs" />
     <Compile Include="Bodies.cs" />
     <Compile Include="BodyLayoutOptimizer.cs" />

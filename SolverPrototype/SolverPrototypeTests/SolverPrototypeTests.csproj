@@ -98,6 +98,7 @@
     <Compile Include="HackCodegenTest.cs" />
     <Compile Include="IslandCacheConvergence.cs" />
     <Compile Include="PenetrationConvergenceTests.cs" />
+    <Compile Include="SpanCodeGenTests.cs" />
     <Compile Include="SimulationSetup.cs" />
     <Compile Include="ContactPenetration1DOFTests.cs" />
     <Compile Include="LayoutTests.cs" />

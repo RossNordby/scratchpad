@@ -21,4 +21,32 @@
     {
         void LoopBody(T i);
     }
+
+    /// <summary>
+    /// Defines a loop body function able to handle the equivalent of a foreach's body that supports breaking the loop early.
+    /// </summary>
+    /// <typeparam name="T">Type to enumerate over.</typeparam>
+    public interface IBreakableForEach<T>
+    {
+        /// <summary>
+        /// Executes one execution of the loop body.
+        /// </summary>
+        /// <param name="i">Visited element.</param>
+        /// <returns>True if the loop should continue, false otherwise.</returns>
+        bool LoopBody(T i);
+    }
+    /// <summary>
+    /// Defines a loop body function able to handle the equivalent of a foreach's body that supports breaking the loop early.
+    /// Takes a ref parameter for efficiency when dealing with large value types.
+    /// </summary>
+    /// <typeparam name="T">Type to enumerate over.</typeparam>
+    public interface IBreakableForEachRef<T>
+    {
+        /// <summary>
+        /// Executes one execution of the loop body.
+        /// </summary>
+        /// <param name="i">Visited element.</param>
+        /// <returns>True if the loop should continue, false otherwise.</returns>
+        bool LoopBody(ref T i);
+    }
 }

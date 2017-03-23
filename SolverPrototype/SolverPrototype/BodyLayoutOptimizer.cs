@@ -125,7 +125,7 @@ namespace SolverPrototype
             enumerator.slotIndex = dumbBodyIndex + 1;
             graph.EnumerateConnectedBodies(dumbBodyIndex, ref enumerator);
 
-
+            //TODO: Should probably try skipping to the end of the blob we optimized in the enumeration.
             ++dumbBodyIndex;
         }
 

@@ -67,6 +67,7 @@ namespace SolverPrototype
             return batch;
         }
 
+
         /// <summary>
         /// Gets whether the batch could hold the specified body handles.
         /// </summary>
