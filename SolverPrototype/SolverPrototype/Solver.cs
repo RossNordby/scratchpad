@@ -132,7 +132,7 @@ namespace SolverPrototype
             }
             var handle = handlePool.Take();
             targetBatch.Allocate(handle, ref bodyHandles, bodyCount, bodies, TypeBatchAllocation, typeId, out reference);
-           
+
             if (handle >= HandlesToConstraints.Length)
             {
                 Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);
@@ -190,17 +190,15 @@ namespace SolverPrototype
         }
 
         /// <summary>
-        /// Removes the constraint associated with the given handle. Note that this may invalidate any outstanding direct constraint references (TypeBatch-index pairs)
-        /// by reordering the constraints within the TypeBatch subject to removal.
+        /// Removes a constraint from a batch, performing any necessary batch cleanup, but does not return the constraint's handle to the pool.
         /// </summary>
-        /// <param name="handle">Handle of the constraint to remove from the solver.</param>
-        public void Remove(int handle)
+        /// <param name="batchIndex">Index of the batch to remove from.</param>
+        /// <param name="typeId">Type id of the constraint to remove.</param>
+        /// <param name="indexInTypeBatch">Index of the constraint to remove within its type batch.</param>
+        internal void RemoveFromBatch(int batchIndex, int typeId, int indexInTypeBatch)
         {
-            //Note that we don't use a ref var here. Have to be careful; we make use of the constraint location after removal. Direct ref would be invalidated.
-            //(Could cache the batch index, but that's splitting some very fine hairs.)
-            var constraintLocation = HandlesToConstraints[handle];
-            var batch = Batches[constraintLocation.BatchIndex];
-            batch.Remove(constraintLocation.TypeId, constraintLocation.IndexInTypeBatch, bodies, HandlesToConstraints, TypeBatchAllocation);
+            var batch = Batches.Elements[batchIndex];
+            batch.Remove(typeId, indexInTypeBatch, bodies, HandlesToConstraints, TypeBatchAllocation);
             if (batch.TypeBatches.Count == 0)
             {
                 //No more constraints exist within the batch; we may be able to get rid of this batch.
@@ -219,7 +217,7 @@ namespace SolverPrototype
                 //In fact, almost every instance where a batch goes empty will involve the highest index batch. If it isn't, it's going to be very high, and there won't be 
                 //many constraints above it. Deferred compression will handle it easily.
                 //Note the use of the cached batch index rather than the ref.
-                if (constraintLocation.BatchIndex == Batches.Count - 1)
+                if (batchIndex == Batches.Count - 1)
                 {
                     //Note that when we remove an empty batch, it may reveal another empty batch. If that happens, remove the revealed batch(es) too.
                     while (Batches.Count > 0 && Batches.Elements[Batches.Count - 1].TypeBatches.Count == 0)
@@ -230,7 +228,19 @@ namespace SolverPrototype
                     }
                 }
             }
-
+        }
+        /// <summary>
+        /// Removes the constraint associated with the given handle. Note that this may invalidate any outstanding direct constraint references (TypeBatch-index pairs)
+        /// by reordering the constraints within the TypeBatch subject to removal.
+        /// </summary>
+        /// <param name="handle">Handle of the constraint to remove from the solver.</param>
+        public void Remove(int handle)
+        {
+            //Note that we don't use a ref var here. Have to be careful; we make use of the constraint location after removal. Direct ref would be invalidated.
+            //(Could cache the batch index, but that's splitting some very fine hairs.)
+            var constraintLocation = HandlesToConstraints[handle];
+            RemoveFromBatch(constraintLocation.BatchIndex, constraintLocation.TypeId, constraintLocation.IndexInTypeBatch);
+            handlePool.Return(handle);
         }
 
         public void GetDescription<TConstraintDescription, TTypeBatch>(ref ConstraintReference constraintReference, out TConstraintDescription description)

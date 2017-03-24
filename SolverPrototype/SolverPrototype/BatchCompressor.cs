@@ -279,7 +279,7 @@ namespace SolverPrototype
                     //Instead, since we already know exactly where the constraint is and what constraint batch it should go to, we can avoid a lot of abstractions
                     //and do more direct copies.
                     sourceBatch.TypeBatches.Elements[compression.TypeBatchIndex].TransferConstraint(
-                        sourceBatch, compression.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
+                        nextBatchIndex, compression.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
                 }
             }
         }

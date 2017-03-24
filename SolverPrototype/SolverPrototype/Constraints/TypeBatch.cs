@@ -36,12 +36,12 @@ namespace SolverPrototype.Constraints
         /// <summary>
         /// Moves a constraint from one ConstraintBatch's TypeBatch to another ConstraintBatch's TypeBatch of the same type.
         /// </summary>
-        /// <param name="sourceBatch">Batch that owns the type batch that is the source of the constraint transfer.</param>
+        /// <param name="sourceBatchIndex">Index of the batch that owns the type batch that is the source of the constraint transfer.</param>
         /// <param name="indexInTypeBatch">Index of the constraint to move in the current type batch.</param>
         /// <param name="solver">Solver that owns the batches.</param>
         /// <param name="bodies">Bodies set that owns all the constraint's bodies.</param>
         /// <param name="targetBatchIndex">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
-        public abstract void TransferConstraint(ConstraintBatch sourceBatch, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex);
+        public unsafe abstract void TransferConstraint(int sourceBatchIndex, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex);
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
@@ -338,12 +338,12 @@ namespace SolverPrototype.Constraints
         /// <summary>
         /// Moves a constraint from one ConstraintBatch's TypeBatch to another ConstraintBatch's TypeBatch of the same type.
         /// </summary>
-        /// <param name="sourceBatch">Batch that owns the type batch that is the source of the constraint transfer.</param>
+        /// <param name="sourceBatchIndex">Index of the batch that owns the type batch that is the source of the constraint transfer.</param>
         /// <param name="indexInTypeBatch">Index of the constraint to move in the current type batch.</param>
         /// <param name="solver">Solver that owns the batches.</param>
         /// <param name="bodies">Bodies set that owns all the constraint's bodies.</param>
         /// <param name="targetBatchIndex">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
-        public unsafe override void TransferConstraint(ConstraintBatch sourceBatch, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex)
+        public unsafe override void TransferConstraint(int sourceBatchIndex, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex)
         {
             //Note that the following does some redundant work. It's technically possible to do better than this, but it requires bypassing a lot of bookkeeping.
             //It's not exactly trivial to keep everything straight, especially over time- it becomes a maintenance nightmare.
@@ -369,8 +369,14 @@ namespace SolverPrototype.Constraints
             GatherScatter.CopyLane(ref AccumulatedImpulses[sourceBundle], sourceInner, ref targetTypeBatch.AccumulatedImpulses[targetBundle], targetInner);
 
             //Now we can get rid of the old allocation.
-            ValidateBundleCounts(); //note that this validation has to come before the removal, since the removal will mutate this type batch!
-            solver.Remove(constraintHandle); //This is safe because the old handle->constraint mapping has not yet been changed. It does do a redundant lookup, though.
+            //note that this validation has to come before the removal, since the removal will mutate this type batch!
+            ValidateBundleCounts();
+            //Note the use of RemoveFromBatch instead of Remove. Solver.Remove returns the handle to the pool, which we do not want!
+            //It may look a bit odd to use a solver-level function here, given that we are operating on batches and handling the solver state directly for the most part. 
+            //However, removes can result in empty batches that require resource reclamation. 
+            //Rather than reimplementing that we just reuse the solver's version. 
+            //That sort of resource cleanup isn't required on add- everything that is needed already exists, and nothing is going away.
+            solver.RemoveFromBatch(sourceBatchIndex, typeId, indexInTypeBatch);
 
             //Don't forget to keep the solver's pointers consistent! We bypassed the usual add procedure, so the solver hasn't been notified yet.
             ref var constraintLocation = ref solver.HandlesToConstraints[constraintHandle];
