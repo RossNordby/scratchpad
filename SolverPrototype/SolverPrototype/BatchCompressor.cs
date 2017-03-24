@@ -93,7 +93,7 @@ namespace SolverPrototype
         /// Index of the constraint batch to optimize.
         /// </summary>
         int nextBatchIndex;
-        
+
         /// <summary>
         /// Incrementally finds and applies a set of compressions to apply to the constraints in the solver's batches.
         /// Constraints in higher index batches try to move to lower index batches whenever possible.
@@ -204,55 +204,42 @@ namespace SolverPrototype
             //Note that this is similar to the ConstraintLayoutOptimizer in terms of batch walking. The differences are:
             //1) We don't have to worry about nonzero offsets, and
             //2) there is only one progression index set, and
-            //3) we operate on constraint indices rather than bundle indices.
-            //4) The batch compressor cannot walk to the next batch during a single pass, since that would invalidate the guarantees required for safe multithreaded analysis.
-            bool WrapBatch(ref AnalysisRegion target)
-            {
-                Debug.Assert(Solver.Batches.Count >= 0);
-                if (target.BatchIndex >= Solver.Batches.Count)
-                {
-                    //Wrap around.
-                    target = new AnalysisRegion();
-                    return true;
-                }
-                return false;
-            }
-            bool WrapTypeBatch(ref AnalysisRegion o)
-            {
-                Debug.Assert(o.BatchIndex <= Solver.Batches.Count, "Should only attempt to wrap type batch indices if the batch index is known to be valid.");
-                if (o.TypeBatchIndex >= Solver.Batches[o.BatchIndex].TypeBatches.Count)
-                {
-                    ++o.BatchIndex;
-                    if (!WrapBatch(ref o))
-                    {
-                        o.TypeBatchIndex = 0;
-                        o.StartIndexInTypeBatch = 0;
-                    }
-                    return true;
-                }
-                return false;
-            }
-            void WrapBundle(ref AnalysisRegion o, ref int batchIndex)
-            {
-                Debug.Assert(o.BatchIndex <= Solver.Batches.Count && o.TypeBatchIndex <= Solver.Batches[o.BatchIndex].TypeBatches.Count,
-                    "Should only attempt to wrap constraint index if the type batch and batch indices are known to be valid.");
-                if (o.StartIndexInTypeBatch >= Solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].ConstraintCount)
-                {
-                    ++o.TypeBatchIndex;
-                    if (!WrapTypeBatch(ref o))
-                    {
-                        o.StartIndexInTypeBatch = 0;
-                    }
-                }
-            }
+            //3) we operate on constraint indices rather than bundle indices, and
+            //4) the batch compressor cannot walk to the next batch during a single pass, since that would invalidate the guarantees required for safe multithreaded analysis.
+
+
             //Since the constraint set could have changed arbitrarily since the previous execution, validate from batch down.
-            if (!WrapBatch(ref nextTarget))
+            Debug.Assert(Solver.Batches.Count >= 0);
+            if (nextBatchIndex >= Solver.Batches.Count)
             {
-                if (!WrapTypeBatch(ref nextTarget))
+                //Invalid batch; wrap to the first one.
+                nextBatchIndex = 0;
+                nextTarget = new AnalysisStart();
+            }
+            else if (nextTarget.TypeBatchIndex >= Solver.Batches[nextBatchIndex].TypeBatches.Count)
+            {
+                //Invalid type batch; move to the next batch.
+                ++nextBatchIndex;
+                if (nextBatchIndex >= Solver.Batches.Count)
+                    nextBatchIndex = 0;
+                nextTarget = new AnalysisStart();
+            }
+            else if (nextTarget.StartIndexInTypeBatch >= Solver.Batches[nextBatchIndex].TypeBatches[nextTarget.TypeBatchIndex].ConstraintCount)
+            {
+                //Invalid constraint index; move to the next type batch.
+                nextTarget.StartIndexInTypeBatch = 0;
+                ++nextTarget.TypeBatchIndex;
+                //Check if we have to move to the next batch.
+                if (nextTarget.TypeBatchIndex >= Solver.Batches[nextBatchIndex].TypeBatches.Count)
                 {
-                    WrapBundle(ref nextTarget);
+                    nextTarget.TypeBatchIndex = 0;
+                    ++nextBatchIndex;
+                    if (nextBatchIndex >= Solver.Batches.Count)
+                        nextBatchIndex = 0;
                 }
             }
+
+
 
             //Build the analysis regions.
             var batch = Solver.Batches[nextBatchIndex];
@@ -270,33 +257,14 @@ namespace SolverPrototype
                 context.Region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
                 context.Region.Start = nextTarget;
                 nextTarget.StartIndexInTypeBatch += context.Region.ConstraintCount;
-                WrapBundle(ref nextTarget);
             }
-            do
-            {
-                //Add the initial target for optimization. It's already been validated- either by the initial test, or by the previous wrap.
-                targets.Add(ref nextTarget);
-                nextTarget.BundleIndex += maximumRegionSizeInBundles;
-                WrapBundle(ref nextTarget);
-
-                //If the next target overlaps with the first target, the collection has wrapped around all constraints. Apparently more regions were requested
-                //than are available. Stop collection.
-                ref var firstTarget = ref targets.Elements[0];
-                if (nextTarget.BatchIndex == firstTarget.BatchIndex &&
-                    nextTarget.TypeBatchIndex == firstTarget.TypeBatchIndex &&
-                    nextTarget.BundleIndex < firstTarget.BundleIndex + maximumRegionSizeInBundles)
-                {
-                    break;
-                }
-            }
-            while (targets.Count < regionCount);
 
             //For now, we only have one worker.
             foundCompressionsCount = 0;
             AnalysisWorker(0);
 
-            //Note that it is possible for this to skip 
-            //Now we've got the set of compressions. Apply them.
+            //Note that it is possible for this to skip some compressions if the maximum number of compressions is hit before all candidates are visited. That's fine;
+            //compressions should be rare under normal circumstances and having to wait some frames for the analysis to swing back through shouldn't be a problem.
 
         }
 
@@ -305,7 +273,23 @@ namespace SolverPrototype
         /// </summary>
         void ApplyCompressions()
         {
-            Debug.Assert(foundCompressionsCount < compressions.Length);
+            //Walk the list of workers in reverse order. We assume here that each worker has generated its results in low to high order as well.
+            //So, by walking backwards sequentially, we ensure that early removals will not interfere with later removals 
+            //because removals take the last element and pull it into the removed slot, leaving the earlier section of the arrays untouched.
+            var sourceBatch = Solver.Batches.Elements[nextBatchIndex];
+            for (int i = workerContexts.Length - 1; i >= 0; --i)
+            {
+                ref var context = ref workerContexts[i];
+                for (int j = context.Compressions.Count - 1; j >= 0; --j)
+                {
+                    ref var compression = ref context.Compressions.Elements[j];
+                    //Note that we do not simply remove and re-add the constraint; while that would work, it would redo a lot of work that isn't necessary.
+                    //Instead, since we already know exactly where the constraint is and what constraint batch it should go to, we can avoid a lot of abstractions
+                    //and do more direct copies.
+                    sourceBatch.TypeBatches.Elements[compression.TypeBatchIndex].TransferConstraint(
+                        compression.IndexInTypeBatch, Solver, compression.TargetBatch);
+                }
+            }
         }
     }
 }

@@ -69,6 +69,35 @@ namespace SolverPrototype
 
 
         /// <summary>
+        /// Gets the TypeBatch associated with the given TypeId in this ConstraintBatch. Creates a new TypeBatch if one does not already exist.
+        /// </summary>
+        /// <param name="typeId">TypeId of the type batch to look up.</param>
+        /// <param name="typeBatchAllocation">Type batch allocation used to initialize constraints.</param>
+        /// <returns>TypeBatch associated with the given typeid in this ConstraintBatch.</returns>
+        internal TypeBatch GetOrCreateTypeBatch(int typeId, TypeBatchAllocation typeBatchAllocation)
+        {
+            if (typeId >= TypeIndexToTypeBatchIndex.Length)
+            {
+                ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
+                TypeIndexToTypeBatchIndex[typeId] = TypeBatches.Count;
+                return CreateNewTypeBatch(typeId, typeBatchAllocation);
+            }
+            else
+            {
+                ref var typeBatchIndex = ref TypeIndexToTypeBatchIndex[typeId];
+                if (typeBatchIndex == -1)
+                {
+                    typeBatchIndex = TypeBatches.Count;
+                    return CreateNewTypeBatch(typeId, typeBatchAllocation);
+                }
+                else
+                {
+                    Debug.Assert(ConstraintTypeIds.GetType(typeId) == TypeBatches.Elements[typeBatchIndex].GetType());
+                    return TypeBatches.Elements[typeBatchIndex];
+                }
+            }
+        }
+        /// <summary>
         /// Gets whether the batch could hold the specified body handles.
         /// </summary>
         /// <param name="constraintBodyHandles">List of body handles to check for in the batch.</param>
@@ -86,7 +115,6 @@ namespace SolverPrototype
             }
             return true;
         }
-
         public unsafe void Allocate(int handle, ref int bodyHandles, int bodyCount, Bodies bodies, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
         {
             Debug.Assert(CanFit(ref bodyHandles, bodyCount));
@@ -99,26 +127,7 @@ namespace SolverPrototype
                 BodyHandles.Add(bodyHandle);
                 bodyIndices[j] = bodies.HandleToIndex[bodyHandle];
             }
-            if (typeId >= TypeIndexToTypeBatchIndex.Length)
-            {
-                ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
-                TypeIndexToTypeBatchIndex[typeId] = TypeBatches.Count;
-                reference.TypeBatch = CreateNewTypeBatch(typeId, typeBatchAllocation);
-            }
-            else
-            {
-                ref var typeBatchIndex = ref TypeIndexToTypeBatchIndex[typeId];
-                if (typeBatchIndex == -1)
-                {
-                    typeBatchIndex = TypeBatches.Count;
-                    reference.TypeBatch = CreateNewTypeBatch(typeId, typeBatchAllocation);
-                }
-                else
-                {
-                    Debug.Assert(ConstraintTypeIds.GetType(typeId) == TypeBatches.Elements[typeBatchIndex].GetType());
-                    reference.TypeBatch = TypeBatches.Elements[typeBatchIndex];
-                }
-            }
+            reference.TypeBatch = GetOrCreateTypeBatch(typeId, typeBatchAllocation);
             reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices);
             //TODO: We could adjust the typeBatchAllocation capacities in response to the allocated index.
             //If it exceeds the current capacity, we could ensure the new size is still included.
