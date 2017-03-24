@@ -111,18 +111,6 @@ namespace SolverPrototype
         //It'll just require some testing.
         //(The broad phase is a pretty likely candidate for this overlay- it both causes no changes in constraints and is very stally compared to most other phases.)
 
-        unsafe struct BodyIndexAccumulator : IForEach<int>
-        {
-            public Bodies Bodies;
-            public int* Handles;
-            public int Index;
-
-            public void LoopBody(int handleIndex)
-            {
-                Handles[Index++] = Bodies.IndexToHandle[handleIndex];
-            }
-        }
-
         int foundCompressionsCount;
         unsafe void AnalysisWorker(int workerId)
         {
@@ -142,7 +130,7 @@ namespace SolverPrototype
                 var end = indexInTypeBatch + availableConstraints;
                 var bodiesPerConstraint = typeBatch.BodiesPerConstraint;
                 var bodyHandles = stackalloc int[bodiesPerConstraint];
-                BodyIndexAccumulator indexAccumulator;
+                ConstraintBodyHandleCollector indexAccumulator;
                 indexAccumulator.Bodies = Bodies;
                 indexAccumulator.Handles = bodyHandles;
                 for (int i = indexInTypeBatch; i < end; ++i)
@@ -158,7 +146,7 @@ namespace SolverPrototype
                     typeBatch.EnumerateConnectedBodyIndices(i, ref indexAccumulator);
                     for (int batchIndex = 0; batchIndex < nextBatchIndex; ++batchIndex)
                     {
-                        if (Solver.Batches[i].CanFit(ref bodyHandles[0], bodiesPerConstraint))
+                        if (Solver.Batches[batchIndex].CanFit(ref bodyHandles[0], bodiesPerConstraint))
                         {
                             //This constraint can move down!
                             //Note that we don't add it if the new index would put the total number of compression targets above the maximum for this pass.
@@ -174,7 +162,7 @@ namespace SolverPrototype
 
                 remainder -= availableConstraints;
                 indexInTypeBatch = end;
-                if (indexInTypeBatch == typeBatch.ConstraintCount)
+                if (indexInTypeBatch == typeBatch.ConstraintCount && remainder > 0)
                 {
                     //If it wasn't large enough, then we need to push the type batch to the next slot.
                     //The region creation phase should guarantee that this is a valid thing to do.
@@ -251,14 +239,18 @@ namespace SolverPrototype
             }
             var constraintsPerWorkerBase = remainingConstraintCount / workerCount;
             var constraintsRemainder = remainingConstraintCount - workerCount * constraintsPerWorkerBase;
+            var DEBUGTotalConstraintsAnalyzed = 0;
             for (int i = 0; i < workerCount; ++i)
             {
                 ref var context = ref workerContexts[i];
                 context.Region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
                 context.Region.Start = nextTarget;
                 nextTarget.StartIndexInTypeBatch += context.Region.ConstraintCount;
+                DEBUGTotalConstraintsAnalyzed += context.Region.ConstraintCount;
             }
 
+            if (workerContexts[0].Compressions.Count > 0)
+                Console.WriteLine($"Analyzed {DEBUGTotalConstraintsAnalyzed} constraints, compressing {workerContexts[0].Compressions.Count}");
             //For now, we only have one worker.
             foundCompressionsCount = 0;
             AnalysisWorker(0);
@@ -287,7 +279,7 @@ namespace SolverPrototype
                     //Instead, since we already know exactly where the constraint is and what constraint batch it should go to, we can avoid a lot of abstractions
                     //and do more direct copies.
                     sourceBatch.TypeBatches.Elements[compression.TypeBatchIndex].TransferConstraint(
-                        compression.IndexInTypeBatch, Solver, compression.TargetBatch);
+                        sourceBatch, compression.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
                 }
             }
         }

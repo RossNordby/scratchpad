@@ -32,7 +32,16 @@ namespace SolverPrototype.Constraints
         /// <returns>Index of the slot in the batch.</returns>
         public unsafe abstract int Allocate(int handle, int* bodyIndices);
         public abstract void Remove(int index, ConstraintLocation[] handlesToConstraints);
-        public abstract void TransferConstraint(int indexInTypeBatch, Solver solver, int targetBatch);
+
+        /// <summary>
+        /// Moves a constraint from one ConstraintBatch's TypeBatch to another ConstraintBatch's TypeBatch of the same type.
+        /// </summary>
+        /// <param name="sourceBatch">Batch that owns the type batch that is the source of the constraint transfer.</param>
+        /// <param name="indexInTypeBatch">Index of the constraint to move in the current type batch.</param>
+        /// <param name="solver">Solver that owns the batches.</param>
+        /// <param name="bodies">Bodies set that owns all the constraint's bodies.</param>
+        /// <param name="targetBatchIndex">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
+        public abstract void TransferConstraint(ConstraintBatch sourceBatch, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex);
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
@@ -106,14 +115,72 @@ namespace SolverPrototype.Constraints
             BufferPools<T>.Locking.Return(old);
         }
 
-        protected unsafe abstract void AddBodyReferences(int index, int* bodyIndices);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe static void AddBodyReferencesLane(ref TBodyReferences bundle, int innerIndex, int* bodyIndices)
+        {
+            //The jit should be able to fold almost all of the size-related calculations and address fiddling.
+            ref var start = ref Unsafe.As<TBodyReferences, int>(ref bundle);
+            ref var targetLane = ref Unsafe.Add(ref start, innerIndex);
+            var stride = Vector<int>.Count * 2;
+            //We assume that the body references struct is organized in memory like Bundle0, Inner0, ... BundleN, InnerN, Count
+            //Assuming contiguous storage, Count is then located at start + stride * BodyCount.
+            var bodyCount = Unsafe.SizeOf<TBodyReferences>() / (stride * 4);
+            Debug.Assert(innerIndex == 0 || Unsafe.Add(ref start, stride * bodyCount) == innerIndex,
+                "Either this bundle hasn't been initialized yet (and so has unknown count), or it should match the new inner index.");
+            for (int i = 0; i < bodyCount; ++i)
+            {
+                BundleIndexing.GetBundleIndices(bodyIndices[i], out var bodyBundleIndex, out var bodyInnerIndex);
+                //Body references, by convention, are stored in bundle-inner-bundle-inner interleaved order.
+                Unsafe.Add(ref targetLane, i * stride) = bodyBundleIndex;
+                Unsafe.Add(ref targetLane, i * stride + Vector<int>.Count) = bodyInnerIndex;
+            }
+            //When adding a lane to a body references struct, it is always at the end. So, the count is one beyond the inner index we just set.
+            Unsafe.Add(ref start, stride * bodyCount) = innerIndex + 1;
+            Debug.Assert(Unsafe.Add(ref start, stride * bodyCount) <= Vector<int>.Count && Unsafe.Add(ref start, stride * bodyCount) >= 0,
+                "If the inner index was valid, the resulting bundle count will be within the bundle limits.");
+
+#if DEBUG
+            for (int i = 0; i < Unsafe.Add(ref start, stride * bodyCount) - 1; ++i)
+            {
+                var aIndex = (Unsafe.Add(ref start, i) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, i + Vector<int>.Count);
+                var bIndex = (Unsafe.Add(ref start, i + 2 * Vector<int>.Count) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, i + 3 * Vector<int>.Count);
+                for (int j = i + 1; j < Unsafe.Add(ref start, stride * bodyCount); ++j)
+                {
+                    var aIndex2 = (Unsafe.Add(ref start, j) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, j + Vector<int>.Count);
+                    var bIndex2 = (Unsafe.Add(ref start, j + 2 * Vector<int>.Count) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, j + 3 * Vector<int>.Count);
+                    Debug.Assert(!(
+                        aIndex == bIndex || aIndex2 == bIndex2 ||
+                        aIndex == aIndex2 || aIndex == bIndex2 ||
+                        bIndex == aIndex2 || bIndex == bIndex2),
+                        "A bundle should not share any body references. If an add causes redundant body references, something upstream broke.");
+                }
+
+            }
+#endif
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ref int GetLanesInBundleCount(ref TBodyReferences bundle)
+        {
+            //We assume that the body references struct is organized in memory like Bundle0, Inner0, ... BundleN, InnerN, Count
+            //Assuming contiguous storage, Count is then located at start + stride * BodyCount.
+            var stride = Vector<int>.Count * 2;
+            var bodyCount = Unsafe.SizeOf<TBodyReferences>() / (stride * 4);
+            return ref Unsafe.Add(ref Unsafe.As<TBodyReferences, int>(ref bundle), stride * bodyCount);
+        }
+
+
         protected abstract void RemoveBodyReferences(int bundleIndex, int innerIndex);
 
         /// <summary>
-        /// Allocates a slot in the batch without filling the body references.
+        /// Allocates room for a constraint without setting up any of the body references information. This should be followed by some other initialization that fills in the 
+        /// body references lane and updates the count.
         /// </summary>
-        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
-        internal int Allocate(int handle)
+        /// <param name="handle">Handle to allocate.</param>
+        /// <returns>Index in the type batch allocated for the constraint.</returns>
+        private int AllocateShared(int handle)
         {
             Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == IndexToHandle.Length)
@@ -139,8 +206,26 @@ namespace SolverPrototype.Constraints
         /// <returns>Index of the slot in the batch.</returns>
         public unsafe sealed override int Allocate(int handle, int* bodyIndices)
         {
-            var index = Allocate(handle);
-            AddBodyReferences(index, bodyIndices);
+            var index = AllocateShared(handle);
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            ref var bundle = ref BodyReferences[bundleIndex];
+            AddBodyReferencesLane(ref bundle, innerIndex, bodyIndices);
+            return index;
+        }
+
+        /// <summary>
+        /// Allocates a slot in the batch without filling the body references lane for the allocated constraint. The BodyReferences.Count is incremented, though.
+        /// </summary>
+        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
+        /// <param name="allocatedBundleIndex">Bundle index for the constraint.</param>
+        /// <param name="allocatedInnerIndex">Index of the constraint within its bundle.</param>
+        /// <returns>Index of the slot in the batch.</returns>
+        internal int Allocate(int handle, out int allocatedBundleIndex, out int allocatedInnerIndex)
+        {
+            var index = AllocateShared(handle);
+            BundleIndexing.GetBundleIndices(index, out allocatedBundleIndex, out allocatedInnerIndex);
+            ref var bundle = ref BodyReferences[allocatedBundleIndex];
+            GetLanesInBundleCount(ref bundle) = allocatedInnerIndex + 1;
             return index;
         }
 
@@ -226,6 +311,10 @@ namespace SolverPrototype.Constraints
             if ((constraintCount & BundleIndexing.VectorMask) == 0)
                 --bundleCount;
             BundleIndexing.GetBundleIndices(lastIndex, out var sourceBundleIndex, out var sourceInnerIndex);
+#if DEBUG
+            //The Move below overwrites the IndexToHandle, so if we want to use it for debugging, we gotta cache it.
+            var removedHandle = IndexToHandle[index];
+#endif
             if (index < lastIndex)
             {
                 //Need to swap.
@@ -235,43 +324,61 @@ namespace SolverPrototype.Constraints
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);
             RemoveBodyReferences(sourceBundleIndex, sourceInnerIndex);
+
+#if DEBUG
+            //While it's not necessary to clear these, it can be useful for debugging if any accesses of the old position (that are not refilled immediately)
+            //result in some form of index error later upon invalid usage.
+            handlesToConstraints[removedHandle].BatchIndex = -1;
+            handlesToConstraints[removedHandle].IndexInTypeBatch = -1;
+            handlesToConstraints[removedHandle].TypeId = -1;
+            IndexToHandle[lastIndex] = -1;
+#endif
         }
 
         /// <summary>
         /// Moves a constraint from one ConstraintBatch's TypeBatch to another ConstraintBatch's TypeBatch of the same type.
         /// </summary>
+        /// <param name="sourceBatch">Batch that owns the type batch that is the source of the constraint transfer.</param>
         /// <param name="indexInTypeBatch">Index of the constraint to move in the current type batch.</param>
         /// <param name="solver">Solver that owns the batches.</param>
-        /// <param name="targetBatch">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
-        public override void TransferConstraint(int indexInTypeBatch, Solver solver, int targetBatch)
+        /// <param name="bodies">Bodies set that owns all the constraint's bodies.</param>
+        /// <param name="targetBatchIndex">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
+        public unsafe override void TransferConstraint(ConstraintBatch sourceBatch, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex)
         {
+            //Note that the following does some redundant work. It's technically possible to do better than this, but it requires bypassing a lot of bookkeeping.
+            //It's not exactly trivial to keep everything straight, especially over time- it becomes a maintenance nightmare.
+            //So instead, given that compressions should generally be extremely rare (relatively speaking) and highly deferrable, we'll accept some minor overhead.
+            int bodiesPerConstraint = BodiesPerConstraint;
+            var bodyHandles = stackalloc int[BodiesPerConstraint];
+            var bodyHandleCollector = new ConstraintBodyHandleCollector(bodies, bodyHandles);
+            EnumerateConnectedBodyIndices(indexInTypeBatch, ref bodyHandleCollector);
+            var targetBatch = solver.Batches.Elements[targetBatchIndex];
+            //Allocate a spot in the new batch. Note that it does not change the Handle->Constraint mapping in the Solver; that's important when we call Solver.Remove below.
+            var constraintHandle = IndexToHandle[indexInTypeBatch];
+            targetBatch.Allocate(constraintHandle, ref bodyHandles[0], bodiesPerConstraint, bodies, solver.TypeBatchAllocation, typeId, out var newReference);
+
             //This cast is pretty gross looking, but guaranteed to work by virtue of the typeid registrations.
-            var targetTypeBatch = (TypeBatch<TBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>)
-                solver.Batches.Elements[targetBatch].GetOrCreateTypeBatch(typeId, solver.TypeBatchAllocation);
-            var handle = IndexToHandle[indexInTypeBatch];
-            //Allocate a target slot. Don't put references into the target slot via the usual means- we'll just copy directly in.
-            var indexInTargetTypeBatch = targetTypeBatch.Allocate(handle);
+            var targetTypeBatch = (TypeBatch<TBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>)newReference.TypeBatch;
+            BundleIndexing.GetBundleIndices(newReference.IndexInTypeBatch, out var targetBundle, out var targetInner);
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var sourceBundle, out var sourceInner);
-            BundleIndexing.GetBundleIndices(indexInTargetTypeBatch, out var targetBundle, out var targetInner);
+            //We don't pull a description or anything from the old constraint. That would require having a unique mapping from constraint to 'full description'. 
+            //Instead, we just directly copy from lane to lane.
             //Note that we leave out the runtime generated bits- they'll just get regenerated.
             GatherScatter.CopyLane(ref BodyReferences[sourceBundle], sourceInner, ref targetTypeBatch.BodyReferences[targetBundle], targetInner);
             GatherScatter.CopyLane(ref PrestepData[sourceBundle], sourceInner, ref targetTypeBatch.PrestepData[targetBundle], targetInner);
             GatherScatter.CopyLane(ref AccumulatedImpulses[sourceBundle], sourceInner, ref targetTypeBatch.AccumulatedImpulses[targetBundle], targetInner);
-            //Get rid of the constraint in the current batch.
-            Remove(indexInTypeBatch, solver.HandlesToConstraints);
-            //Don't forget to keep the solver's pointers consistent! We bypassed the usual add procedure, so the solver hasn't been notified yet.
-            ref var constraintLocation = ref solver.HandlesToConstraints[handle];
-            constraintLocation.BatchIndex = targetBatch;
-            constraintLocation.IndexInTypeBatch = indexInTargetTypeBatch;
-            //Typeid is unchanged.
-            Debug.Assert(constraintLocation.TypeId == typeId && targetTypeBatch.typeId == typeId);
 
-            //Note that this implementation is a little bit dangerous in the sense that it creates more codepaths that must maintain synchronization with all the others.
-            //If we added more bookkeeping bits in one, the others might end up broken. But, in this case, it's pretty useful- the overhead required for a full remove-add
-            //is very high compared to a typebatch-typebatch copy.
-            //Basically, annoyance for performance, like many things in BEPUphysics v2. This is a sequential operation, so reducing overhead is important.
-            //You'll see this tradeoff repeated in the deactivation system where it preprocesses adds into bulk copy operations, 
-            //somewhat similar to the above (except for many constraints and bodies at once).
+            //Now we can get rid of the old allocation.
+            ValidateBundleCounts(); //note that this validation has to come before the removal, since the removal will mutate this type batch!
+            solver.Remove(constraintHandle); //This is safe because the old handle->constraint mapping has not yet been changed. It does do a redundant lookup, though.
+
+            //Don't forget to keep the solver's pointers consistent! We bypassed the usual add procedure, so the solver hasn't been notified yet.
+            ref var constraintLocation = ref solver.HandlesToConstraints[constraintHandle];
+            constraintLocation.BatchIndex = targetBatchIndex;
+            constraintLocation.IndexInTypeBatch = newReference.IndexInTypeBatch;
+            constraintLocation.TypeId = typeId;
+            targetTypeBatch.ValidateBundleCounts();
+
         }
 
         public override void Initialize(int initialCapacityInBundles, int typeId)

@@ -318,6 +318,7 @@ namespace SolverPrototypeTests
                 for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
                 {
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
+                    Debug.Assert(typeBatch.ConstraintCount > 0, "If a type batch exists, there should be constraints in it.");
                     for (int indexInTypeBatch = 0; indexInTypeBatch < typeBatch.ConstraintCount; ++indexInTypeBatch)
                     {
                         var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
@@ -428,6 +429,7 @@ namespace SolverPrototypeTests
             if (batch.TypeBatches.Count > 0)
             {
                 var typeBatch = batch.TypeBatches[random.Next(batch.TypeBatches.Count)];
+                Debug.Assert(typeBatch.ConstraintCount > 0, "If a type batch exists, it should have constraints in it.");
                 var indexInTypeBatch = random.Next(typeBatch.ConstraintCount);
                 var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
 
@@ -467,6 +469,7 @@ namespace SolverPrototypeTests
             var removedBodies = new List<int>();
             var random = new Random(5);
 
+            Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
 
             var constraintActionProbability = originalConstraintCount > 0 ? 1 - (double)simulation.Bodies.BodyCount / originalConstraintCount : 0;
 
@@ -522,10 +525,6 @@ namespace SolverPrototypeTests
                 {
                     newConstraintCount += typeBatch.ConstraintCount;
                 }
-            }
-            for (int i = 0; i < newConstraintCount; ++i)
-            {
-                simulation.Solver.GetDescription<ContactManifold4Constraint>(i, out var description);
             }
             Debug.Assert(newConstraintCount == originalConstraintCount, "Best have the same number of constraints if we actually added them all back!");
             Debug.Assert(bodyEntries.Length == simulation.Bodies.BodyCount, "And bodies, too!");

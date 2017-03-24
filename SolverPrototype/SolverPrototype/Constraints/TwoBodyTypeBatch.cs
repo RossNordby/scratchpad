@@ -42,43 +42,16 @@ namespace SolverPrototype.Constraints
             innerIndex = bodyInnerIndex;
         }
 
-        protected unsafe sealed override void AddBodyReferences(int index, int* bodyIndices)
-        {
-            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            ref var bundle = ref BodyReferences[bundleIndex];
-            Debug.Assert(innerIndex == 0 || bundle.Count == innerIndex,
-                "Either this bundle hasn't been initialized yet (and so has unknown count), or it should match the new inner index.");
-            //Since we only ever add constraints at the very end, the count is based on the inner index.
-            bundle.Count = innerIndex + 1;
-            GatherScatter.SetBodyReferencesLane(ref bundle.BundleIndexA, innerIndex, bodyIndices, 2);
-#if DEBUG
-            for (int i = 0; i < bundle.Count - 1; ++i)
-            {
-                var aIndex = (bundle.BundleIndexA[i] << BundleIndexing.VectorShift) | bundle.InnerIndexA[i];
-                var bIndex = (bundle.BundleIndexB[i] << BundleIndexing.VectorShift) | bundle.InnerIndexB[i];
-                for (int j = i + 1; j < bundle.Count; ++j)
-                {
-                    var aIndex2 = (bundle.BundleIndexA[j] << BundleIndexing.VectorShift) | bundle.InnerIndexA[j];
-                    var bIndex2 = (bundle.BundleIndexB[j] << BundleIndexing.VectorShift) | bundle.InnerIndexB[j];
-                    Debug.Assert(!(
-                        aIndex == bIndex || aIndex2 == bIndex2 ||
-                        aIndex == aIndex2 || aIndex == bIndex2 ||
-                        bIndex == aIndex2 || bIndex == bIndex2),
-                        "A bundle should not share any body references. If an add causes redundant body references, something upstream broke.");
-                }
-
-            }
-#endif
-
-        }
         protected sealed override void RemoveBodyReferences(int bundleIndex, int innerIndex)
         {
             ref var bundle = ref BodyReferences[bundleIndex];
-            Debug.Assert(bundle.Count > 0, "The caller should guarantee that any one bundle isn't over-removed from.");
+            //This removal should only ever occur at the very end of the constraint set, so the innerIndex should be equal to the count + 1.
+            Debug.Assert(bundle.Count == innerIndex + 1, "Since the last element is the only one that is ever removed, the last slot of the bundle should match the provided inner index.");
             //This is a little defensive; in the event that the body set actually scales down, you don't want to end up with invalid pointers in some lanes.
             //TODO: This may need to change depending on how we handle kinematic/static/inactive storage and encoding.
             //Note the use of an explicit count. We don't directly control the memory size of TwoBodyReferences, but we don't want the clear to touch the count slot. 
-            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex, 2);
+            //Note that the count is 4, not 2! The count is in terms of cleared slots, not bodies, and the body references struct has 2 slots per body (bundle and inner).
+            GatherScatter.ClearLane<TwoBodyReferences, int>(ref bundle, innerIndex, 4);
             bundle.Count--;
 
         }
@@ -177,9 +150,10 @@ namespace SolverPrototype.Constraints
             BufferPools<TPrestepData>.Locking.Return(prestepCache);
             BufferPools<TAccumulatedImpulse>.Locking.Return(accumulatedImpulseCache);
         }
-
-        public override void ValidateBundleCounts()
+        
+        public sealed override void ValidateBundleCounts()
         {
+            Debug.Assert(constraintCount > 0, "If a type batch exists, it should have constraints in it.");
             //This is a pure debug function. Performance does not matter.
             for (int i = 0; i < bundleCount - 1; ++i)
             {

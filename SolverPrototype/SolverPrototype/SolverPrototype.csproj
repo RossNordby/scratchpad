@@ -103,6 +103,7 @@
     <Compile Include="Constraints\ContactPenetrationLimit.cs" />
     <Compile Include="Constraints\ContactPenetrationLimit4.cs" />
     <Compile Include="Constraints\IConstraintDescription.cs" />
+    <Compile Include="HandyEnumerators.cs" />
     <Compile Include="IForEachRef.cs" />
     <Compile Include="TypeBatchAllocation.cs" />
     <Compile Include="Matrix2x2Wide.cs" />

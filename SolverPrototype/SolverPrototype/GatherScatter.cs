@@ -362,19 +362,6 @@ namespace SolverPrototype
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void SetBodyReferencesLane(ref Vector<int> start, int innerIndex, int* bodyIndices, int bodyCount)
-        {
-            ref var targetLane = ref Get(ref start, innerIndex);
-            var stride = Vector<int>.Count * 2;
-            for (int i = 0; i < bodyCount; ++i)
-            {
-                BundleIndexing.GetBundleIndices(bodyIndices[i], out var bodyBundleIndex, out var bodyInnerIndex);
-                //Body references, by convention, are stored in bundle-inner-bundle-inner interleaved order.
-                Unsafe.Add(ref targetLane, i * stride) = bodyBundleIndex;
-                Unsafe.Add(ref targetLane, i * stride + Vector<int>.Count) = bodyInnerIndex;
-            }
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
