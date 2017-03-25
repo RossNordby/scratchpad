@@ -24,7 +24,7 @@ namespace SolverPrototypeTests
             var compressor = new BatchCompressor(simulation.Solver, simulation.Bodies);
             for (int i = 0; i < 1000; ++i)
             {
-                SimulationSetup.AddRemoveChurn(simulation, 100);
+                SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
                 for (int j = 0; j < 100; ++j)
                 {
                     compressor.Compress();

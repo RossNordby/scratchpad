@@ -190,42 +190,36 @@ namespace SolverPrototypeTests
         }
 
 
-        struct RemovedConstraint
+        struct CachedConstraint
         {
             public ContactManifold4Constraint Description;
             public int BodyA;
             public int BodyB;
         }
 
-        struct BodyEntry
-        {
-            public int Handle;
-            public BodyDescription Description;
-        }
-
-        struct BodyIndexEnumerator : IForEach<int>
+        struct BodyEnumerator : IForEach<int>
         {
             public Bodies Bodies;
-            public int[] HandleToEntryIndex;
-            public int EntryIndexA;
-            public int EntryIndexB;
+            public int[] HandlesToIdentity;
+            public int IdentityA;
+            public int IdentityB;
             public int IndexInConstraint;
 
-            public BodyIndexEnumerator(Bodies bodies, int[] handleToEntryIndex)
+            public BodyEnumerator(Bodies bodies, int[] handleToEntryIndex)
             {
                 Bodies = bodies;
-                HandleToEntryIndex = handleToEntryIndex;
-                EntryIndexA = EntryIndexB = IndexInConstraint = 0;
+                HandlesToIdentity = handleToEntryIndex;
+                IdentityA = IdentityB = IndexInConstraint = 0;
 
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
-                var entryIndex = HandleToEntryIndex[Bodies.IndexToHandle[connectedBodyIndex]];
+                var entryIndex = HandlesToIdentity[Bodies.IndexToHandle[connectedBodyIndex]];
                 if (IndexInConstraint == 0)
-                    EntryIndexA = entryIndex;
+                    IdentityA = entryIndex;
                 else
-                    EntryIndexB = entryIndex;
+                    IdentityB = entryIndex;
                 ++IndexInConstraint;
             }
         }
@@ -233,21 +227,25 @@ namespace SolverPrototypeTests
         struct ConstraintRemover : IForEach<ConstraintConnectivityGraph.BodyConstraintReference>
         {
             Simulation simulation;
-            int[] handleToEntryIndex;
-            List<RemovedConstraint> removedConstraints;
+            int[] constraintHandlesToIdentity;
+            List<int> removedConstraints;
+            int[] constraintHandles;
+            CachedConstraint[] constraintDescriptions;
             int iterations;
-            public ConstraintRemover(Simulation simulation, int[] handleToEntryIndex, List<RemovedConstraint> removedConstraints)
+            public ConstraintRemover(Simulation simulation, int[] constraintHandles, int[] constraintHandlesToIdentity, CachedConstraint[] constraintDescriptions, List<int> removedConstraints)
             {
                 this.simulation = simulation;
-                this.handleToEntryIndex = handleToEntryIndex;
+                this.constraintHandles = constraintHandles;
+                this.constraintHandlesToIdentity = constraintHandlesToIdentity;
                 this.removedConstraints = removedConstraints;
+                this.constraintDescriptions = constraintDescriptions;
                 iterations = 0;
 
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(ConstraintConnectivityGraph.BodyConstraintReference constraint)
             {
-                RemoveConstraint(simulation, constraint.ConnectingConstraintHandle, handleToEntryIndex, removedConstraints);
+                RemoveConstraint(simulation, constraint.ConnectingConstraintHandle, constraintHandlesToIdentity, constraintHandles, constraintDescriptions, removedConstraints);
                 WriteLine($"Removed constraint (handle: {constraint.ConnectingConstraintHandle}) for a body removal.");
                 iterations++;
             }
@@ -270,17 +268,14 @@ namespace SolverPrototypeTests
             }
         }
 
-        static void RemoveConstraint(Simulation simulation, int constraintHandle, int[] handleToEntry, List<RemovedConstraint> removedConstraints)
+        static void RemoveConstraint(Simulation simulation, int constraintHandle, int[] constraintHandlesToIdentity, int[] constraintHandles, CachedConstraint[] constraintDescriptions, List<int> removedConstraints)
         {
-            //Enumerate over the body indices referenced by the constraint and convert them to out of engine identities so that they don't get lost.
-            simulation.Solver.GetConstraintReference(constraintHandle, out var reference);
-
-            var bodyIndexEnumerator = new BodyIndexEnumerator(simulation.Bodies, handleToEntry);
-            reference.TypeBatch.EnumerateConnectedBodyIndices(reference.IndexInTypeBatch, ref bodyIndexEnumerator);
-            simulation.Solver.GetDescription(constraintHandle, out ContactManifold4Constraint description);
+            var constraintIdentity = constraintHandlesToIdentity[constraintHandle];
+            ref var description = ref constraintDescriptions[constraintIdentity];
+            constraintHandlesToIdentity[constraintHandle] = -1;
+            constraintHandles[constraintIdentity] = -1;
             simulation.RemoveConstraint(constraintHandle);
-            removedConstraints.Add(new RemovedConstraint { Description = description, BodyA = bodyIndexEnumerator.EntryIndexA, BodyB = bodyIndexEnumerator.EntryIndexB });
-
+            removedConstraints.Add(constraintIdentity);
         }
 
         struct ConstraintBodyValidationEnumerator : IForEach<int>
@@ -303,9 +298,9 @@ namespace SolverPrototypeTests
         {
             //Debug.WriteLine(message);
         }
-    
+
         [Conditional("DEBUG")]
-        static void Validate(Simulation simulation, List<RemovedConstraint> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
+        static void Validate(Simulation simulation, List<int> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
         {
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
             {
@@ -359,42 +354,45 @@ namespace SolverPrototypeTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnAddBody(Simulation simulation, BodyEntry[] bodyEntries, int[] handleToEntry, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
+        private static void ChurnAddBody(Simulation simulation, BodyDescription[] bodyDescriptions, int[] bodyHandles, int[] bodyHandlesToIdentity, int originalConstraintCount, List<int> removedConstraints, List<int> removedBodies, Random random)
         {
             //Add a body.
             var toAddIndex = random.Next(removedBodies.Count);
             var toAdd = removedBodies[toAddIndex];
             FastRemoveAt(removedBodies, toAddIndex);
-            var bodyHandle = simulation.Add(ref bodyEntries[toAdd].Description);
-            handleToEntry[bodyHandle] = toAdd;
-            bodyEntries[toAdd].Handle = bodyHandle;
+            var bodyHandle = simulation.Add(ref bodyDescriptions[toAdd]);
+            bodyHandlesToIdentity[bodyHandle] = toAdd;
+            bodyHandles[toAdd] = bodyHandle;
             WriteLine($"Added body, handle: {bodyHandle}");
-            Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
+            Validate(simulation, removedConstraints, removedBodies, bodyHandles.Length, originalConstraintCount);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnRemoveBody(Simulation simulation, BodyEntry[] bodyEntries, int[] handleToEntry, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
+        private static void ChurnRemoveBody(Simulation simulation, int[] bodyHandles, int[] bodyHandlesToIdentity, int[] constraintHandles,
+            int[] constraintHandlesToIdentity, CachedConstraint[] constraintDescriptions,
+            List<int> removedConstraints, List<int> removedBodies, Random random)
         {
             //Remove a body.
             var removedBodyIndex = random.Next(simulation.Bodies.BodyCount);
             //All constraints associated with the body have to be removed first.
-            var constraintRemover = new ConstraintRemover(simulation, handleToEntry, removedConstraints);
+            var constraintRemover = new ConstraintRemover(simulation, constraintHandles, constraintHandlesToIdentity, constraintDescriptions, removedConstraints);
             simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintRemover);
 #if DEBUG
-            var constraintChecker = new ZeroConstraintChecker(simulation, handleToEntry);
+            var constraintChecker = new ZeroConstraintChecker(simulation, bodyHandlesToIdentity);
             simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintChecker);
 #endif
             var handle = simulation.Bodies.IndexToHandle[removedBodyIndex];
             simulation.RemoveBody(handle);
-            bodyEntries[handleToEntry[handle]].Handle = -1;
-            removedBodies.Add(handleToEntry[handle]);
-            handleToEntry[handle] = -1;
+            bodyHandles[bodyHandlesToIdentity[handle]] = -1;
+            removedBodies.Add(bodyHandlesToIdentity[handle]);
+            bodyHandlesToIdentity[handle] = -1;
             WriteLine($"Removed body, former handle: {handle}");
-            Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
+            Validate(simulation, removedConstraints, removedBodies, bodyHandles.Length, constraintHandles.Length);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnAddConstraint(Simulation simulation, BodyEntry[] bodyEntries, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
+        private static void ChurnAddConstraint(Simulation simulation, int[] bodyHandles, int[] constraintHandles, int[] constraintHandlesToIdentity,
+            CachedConstraint[] constraintDescriptions, List<int> removedConstraints, List<int> removedBodies, Random random)
         {
             //Add a constraint.
             int attemptCount = 0;
@@ -402,23 +400,27 @@ namespace SolverPrototypeTests
             {
                 //There's no guarantee that the bodies involved with the removed constraint are actually in the simulation.
                 //Rather than doing anything clever, just retry a few times.
-                var constraintIndex = random.Next(removedConstraints.Count);
-                var constraint = removedConstraints[constraintIndex];
+                var constraintIdentityIndex = random.Next(removedConstraints.Count);
+                var constraintIdentity = removedConstraints[constraintIdentityIndex];
+                ref var constraint = ref constraintDescriptions[constraintIdentity];
                 int handleA, handleB;
-                if ((handleA = bodyEntries[constraint.BodyA].Handle) >= 0 && (handleB = bodyEntries[constraint.BodyB].Handle) >= 0)
+                if ((handleA = bodyHandles[constraint.BodyA]) >= 0 && (handleB = bodyHandles[constraint.BodyB]) >= 0)
                 {
                     //The constraint is addable.
                     var constraintHandle = simulation.Add(handleA, handleB, ref constraint.Description);
+                    constraintHandles[constraintIdentity] = constraintHandle;
+                    constraintHandlesToIdentity[constraintHandle] = constraintIdentity;
                     WriteLine($"Added constraint, handle: {constraintHandle}");
-                    FastRemoveAt(removedConstraints, constraintIndex);
+                    FastRemoveAt(removedConstraints, constraintIdentityIndex);
                     break;
                 }
             } while (++attemptCount < 10);
-            Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
+            Validate(simulation, removedConstraints, removedBodies, bodyHandles.Length, constraintHandles.Length);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnRemoveConstraint(Simulation simulation, BodyEntry[] bodyEntries, int[] handleToEntry, int originalConstraintCount, List<RemovedConstraint> removedConstraints, List<int> removedBodies, Random random)
+        private static void ChurnRemoveConstraint(Simulation simulation, int originalBodyCount,
+            int[] constraintHandlesToIdentity, int[] constraintHandles, CachedConstraint[] constraintDescriptions, List<int> removedConstraints, List<int> removedBodies, Random random)
         {
             //Remove a constraint.
             var batchIndex = random.Next(simulation.Solver.Batches.Count);
@@ -433,27 +435,24 @@ namespace SolverPrototypeTests
                 var indexInTypeBatch = random.Next(typeBatch.ConstraintCount);
                 var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
 
-                RemoveConstraint(simulation, constraintHandle, handleToEntry, removedConstraints);
+                RemoveConstraint(simulation, constraintHandle, constraintHandlesToIdentity, constraintHandles, constraintDescriptions, removedConstraints);
                 WriteLine($"Removed constraint, former handle: {constraintHandle}");
-                Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
+                Validate(simulation, removedConstraints, removedBodies, originalBodyCount, constraintHandles.Length);
             }
         }
 
-        public static double AddRemoveChurn(Simulation simulation, int iterations)
+        public static double AddRemoveChurn(Simulation simulation, int iterations, int[] bodyHandles, int[] constraintHandles)
         {
+            //There are three levels of 'index' for each object in this test:
+            //1) The top level 'identity'. Even when a body or constraint gets readded, the slot in the top level array maintains a pointer to the new handle.
+            //2) The in-engine handle. Within the engine, it acts as the identity. The engine only cares about tracking identity between calls to add and remove for any given object.
+            //3) The index of the object in memory.
+            //As we add and remove stuff, we want to still be able to find a particular constraint by its original identity, so we have to do some work to track that.
+
             //Take a snapshot of the body descriptions.
-            var bodyEntries = new BodyEntry[simulation.Bodies.BodyCount];
-            var handleToEntry = new int[simulation.Bodies.HandleToIndex.Length];
-            for (int i = 0; i < handleToEntry.Length; ++i)
-                handleToEntry[i] = -1;
-            for (int i = 0; i < simulation.Bodies.BodyCount; ++i)
-            {
-                ref var body = ref bodyEntries[i];
-                body.Handle = simulation.Bodies.IndexToHandle[i];
-                simulation.Bodies.GetLocalInertia(body.Handle, out body.Description.LocalInertia);
-                simulation.Bodies.GetVelocity(body.Handle, out body.Description.Velocity);
-                handleToEntry[body.Handle] = i;
-            }
+            var bodyDescriptions = new BodyDescription[bodyHandles.Length];
+            var constraintDescriptions = new CachedConstraint[constraintHandles.Length];
+            Debug.Assert(simulation.Bodies.BodyCount == bodyHandles.Length);
             int originalConstraintCount = 0;
             foreach (var batch in simulation.Solver.Batches)
             {
@@ -462,14 +461,47 @@ namespace SolverPrototypeTests
                     originalConstraintCount += typeBatch.ConstraintCount;
                 }
             }
+            Debug.Assert(constraintHandles.Length == originalConstraintCount);
+
+            //We'll need a mapping from the current handles back to the identity.
+            var bodyHandlesToIdentity = new int[simulation.Bodies.HandleToIndex.Length];
+            for (int i = 0; i < bodyHandlesToIdentity.Length; ++i)
+                bodyHandlesToIdentity[i] = -1;
+            var constraintHandlesToIdentity = new int[simulation.Solver.HandlesToConstraints.Length];
+            for (int i = 0; i < constraintHandlesToIdentity.Length; ++i)
+                constraintHandlesToIdentity[i] = -1;
+
+            for (int i = 0; i < bodyHandles.Length; ++i)
+            {
+                ref var bodyDescription = ref bodyDescriptions[i];
+                var handle = bodyHandles[i];
+                simulation.Bodies.GetLocalInertia(handle, out bodyDescription.LocalInertia);
+                simulation.Bodies.GetVelocity(handle, out bodyDescription.Velocity);
+                bodyHandlesToIdentity[handle] = i;
+            }
+
+            for (int i = 0; i < constraintHandles.Length; ++i)
+            {
+                var constraintHandle = constraintHandles[i];
+                constraintHandlesToIdentity[constraintHandle] = i;
+                simulation.Solver.GetDescription(constraintHandle, out constraintDescriptions[i].Description);
+                simulation.Solver.GetConstraintReference(constraintHandle, out var reference);
+
+                var bodyIdentityEnumerator = new BodyEnumerator(simulation.Bodies, bodyHandlesToIdentity);
+                reference.TypeBatch.EnumerateConnectedBodyIndices(reference.IndexInTypeBatch, ref bodyIdentityEnumerator);
+                constraintDescriptions[i].BodyA = bodyIdentityEnumerator.IdentityA;
+                constraintDescriptions[i].BodyB = bodyIdentityEnumerator.IdentityB;
+            }
+
+
 
             //Any time a body is removed, the handle in the associated body entry must be updated to -1.
             //All constraints refer to bodies by their out-of-engine identity so that everything stays robust in the face of adds and removes.
-            var removedConstraints = new List<RemovedConstraint>();
+            var removedConstraints = new List<int>();
             var removedBodies = new List<int>();
             var random = new Random(5);
 
-            Validate(simulation, removedConstraints, removedBodies, bodyEntries.Length, originalConstraintCount);
+            Validate(simulation, removedConstraints, removedBodies, bodyHandles.Length, originalConstraintCount);
 
             var constraintActionProbability = originalConstraintCount > 0 ? 1 - (double)simulation.Bodies.BodyCount / originalConstraintCount : 0;
 
@@ -482,24 +514,24 @@ namespace SolverPrototypeTests
                     var constraintRemovalProbability = (originalConstraintCount - removedConstraints.Count) / (double)originalConstraintCount;
                     if (random.NextDouble() < constraintRemovalProbability)
                     {
-                        ChurnRemoveConstraint(simulation, bodyEntries, handleToEntry, originalConstraintCount, removedConstraints, removedBodies, random);
+                        ChurnRemoveConstraint(simulation, bodyHandles.Length, constraintHandlesToIdentity, constraintHandles, constraintDescriptions, removedConstraints, removedBodies, random);
                     }
                     else if (removedConstraints.Count > 0)
                     {
-                        ChurnAddConstraint(simulation, bodyEntries, originalConstraintCount, removedConstraints, removedBodies, random);
+                        ChurnAddConstraint(simulation, bodyHandles, constraintHandles, constraintHandlesToIdentity, constraintDescriptions, removedConstraints, removedBodies, random);
                     }
                 }
                 else
                 {
                     //Body action.
-                    var bodyRemovalProbability = (bodyEntries.Length - removedBodies.Count) / (double)bodyEntries.Length;
+                    var bodyRemovalProbability = (bodyHandles.Length - removedBodies.Count) / (double)bodyHandles.Length;
                     if (random.NextDouble() < bodyRemovalProbability)
                     {
-                        ChurnRemoveBody(simulation, bodyEntries, handleToEntry, originalConstraintCount, removedConstraints, removedBodies, random);
+                        ChurnRemoveBody(simulation, bodyHandles, bodyHandlesToIdentity, constraintHandles, constraintHandlesToIdentity, constraintDescriptions, removedConstraints, removedBodies, random);
                     }
                     else if (removedBodies.Count > 0)
                     {
-                        ChurnAddBody(simulation, bodyEntries, handleToEntry, originalConstraintCount, removedConstraints, removedBodies, random);
+                        ChurnAddBody(simulation, bodyDescriptions, bodyHandles, bodyHandlesToIdentity, originalConstraintCount, removedConstraints, removedBodies, random);
                     }
                 }
             }
@@ -508,15 +540,19 @@ namespace SolverPrototypeTests
             //Go ahead and add everything back so the outer test can proceed unaffected. Theoretically.
             for (int i = 0; i < removedBodies.Count; ++i)
             {
-                var bodyHandle = simulation.Add(ref bodyEntries[removedBodies[i]].Description);
-                bodyEntries[removedBodies[i]].Handle = bodyHandle;
-                handleToEntry[bodyHandle] = removedBodies[i];
+                var bodyHandle = simulation.Add(ref bodyDescriptions[removedBodies[i]]);
+                bodyHandles[removedBodies[i]] = bodyHandle;
+                bodyHandlesToIdentity[bodyHandle] = removedBodies[i];
             }
 
             for (int i = 0; i < removedConstraints.Count; ++i)
             {
-                var constraint = removedConstraints[i];
-                simulation.Add(bodyEntries[constraint.BodyA].Handle, bodyEntries[constraint.BodyB].Handle, ref constraint.Description);
+                var constraintIdentity = removedConstraints[i];
+                ref var constraint = ref constraintDescriptions[constraintIdentity];
+                var constraintHandle = simulation.Add(bodyHandles[constraint.BodyA], bodyHandles[constraint.BodyB], ref constraint.Description);
+                constraintHandles[constraintIdentity] = constraintHandle;
+                constraintHandlesToIdentity[constraintHandle] = constraintIdentity;
+
             }
             var newConstraintCount = 0;
             foreach (var batch in simulation.Solver.Batches)
@@ -527,7 +563,7 @@ namespace SolverPrototypeTests
                 }
             }
             Debug.Assert(newConstraintCount == originalConstraintCount, "Best have the same number of constraints if we actually added them all back!");
-            Debug.Assert(bodyEntries.Length == simulation.Bodies.BodyCount, "And bodies, too!");
+            Debug.Assert(bodyHandles.Length == simulation.Bodies.BodyCount, "And bodies, too!");
 
             return timer.Elapsed.TotalSeconds;
         }
