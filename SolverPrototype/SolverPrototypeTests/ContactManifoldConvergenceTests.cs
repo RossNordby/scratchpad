@@ -19,7 +19,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
            
-            SimulationSetup.BuildLattice(8, 8, 8, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(24, 24, 24, out var simulation, out var bodyHandles, out var constraintHandles);
 
             var compressor = new BatchCompressor(simulation.Solver, simulation.Bodies);
             for (int i = 0; i < 1000; ++i)

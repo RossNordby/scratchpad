@@ -227,7 +227,7 @@ namespace SolverPrototype
                 }
             }
 
-
+            //Console.WriteLine($"start: batch {nextBatchIndex}, type batch {nextTarget.TypeBatchIndex}, index {nextTarget.StartIndexInTypeBatch}");
 
             //Build the analysis regions.
             var batch = Solver.Batches[nextBatchIndex];
@@ -236,6 +236,11 @@ namespace SolverPrototype
             for (int i = nextTarget.TypeBatchIndex; i < batch.TypeBatches.Count; ++i)
             {
                 remainingConstraintCount += batch.TypeBatches[i].ConstraintCount;
+                if (remainingConstraintCount > TargetCandidateCount)
+                {
+                    remainingConstraintCount = TargetCandidateCount;
+                    break;
+                }
             }
             var constraintsPerWorkerBase = remainingConstraintCount / workerCount;
             var constraintsRemainder = remainingConstraintCount - workerCount * constraintsPerWorkerBase;
