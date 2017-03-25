@@ -244,18 +244,18 @@ namespace SolverPrototype
             }
             var constraintsPerWorkerBase = remainingConstraintCount / workerCount;
             var constraintsRemainder = remainingConstraintCount - workerCount * constraintsPerWorkerBase;
-            var DEBUGTotalConstraintsAnalyzed = 0;
+            //var DEBUGTotalConstraintsAnalyzed = 0;
             for (int i = 0; i < workerCount; ++i)
             {
                 ref var context = ref workerContexts[i];
                 context.Region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
                 context.Region.Start = nextTarget;
                 nextTarget.StartIndexInTypeBatch += context.Region.ConstraintCount;
-                DEBUGTotalConstraintsAnalyzed += context.Region.ConstraintCount;
+                //DEBUGTotalConstraintsAnalyzed += context.Region.ConstraintCount;
             }
 
-            if (workerContexts[0].Compressions.Count > 0)
-                Console.WriteLine($"Analyzed {DEBUGTotalConstraintsAnalyzed} constraints, compressing {workerContexts[0].Compressions.Count}");
+            //if (workerContexts[0].Compressions.Count > 0)
+            //    Console.WriteLine($"Analyzed {DEBUGTotalConstraintsAnalyzed} constraints, compressing {workerContexts[0].Compressions.Count}");
             //For now, we only have one worker.
             foundCompressionsCount = 0;
             AnalysisWorker(0);

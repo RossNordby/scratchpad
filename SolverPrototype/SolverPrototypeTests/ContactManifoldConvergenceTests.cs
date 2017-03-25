@@ -18,19 +18,25 @@ namespace SolverPrototypeTests
         {
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
-           
-            SimulationSetup.BuildLattice(24, 24, 24, out var simulation, out var bodyHandles, out var constraintHandles);
+
+            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             var compressor = new BatchCompressor(simulation.Solver, simulation.Bodies);
-            for (int i = 0; i < 1000; ++i)
+            double compressionTimeAccumulator = 0;
+            const int iterations = 1000;
+            const int internalCompressionIterations = 100;
+            for (int i = 0; i < iterations; ++i)
             {
                 SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
-                for (int j = 0; j < 100; ++j)
+                GC.Collect(3, GCCollectionMode.Forced, true);
+                var start = Stopwatch.GetTimestamp();
+                for (int j = 0; j < internalCompressionIterations; ++j)
                 {
                     compressor.Compress();
                 }
-
+                compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
             }
+            Console.WriteLine($"Time per compression: {1e6 * compressionTimeAccumulator / (iterations * internalCompressionIterations)} us");
             GC.Collect(3, GCCollectionMode.Forced, true);
 
             //Attempt cache optimization.
@@ -98,7 +104,7 @@ namespace SolverPrototypeTests
                     simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
                     var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
 
-                    
+
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
                     ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];
                     var velocityA =
