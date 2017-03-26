@@ -799,7 +799,7 @@ namespace BEPUutilities2
             }
             else
             {
-                axis = Toolbox.UpVector;
+                axis = Vector3.UnitY;
                 angle = 0;
             }
         }

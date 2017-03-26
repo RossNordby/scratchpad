@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 namespace BEPUutilities2.ResourceManagement
 {
+    //TODO: this class should probably be entirely removed. It's only really useful when dealing with threads that weren't given a personal memory source.
+    //Going forward, we should probably consider that to be a performance bug.
     /// <summary>
     /// Provides storage for reusable arrays with power-of-2 lengths.
     /// Taking resouces and returning resources are locked to prevent simultaneous access. Other functions are not locked.
@@ -11,6 +14,7 @@ namespace BEPUutilities2.ResourceManagement
     /// <typeparam name="T">Type of resource contained in the buffers.</typeparam>
     /// <remarks>This is designed for use with unsafe code. It often sacrifices safety for performance or simplicity.
     /// Running with DEBUG defined will catch some misuse, but otherwise many invalid usages will be allowed.</remarks>
+    [Obsolete]
     public sealed class LockingBufferPool<T> : BufferPool<T>
     {
 
@@ -18,11 +22,11 @@ namespace BEPUutilities2.ResourceManagement
         /// <summary>
         /// Gets the locker used by TakeFromPoolIndex and Return.
         /// </summary>
-        public SpinLock Locker //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy.
+        public ref SpinLock Locker
         {
             get
             {
-                return locker;
+                return ref locker;
             }
         }
 
@@ -33,7 +37,8 @@ namespace BEPUutilities2.ResourceManagement
         /// <returns>Pool of the requested size.</returns>
         public override T[] TakeFromPoolIndex(int poolIndex)
         {
-            locker.Enter();
+            bool lockTaken = false;
+            locker.Enter(ref lockTaken);
             var buffer = TakeFromPoolIndexInternal(poolIndex);
             locker.Exit();
             return buffer;
@@ -46,9 +51,10 @@ namespace BEPUutilities2.ResourceManagement
         /// <param name="poolIndex">Pool index associated with the buffer.</param>
         public override void Return(T[] buffer, int poolIndex)
         {
-            locker.Enter();
+            bool lockTaken = false;
+            locker.Enter(ref lockTaken);
             ReturnInternal(buffer, poolIndex);
-            locker.Exit();
+            locker.Exit(false);
         }
 
         /// <summary>

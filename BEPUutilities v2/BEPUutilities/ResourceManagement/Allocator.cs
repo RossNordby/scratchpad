@@ -5,9 +5,6 @@ using System;
 
 namespace BEPUutilities2.ResourceManagement
 {
-
-
-
     /// <summary>
     /// Represents a chunk of abstract memory supporting allocations and deallocations.
     /// Never moves any memory.
@@ -79,7 +76,7 @@ namespace BEPUutilities2.ResourceManagement
         /// <param name="size">Size of the memory to test.</param>
         /// <param name="ignoredIds">Ids of allocations to treat as nonexistent for the purposes of the test.</param>
         /// <returns>True if the size could fit, false if out of memory or if memory was too fragmented to find a spot.</returns>
-        public bool CanFit(long size, QuickList<ulong>? ignoredIds = null)
+        public bool CanFit(long size, QuickList<ulong>? ignoredIds = null) //TODO: a simple predicate (genericstructy) would be a lot nicer.
         {
             if (allocations.Count == 0)
             {

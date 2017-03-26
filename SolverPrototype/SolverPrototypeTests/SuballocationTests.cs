@@ -9,8 +9,6 @@ namespace SolverPrototypeTests
 {
     static class SuballocationTests
     {
-        private static object debug;
-
         public struct TestPredicate : IPredicate<int>, IPredicateRef<int>
         {
             public int ToCompare;

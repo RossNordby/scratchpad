@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 
 namespace BEPUutilities2.ResourceManagement
 {
@@ -15,11 +16,11 @@ namespace BEPUutilities2.ResourceManagement
         /// <summary>
         /// Gets the locker used by LockingTake and LockingReturn.
         /// </summary>
-        public SpinLock Locker //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy.
+        public ref SpinLock Locker //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy.
         {
             get
             {
-                return spinLock;
+                return ref spinLock;
             }
         }
 
@@ -132,11 +133,13 @@ namespace BEPUutilities2.ResourceManagement
         /// No other LockingTakes or LockingReturns will interfere during the execution of this function.
         /// </summary>
         /// <returns>Element from the pool.</returns>
+        [Obsolete] //We should try to avoid using any locking pools whenever possible. It usually implies some poor design, but not always- might have to undo this obsolete.
         public T LockingTake()
         {
-            spinLock.Enter();
+            bool taken = false;
+            spinLock.Enter(ref taken);
             var item = Take();
-            spinLock.Exit();
+            spinLock.Exit(false);
             return item;
         }
 
@@ -145,11 +148,13 @@ namespace BEPUutilities2.ResourceManagement
         /// No other LockingTakes or LockingReturns will interfere during the execution of this function.
         /// </summary>
         /// <param name="item">Item to give back to the pool.</param>
+        [Obsolete] //We should try to avoid using any locking pools whenever possible. It usually implies some poor design, but not always- might have to undo this obsolete.
         public void LockingReturn(T item)
         {
-            spinLock.Enter();
+            bool taken = false;
+            spinLock.Enter(ref taken);
             Return(item);
-            spinLock.Exit();
+            spinLock.Exit(false);
         }
 
     }
