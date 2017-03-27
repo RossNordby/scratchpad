@@ -41,12 +41,12 @@ namespace BEPUutilities2.ResourceManagement
         /// <remarks>
         /// If the span regions overlap, the result is the same as if the original values of the source were preserved in a temporary location before writing to the target.
         /// </remarks>
-        /// <typeparam name="TOtherSpan">The type of the span to copy into.</typeparam>
+        /// <typeparam name="TTargetSpan">The type of the span to copy into.</typeparam>
         /// <param name="sourceStart">Start index of the copy source region.</param>
         /// <param name="targetSpan">Span to copy into.</param>
         /// <param name="targetStart">Start index of the copy target region.</param>
         /// <param name="count">Number of elements to copy.</param>
-        void CopyTo<TOtherSpan>(int sourceStart, ref TOtherSpan targetSpan, int targetStart, int count) where TOtherSpan : ISpan<T>;
+        void CopyTo<TTargetSpan>(int sourceStart, ref TTargetSpan targetSpan, int targetStart, int count) where TTargetSpan : ISpan<T>;
 
         /// <summary>
         /// Clears the memory in a subset of the span.
