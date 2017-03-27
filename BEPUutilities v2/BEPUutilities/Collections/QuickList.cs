@@ -85,9 +85,9 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, out TSpan oldSpan)
         {
-            Debug.Assert(oldSpan.Length != newSpan.Length, "Resizing without changing the size is pretty peculiar. Is something broken?");
             Validate();
             oldSpan = Span;
+            Debug.Assert(oldSpan.Length != newSpan.Length, "Resizing without changing the size is pretty peculiar. Is something broken?");
             Span = newSpan;
             if (Count > Span.Length)
                 Count = Span.Length;
@@ -146,7 +146,7 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Adds the elements of a list to the QuickList.
+        /// Adds the elements of a list to the QuickList without checking capacity.
         /// </summary>
         /// <typeparam name="TSourceSpan">Type of the source span.</typeparam>
         /// <param name="span">Span of elements to add.</param>

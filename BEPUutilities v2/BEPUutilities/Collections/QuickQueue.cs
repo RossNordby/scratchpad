@@ -106,7 +106,7 @@ namespace BEPUutilities2.Collections
         public static void Create<TPool>(TPool pool, int minimumInitialCount, out QuickQueue<T, TSpan> queue) where TPool : IMemoryPool<T, TSpan>
         {
             pool.Take(minimumInitialCount, out queue.Span);
-            queue.ValidateSpanCapacity(ref queue.Span);
+            ValidateSpanCapacity(ref queue.Span);
             queue.Count = 0;
             queue.CapacityMask = queue.Span.Length - 1;
             queue.FirstIndex = 0;
@@ -124,8 +124,8 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, out TSpan oldSpan)
         {
-            Debug.Assert(oldSpan.Length != newSpan.Length, "Resizing without changing the size is pretty peculiar. Is something broken?");
             Validate();
+            Debug.Assert(Span.Length != newSpan.Length, "Resizing without changing the size is pretty peculiar. Is something broken?");
             var oldQueue = this;
             //Truncate length.
             if (oldQueue.Count > newSpan.Length)
@@ -503,7 +503,7 @@ namespace BEPUutilities2.Collections
         }
 
         [Conditional("DEBUG")]
-        void ValidateSpanCapacity(ref TSpan span)
+        static void ValidateSpanCapacity(ref TSpan span)
         {
             Debug.Assert((span.Length & (span.Length - 1)) == 0, "Queues depend upon power of 2 backing span sizes for efficient modulo operations.");
         }

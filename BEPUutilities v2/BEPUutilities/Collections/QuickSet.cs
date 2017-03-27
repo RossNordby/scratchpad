@@ -17,6 +17,9 @@ namespace BEPUutilities2.Collections
     /// <para>Note that the implementation is extremely simple. It uses single-step linear probing under the assumption of very low collision rates.
     /// A generous table capacity is recommended; this trades some memory for simplicity and runtime performance.</para></remarks>
     /// <typeparam name="T">Type of element held by the container.</typeparam>
+    /// <typeparam name="TSpan">Type of the element holding span.</typeparam>
+    /// <typeparam name="TTableSpan">Type of the index table span.</typeparam>
+    /// <typeparam name="TEqualityComparer">Type of the equality tester and hash calculator used.</typeparam>
     public struct QuickSet<T, TSpan, TTableSpan, TEqualityComparer>
         where TSpan : ISpan<T>
         where TTableSpan : ISpan<int>
@@ -104,6 +107,8 @@ namespace BEPUutilities2.Collections
         /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
         /// <param name="comparer">Comparer to use in the set.</param>
         /// <param name="set">Created set.</param>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Create<TPool, TTablePool>(TPool pool, TTablePool tablePool, int initialElementPoolIndex, int tableSizePower, TEqualityComparer comparer,
             out QuickSet<T, TSpan, TTableSpan, TEqualityComparer> set)
@@ -122,6 +127,8 @@ namespace BEPUutilities2.Collections
         /// <param name="initialElementPoolIndex">Initial pool index to pull the object buffer from. The size of the initial buffer will be 2^initialElementPoolIndex.</param>
         /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
         /// <param name="set">Created set.</param>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Create<TPool, TTablePool>(TPool pool, TTablePool tablePool, int initialElementPoolIndex, int tableSizePower,
             out QuickSet<T, TSpan, TTableSpan, TEqualityComparer> set)
@@ -137,7 +144,6 @@ namespace BEPUutilities2.Collections
         /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
         /// </summary>
         /// <param name="newSpan">New span to use.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, ref TTableSpan newTableSpan, out TSpan oldSpan, out TTableSpan oldTableSpan)
         {
             ValidateSpanCapacity(ref newSpan, ref newTableSpan);
@@ -153,43 +159,79 @@ namespace BEPUutilities2.Collections
             //Should really attempt to avoid resizes on sets and dictionaries whenever possible anyway. It ain't fast.
             for (int i = 0; i < newCount; ++i)
             {
-                Add(ref oldSet.Span[i]);
+                //We assume that ref adds will get inlined reasonably here. That's not actually guaranteed, but we'll bite the bullet.
+                //(You could technically branch on the Unsafe.SizeOf<T>, which should result in a compile time specialized zero overhead implementation... but meh!)
+                AddUnsafely(ref oldSet.Span[i]);
             }
+            oldSpan = oldSet.Span;
+            oldTableSpan = oldSet.Table;
 
         }
+
+        /// <summary>
+        /// Resizes the queue's backing array for the given size as a power of two.
+        /// If the new span is smaller, the queue's count is truncated and the extra elements are dropped. 
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <typeparam name="TTablePool">Type of the table span pool.</typeparam>
+        /// <param name="newSizePower">Exponent of the size of the new memory block. New size will be 2^newSizePower.</param>
+        /// <param name="tablePoolOffset">Offset to apply to the object size power to get the table power. New table size will be 2^(newSizePower + tablePoolOffset).</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Resize(int newObjectPoolIndex, int newTablePoolIndex)
+        public void ResizeForPower<TPool, TTablePool>(int newSizePower, int tablePoolOffset, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
         {
-            Debug.Assert(Count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
-            //Just double the size of the set.
-            var oldSet = this;
-            this = new QuickSet<T>(ElementPool, TablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
-            for (int i = 0; i < oldSet.Count; ++i)
-            {
-                Add(oldSet.Span[i]);
-            }
+            var oldCount = Count;
+            pool.TakeForPower(newSizePower, out var newSpan);
+            tablePool.TakeForPower(newSizePower + tablePoolOffset, out var newTableSpan);
+            Resize(ref newSpan, ref newTableSpan, out var oldSpan, out var oldTableSpan);
 
             //The elements array may contain reference types.
             //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
             //Clear it before disposal to avoid leaking references.
-            //Note that only the elements array is cleared; the table array contains only primitives and does not need to be cleared.
-            //(TODO: This clear could be narrowed to arrays of managed types.)
-            if (!typeof(T).IsPrimitive)
-                Array.Clear(oldSet.Span, 0, oldSet.Count);
-            oldSet.Dispose();
+            oldSpan.ClearManagedReferences(0, oldCount);
+            pool.Return(ref oldSpan);
+            tablePool.Return(ref oldTableSpan);
+        }
+
+        /// <summary>
+        /// Resizes the queue's backing array for the given size.
+        /// If the new span is smaller, the queue's count is truncated and the extra elements are dropped. 
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <typeparam name="TTablePool">Type of the table span pool.</typeparam>
+        /// <param name="newSize">Minimum size of the new object memory block. Actual size may be larger.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Resize<TPool, TTablePool>(int newSize, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            var oldSpanPower = BufferPool.GetPoolIndex(Span.Length);
+            var oldTableSpanPower = BufferPool.GetPoolIndex(Table.Length);
+            var tablePoolOffset = oldTableSpanPower - oldSpanPower;
+            ResizeForPower(BufferPool.GetPoolIndex(newSize), tablePoolOffset, pool, tablePool);
         }
 
         /// <summary>
         /// Ensures that the set has enough room to hold the specified number of elements.
-        /// </summary>
+        /// </summary>     
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
         /// <param name="count">Number of elements to hold.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(int count)
+        public void EnsureCapacity<TPool, TTablePool>(int count, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
         {
             if (count > Span.Length)
             {
-                var newPoolIndex = BufferPool.GetPoolIndex(count);
-                Resize(newPoolIndex, tablePoolIndex - elementPoolIndex + newPoolIndex);
+                Resize(count, pool, tablePool);
             }
         }
 
@@ -202,18 +244,18 @@ namespace BEPUutilities2.Collections
         /// <param name="elementIndex">The index of the element in the elements array, if it exists; -1 otherwise.</param>
         /// <returns>True if the element is present in the set, false if it is not.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool GetTableIndices(T element, out int tableIndex, out int elementIndex)
+        public bool GetTableIndices(ref T element, out int tableIndex, out int elementIndex)
         {
             Validate();
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
-            tableIndex = QuickDictionary<int, int>.Rehash(element.GetHashCode()) & TableMask;
+            tableIndex = QuickDictionary<int, int>.Rehash(EqualityComparer.GetHashCode(ref element) & TableMask;
             //0 in the table means 'not taken'; all other values are offset by 1 upward. That is, 1 is actually index 0, 2 is actually index 1, and so on.
             //This is preferred over using a negative number for flagging since clean buffers will contain all 0's.
             while ((elementIndex = Table[tableIndex]) > 0)
             {
                 //This table index is taken. Is this the specified element?
                 //Remember to decode the object index.
-                if (Span[--elementIndex].Equals(element))
+                if (EqualityComparer.Equals(ref Span[--elementIndex], ref element))
                 {
                     return true;
                 }
@@ -223,16 +265,28 @@ namespace BEPUutilities2.Collections
             return false;
         }
 
+
         /// <summary>
         /// Gets the index of the element in the list if it exists.
         /// </summary>
         /// <param name="element">Element to get the index of.</param>
         /// <returns>The index of the element if the element exists in the list, -1 otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(T element)
         {
-            Validate();
-            int tableIndex, objectIndex;
-            GetTableIndices(element, out tableIndex, out objectIndex);
+            GetTableIndices(ref element, out int tableIndex, out int objectIndex);
+            return objectIndex;
+        }
+
+        /// <summary>
+        /// Gets the index of the element in the list if it exists.
+        /// </summary>
+        /// <param name="element">Element to get the index of.</param>
+        /// <returns>The index of the element if the element exists in the list, -1 otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int IndexOf(ref T element)
+        {
+            GetTableIndices(ref element, out int tableIndex, out int objectIndex);
             return objectIndex;
         }
 
@@ -241,46 +295,123 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="element">Element to test for.</param>
         /// <returns>True if the element already belongs to the set, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(T element)
         {
-            Validate();
-            int tableIndex, objectIndex;
-            return GetTableIndices(element, out tableIndex, out objectIndex);
+            return GetTableIndices(ref element, out int tableIndex, out int objectIndex);
+        }
+
+        /// <summary>
+        /// Checks if a given element already belongs to the set.
+        /// </summary>
+        /// <param name="element">Element to test for.</param>
+        /// <returns>True if the element already belongs to the set, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains(ref T element)
+        {
+            return GetTableIndices(ref element, out int tableIndex, out int objectIndex);
         }
 
         /// <summary>
         /// Adds an element to the set. If a version of the element (same hash code, 'equal' by comparer) is already present,
         /// it is replaced by the given version.
+        /// Does not resize in the event that the capacity is exceeded.
         /// </summary>
         /// <param name="element">Element to add.</param>
         /// <returns>True if the element was added to the set, false if the element was already present and was instead replaced.</returns>
-        public bool AddAndReplace(T element)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplaceUnsafely(ref T element)
         {
             Validate();
-            if (Count == Span.Length)
-            {
-                //There's no room left; resize.
-                Resize(elementPoolIndex + 1, tablePoolIndex + 1);
-
-                //Note that this is tested before any indices are found.
-                //If we resized only after determining that it was going to be added,
-                //the potential resize would invalidate the computed indices.
-            }
-
-            int tableIndex, elementIndex;
-            if (GetTableIndices(element, out tableIndex, out elementIndex))
+            if (GetTableIndices(ref element, out int tableIndex, out int elementIndex))
             {
                 //Already present!
                 Span[elementIndex] = element;
                 return false;
             }
 
-
             //It wasn't in the set. Add it!
+            ValidateUnsafeAdd();
             Span[Count] = element;
             //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
             Table[tableIndex] = ++Count;
             return true;
+        }
+
+        /// <summary>
+        /// Adds an element to the set. If a version of the element (same hash code, 'equal' by comparer) is already present,
+        /// it is replaced by the given version.
+        /// Does not resize in the event that the capacity is exceeded.
+        /// </summary>
+        /// <param name="element">Element to add.</param>
+        /// <returns>True if the element was added to the set, false if the element was already present and was instead replaced.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplaceUnsafely(T element)
+        {
+            return AddAndReplaceUnsafely(ref element);
+        }
+
+        /// <summary>
+        /// Adds an element to the set if it is not already present.
+        /// Does not resize in the event that the capacity is exceeded.
+        /// </summary>
+        /// <param name="element">Element to add.</param>
+        /// <returns>True if the element was added to the set, false if the element was already present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddUnsafely(ref T element)
+        {
+            Validate();
+            if (GetTableIndices(ref element, out int tableIndex, out int elementIndex))
+            {
+                //Already present!
+                return false;
+            }
+
+            //It wasn't in the set. Add it!
+            ValidateUnsafeAdd();
+            Span[Count] = element;
+            //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
+            Table[tableIndex] = ++Count;
+            return true;
+        }
+
+        /// <summary>
+        /// Adds an element to the set if it is not already present.
+        /// Does not resize in the event that the capacity is exceeded.
+        /// </summary>
+        /// <param name="element">Element to add.</param>
+        /// <returns>True if the element was added to the set, false if the element was already present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddUnsafely(T element)
+        {
+            return AddUnsafely(ref element);
+        }
+
+        /// <summary>
+        /// Adds an element to the set. If a version of the element (same hash code, 'equal' by comparer) is already present,
+        /// it is replaced by the given version.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        /// <returns>True if the element was added to the set, false if the element was already present and was instead replaced.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplace<TPool, TTablePool>(ref T element, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            if (Count == Span.Length)
+            {
+                //There's no room left; resize.
+                Resize(Count * 2, pool, tablePool);
+
+                //Note that this is tested before any indices are found.
+                //If we resized only after determining that it was going to be added,
+                //the potential resize would invalidate the computed indices.
+            }
+            return AddAndReplaceUnsafely(ref element);
         }
 
 
@@ -288,34 +419,64 @@ namespace BEPUutilities2.Collections
         /// Adds an element to the set if it is not already present.
         /// </summary>
         /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
         /// <returns>True if the element was added to the set, false if the element was already present.</returns>
-        public bool Add(T element)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Add<TPool, TTablePool>(ref T element, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
         {
-            Validate();
-
             if (Count == Span.Length)
             {
                 //There's no room left; resize.
-                Resize(elementPoolIndex + 1, tablePoolIndex + 1);
+                Resize(Count * 2, pool, tablePool);
 
                 //Note that this is tested before any indices are found.
                 //If we resized only after determining that it was going to be added,
                 //the potential resize would invalidate the computed indices.
             }
-
-            int tableIndex, elementIndex;
-            if (GetTableIndices(element, out tableIndex, out elementIndex))
-            {
-                //Already present!
-                return false;
-            }
+            return AddUnsafely(ref element);
+        }
 
 
-            //It wasn't in the set. Add it!
-            Span[Count] = element;
-            //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
-            Table[tableIndex] = ++Count;
-            return true;
+        /// <summary>
+        /// Adds an element to the set. If a version of the element (same hash code, 'equal' by comparer) is already present,
+        /// it is replaced by the given version.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        /// <returns>True if the element was added to the set, false if the element was already present and was instead replaced.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplace<TPool, TTablePool>(T element, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+
+            return AddAndReplaceUnsafely(ref element);
+        }
+
+
+        /// <summary>
+        /// Adds an element to the set if it is not already present.
+        /// </summary>
+        /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <returns>True if the element was added to the set, false if the element was already present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Add<TPool, TTablePool>(T element, TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            return Add(ref element, pool, tablePool);
         }
 
         //Note: the reason this is named "FastRemove" instead of just "Remove" despite it being the only remove present is that
@@ -327,12 +488,11 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="element">Element to remove.</param>
         /// <returns>True if the element was found and removed, false otherwise.</returns>
-        public bool FastRemove(T element)
+        public bool FastRemove(ref T element)
         {
             Validate();
             //Find it.
-            int tableIndex, objectIndex;
-            if (GetTableIndices(element, out tableIndex, out objectIndex))
+            if (GetTableIndices(ref element, out int tableIndex, out int objectIndex))
             {
                 //We found the object!
                 //Add and remove must both maintain a property:
@@ -369,8 +529,7 @@ namespace BEPUutilities2.Collections
                 {
                     Span[objectIndex] = Span[Count];
                     //Locate the swapped object in the table and update its index.
-                    int oldObjectIndex;
-                    GetTableIndices(Span[objectIndex], out tableIndex, out oldObjectIndex);
+                    GetTableIndices(ref Span[objectIndex], out tableIndex, out int oldObjectIndex);
                     Table[tableIndex] = objectIndex + 1; //Remember the encoding! all indices offset by 1.
                 }
                 //Clear the final slot in the elements set.
@@ -385,12 +544,19 @@ namespace BEPUutilities2.Collections
         /// <summary>
         /// Shrinks the internal buffers to the smallest acceptable size and releases the old buffers to the pools.
         /// </summary>
-        public void Compact()
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        public void Compact<TPool, TTablePool>(TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
         {
             Validate();
             var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(Count);
-            if (minimumRequiredPoolIndex != elementPoolIndex)
-                Resize(minimumRequiredPoolIndex, minimumRequiredPoolIndex + (tablePoolIndex - elementPoolIndex));
+            if ((1 << minimumRequiredPoolIndex) != Span.Length)
+                Resize(Count, pool, tablePool);
         }
 
         /// <summary>
@@ -423,11 +589,11 @@ namespace BEPUutilities2.Collections
 
         public struct Enumerator : IEnumerator<T>
         {
-            private readonly T[] backingArray;
+            private readonly TSpan backingArray;
             private readonly int count;
             private int index;
 
-            public Enumerator(T[] backingArray, int count)
+            public Enumerator(TSpan backingArray, int count)
             {
                 this.backingArray = backingArray;
                 this.count = count;
@@ -460,7 +626,7 @@ namespace BEPUutilities2.Collections
             }
         }
         [Conditional("DEBUG")]
-        void ValidateSpanCapacity(ref TSpan span, ref TTableSpan tableSpan)
+        static void ValidateSpanCapacity(ref TSpan span, ref TTableSpan tableSpan)
         {
             Debug.Assert(tableSpan.Length >= span.Length, "The table span must be at least as large as the element span.");
             Debug.Assert((tableSpan.Length & (tableSpan.Length - 1)) == 0, "Set depend upon power of 2 backing table span sizes for efficient modulo operations.");
@@ -471,6 +637,12 @@ namespace BEPUutilities2.Collections
         {
             ValidateSpanCapacity(ref Span, ref Table);
             Debug.Assert(Table.Length != 0, "The QuickSet must have its internal buffers and pools available; default-constructed or disposed QuickSets should not be used.");
+        }
+
+        [Conditional("DEBUG")]
+        void ValidateUnsafeAdd()
+        {
+            Debug.Assert(Count < Span.Length, "Unsafe adders can only be used if the capacity is guaranteed to hold the new size.");
         }
 
 
