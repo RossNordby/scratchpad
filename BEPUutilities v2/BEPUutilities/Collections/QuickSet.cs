@@ -345,7 +345,7 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="element">Element to add.</param>
         /// <returns>True if the element was added to the set, false if the element was already present and was instead replaced.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)] //TODO: Test performance of full chain inline.
         public bool AddAndReplaceUnsafely(ref T element)
         {
             Validate();
@@ -383,7 +383,7 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="element">Element to add.</param>
         /// <returns>True if the element was added to the set, false if the element was already present.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)] //TODO: Test performance of full chain inline.
         public bool AddUnsafely(ref T element)
         {
             Validate();
@@ -564,6 +564,18 @@ namespace BEPUutilities2.Collections
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// Removes an element from the set if belongs to the set.
+        /// Does not preserve the order of elements in the set.
+        /// </summary>
+        /// <param name="element">Element to remove.</param>
+        /// <returns>True if the element was found and removed, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool FastRemove(T element)
+        {
+            return FastRemove(ref element);
         }
 
 

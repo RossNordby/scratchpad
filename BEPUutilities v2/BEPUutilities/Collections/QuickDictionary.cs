@@ -312,11 +312,13 @@ namespace BEPUutilities2.Collections
         /// <summary>
         /// Ensures that the dictionary has enough room to hold the specified number of elements.
         /// </summary>     
-        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
         /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
-        /// <param name="count">Number of elements to hold.</param>
-        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        /// <param name="keyPool">Pool to pull a new key span from and return the old span to.</param>
+        /// <param name="valuePool">Pool to pull a new value span from and return the old span to.</param>
         /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        /// <param name="count">Number of elements to hold.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureCapacity<TKeyPool, TValuePool, TTablePool>(int count, TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
             where TKeyPool : IMemoryPool<TKey, TKeySpan>
@@ -332,11 +334,13 @@ namespace BEPUutilities2.Collections
         /// <summary>
         /// Shrinks the internal buffers to the smallest acceptable size and releases the old buffers to the pools.
         /// </summary>
-        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
         /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="keyPool">Pool to pull a new key span from and return the old span to.</param>
+        /// <param name="valuePool">Pool to pull a new value span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
         /// <param name="element">Element to add.</param>
-        /// <param name="pool">Pool used for element spans.</param>
-        /// <param name="tablePool">Pool used for table spans.</param>
         public void Compact<TKeyPool, TValuePool, TTablePool>(TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
             where TKeyPool : IMemoryPool<TKey, TKeySpan>
             where TValuePool : IMemoryPool<TValue, TValueSpan>
@@ -392,12 +396,36 @@ namespace BEPUutilities2.Collections
             return objectIndex;
         }
 
+
+        /// <summary>
+        /// Gets the index of the key in the dictionary values list if it exists.
+        /// </summary>
+        /// <param name="key">Key to get the index of.</param>
+        /// <returns>The index of the key if the key exists in the dictionary, -1 otherwise.</returns>
+        public int IndexOf(ref TKey key)
+        {
+            Validate();
+            GetTableIndices(ref key, out int tableIndex, out int objectIndex);
+            return objectIndex;
+        }
+
         /// <summary>
         /// Checks if a given key already belongs to the dictionary.
         /// </summary>
         /// <param name="key">Key to test for.</param>
         /// <returns>True if the key already belongs to the dictionary, false otherwise.</returns>
         public bool ContainsKey(TKey key)
+        {
+            Validate();
+            return GetTableIndices(ref key, out int tableIndex, out int objectIndex);
+        }
+
+        /// <summary>
+        /// Checks if a given key already belongs to the dictionary.
+        /// </summary>
+        /// <param name="key">Key to test for.</param>
+        /// <returns>True if the key already belongs to the dictionary, false otherwise.</returns>
+        public bool ContainsKey(ref TKey key)
         {
             Validate();
             return GetTableIndices(ref key, out int tableIndex, out int objectIndex);
@@ -422,24 +450,35 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
+        /// Tries to retrieve the value associated with a key if it exists.
+        /// </summary>
+        /// <param name="key">Key to look up.</param>
+        /// <param name="value">Value associated with the specified key.</param>
+        /// <returns>True if a value was found, false otherwise.</returns>
+        public bool TryGetValue(ref TKey key, out TValue value)
+        {
+            Validate();
+            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
+            {
+                value = Values[elementIndex];
+                return true;
+            }
+            value = default(TValue);
+            return false;
+        }
+
+        /// <summary>
         /// Adds a pair to the dictionary. If a version of the key (same hash code, 'equal' by comparer) is already present,
         /// the existing pair is replaced by the given version.
         /// </summary>
         /// <param name="key">Key of the pair to add.</param>
         /// <param name="value">Value of the pair to add.</param>
         /// <returns>True if the pair was added to the dictionary, false if the key was already present and its pair was replaced.</returns>
-        public bool AddAndReplace(TKey key, TValue value)
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)] //TODO: Test performance of full chain inline.
+        public bool AddAndReplaceUnsafely(ref TKey key, ref TValue value)
         {
             Validate();
-            if (Count == Keys.Length)
-            {
-                //There's no room left; resize.
-                Resize(pairPoolIndex + 1, tablePoolIndex + 1);
-
-                //Note that this is tested before any indices are found.
-                //If we resized only after determining that it was going to be added,
-                //the potential resize would invalidate the computed indices.
-            }
+            ValidateUnsafeAdd();
 
             if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
             {
@@ -449,6 +488,43 @@ namespace BEPUutilities2.Collections
                 return false;
             }
 
+            //It wasn't in the dictionary. Add it!
+            Keys[Count] = key;
+            Values[Count] = value;
+            //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
+            Table[tableIndex] = ++Count;
+            return true;
+        }
+
+        /// <summary>
+        /// Adds a pair to the dictionary. If a version of the key (same hash code, 'equal' by comparer) is already present,
+        /// the existing pair is replaced by the given version.
+        /// </summary>
+        /// <param name="key">Key of the pair to add.</param>
+        /// <param name="value">Value of the pair to add.</param>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present and its pair was replaced.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplaceUnsafely(TKey key, TValue value)
+        {
+            return AddAndReplaceUnsafely(ref key, ref value);
+        }
+
+        /// <summary>
+        /// Adds a pair to the dictionary if it is not already present.
+        /// </summary>
+        /// <param name="key">Key of the pair to add.</param>
+        /// <param name="value">Value of the pair to add.</param>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present.</returns>
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)] //TODO: Test performance of full chain inline.
+        public bool AddUnsafely(ref TKey key, ref TValue value)
+        {
+            Validate();
+            ValidateUnsafeAdd();
+            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
+            {
+                //Already present!
+                return false;
+            }
 
             //It wasn't in the dictionary. Add it!
             Keys[Count] = key;
@@ -458,40 +534,126 @@ namespace BEPUutilities2.Collections
             return true;
         }
 
-
         /// <summary>
         /// Adds a pair to the dictionary if it is not already present.
         /// </summary>
         /// <param name="key">Key of the pair to add.</param>
         /// <param name="value">Value of the pair to add.</param>
         /// <returns>True if the pair was added to the dictionary, false if the key was already present.</returns>
-        public bool Add(TKey key, TValue value)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddUnsafely(TKey key, TValue value)
+        {
+            return AddUnsafely(ref key, ref value);
+        }
+
+        /// <summary>
+        /// Adds a pair to the dictionary. If a version of the key (same hash code, 'equal' by comparer) is already present,
+        /// the existing pair is replaced by the given version.
+        /// </summary>
+        /// <param name="key">Key of the pair to add.</param>
+        /// <param name="value">Value of the pair to add.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="keyPool">Pool to pull a new key span from and return the old span to.</param>
+        /// <param name="valuePool">Pool to pull a new value span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present and its pair was replaced.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplace<TKeyPool, TValuePool, TTablePool>(ref TKey key, ref TValue value,
+            TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            if (Count == Keys.Length)
+            {
+                //There's no room left; resize.
+                Resize(Count * 2, keyPool, valuePool, tablePool);
+
+                //Note that this is tested before any indices are found.
+                //If we resized only after determining that it was going to be added,
+                //the potential resize would invalidate the computed indices.
+            }
+            return AddAndReplaceUnsafely(ref key, ref value);
+        }
+
+        /// <summary>
+        /// Adds a pair to the dictionary. If a version of the key (same hash code, 'equal' by comparer) is already present,
+        /// the existing pair is replaced by the given version.
+        /// </summary>
+        /// <param name="key">Key of the pair to add.</param>
+        /// <param name="value">Value of the pair to add.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="keyPool">Pool to pull a new key span from and return the old span to.</param>
+        /// <param name="valuePool">Pool to pull a new value span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present and its pair was replaced.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool AddAndReplace<TKeyPool, TValuePool, TTablePool>(TKey key, TValue value,
+            TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            return AddAndReplace(ref key, ref value, keyPool, valuePool, tablePool);
+        }
+
+        /// <summary>
+        /// Adds a pair to the dictionary if it is not already present.
+        /// </summary>
+        /// <param name="key">Key of the pair to add.</param>
+        /// <param name="value">Value of the pair to add.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="keyPool">Pool to pull a new key span from and return the old span to.</param>
+        /// <param name="valuePool">Pool to pull a new value span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Add<TKeyPool, TValuePool, TTablePool>(ref TKey key, ref TValue value,
+            TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
         {
             Validate();
 
             if (Count == Keys.Length)
             {
                 //There's no room left; resize.
-                Resize(pairPoolIndex + 1, tablePoolIndex + 1);
+                Resize(Count * 2, keyPool, valuePool, tablePool);
 
                 //Note that this is tested before any indices are found.
                 //If we resized only after determining that it was going to be added,
                 //the potential resize would invalidate the computed indices.
             }
+            return AddUnsafely(ref key, ref value);
+        }
 
-            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
-            {
-                //Already present!
-                return false;
-            }
-
-
-            //It wasn't in the dictionary. Add it!
-            Keys[Count] = key;
-            Values[Count] = value;
-            //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
-            Table[tableIndex] = ++Count;
-            return true;
+        /// <summary>
+        /// Adds a pair to the dictionary if it is not already present.
+        /// </summary>
+        /// <param name="key">Key of the pair to add.</param>
+        /// <param name="value">Value of the pair to add.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="keyPool">Pool to pull a new key span from and return the old span to.</param>
+        /// <param name="valuePool">Pool to pull a new value span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Add<TKeyPool, TValuePool, TTablePool>(TKey key, TValue value,
+            TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            return Add(ref key, ref value, keyPool, valuePool, tablePool);
         }
 
         //Note: the reason this is named "FastRemove" instead of just "Remove" despite it being the only remove present is that
@@ -503,7 +665,7 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="key">Key of the pair to remove.</param>
         /// <returns>True if the key was found and removed, false otherwise.</returns>
-        public bool FastRemove(TKey key)
+        public bool FastRemove(ref TKey key)
         {
             Validate();
             //Find it.
@@ -557,7 +719,17 @@ namespace BEPUutilities2.Collections
             return false;
         }
 
-
+        /// <summary>
+        /// Removes a pair associated with a key from the dictionary if belongs to the dictionary.
+        /// Does not preserve the order of elements in the dictionary.
+        /// </summary>
+        /// <param name="key">Key of the pair to remove.</param>
+        /// <returns>True if the key was found and removed, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool FastRemove(TKey key)
+        {
+            return FastRemove(ref key);
+        }
 
         /// <summary>
         /// Removes all elements from the dictionary.
