@@ -153,77 +153,66 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Resizes the list's backing array for the given size as a power of two.
+        /// Resizes the queue's backing array for the given size as a power of two.
+        /// If the new span is smaller, the queue's count is truncated and the extra elements are dropped. 
         /// </summary>
         /// <typeparam name="TPool">Type of the span pool.</typeparam>
         /// <param name="newSizePower">Exponent of the size of the new memory block. New size will be 2^newSizePower.</param>
         /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Resize<TPool>(int newSizePower, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        public void ResizeForPower<TPool>(int newSizePower, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             Validate();
-            Debug.Assert(Count <= (1 << newSizePower), "New pool index must contain all elements.");
-            var oldSpan = Span;
-            pool.TakeForPower(newSizePower, out )
             var oldQueue = this;
-            this = new QuickQueue<T, TSpan>(pool, newSizePower);
-            count = oldQueue.Count;
-
-
-            FirstIndex = 0;
-            LastIndex = count - 1;
+            pool.TakeForPower(newSizePower, out var newSpan);
+            Resize(ref newSpan, out var oldSpan);
 
             //The array may contain reference types.
             //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
             //Clear it before disposal to avoid leaking references.
-            //(TODO: This clear could be narrowed to arrays of managed types.)
-            if (!typeof(T).IsPrimitive)
-            {
-                oldQueue.Clear();
-            }
-            oldQueue.Dispose();
+            ClearSpanManaged(ref oldQueue.Span, oldQueue.FirstIndex, oldQueue.LastIndex, oldQueue.Count);
+            pool.Return(ref oldSpan);
         }
 
+        /// <summary>
+        /// Resizes the queue's backing array for the given size.
+        /// Any elements that do not fit in the resized span are dropped and the count is truncated.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <param name="newSize">Minimum number of elements required in the new backing array. Actual capacity of the created span may exceed this size.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Resize<TPool>(int newSize, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            ResizeForPower(BufferPool.GetPoolIndex(newSize), pool);
+        }
 
         /// <summary>
         /// Ensures that the queue has enough room to hold the specified number of elements.
         /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
         /// <param name="count">Number of elements to hold.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(int count)
+        public void EnsureCapacity<TPool>(int count, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
-            if (count > Elements.Length)
+            if (count > Span.Length)
             {
-                Resize(BufferPool.GetPoolIndex(count));
+                Resize(count, pool);
             }
         }
 
+
         /// <summary>
         /// Enqueues the element to the end of the queue, incrementing the last index.
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Enqueue(T element)
+        public void EnqueueUnsafely(T element)
         {
             Validate();
-            if (count == Elements.Length)
-                Resize(poolIndex + 1);
-            Elements[(LastIndex = ((LastIndex + 1) & CapacityMask))] = element;
-            ++count;
-        }
-
-        /// <summary>
-        /// Enqueues the element to the start of the queue, decrementing the first index.
-        /// </summary>
-        /// <param name="element">Item to enqueue.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnqueueFirst(T element)
-        {
-            Validate();
-            if (count == Elements.Length)
-                Resize(poolIndex + 1);
-            Elements[(FirstIndex = ((FirstIndex - 1) & CapacityMask))] = element;
-            ++count;
+            Span[(LastIndex = ((LastIndex + 1) & CapacityMask))] = element;
+            ++Count;
         }
 
         /// <summary>
@@ -231,13 +220,11 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Enqueue(ref T element)
+        public void EnqueueUnsafely(ref T element)
         {
             Validate();
-            if (count == Elements.Length)
-                Resize(poolIndex + 1);
-            Elements[(LastIndex = ((LastIndex + 1) & CapacityMask))] = element;
-            ++count;
+            Span[(LastIndex = ((LastIndex + 1) & CapacityMask))] = element;
+            ++Count;
         }
 
         /// <summary>
@@ -245,13 +232,74 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="element">Item to enqueue.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnqueueFirst(ref T element)
+        public void EnqueueFirstUnsafely(T element)
         {
             Validate();
-            if (count == Elements.Length)
-                Resize(poolIndex + 1);
-            Elements[(FirstIndex = ((FirstIndex - 1) & CapacityMask))] = element;
-            ++count;
+            Span[(FirstIndex = ((FirstIndex - 1) & CapacityMask))] = element;
+            ++Count;
+        }
+
+        /// <summary>
+        /// Enqueues the element to the start of the queue, decrementing the first index.
+        /// </summary>
+        /// <param name="element">Item to enqueue.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnqueueFirstUnsafely(ref T element)
+        {
+            Validate();
+            Span[(FirstIndex = ((FirstIndex - 1) & CapacityMask))] = element;
+            ++Count;
+        }
+
+        /// <summary>
+        /// Enqueues the element to the end of the queue, incrementing the last index.
+        /// </summary>
+        /// <param name="element">Item to enqueue.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Enqueue<TPool>(T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            EnqueueUnsafely(element);
+        }
+
+        /// <summary>
+        /// Enqueues the element to the end of the queue, incrementing the last index.
+        /// </summary>
+        /// <param name="element">Item to enqueue.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Enqueue<TPool>(ref T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            if (Count == Span.Length)
+                Resize(Span.Length * 2, pool);
+            EnqueueUnsafely(ref element);
+        }
+
+        /// <summary>
+        /// Enqueues the element to the start of the queue, decrementing the first index.
+        /// </summary>
+        /// <param name="element">Item to enqueue.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnqueueFirst<TPool>(T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            if (Count == Span.Length)
+                Resize(Span.Length * 2, pool);
+            EnqueueFirstUnsafely(element);
+        }
+
+
+        /// <summary>
+        /// Enqueues the element to the start of the queue, decrementing the first index.
+        /// </summary>
+        /// <param name="element">Item to enqueue.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnqueueFirst<TPool>(ref T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            if (Count == Span.Length)
+                Resize(Span.Length * 2, pool);
+            EnqueueFirstUnsafely(ref element);
         }
 
         /// <summary>
@@ -262,9 +310,9 @@ namespace BEPUutilities2.Collections
         public T Dequeue()
         {
             Validate();
-            if (count == 0)
+            if (Count == 0)
                 throw new InvalidOperationException("The queue is empty.");
-            var element = Elements[FirstIndex];
+            var element = Span[FirstIndex];
             DeleteFirst();
             return element;
 
@@ -278,9 +326,9 @@ namespace BEPUutilities2.Collections
         public T DequeueLast()
         {
             Validate();
-            if (count == 0)
+            if (Count == 0)
                 throw new InvalidOperationException("The queue is empty.");
-            var element = Elements[LastIndex];
+            var element = Span[LastIndex];
             DeleteLast();
             return element;
 
@@ -295,9 +343,9 @@ namespace BEPUutilities2.Collections
         public bool TryDequeue(out T element)
         {
             Validate();
-            if (count > 0)
+            if (Count > 0)
             {
-                element = Elements[FirstIndex];
+                element = Span[FirstIndex];
                 DeleteFirst();
                 return true;
             }
@@ -315,9 +363,9 @@ namespace BEPUutilities2.Collections
         public bool TryDequeueLast(out T element)
         {
             Validate();
-            if (count > 0)
+            if (Count > 0)
             {
-                element = Elements[LastIndex];
+                element = Span[LastIndex];
                 DeleteLast();
                 return true;
             }
@@ -328,16 +376,16 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void DeleteFirst()
         {
-            Elements[FirstIndex] = default(T);
+            Span[FirstIndex] = default(T);
             FirstIndex = (FirstIndex + 1) & CapacityMask;
-            --count;
+            --Count;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void DeleteLast()
         {
-            Elements[LastIndex] = default(T);
+            Span[LastIndex] = default(T);
             LastIndex = (LastIndex - 1) & CapacityMask;
-            --count;
+            --Count;
         }
 
         /// <summary>
@@ -372,39 +420,42 @@ namespace BEPUutilities2.Collections
             if ((FirstIndex > LastIndex && arrayIndex < LastIndex) || //Case 1
                 (FirstIndex < LastIndex && (LastIndex - arrayIndex) < (arrayIndex - FirstIndex))) //Case 3
             {
-                Array.Copy(Elements, arrayIndex + 1, Elements, arrayIndex, LastIndex - arrayIndex);
+                Span.CopyTo(arrayIndex + 1, ref Span, arrayIndex, LastIndex - arrayIndex);
                 DeleteLast();
             }
             else
             {
-                Array.Copy(Elements, FirstIndex, Elements, FirstIndex + 1, arrayIndex - FirstIndex);
+                Span.CopyTo(FirstIndex, ref Span, FirstIndex + 1, arrayIndex - FirstIndex);
                 DeleteFirst();
             }
         }
 
-        /// <summary>
-        /// Copies the elements of the <see cref="T:System.Collections.Generic.ICollection`1"/> to an <see cref="T:System.Array"/>, starting at a particular <see cref="T:System.Array"/> index.
-        /// </summary>
-        /// <param name="array">The one-dimensional <see cref="T:System.Array"/> that is the destination of the elements copied from <see cref="T:System.Collections.Generic.ICollection`1"/>. The <see cref="T:System.Array"/> must have zero-based indexing.</param><param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param><exception cref="T:System.ArgumentNullException"><paramref name="array"/> is null.</exception><exception cref="T:System.ArgumentOutOfRangeException"><paramref name="arrayIndex"/> is less than 0.</exception><exception cref="T:System.ArgumentException">The number of elements in the source <see cref="T:System.Collections.Generic.ICollection`1"/> is greater than the available space from <paramref name="arrayIndex"/> to the end of the destination <paramref name="array"/>.</exception>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyTo(T[] array, int arrayIndex)
+        private static void ClearSpan(ref TSpan span, int firstIndex, int lastIndex, int count)
         {
-            if (count > 0)
+            if (lastIndex >= firstIndex)
             {
-                if (FirstIndex <= LastIndex)
-                {
-                    Array.Copy(Elements, FirstIndex, array, arrayIndex, count);
-                }
-                else
-                {
-                    //Copy the old first-end to the first part of the new array.
-                    Array.Copy(Elements, FirstIndex, array, arrayIndex, Elements.Length - FirstIndex);
-                    //Copy the old begin-last to the second part of the new array.
-                    Array.Copy(Elements, 0, array, arrayIndex + Elements.Length - FirstIndex, LastIndex + 1);
-                }
+                span.Clear(firstIndex, count);
+            }
+            else if (count > 0)
+            {
+                span.Clear(firstIndex, span.Length - firstIndex);
+                span.Clear(0, lastIndex + 1);
             }
         }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void ClearSpanManaged(ref TSpan span, int firstIndex, int lastIndex, int count)
+        {
+            if (lastIndex >= firstIndex)
+            {
+                span.ClearManagedReferences(firstIndex, count);
+            }
+            else if (count > 0)
+            {
+                span.ClearManagedReferences(firstIndex, span.Length - firstIndex);
+                span.ClearManagedReferences(0, lastIndex + 1);
+            }
+        }
         /// <summary>
         /// Clears the queue by setting the count to zero and explicitly setting all relevant indices in the backing array to default values.
         /// </summary>
@@ -412,16 +463,8 @@ namespace BEPUutilities2.Collections
         public void Clear()
         {
             Validate();
-            if (LastIndex >= FirstIndex)
-            {
-                Array.Clear(Elements, FirstIndex, count);
-            }
-            else if (count > 0)
-            {
-                Array.Clear(Elements, FirstIndex, Elements.Length - FirstIndex);
-                Array.Clear(Elements, 0, LastIndex + 1);
-            }
-            count = 0;
+            ClearSpan(ref Span, FirstIndex, LastIndex, Count);
+            Count = 0;
             FirstIndex = 0;
             LastIndex = CapacityMask; //length - 1
         }
@@ -432,7 +475,7 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void FastClear()
         {
-            count = 0;
+            Count = 0;
             FirstIndex = 0;
             LastIndex = CapacityMask;
         }
@@ -440,12 +483,14 @@ namespace BEPUutilities2.Collections
         /// <summary>
         /// Compacts the internal buffer to the minimum size required for the number of elements in the queue.
         /// </summary>
-        public void Compact()
+        /// <typeparam name="TPool">Type of the pool to pull from if necessary.</typeparam>
+        /// <param name="pool">Pool to pull from if necessary.</param>
+        public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             Validate();
             var newPoolIndex = BufferPool.GetPoolIndex(Count);
-            if (newPoolIndex != poolIndex)
-                Resize(newPoolIndex);
+            if ((1 << newPoolIndex) != Span.Length)
+                ResizeForPower(newPoolIndex, pool);
         }
 
         [Conditional("DEBUG")]

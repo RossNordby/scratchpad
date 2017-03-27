@@ -140,7 +140,7 @@ namespace BEPUutilities2.Collections
             Validate();
             if (count > Span.Length)
             {
-                ResizeForPower(BufferPool.GetPoolIndex(count), pool);
+                Resize(count, pool);
             }
         }
 
