@@ -10,10 +10,18 @@ namespace BEPUutilities2.Collections
     /// Container supporting constant time adds and removes while preserving fast iteration times.
     /// Offers very direct access to information at the cost of safety.
     /// </summary>
-    /// <remarks><para>Be very careful when using this type. It has sacrificed a lot upon the altar of performance; a few notable issues include:
-    /// it is a value type and copying it around will break things without extreme care, it cannot be validly default-constructed,
-    /// it exposes internal structures to user modification, it is particularly vulnerable to bad hash functions, 
-    /// it rarely checks input for errors, and the enumerator doesn't check for mid-enumeration modification.</para>
+    /// <remarks>
+    /// <para>
+    /// Be very careful when using this type. It has sacrificed a lot upon the altar of performance; a few notable issues include:
+    /// it is a value type and copying it around will break things without extreme care,
+    /// it cannot be validly default-constructed,
+    /// it exposes internal structures to user modification, 
+    /// it rarely checks input for errors,
+    /// the enumerator doesn't check for mid-enumeration modification,
+    /// it allows unsafe addition that can break if the user doesn't manage the capacity,
+    /// it works on top of an abstracted memory blob which might internally be a pointer that could be rugpulled, 
+    /// it does not (and is incapable of) checking that provided memory gets returned to the same pool that it came from.
+    /// </para>
     /// <para>Note that the implementation is extremely simple. It uses single-step linear probing under the assumption of very low collision rates.
     /// A generous table capacity is recommended; this trades some memory for simplicity and runtime performance.</para></remarks>
     /// <typeparam name="T">Type of element held by the container.</typeparam>
@@ -53,14 +61,13 @@ namespace BEPUutilities2.Collections
 
 
         /// <summary>
-        /// Gets or sets an element at the given index in the list representation.
+        /// Gets or sets an element at the given index in the list representation of the set.
         /// </summary>
         /// <param name="index">Index to grab an element from.</param>
-        /// <returns>Element at the given index in the list.</returns>
+        /// <returns>Element at the given index in the set.</returns>
         public ref T this[int index]
         {
-            //You would think that such a trivial accessor would inline without any external suggestion.
-            //Sometimes, yes. Sometimes, no. :(
+            //TODO: Check inlining
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
@@ -142,8 +149,11 @@ namespace BEPUutilities2.Collections
         /// Swaps out the set's backing memory span for a new span.
         /// If the new span is smaller, the set's count is truncated and the extra elements are dropped. 
         /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
-        /// </summary>
-        /// <param name="newSpan">New span to use.</param>
+        /// </summary>      
+        /// <param name="newSpan">New span to use for elements.</param>
+        /// <param name="newTableSpan">New span to use for the table.</param>
+        /// <param name="oldSpan">Previous span used for elements.</param>
+        /// <param name="oldTableSpan">Previous span used for the table.</param>
         public void Resize(ref TSpan newSpan, ref TTableSpan newTableSpan, out TSpan oldSpan, out TTableSpan oldTableSpan)
         {
             ValidateSpanCapacity(ref newSpan, ref newTableSpan);
@@ -169,8 +179,8 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Resizes the queue's backing array for the given size as a power of two.
-        /// If the new span is smaller, the queue's count is truncated and the extra elements are dropped. 
+        /// Resizes the set's backing array for the given size as a power of two.
+        /// If the new span is smaller, the set's count is truncated and the extra elements are dropped. 
         /// </summary>
         /// <typeparam name="TPool">Type of the span pool.</typeparam>
         /// <typeparam name="TTablePool">Type of the table span pool.</typeparam>
@@ -197,8 +207,8 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Resizes the queue's backing array for the given size.
-        /// If the new span is smaller, the queue's count is truncated and the extra elements are dropped. 
+        /// Resizes the set's backing array for the given size.
+        /// If the new span is smaller, the set's count is truncated and the extra elements are dropped. 
         /// </summary>
         /// <typeparam name="TPool">Type of the span pool.</typeparam>
         /// <typeparam name="TTablePool">Type of the table span pool.</typeparam>
@@ -235,6 +245,23 @@ namespace BEPUutilities2.Collections
             }
         }
 
+        /// <summary>
+        /// Shrinks the internal buffers to the smallest acceptable size and releases the old buffers to the pools.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        public void Compact<TPool, TTablePool>(TPool pool, TTablePool tablePool)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            Validate();
+            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(Count);
+            if ((1 << minimumRequiredPoolIndex) != Span.Length)
+                Resize(Count, pool, tablePool);
+        }
 
         /// <summary>
         /// Gets the index of the element in the table.
@@ -248,7 +275,7 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
-            tableIndex = QuickDictionary<int, int>.Rehash(EqualityComparer.GetHashCode(ref element) & TableMask;
+            tableIndex = HashHelper.Rehash(EqualityComparer.GetHashCode(ref element)) & TableMask;
             //0 in the table means 'not taken'; all other values are offset by 1 upward. That is, 1 is actually index 0, 2 is actually index 1, and so on.
             //This is preferred over using a negative number for flagging since clean buffers will contain all 0's.
             while ((elementIndex = Table[tableIndex]) > 0)
@@ -265,12 +292,11 @@ namespace BEPUutilities2.Collections
             return false;
         }
 
-
         /// <summary>
-        /// Gets the index of the element in the list if it exists.
+        /// Gets the index of the element in the set if it exists.
         /// </summary>
         /// <param name="element">Element to get the index of.</param>
-        /// <returns>The index of the element if the element exists in the list, -1 otherwise.</returns>
+        /// <returns>The index of the element if the element exists in the set, -1 otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(T element)
         {
@@ -279,10 +305,10 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Gets the index of the element in the list if it exists.
+        /// Gets the index of the element in the set if it exists.
         /// </summary>
         /// <param name="element">Element to get the index of.</param>
-        /// <returns>The index of the element if the element exists in the list, -1 otherwise.</returns>
+        /// <returns>The index of the element if the element exists in the set, -1 otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ref T element)
         {
@@ -506,7 +532,7 @@ namespace BEPUutilities2.Collections
                 {
                     //This slot contains something. What is its actual index?
                     --moveCandidateIndex;
-                    int desiredIndex = QuickDictionary<int, int>.Rehash(Span[moveCandidateIndex].GetHashCode()) & TableMask;
+                    int desiredIndex = HashHelper.Rehash(Span[moveCandidateIndex].GetHashCode()) & TableMask;
 
                     //Would this element be closer to its actual index if it was moved to the gap?
                     //To find out, compute the clockwise distance from the gap and the clockwise distance from the ideal location.
@@ -542,24 +568,6 @@ namespace BEPUutilities2.Collections
 
 
         /// <summary>
-        /// Shrinks the internal buffers to the smallest acceptable size and releases the old buffers to the pools.
-        /// </summary>
-        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
-        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
-        /// <param name="element">Element to add.</param>
-        /// <param name="pool">Pool used for element spans.</param>
-        /// <param name="tablePool">Pool used for table spans.</param>
-        public void Compact<TPool, TTablePool>(TPool pool, TTablePool tablePool)
-            where TPool : IMemoryPool<T, TSpan>
-            where TTablePool : IMemoryPool<int, TTableSpan>
-        {
-            Validate();
-            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(Count);
-            if ((1 << minimumRequiredPoolIndex) != Span.Length)
-                Resize(Count, pool, tablePool);
-        }
-
-        /// <summary>
         /// Removes all elements from the set.
         /// </summary>
         public void Clear()
@@ -583,7 +591,7 @@ namespace BEPUutilities2.Collections
         public Enumerator GetEnumerator()
         {
             Validate();
-            return new Enumerator(Span, Count);
+            return new Enumerator(ref Span, Count);
         }
 
 
@@ -593,7 +601,7 @@ namespace BEPUutilities2.Collections
             private readonly int count;
             private int index;
 
-            public Enumerator(TSpan backingArray, int count)
+            public Enumerator(ref TSpan backingArray, int count)
             {
                 this.backingArray = backingArray;
                 this.count = count;
@@ -629,7 +637,7 @@ namespace BEPUutilities2.Collections
         static void ValidateSpanCapacity(ref TSpan span, ref TTableSpan tableSpan)
         {
             Debug.Assert(tableSpan.Length >= span.Length, "The table span must be at least as large as the element span.");
-            Debug.Assert((tableSpan.Length & (tableSpan.Length - 1)) == 0, "Set depend upon power of 2 backing table span sizes for efficient modulo operations.");
+            Debug.Assert((tableSpan.Length & (tableSpan.Length - 1)) == 0, "QuickSets depend upon power of 2 backing table span sizes for efficient modulo operations.");
         }
 
         [Conditional("DEBUG")]

@@ -82,6 +82,7 @@ namespace BEPUutilities2.Collections
         /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
         /// </summary>
         /// <param name="newSpan">New span to use.</param>
+        /// <param name="oldSpan">Previous span used for elements.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, out TSpan oldSpan)
         {
@@ -146,6 +147,17 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
+        /// Compacts the internal buffer to the minimum size required for the number of elements in the list.
+        /// </summary>
+        public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            var newPoolIndex = BufferPool.GetPoolIndex(Count);
+            if ((1 << newPoolIndex) != Span.Length)
+                ResizeForPower(newPoolIndex, pool);
+        }
+
+        /// <summary>
         /// Adds the elements of a list to the QuickList without checking capacity.
         /// </summary>
         /// <typeparam name="TSourceSpan">Type of the source span.</typeparam>
@@ -156,6 +168,7 @@ namespace BEPUutilities2.Collections
         public void AddRangeUnsafely<TSourceSpan>(ref TSourceSpan span, int start, int count) where TSourceSpan : ISpan<T>
         {
             Validate();
+            ValidateUnsafeAdd();
             span.CopyTo(0, ref Span, Count, count);
             Count += count;
         }
@@ -199,6 +212,7 @@ namespace BEPUutilities2.Collections
         public void AddUnsafely(T element)
         {
             Validate();
+            ValidateUnsafeAdd();
             Span[Count] = element;
             ++Count;
         }
@@ -225,6 +239,7 @@ namespace BEPUutilities2.Collections
         public void AddUnsafely(ref T element)
         {
             Validate();
+            ValidateUnsafeAdd();
             Span[Count] = element;
             ++Count;
         }
@@ -434,34 +449,10 @@ namespace BEPUutilities2.Collections
             Count = 0;
         }
 
-        /// <summary>
-        /// Compacts the internal buffer to the minimum size required for the number of elements in the list.
-        /// </summary>
-        public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
-        {
-            Validate();
-            var newPoolIndex = BufferPool.GetPoolIndex(Count);
-            if ((1 << newPoolIndex) != Span.Length)
-                ResizeForPower(newPoolIndex, pool);
-        }
-
-
-        [Conditional("DEBUG")]
-        void ValidateIndex(int index)
-        {
-            Debug.Assert(index >= 0 && index < Count, "Index must be nonnegative and less than the number of elements in the list.");
-        }
-
-
-        [Conditional("DEBUG")]
-        private void Validate()
-        {
-            Debug.Assert(Span.Length >= 0, "Any QuickList in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
-        }
 
         public Enumerator GetEnumerator()
         {
-            return new Enumerator(Span, Count);
+            return new Enumerator(ref Span, Count);
         }
 
 
@@ -471,7 +462,7 @@ namespace BEPUutilities2.Collections
             private readonly int count;
             private int index;
 
-            public Enumerator(TSpan span, int count)
+            public Enumerator(ref TSpan span, int count)
             {
                 this.span = span;
                 this.count = count;
@@ -502,5 +493,25 @@ namespace BEPUutilities2.Collections
                 index = -1;
             }
         }
+
+
+        [Conditional("DEBUG")]
+        void ValidateIndex(int index)
+        {
+            Debug.Assert(index >= 0 && index < Count, "Index must be nonnegative and less than the number of elements in the list.");
+        }
+
+        [Conditional("DEBUG")]
+        private void Validate()
+        {
+            Debug.Assert(Span.Length >= 0, "Any QuickList in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
+        }
+
+        [Conditional("DEBUG")]
+        void ValidateUnsafeAdd()
+        {
+            Debug.Assert(Count < Span.Length, "Unsafe adders can only be used if the capacity is guaranteed to hold the new size.");
+        }
+
     }
 }

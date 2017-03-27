@@ -21,7 +21,7 @@ namespace BEPUutilities2.Collections
     /// it does not (and is incapable of) checking that provided memory gets returned to the same pool that it came from.
     /// </remarks>
     /// <typeparam name="T">Type of the elements in the queue.</typeparam>
-    /// <typeparam name="TSpan">Type of the memory span backing the list.</typeparam>
+    /// <typeparam name="TSpan">Type of the memory span backing the queue.</typeparam>
     public struct QuickQueue<T, TSpan> where TSpan : ISpan<T>
     {
         /// <summary>
@@ -121,6 +121,7 @@ namespace BEPUutilities2.Collections
         /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
         /// </summary>
         /// <param name="newSpan">New span to use.</param>
+        /// <param name="oldSpan">Previous span used for elements.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, out TSpan oldSpan)
         {
@@ -142,7 +143,7 @@ namespace BEPUutilities2.Collections
             //There is no guarantee that the count is equal to Elements.Length, so both cases must be covered.
             if (oldQueue.LastIndex >= oldQueue.FirstIndex)
             {
-                //The indices are in order and the list has at least one element in it, so just do one contiguous copy.
+                //The indices are in order and the queue has at least one element in it, so just do one contiguous copy.
                 oldSpan.CopyTo(oldQueue.FirstIndex, ref Span, 0, Count);
             }
             else if (Count > 0)
@@ -205,6 +206,18 @@ namespace BEPUutilities2.Collections
             }
         }
 
+        /// <summary>
+        /// Compacts the internal buffer to the minimum size required for the number of elements in the queue.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the pool to pull from if necessary.</typeparam>
+        /// <param name="pool">Pool to pull from if necessary.</param>
+        public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            var newPoolIndex = BufferPool.GetPoolIndex(Count);
+            if ((1 << newPoolIndex) != Span.Length)
+                ResizeForPower(newPoolIndex, pool);
+        }
 
         /// <summary>
         /// Enqueues the element to the end of the queue, incrementing the last index.
@@ -214,6 +227,7 @@ namespace BEPUutilities2.Collections
         public void EnqueueUnsafely(T element)
         {
             Validate();
+            ValidateUnsafeAdd();
             Span[(LastIndex = ((LastIndex + 1) & CapacityMask))] = element;
             ++Count;
         }
@@ -226,6 +240,7 @@ namespace BEPUutilities2.Collections
         public void EnqueueUnsafely(ref T element)
         {
             Validate();
+            ValidateUnsafeAdd();
             Span[(LastIndex = ((LastIndex + 1) & CapacityMask))] = element;
             ++Count;
         }
@@ -238,6 +253,7 @@ namespace BEPUutilities2.Collections
         public void EnqueueFirstUnsafely(T element)
         {
             Validate();
+            ValidateUnsafeAdd();
             Span[(FirstIndex = ((FirstIndex - 1) & CapacityMask))] = element;
             ++Count;
         }
@@ -250,6 +266,7 @@ namespace BEPUutilities2.Collections
         public void EnqueueFirstUnsafely(ref T element)
         {
             Validate();
+            ValidateUnsafeAdd();
             Span[(FirstIndex = ((FirstIndex - 1) & CapacityMask))] = element;
             ++Count;
         }
@@ -483,42 +500,9 @@ namespace BEPUutilities2.Collections
             LastIndex = CapacityMask;
         }
 
-        /// <summary>
-        /// Compacts the internal buffer to the minimum size required for the number of elements in the queue.
-        /// </summary>
-        /// <typeparam name="TPool">Type of the pool to pull from if necessary.</typeparam>
-        /// <param name="pool">Pool to pull from if necessary.</param>
-        public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
-        {
-            Validate();
-            var newPoolIndex = BufferPool.GetPoolIndex(Count);
-            if ((1 << newPoolIndex) != Span.Length)
-                ResizeForPower(newPoolIndex, pool);
-        }
-
-        [Conditional("DEBUG")]
-        void ValidateIndex(int index)
-        {
-            Debug.Assert(index >= 0 && index < Count, "Index must be nonnegative and less than the number of elements in the queue.");
-        }
-
-        [Conditional("DEBUG")]
-        static void ValidateSpanCapacity(ref TSpan span)
-        {
-            Debug.Assert((span.Length & (span.Length - 1)) == 0, "Queues depend upon power of 2 backing span sizes for efficient modulo operations.");
-        }
-
-        [Conditional("DEBUG")]
-        private void Validate()
-        {
-            ValidateSpanCapacity(ref Span);
-            Debug.Assert(Span.Length >= 0, "Any QuickQueue in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
-        }
-
-
         public Enumerator GetEnumerator()
         {
-            return new Enumerator(Span, Count, FirstIndex);
+            return new Enumerator(ref Span, Count, FirstIndex);
         }
 
         public struct Enumerator : IEnumerator<T>
@@ -529,7 +513,7 @@ namespace BEPUutilities2.Collections
             private readonly int capacityMask;
             private int index;
 
-            public Enumerator(TSpan span, int count, int firstIndex)
+            public Enumerator(ref TSpan span, int count, int firstIndex)
             {
                 this.span = span;
                 this.count = count;
@@ -562,5 +546,31 @@ namespace BEPUutilities2.Collections
                 index = -1;
             }
         }
+
+        [Conditional("DEBUG")]
+        void ValidateIndex(int index)
+        {
+            Debug.Assert(index >= 0 && index < Count, "Index must be nonnegative and less than the number of elements in the queue.");
+        }
+
+        [Conditional("DEBUG")]
+        static void ValidateSpanCapacity(ref TSpan span)
+        {
+            Debug.Assert((span.Length & (span.Length - 1)) == 0, "Queues depend upon power of 2 backing span sizes for efficient modulo operations.");
+        }
+
+        [Conditional("DEBUG")]
+        void ValidateUnsafeAdd()
+        {
+            Debug.Assert(Count < Span.Length, "Unsafe adders can only be used if the capacity is guaranteed to hold the new size.");
+        }
+
+        [Conditional("DEBUG")]
+        private void Validate()
+        {
+            ValidateSpanCapacity(ref Span);
+            Debug.Assert(Span.Length >= 0, "Any QuickQueue in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
+        }
+
     }
 }

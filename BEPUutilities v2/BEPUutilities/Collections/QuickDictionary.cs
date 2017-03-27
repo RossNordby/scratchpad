@@ -7,182 +7,18 @@ using System.Runtime.CompilerServices;
 namespace BEPUutilities2.Collections
 {
     /// <summary>
-    /// Container supporting constant time adds and removes of key-value pairs while preserving fast iteration times.
-    /// Offers very direct access to information at the cost of safety.
+    /// Contains basic helpers for hashing.
     /// </summary>
-    /// <remarks><para>Be very careful when using this type. It has sacrificed a lot upon the altar of performance; a few notable issues include:
-    /// it is a value type and copying it around will break things without extreme care, it cannot be validly default-constructed,
-    /// it exposes internal structures to user modification, it is particularly vulnerable to bad hash functions, 
-    /// it rarely checks input for errors, and the enumerator doesn't check for mid-enumeration modification.</para>
-    /// <para>Note that the implementation is extremely simple. It uses single-step linear probing under the assumption of very low collision rates.
-    /// A generous table capacity is recommended; this trades some memory for simplicity and runtime performance.</para></remarks>
-    /// <typeparam name="TKey">Type of key held by the container.</typeparam>
-    /// <typeparam name="TValue">Type of value held by the container.</typeparam>
-    public struct QuickDictionary<TKey, TValue> : IDisposable, IEnumerable<KeyValuePair<TKey, TValue>> where TKey : IEquatable<TKey>
+    public static class HashHelper
     {
         /// <summary>
-        /// Gets the number of elements in the dictionary.
+        /// Redistributes a hash. Useful for converting unique but contiguous hashes into a semirandom distribution.
         /// </summary>
-        public int Count;
-
-        /// <summary>
-        /// Gets the backing array of the dictionary's table. Values are distributed according to the key hash functions.
-        /// Slots containing 0 are unused and point to nothing. Slots containing higher values are equal to one plus the index of an element in the Keys and Values arrays.
-        /// </summary>
-        public readonly int[] Table;
-
-        /// <summary>
-        /// Gets the backing array containing the keys of the dictionary.
-        /// Indices from 0 to Count-1 hold actual data. All other data is undefined.
-        /// </summary>
-        public readonly TKey[] Keys;
-
-
-        /// <summary>
-        /// Gets the backing array containing the values of the dictionary.
-        /// Indices from 0 to Count-1 hold actual data. All other data is undefined.
-        /// </summary>
-        public readonly TValue[] Values;
-
-
-        /// <summary>
-        /// Pool from which table arrays are pulled.
-        /// </summary>
-        public readonly BufferPool<int> TablePool;
-        /// <summary>
-        /// Pool from which key arrays are pulled.
-        /// </summary>
-        public readonly BufferPool<TKey> KeyPool;
-        /// <summary>
-        /// Pool from which value arrays are pulled.
-        /// </summary>
-        public readonly BufferPool<TValue> ValuePool;
-
-        /// <summary>
-        /// Gets or sets a key-value pair at the given index in the list representation.
-        /// </summary>
-        /// <param name="index">Index to grab a pair from.</param>
-        /// <returns>Pair at the given index in the list.</returns>
-        public KeyValuePair<TKey, TValue> this[int index]
-        {
-            //You would think that such a trivial accessor would inline without any external suggestion.
-            //Sometimes, yes. Sometimes, no. :(
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                Debug.Assert(index >= 0 && index < Count, "Index should be within the list's size.");
-                return new KeyValuePair<TKey, TValue>(Keys[index], Values[index]);
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
-            {
-                Debug.Assert(index >= 0 && index < Count, "Index should be within the list's size.");
-                Keys[index] = value.Key;
-                Values[index] = value.Value;
-            }
-        }
-
-        private int pairPoolIndex;
-        private int tablePoolIndex;
-        private int tableMask;
-
-        /// <summary>
-        /// Gets the buffer pool index associated with the key and value arrays.
-        /// </summary>
-        public int PairPoolIndex
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return pairPoolIndex;
-            }
-        }
-        /// <summary>
-        /// Gets the buffer pool index associated with the table array.
-        /// </summary>
-        public int TablePoolIndex
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return tablePoolIndex;
-            }
-        }
-
-        /// <summary>
-        /// Creates a new set.
-        /// </summary>
-        /// <param name="tablePool">Pool from which to retrieve integer arrays.</param>
-        /// <param name="keyPool">Pool from which to retrieve TKey arrays.</param>
-        /// <param name="valuePool">Pool from which to retrieve TValue arrays.</param>
-        /// <param name="initialElementPoolIndex">Initial pool index to pull the object buffer from. The size of the initial buffer will be 2^initialElementPoolIndex.</param>
-        /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
-        public QuickDictionary(BufferPool<TKey> keyPool, BufferPool<TValue> valuePool, BufferPool<int> tablePool, int initialElementPoolIndex = 2, int tableSizePower = 3)
-        {
-            if (tableSizePower <= 0)
-                throw new ArgumentException("The hash table must be larger than the element array.", "tableSizePower");
-            if (initialElementPoolIndex < 0)
-                throw new ArgumentException("Initial pool index must be nonnegative.", "initialElementPoolIndex");
-            this.TablePool = tablePool;
-            this.KeyPool = keyPool;
-            this.ValuePool = valuePool;
-
-            pairPoolIndex = initialElementPoolIndex;
-            tablePoolIndex = initialElementPoolIndex + tableSizePower;
-            Keys = keyPool.TakeFromPoolIndex(pairPoolIndex);
-            Values = valuePool.TakeFromPoolIndex(pairPoolIndex);
-            Table = tablePool.TakeFromPoolIndex(tablePoolIndex);
-            //Pooled buffers are not guaranteed to be cleared. The dictionary and set require clean tables, 0 means untaken.
-            Array.Clear(Table, 0, Table.Length);
-            Count = 0;
-            tableMask = Table.Length - 1;
-
-#if DEBUG
-            disposed = false;
-#endif
-
-        }
-
-        /// <summary>
-        /// Ensures that the dictionary has enough room to hold the specified number of elements.
-        /// </summary>
-        /// <param name="count">Number of elements to hold.</param>
+        /// <param name="hash">Hash to redistribute.</param>
+        /// <returns>Hashed hash.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(int count)
+        public static int Rehash(int hash)
         {
-            if (count > Keys.Length)
-            {
-                var newPoolIndex = BufferPool.GetPoolIndex(count);
-                Resize(newPoolIndex, tablePoolIndex - pairPoolIndex + newPoolIndex);
-            }
-        }
-
-        private void Resize(int newObjectPoolIndex, int newTablePoolIndex)
-        {
-            Debug.Assert(Count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
-            //Just double the size of the set.
-            var oldDictionary = this;
-            this = new QuickDictionary<TKey, TValue>(KeyPool, ValuePool, TablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
-            for (int i = 0; i < oldDictionary.Count; ++i)
-            {
-                Add(oldDictionary.Keys[i], oldDictionary.Values[i]);
-            }
-
-            //The keys and values arrays may contain reference types.
-            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
-            //Clear it before disposal to avoid leaking references.
-            //Note that only the elements array is cleared; the table array contains only primitives and does not need to be cleared.
-            //(TODO: This clear could be narrowed to arrays of managed types.)
-            if (!typeof(TKey).IsPrimitive)
-                Array.Clear(oldDictionary.Keys, 0, oldDictionary.Count);
-            if (!typeof(TValue).IsPrimitive)
-                Array.Clear(oldDictionary.Values, 0, oldDictionary.Count);
-            oldDictionary.Dispose();
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int Rehash(int hash)
-        { 
             //This rehash aims to address two problems:
             //1) Many common keys, such as ints and longs, will result in contiguous hash codes. 
             //Contiguous hash codes result in contiguous table entries, which destroy this implementation's linear probing performance.
@@ -204,6 +40,315 @@ namespace BEPUutilities2.Collections
                 ((uhash << c) | (uhash >> (32 - c)));
             return (int)redongled;
         }
+    }
+    /// <summary>
+    /// Container supporting constant time adds and removes of key-value pairs while preserving fast iteration times.
+    /// Offers very direct access to information at the cost of safety.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Be very careful when using this type. It has sacrificed a lot upon the altar of performance; a few notable issues include:
+    /// it is a value type and copying it around will break things without extreme care,
+    /// it cannot be validly default-constructed,
+    /// it exposes internal structures to user modification, 
+    /// it rarely checks input for errors,
+    /// the enumerator doesn't check for mid-enumeration modification,
+    /// it allows unsafe addition that can break if the user doesn't manage the capacity,
+    /// it works on top of an abstracted memory blob which might internally be a pointer that could be rugpulled, 
+    /// it does not (and is incapable of) checking that provided memory gets returned to the same pool that it came from.
+    /// </para>
+    /// <para>Note that the implementation is extremely simple. It uses single-step linear probing under the assumption of very low collision rates.
+    /// A generous table capacity is recommended; this trades some memory for simplicity and runtime performance.</para></remarks>
+    /// <typeparam name="TKey">Type of key held by the container.</typeparam>
+    /// <typeparam name="TValue">Type of value held by the container.</typeparam>
+    /// <typeparam name="TKeySpan">Type of the key holding span.</typeparam>
+    /// <typeparam name="TValueSpan">Type of the value holding span.</typeparam>
+    /// <typeparam name="TTableSpan">Type of the index table span.</typeparam>
+    /// <typeparam name="TEqualityComparer">Type of the equality tester and hash calculator used.</typeparam>
+    public struct QuickDictionary<TKey, TValue, TKeySpan, TValueSpan, TTableSpan, TEqualityComparer> //i apologize
+        where TKeySpan : ISpan<TKey>
+        where TValueSpan : ISpan<TValue>
+        where TTableSpan : ISpan<int>
+        where TEqualityComparer : IEqualityComparerRef<TKey>
+    {
+        /// <summary>
+        /// Gets the number of elements in the dictionary.
+        /// </summary>
+        public int Count;
+
+        /// <summary>
+        /// Mask for use in performing fast modulo operations for hashes. Requires that the table span is a power of 2.
+        /// </summary>
+        public int TableMask;
+
+        /// <summary>
+        /// Backing memory of the dictionary's table. Values are distributed according to the EqualityComparer's hash function.
+        /// Slots containing 0 are unused and point to nothing. Slots containing higher values are equal to one plus the index of an element in the Span.
+        /// </summary>
+        public TTableSpan Table;
+
+        /// <summary>
+        /// Backing memory containing the keys of the dictionary.
+        /// Indices from 0 to Count-1 hold actual data. All other data is undefined.
+        /// </summary>
+        public TKeySpan Keys;
+
+        /// <summary>
+        /// Backing memory containing the values of the dictionary.
+        /// Indices from 0 to Count-1 hold actual data. All other data is undefined.
+        /// </summary>
+        public TValueSpan Values;
+
+        /// <summary>
+        /// Equality comparer used 
+        /// </summary>
+        public TEqualityComparer EqualityComparer;
+
+        /// <summary>
+        /// Gets or sets a key-value pair at the given index in the list representation.
+        /// </summary>
+        /// <param name="index">Index to grab a pair from.</param>
+        /// <returns>Pair at the given index in the dictionary.</returns>
+        public KeyValuePair<TKey, TValue> this[int index]
+        {
+            //You would think that such a trivial accessor would inline without any external suggestion.
+            //Sometimes, yes. Sometimes, no. :(
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                Debug.Assert(index >= 0 && index < Count, "Index should be within the dictionary's size.");
+                return new KeyValuePair<TKey, TValue>(Keys[index], Values[index]);
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set
+            {
+                Debug.Assert(index >= 0 && index < Count, "Index should be within the dictionary's size.");
+                Keys[index] = value.Key;
+                Values[index] = value.Value;
+            }
+        }
+
+
+        /// <summary>
+        /// Creates a new dictionary.
+        /// </summary>
+        /// <param name="initialKeySpan">Span to use as backing memory of the dictionary keys.</param>
+        /// <param name="initialValueSpan">Span to use as backing memory of the dictionary values.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="comparer">Comparer to use for the dictionary.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public QuickDictionary(ref TKeySpan initialKeySpan, ref TValueSpan initialValueSpan, ref TTableSpan initialTableSpan, TEqualityComparer comparer)
+        {
+            ValidateSpanCapacity(ref initialKeySpan, ref initialValueSpan, ref initialTableSpan);
+            Keys = initialKeySpan;
+            Values = initialValueSpan;
+            Table = initialTableSpan;
+            TableMask = Table.Length - 1;
+            Count = 0;
+            EqualityComparer = comparer;
+            Debug.Assert(EqualityComparer != null);
+        }
+
+        /// <summary>
+        /// Creates a new dictionary with a default constructed comparer.
+        /// </summary>
+        /// <param name="initialKeySpan">Span to use as backing memory of the dictionary keys.</param>
+        /// <param name="initialValueSpan">Span to use as backing memory of the dictionary values.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="comparer">Comparer to use for the dictionary.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public QuickDictionary(ref TKeySpan initialKeySpan, ref TValueSpan initialValueSpan, ref TTableSpan initialTableSpan)
+            : this(ref initialKeySpan, ref initialValueSpan, ref initialTableSpan, default(TEqualityComparer))
+        {
+        }
+
+        /// <summary>
+        /// Creates a new dictionary.
+        /// </summary>
+        /// <param name="keyPool">Pool to pull a key span from.</param>   
+        /// <param name="valuePool">Pool to pull a value span from.</param>   
+        /// <param name="tablePool">Pool to pull a table span from.</param>
+        /// <param name="initialElementPoolIndex">Initial pool index to pull the object buffer from. The size of the initial buffer will be 2^initialElementPoolIndex.</param>
+        /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
+        /// <param name="comparer">Comparer to use in the dictionary.</param>
+        /// <param name="dictionary">Created dictionary.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Create<TKeyPool, TValuePool, TTablePool>(TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool, int initialElementPoolIndex, int tableSizePower, TEqualityComparer comparer,
+            out QuickDictionary<TKey, TValue, TKeySpan, TValueSpan, TTableSpan, TEqualityComparer> dictionary)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            keyPool.TakeForPower(initialElementPoolIndex, out var keySpan);
+            valuePool.TakeForPower(initialElementPoolIndex, out var valueSpan);
+            tablePool.TakeForPower(initialElementPoolIndex + tableSizePower, out var tableSpan);
+            dictionary = new QuickDictionary<TKey, TValue, TKeySpan, TValueSpan, TTableSpan, TEqualityComparer>(ref keySpan, ref valueSpan, ref tableSpan, comparer);
+        }
+        /// <summary>
+        /// Creates a new dictionary with a default constructed comparer.
+        /// </summary>
+        /// <param name="keyPool">Pool to pull a key span from.</param>   
+        /// <param name="valuePool">Pool to pull a value span from.</param>   
+        /// <param name="tablePool">Pool to pull a table span from.</param>
+        /// <param name="initialElementPoolIndex">Initial pool index to pull the object buffer from. The size of the initial buffer will be 2^initialElementPoolIndex.</param>
+        /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
+        /// <param name="comparer">Comparer to use in the dictionary.</param>
+        /// <param name="dictionary">Created dictionary.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Create<TKeyPool, TValuePool, TTablePool>(TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool, int initialElementPoolIndex, int tableSizePower,
+            out QuickDictionary<TKey, TValue, TKeySpan, TValueSpan, TTableSpan, TEqualityComparer> dictionary)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            Create(keyPool, valuePool, tablePool, initialElementPoolIndex, tableSizePower, default(TEqualityComparer), out dictionary);
+        }
+
+        /// <summary>
+        /// Swaps out the dictionary's backing memory span for a new span.
+        /// If the new span is smaller, the dictionary's count is truncated and the extra elements are dropped. 
+        /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
+        /// </summary>
+        /// <param name="newKeySpan">New span to use for keys.</param>
+        /// <param name="newValueSpan">New span to use for values.</param>
+        /// <param name="newTableSpan">New span to use for the table.</param>
+        /// <param name="oldKeySpan">Previous span used for keys.</param>
+        /// <param name="oldValueSpan">Previous span used for values.</param>
+        /// <param name="oldTableSpan">Previous span used for the table.</param>
+        public void Resize(ref TKeySpan newKeySpan, ref TValueSpan newValueSpan, ref TTableSpan newTableSpan,
+            out TKeySpan oldKeySpan, out TValueSpan oldValueSpan, out TTableSpan oldTableSpan)
+        {
+            ValidateSpanCapacity(ref newKeySpan, ref newValueSpan, ref newTableSpan);
+            var oldDictionary = this;
+            Keys = newKeySpan;
+            Values = newValueSpan;
+            Table = newTableSpan;
+            Count = 0;
+            TableMask = newTableSpan.Length - 1;
+            var newCount = oldDictionary.Count > newKeySpan.Length ? newKeySpan.Length : oldDictionary.Count;
+
+            //Unfortunately we can't really do a straight copy; the backing table relies on modulo operations.
+            //Technically, we could copy the regular dictionary and then rely on a partial add to take care of the rest, but bleh!
+            //Should really attempt to avoid resizes on sets and dictionaries whenever possible anyway. It ain't fast.
+            for (int i = 0; i < newCount; ++i)
+            {
+                //We assume that ref adds will get inlined reasonably here. That's not actually guaranteed, but we'll bite the bullet.
+                //(You could technically branch on the Unsafe.SizeOf<T>, which should result in a compile time specialized zero overhead implementation... but meh!)
+                AddUnsafely(ref oldDictionary.Keys[i], ref oldDictionary.Values[i]);
+            }
+            oldKeySpan = oldDictionary.Keys;
+            oldValueSpan = oldDictionary.Values;
+            oldTableSpan = oldDictionary.Table;
+
+        }
+
+        /// <summary>
+        /// Resizes the dictionary's backing array for the given size as a power of two.
+        /// If the new span is smaller, the dictionary's count is truncated and the extra elements are dropped. 
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <typeparam name="TTablePool">Type of the table span pool.</typeparam>
+        /// <param name="newSizePower">Exponent of the size of the new memory block. New size will be 2^newSizePower.</param>
+        /// <param name="tablePoolOffset">Offset to apply to the object size power to get the table power. New table size will be 2^(newSizePower + tablePoolOffset).</param>
+        /// <param name="keyPool">Pool to pull a key span from.</param>   
+        /// <param name="valuePool">Pool to pull a value span from.</param>   
+        /// <param name="tablePool">Pool to pull a table span from.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ResizeForPower<TKeyPool, TValuePool, TTablePool>(int newSizePower, int tablePoolOffset, TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            var oldCount = Count;
+            keyPool.TakeForPower(newSizePower, out var newKeySpan);
+            valuePool.TakeForPower(newSizePower, out var newValueSpan);
+            tablePool.TakeForPower(newSizePower + tablePoolOffset, out var newTableSpan);
+            Resize(ref newKeySpan, ref newValueSpan, ref newTableSpan, out var oldKeySpan, out var oldValueSpan, out var oldTableSpan);
+
+            //The elements array may contain reference types.
+            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
+            //Clear it before disposal to avoid leaking references.
+            oldKeySpan.ClearManagedReferences(0, oldCount);
+            oldValueSpan.ClearManagedReferences(0, oldCount);
+            keyPool.Return(ref oldKeySpan);
+            valuePool.Return(ref oldValueSpan);
+            tablePool.Return(ref oldTableSpan);
+        }
+
+        /// <summary>
+        /// Resizes the dictionary's backing array for the given size.
+        /// If the new span is smaller, the dictionary's count is truncated and the extra elements are dropped. 
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <typeparam name="TTablePool">Type of the table span pool.</typeparam>
+        /// <param name="newSize">Minimum size of the new object memory block. Actual size may be larger.</param>
+        /// <param name="keyPool">Pool to pull a key span from.</param>   
+        /// <param name="valuePool">Pool to pull a value span from.</param>   
+        /// <param name="tablePool">Pool to pull a table span from.</param>
+        /// <typeparam name="TKeyPool">Type of the pool used for key spans.</typeparam>
+        /// <typeparam name="TValuePool">Type of the pool used for value spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Resize<TKeyPool, TValuePool, TTablePool>(int newSize, TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            var oldSpanPower = BufferPool.GetPoolIndex(Keys.Length);
+            var oldTableSpanPower = BufferPool.GetPoolIndex(Table.Length);
+            var tablePoolOffset = oldTableSpanPower - oldSpanPower;
+            ResizeForPower(BufferPool.GetPoolIndex(newSize), tablePoolOffset, keyPool, valuePool, tablePool);
+        }
+
+        /// <summary>
+        /// Ensures that the dictionary has enough room to hold the specified number of elements.
+        /// </summary>     
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="count">Number of elements to hold.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        /// <param name="tablePool">Pool to pull a new table span from and return the old table span to.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void EnsureCapacity<TKeyPool, TValuePool, TTablePool>(int count, TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            if (count > Keys.Length)
+            {
+                Resize(count, keyPool, valuePool, tablePool);
+            }
+        }
+
+        /// <summary>
+        /// Shrinks the internal buffers to the smallest acceptable size and releases the old buffers to the pools.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        /// <typeparam name="TTablePool">Type of the pool used for table spans.</typeparam>
+        /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used for element spans.</param>
+        /// <param name="tablePool">Pool used for table spans.</param>
+        public void Compact<TKeyPool, TValuePool, TTablePool>(TKeyPool keyPool, TValuePool valuePool, TTablePool tablePool)
+            where TKeyPool : IMemoryPool<TKey, TKeySpan>
+            where TValuePool : IMemoryPool<TValue, TValueSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            Validate();
+            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(Count);
+            if ((1 << minimumRequiredPoolIndex) != Keys.Length)
+                Resize(Count, keyPool, valuePool, tablePool);
+        }
+
+
 
         /// <summary>
         /// Gets the index of the element in the table.
@@ -211,14 +356,14 @@ namespace BEPUutilities2.Collections
         /// <param name="element">Element to look up.</param>
         /// <param name="tableIndex">Index of the element in the redirect table, or if it is not present, the index of where it would be added.</param>
         /// <param name="elementIndex">The index of the element in the element arrays, if it exists; -1 otherwise.</param>
-        /// <returns>True if the element is present in the set, false if it is not.</returns>
+        /// <returns>True if the element is present in the dictionary, false if it is not.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool GetTableIndices(TKey element, out int tableIndex, out int elementIndex)
+        public bool GetTableIndices(ref TKey element, out int tableIndex, out int elementIndex)
         {
             Validate();
-            
+
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
-            tableIndex = Rehash(element.GetHashCode()) & tableMask;
+            tableIndex = HashHelper.Rehash(EqualityComparer.GetHashCode(ref element)) & TableMask;
             //0 in the table means 'not taken'; all other values are offset by 1 upward. That is, 1 is actually index 0, 2 is actually index 1, and so on.
             //This is preferred over using a negative number for flagging since clean buffers will contain all 0's.
             while ((elementIndex = Table[tableIndex]) > 0)
@@ -229,7 +374,7 @@ namespace BEPUutilities2.Collections
                 {
                     return true;
                 }
-                tableIndex = (tableIndex + 1) & tableMask;
+                tableIndex = (tableIndex + 1) & TableMask;
             }
             elementIndex = -1;
             return false;
@@ -243,21 +388,19 @@ namespace BEPUutilities2.Collections
         public int IndexOf(TKey key)
         {
             Validate();
-            int tableIndex, objectIndex;
-            GetTableIndices(key, out tableIndex, out objectIndex);
+            GetTableIndices(ref key, out int tableIndex, out int objectIndex);
             return objectIndex;
         }
 
         /// <summary>
-        /// Checks if a given key already belongs to the set.
+        /// Checks if a given key already belongs to the dictionary.
         /// </summary>
         /// <param name="key">Key to test for.</param>
-        /// <returns>True if the key already belongs to the set, false otherwise.</returns>
+        /// <returns>True if the key already belongs to the dictionary, false otherwise.</returns>
         public bool ContainsKey(TKey key)
         {
             Validate();
-            int tableIndex, objectIndex;
-            return GetTableIndices(key, out tableIndex, out objectIndex);
+            return GetTableIndices(ref key, out int tableIndex, out int objectIndex);
         }
 
         /// <summary>
@@ -269,8 +412,7 @@ namespace BEPUutilities2.Collections
         public bool TryGetValue(TKey key, out TValue value)
         {
             Validate();
-            int tableIndex, elementIndex;
-            if (GetTableIndices(key, out tableIndex, out elementIndex))
+            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
             {
                 value = Values[elementIndex];
                 return true;
@@ -280,12 +422,12 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Adds a pair to the set. If a version of the key (same hash code, 'equal' by comparer) is already present,
+        /// Adds a pair to the dictionary. If a version of the key (same hash code, 'equal' by comparer) is already present,
         /// the existing pair is replaced by the given version.
         /// </summary>
         /// <param name="key">Key of the pair to add.</param>
         /// <param name="value">Value of the pair to add.</param>
-        /// <returns>True if the pair was added to the set, false if the key was already present and its pair was replaced.</returns>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present and its pair was replaced.</returns>
         public bool AddAndReplace(TKey key, TValue value)
         {
             Validate();
@@ -299,8 +441,7 @@ namespace BEPUutilities2.Collections
                 //the potential resize would invalidate the computed indices.
             }
 
-            int tableIndex, elementIndex;
-            if (GetTableIndices(key, out tableIndex, out elementIndex))
+            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
             {
                 //Already present!
                 Keys[elementIndex] = key;
@@ -309,7 +450,7 @@ namespace BEPUutilities2.Collections
             }
 
 
-            //It wasn't in the set. Add it!
+            //It wasn't in the dictionary. Add it!
             Keys[Count] = key;
             Values[Count] = value;
             //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
@@ -319,11 +460,11 @@ namespace BEPUutilities2.Collections
 
 
         /// <summary>
-        /// Adds a pair to the set if it is not already present.
+        /// Adds a pair to the dictionary if it is not already present.
         /// </summary>
         /// <param name="key">Key of the pair to add.</param>
         /// <param name="value">Value of the pair to add.</param>
-        /// <returns>True if the pair was added to the set, false if the key was already present.</returns>
+        /// <returns>True if the pair was added to the dictionary, false if the key was already present.</returns>
         public bool Add(TKey key, TValue value)
         {
             Validate();
@@ -338,15 +479,14 @@ namespace BEPUutilities2.Collections
                 //the potential resize would invalidate the computed indices.
             }
 
-            int tableIndex, elementIndex;
-            if (GetTableIndices(key, out tableIndex, out elementIndex))
+            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
             {
                 //Already present!
                 return false;
             }
 
 
-            //It wasn't in the set. Add it!
+            //It wasn't in the dictionary. Add it!
             Keys[Count] = key;
             Values[Count] = value;
             //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
@@ -358,8 +498,8 @@ namespace BEPUutilities2.Collections
         //there may later exist an order preserving "Remove". That would be a very sneaky breaking change.
 
         /// <summary>
-        /// Removes a pair associated with a key from the set if belongs to the set.
-        /// Does not preserve the order of elements in the set.
+        /// Removes a pair associated with a key from the dictionary if belongs to the dictionary.
+        /// Does not preserve the order of elements in the dictionary.
         /// </summary>
         /// <param name="key">Key of the pair to remove.</param>
         /// <returns>True if the key was found and removed, false otherwise.</returns>
@@ -367,8 +507,7 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             //Find it.
-            int tableIndex, elementIndex;
-            if (GetTableIndices(key, out tableIndex, out elementIndex))
+            if (GetTableIndices(ref key, out int tableIndex, out int elementIndex))
             {
                 //We found the object!
                 //Add and remove must both maintain a property:
@@ -378,17 +517,17 @@ namespace BEPUutilities2.Collections
                 int moveCandidateIndex;
                 int gapIndex = tableIndex;
                 //Search clockwise.
-                while ((moveCandidateIndex = Table[tableIndex = (tableIndex + 1) & tableMask]) > 0)
+                while ((moveCandidateIndex = Table[tableIndex = (tableIndex + 1) & TableMask]) > 0)
                 {
                     //This slot contains something. What is its actual index?
                     --moveCandidateIndex;
-                    int desiredIndex = Rehash(Keys[moveCandidateIndex].GetHashCode()) & tableMask;
+                    int desiredIndex = HashHelper.Rehash(Keys[moveCandidateIndex].GetHashCode()) & TableMask;
 
                     //Would this element be closer to its actual index if it was moved to the gap?
                     //To find out, compute the clockwise distance from the gap and the clockwise distance from the ideal location.
 
-                    var distanceFromGap = (tableIndex - gapIndex) & tableMask;
-                    var distanceFromIdeal = (tableIndex - desiredIndex) & tableMask;
+                    var distanceFromGap = (tableIndex - gapIndex) & TableMask;
+                    var distanceFromIdeal = (tableIndex - desiredIndex) & TableMask;
                     if (distanceFromGap <= distanceFromIdeal)
                     {
                         //The distance to the gap is less than or equal the distance to the ideal location, so just move to the gap.
@@ -406,8 +545,7 @@ namespace BEPUutilities2.Collections
                     Keys[elementIndex] = Keys[Count];
                     Values[elementIndex] = Values[Count];
                     //Locate the swapped object in the table and update its index.
-                    int oldObjectIndex;
-                    GetTableIndices(Keys[elementIndex], out tableIndex, out oldObjectIndex);
+                    GetTableIndices(ref Keys[elementIndex], out tableIndex, out int oldObjectIndex);
                     Table[tableIndex] = elementIndex + 1; //Remember the encoding! all indices offset by 1.
                 }
                 //Clear the final slot in the elements set.
@@ -420,27 +558,17 @@ namespace BEPUutilities2.Collections
         }
 
 
-        /// <summary>
-        /// Shrinks the internal buffers to the smallest acceptable size and releases the old buffers to the pools.
-        /// </summary>
-        public void Compact()
-        {
-            Validate();
-            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(Count);
-            if (minimumRequiredPoolIndex != pairPoolIndex)
-                Resize(minimumRequiredPoolIndex, minimumRequiredPoolIndex + (tablePoolIndex - pairPoolIndex));
-        }
 
         /// <summary>
         /// Removes all elements from the dictionary.
         /// </summary>
         public void Clear()
         {
-            //While it may be appealing to remove individual elements from the set when the set is sparse,
+            //While it may be appealing to remove individual elements from the dictionary when sparse,
             //using a brute force clear over the entire table is almost always faster. And it's a lot simpler!
-            Array.Clear(Table, 0, Table.Length);
-            Array.Clear(Keys, 0, Count);
-            Array.Clear(Values, 0, Count);
+            Table.Clear(0, Table.Length);
+            Keys.Clear(0, Count);
+            Values.Clear(0, Count);
             Count = 0;
         }
 
@@ -449,34 +577,24 @@ namespace BEPUutilities2.Collections
         /// </summary>
         public void FastClear()
         {
-            Array.Clear(Table, 0, Table.Length);
+            Table.Clear(0, Table.Length);
             Count = 0;
         }
 
         public Enumerator GetEnumerator()
         {
             Validate();
-            return new Enumerator(Keys, Values, Count);
-        }
-
-        IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
+            return new Enumerator(ref Keys, ref Values, Count);
         }
 
         public struct Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
         {
-            private readonly TKey[] keys;
-            private readonly TValue[] values;
+            private readonly TKeySpan keys;
+            private readonly TValueSpan values;
             private readonly int count;
             private int index;
 
-            public Enumerator(TKey[] keys, TValue[] values, int count)
+            public Enumerator(ref TKeySpan keys, ref TValueSpan values, int count)
             {
                 this.keys = keys;
                 this.values = values;
@@ -509,30 +627,28 @@ namespace BEPUutilities2.Collections
                 index = -1;
             }
         }
+        [Conditional("DEBUG")]
+        static void ValidateSpanCapacity(ref TKeySpan keySpan, ref TValueSpan valueSpan, ref TTableSpan tableSpan)
+        {
+            Debug.Assert(tableSpan.Length >= keySpan.Length, "The table span must be at least as large as the key span.");
+            Debug.Assert(valueSpan.Length >= keySpan.Length, "The value span must be at least as large as the key span.");
+            Debug.Assert((tableSpan.Length & (tableSpan.Length - 1)) == 0, "Dictionaries depend upon power of 2 backing table span sizes for efficient modulo operations.");
+        }
 
         [Conditional("DEBUG")]
         private void Validate()
         {
-#if DEBUG
-            Debug.Assert(!disposed && Table != null, "The QuickDictionary must have its internal buffers and pools available; default-constructed or disposed QuickSets should not be used.");
-#endif
+            ValidateSpanCapacity(ref Keys, ref Values, ref Table);
+            Debug.Assert(Table.Length != 0, "The QuickDictionary must have its internal buffers and pools available; default-constructed or disposed QuickDictionary should not be used.");
         }
 
-#if DEBUG
-        bool disposed;
-#endif
-            /// <summary>
-            /// Returns the dictionary's buffers to the pools. Does not clear the buffers.
-            /// </summary>
-        public void Dispose()
+
+        [Conditional("DEBUG")]
+        void ValidateUnsafeAdd()
         {
-            TablePool.Return(Table, tablePoolIndex);
-            KeyPool.Return(Keys, pairPoolIndex);
-            ValuePool.Return(Values, pairPoolIndex);
-#if DEBUG
-            disposed = true;
-#endif
+            Debug.Assert(Count < Keys.Length, "Unsafe adders can only be used if the capacity is guaranteed to hold the new size.");
         }
+
 
 
 
