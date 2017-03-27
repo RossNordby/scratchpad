@@ -17,112 +17,166 @@ namespace BEPUutilities2.Collections
     /// <para>Note that the implementation is extremely simple. It uses single-step linear probing under the assumption of very low collision rates.
     /// A generous table capacity is recommended; this trades some memory for simplicity and runtime performance.</para></remarks>
     /// <typeparam name="T">Type of element held by the container.</typeparam>
-    public struct QuickSet<T> : IDisposable, IEnumerable<T> where T : IEquatable<T>
+    public struct QuickSet<T, TSpan, TTableSpan, TEqualityComparer>
+        where TSpan : ISpan<T>
+        where TTableSpan : ISpan<int>
+        where TEqualityComparer : IEqualityComparerRef<T>
     {
         /// <summary>
         /// Gets the number of elements in the set.
         /// </summary>
         public int Count;
-
         /// <summary>
-        /// Gets the backing array of the set's table. Values are distributed according to the element hash functions.
-        /// Slots containing 0 are unused and point to nothing. Slots containing higher values are equal to one plus the index of an element in the Elements array.
+        /// Mask for use in performing fast modulo operations for hashes. Requires that the table span is a power of 2.
         /// </summary>
-        public readonly int[] Table;
+        public int TableMask;
 
         /// <summary>
-        /// Gets the backing array containing the elements of the set.
+        /// Backing memory of the set's table. Values are distributed according to the EqualityComparer's hash function.
+        /// Slots containing 0 are unused and point to nothing. Slots containing higher values are equal to one plus the index of an element in the Span.
+        /// </summary>
+        public TTableSpan Table;
+
+        /// <summary>
+        /// Backing memory containing the elements of the set.
         /// Indices from 0 to Count-1 hold actual data. All other data is undefined.
         /// </summary>
-        public readonly T[] Elements;
+        public TSpan Span;
 
         /// <summary>
-        /// Pool from which table arrays are pulled.
+        /// Equality comparer used 
         /// </summary>
-        public readonly BufferPool<int> TablePool;
-        /// <summary>
-        /// Pool from which element arrays are pulled.
-        /// </summary>
-        public readonly BufferPool<T> ElementPool;
+        public TEqualityComparer EqualityComparer;
+
 
         /// <summary>
         /// Gets or sets an element at the given index in the list representation.
         /// </summary>
         /// <param name="index">Index to grab an element from.</param>
         /// <returns>Element at the given index in the list.</returns>
-        public T this[int index]
+        public ref T this[int index]
         {
             //You would think that such a trivial accessor would inline without any external suggestion.
             //Sometimes, yes. Sometimes, no. :(
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                Debug.Assert(index >= 0 && index < Count, "Index should be within the list's size.");
-                return Elements[index];
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
-            {
-                Debug.Assert(index >= 0 && index < Count, "Index should be within the list's size.");
-                Elements[index] = value;
+                Debug.Assert(index >= 0 && index < Count, "Index should be within the set's size.");
+                return ref Span[index];
             }
         }
-
-        private int elementPoolIndex;
-        private int tablePoolIndex;
-        private int tableMask;
-        /// <summary>
-        /// Gets the buffer pool index associated with the elements array.
-        /// </summary>
-        public int ElementPoolIndex
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return elementPoolIndex;
-            }
-        }
-        /// <summary>
-        /// Gets the buffer pool index associated with the table array.
-        /// </summary>
-        public int TablePoolIndex
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return tablePoolIndex;
-            }
-        }
-
 
         /// <summary>
         /// Creates a new set.
         /// </summary>
-        /// <param name="tablePool">Pool from which to retrieve integer arrays.</param>
-        /// <param name="elementPool">Pool from which to retrieve typed arrays.</param>
+        /// <param name="initialSpan">Span to use as backing memory of the set elements.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="comparer">Comparer to use for the set.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public QuickSet(ref TSpan initialSpan, ref TTableSpan initialTableSpan, TEqualityComparer comparer)
+        {
+            ValidateSpanCapacity(ref initialSpan, ref initialTableSpan);
+            Span = initialSpan;
+            Table = initialTableSpan;
+            TableMask = Table.Length - 1;
+            Count = 0;
+            EqualityComparer = comparer;
+            Debug.Assert(EqualityComparer != null);
+        }
+
+        /// <summary>
+        /// Creates a new set using a default constructed equality comparer.
+        /// </summary>
+        /// <param name="initialSpan">Span to use as backing memory of the set elements.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public QuickSet(ref TSpan initialSpan, ref TTableSpan initialTableSpan)
+            : this(ref initialSpan, ref initialTableSpan, default(TEqualityComparer))
+        {
+        }
+
+        /// <summary>
+        /// Creates a new set.
+        /// </summary>
+        /// <param name="pool">Pool to pull a span from.</param>   
+        /// <param name="tablePool">Pool to pull a table span from.</param>
         /// <param name="initialElementPoolIndex">Initial pool index to pull the object buffer from. The size of the initial buffer will be 2^initialElementPoolIndex.</param>
         /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
-        public QuickSet(BufferPool<T> elementPool, BufferPool<int> tablePool, int initialElementPoolIndex = 2, int tableSizePower = 3)
+        /// <param name="comparer">Comparer to use in the set.</param>
+        /// <param name="set">Created set.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Create<TPool, TTablePool>(TPool pool, TTablePool tablePool, int initialElementPoolIndex, int tableSizePower, TEqualityComparer comparer,
+            out QuickSet<T, TSpan, TTableSpan, TEqualityComparer> set)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
         {
-            if (tableSizePower <= 0)
-                throw new ArgumentException("The hash table must be larger than the element array.", "tableSizePower");
-            if (initialElementPoolIndex < 0)
-                throw new ArgumentException("Initial pool index must be nonnegative.", "initialElementPoolIndex");
-            this.TablePool = tablePool;
-            this.ElementPool = elementPool;
+            pool.TakeForPower(initialElementPoolIndex, out var span);
+            tablePool.TakeForPower(initialElementPoolIndex + tableSizePower, out var tableSpan);
+            set = new QuickSet<T, TSpan, TTableSpan, TEqualityComparer>(ref span, ref tableSpan, comparer);
+        }
+        /// <summary>
+        /// Creates a new set with a default constructed comparer.
+        /// </summary>
+        /// <param name="pool">Pool to pull a span from.</param>   
+        /// <param name="tablePool">Pool to pull a table span from.</param>
+        /// <param name="initialElementPoolIndex">Initial pool index to pull the object buffer from. The size of the initial buffer will be 2^initialElementPoolIndex.</param>
+        /// <param name="tableSizePower">Initial pool index to pull the object buffer from. The size of the initial table buffer will be 2^(initialElementPoolIndex + tableSizePower).</param>
+        /// <param name="set">Created set.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Create<TPool, TTablePool>(TPool pool, TTablePool tablePool, int initialElementPoolIndex, int tableSizePower,
+            out QuickSet<T, TSpan, TTableSpan, TEqualityComparer> set)
+            where TPool : IMemoryPool<T, TSpan>
+            where TTablePool : IMemoryPool<int, TTableSpan>
+        {
+            Create(pool, tablePool, initialElementPoolIndex, tableSizePower, default(TEqualityComparer), out set);
+        }
 
-            elementPoolIndex = initialElementPoolIndex;
-            tablePoolIndex = initialElementPoolIndex + tableSizePower;
-            Elements = elementPool.TakeFromPoolIndex(elementPoolIndex);
-            Table = tablePool.TakeFromPoolIndex(tablePoolIndex);
-            //Correctness requires a clean table. '0' means 'not taken'.
-            Array.Clear(Table, 0, Table.Length);
+        /// <summary>
+        /// Swaps out the set's backing memory span for a new span.
+        /// If the new span is smaller, the set's count is truncated and the extra elements are dropped. 
+        /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
+        /// </summary>
+        /// <param name="newSpan">New span to use.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Resize(ref TSpan newSpan, ref TTableSpan newTableSpan, out TSpan oldSpan, out TTableSpan oldTableSpan)
+        {
+            ValidateSpanCapacity(ref newSpan, ref newTableSpan);
+            var oldSet = this;
+            Span = newSpan;
+            Table = newTableSpan;
             Count = 0;
-            tableMask = Table.Length - 1;
+            TableMask = newTableSpan.Length - 1;
+            var newCount = oldSet.Count > newSpan.Length ? newSpan.Length : oldSet.Count;
 
-#if DEBUG
-            disposed = false;
-#endif
+            //Unfortunately we can't really do a straight copy; the backing table relies on modulo operations.
+            //Technically, we could copy the regular set and then rely on a partial add to take care of the rest, but bleh!
+            //Should really attempt to avoid resizes on sets and dictionaries whenever possible anyway. It ain't fast.
+            for (int i = 0; i < newCount; ++i)
+            {
+                Add(ref oldSet.Span[i]);
+            }
+
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Resize(int newObjectPoolIndex, int newTablePoolIndex)
+        {
+            Debug.Assert(Count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
+            //Just double the size of the set.
+            var oldSet = this;
+            this = new QuickSet<T>(ElementPool, TablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
+            for (int i = 0; i < oldSet.Count; ++i)
+            {
+                Add(oldSet.Span[i]);
+            }
+
+            //The elements array may contain reference types.
+            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
+            //Clear it before disposal to avoid leaking references.
+            //Note that only the elements array is cleared; the table array contains only primitives and does not need to be cleared.
+            //(TODO: This clear could be narrowed to arrays of managed types.)
+            if (!typeof(T).IsPrimitive)
+                Array.Clear(oldSet.Span, 0, oldSet.Count);
+            oldSet.Dispose();
         }
 
         /// <summary>
@@ -132,33 +186,13 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnsureCapacity(int count)
         {
-            if (count > Elements.Length)
+            if (count > Span.Length)
             {
                 var newPoolIndex = BufferPool.GetPoolIndex(count);
                 Resize(newPoolIndex, tablePoolIndex - elementPoolIndex + newPoolIndex);
             }
         }
 
-        private void Resize(int newObjectPoolIndex, int newTablePoolIndex)
-        {
-            Debug.Assert(Count <= (1 << newObjectPoolIndex), "New pool index must contain all elements.");
-            //Just double the size of the set.
-            var oldSet = this;
-            this = new QuickSet<T>(ElementPool, TablePool, newObjectPoolIndex, newTablePoolIndex - newObjectPoolIndex);
-            for (int i = 0; i < oldSet.Count; ++i)
-            {
-                Add(oldSet.Elements[i]);
-            }
-
-            //The elements array may contain reference types.
-            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
-            //Clear it before disposal to avoid leaking references.
-            //Note that only the elements array is cleared; the table array contains only primitives and does not need to be cleared.
-            //(TODO: This clear could be narrowed to arrays of managed types.)
-            if (!typeof(T).IsPrimitive)
-                Array.Clear(oldSet.Elements, 0, oldSet.Count);
-            oldSet.Dispose();
-        }
 
         /// <summary>
         /// Gets the index of the element in the table.
@@ -172,18 +206,18 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
-            tableIndex = QuickDictionary<int, int>.Rehash(element.GetHashCode()) & tableMask;
+            tableIndex = QuickDictionary<int, int>.Rehash(element.GetHashCode()) & TableMask;
             //0 in the table means 'not taken'; all other values are offset by 1 upward. That is, 1 is actually index 0, 2 is actually index 1, and so on.
             //This is preferred over using a negative number for flagging since clean buffers will contain all 0's.
             while ((elementIndex = Table[tableIndex]) > 0)
             {
                 //This table index is taken. Is this the specified element?
                 //Remember to decode the object index.
-                if (Elements[--elementIndex].Equals(element))
+                if (Span[--elementIndex].Equals(element))
                 {
                     return true;
                 }
-                tableIndex = (tableIndex + 1) & tableMask;
+                tableIndex = (tableIndex + 1) & TableMask;
             }
             elementIndex = -1;
             return false;
@@ -223,7 +257,7 @@ namespace BEPUutilities2.Collections
         public bool AddAndReplace(T element)
         {
             Validate();
-            if (Count == Elements.Length)
+            if (Count == Span.Length)
             {
                 //There's no room left; resize.
                 Resize(elementPoolIndex + 1, tablePoolIndex + 1);
@@ -237,13 +271,13 @@ namespace BEPUutilities2.Collections
             if (GetTableIndices(element, out tableIndex, out elementIndex))
             {
                 //Already present!
-                Elements[elementIndex] = element;
+                Span[elementIndex] = element;
                 return false;
             }
 
 
             //It wasn't in the set. Add it!
-            Elements[Count] = element;
+            Span[Count] = element;
             //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
             Table[tableIndex] = ++Count;
             return true;
@@ -259,7 +293,7 @@ namespace BEPUutilities2.Collections
         {
             Validate();
 
-            if (Count == Elements.Length)
+            if (Count == Span.Length)
             {
                 //There's no room left; resize.
                 Resize(elementPoolIndex + 1, tablePoolIndex + 1);
@@ -278,7 +312,7 @@ namespace BEPUutilities2.Collections
 
 
             //It wasn't in the set. Add it!
-            Elements[Count] = element;
+            Span[Count] = element;
             //Use the encoding- all indices are offset by 1 since 0 represents 'empty'.
             Table[tableIndex] = ++Count;
             return true;
@@ -308,17 +342,17 @@ namespace BEPUutilities2.Collections
                 int moveCandidateIndex;
                 int gapIndex = tableIndex;
                 //Search clockwise.
-                while ((moveCandidateIndex = Table[tableIndex = (tableIndex + 1) & tableMask]) > 0)
+                while ((moveCandidateIndex = Table[tableIndex = (tableIndex + 1) & TableMask]) > 0)
                 {
                     //This slot contains something. What is its actual index?
                     --moveCandidateIndex;
-                    int desiredIndex = QuickDictionary<int, int>.Rehash(Elements[moveCandidateIndex].GetHashCode()) & tableMask;
+                    int desiredIndex = QuickDictionary<int, int>.Rehash(Span[moveCandidateIndex].GetHashCode()) & TableMask;
 
                     //Would this element be closer to its actual index if it was moved to the gap?
                     //To find out, compute the clockwise distance from the gap and the clockwise distance from the ideal location.
 
-                    var distanceFromGap = (tableIndex - gapIndex) & tableMask;
-                    var distanceFromIdeal = (tableIndex - desiredIndex) & tableMask;
+                    var distanceFromGap = (tableIndex - gapIndex) & TableMask;
+                    var distanceFromIdeal = (tableIndex - desiredIndex) & TableMask;
                     if (distanceFromGap <= distanceFromIdeal)
                     {
                         //The distance to the gap is less than or equal the distance to the ideal location, so just move to the gap.
@@ -333,14 +367,14 @@ namespace BEPUutilities2.Collections
                 --Count;
                 if (objectIndex < Count)
                 {
-                    Elements[objectIndex] = Elements[Count];
+                    Span[objectIndex] = Span[Count];
                     //Locate the swapped object in the table and update its index.
                     int oldObjectIndex;
-                    GetTableIndices(Elements[objectIndex], out tableIndex, out oldObjectIndex);
+                    GetTableIndices(Span[objectIndex], out tableIndex, out oldObjectIndex);
                     Table[tableIndex] = objectIndex + 1; //Remember the encoding! all indices offset by 1.
                 }
                 //Clear the final slot in the elements set.
-                Elements[Count] = default(T);
+                Span[Count] = default(T);
 
                 return true;
             }
@@ -366,8 +400,8 @@ namespace BEPUutilities2.Collections
         {
             //While it may be appealing to remove individual elements from the set when the set is sparse,
             //using a brute force clear over the entire table is almost always faster. And it's a lot simpler!
-            Array.Clear(Table, 0, Table.Length);
-            Array.Clear(Elements, 0, Count);
+            Table.Clear(0, Table.Length);
+            Span.Clear(0, Count);
             Count = 0;
         }
 
@@ -376,25 +410,16 @@ namespace BEPUutilities2.Collections
         /// </summary>
         public void FastClear()
         {
-            Array.Clear(Table, 0, Table.Length);
+            Table.Clear(0, Table.Length);
             Count = 0;
         }
 
         public Enumerator GetEnumerator()
         {
             Validate();
-            return new Enumerator(Elements, Count);
+            return new Enumerator(Span, Count);
         }
 
-        IEnumerator<T> IEnumerable<T>.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
 
         public struct Enumerator : IEnumerator<T>
         {
@@ -434,29 +459,21 @@ namespace BEPUutilities2.Collections
                 index = -1;
             }
         }
+        [Conditional("DEBUG")]
+        void ValidateSpanCapacity(ref TSpan span, ref TTableSpan tableSpan)
+        {
+            Debug.Assert(tableSpan.Length >= span.Length, "The table span must be at least as large as the element span.");
+            Debug.Assert((tableSpan.Length & (tableSpan.Length - 1)) == 0, "Set depend upon power of 2 backing table span sizes for efficient modulo operations.");
+        }
 
         [Conditional("DEBUG")]
         private void Validate()
         {
-#if DEBUG
-            Debug.Assert(!disposed && Table != null, "The QuickSet must have its internal buffers and pools available; default-constructed or disposed QuickSets should not be used.");
-#endif
+            ValidateSpanCapacity(ref Span, ref Table);
+            Debug.Assert(Table.Length != 0, "The QuickSet must have its internal buffers and pools available; default-constructed or disposed QuickSets should not be used.");
         }
 
-#if DEBUG
-        bool disposed;
-#endif
-        /// <summary>
-        /// Returns the set's buffers to the pools. Does not clear the buffers.
-        /// </summary>
-        public void Dispose()
-        {
-            TablePool.Return(Table, tablePoolIndex);
-            ElementPool.Return(Elements, elementPoolIndex);
-#if DEBUG
-            disposed = true;
-#endif
-        }
+
 
 
 

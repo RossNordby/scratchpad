@@ -95,20 +95,79 @@ namespace BEPUutilities2.ResourceManagement
 
     }
 
+    /// <summary>
+    /// Defines a type able to match an element.
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public interface IPredicate<T>
     {
         //We're assuming here that the inlining will be good enough that we won't pay extra for passing by ref under any circumstance. This isn't always the case.
-        bool Matches(ref T element);
+        bool Matches(ref T item);
     }
-    public struct EqualityComparerWrapper<T> : IPredicate<T>
+    /// <summary>
+    /// Defines a type capable of performing the hashing and equality comparisons necessary for hash based collections.
+    /// </summary>
+    /// <typeparam name="T">Type of the elements to be hashed and compared.</typeparam>
+    public interface IEqualityComparerRef<T>
     {
-        public T Compared;
+        int GetHashCode(ref T item);
+        bool Equals(ref T a, ref T b);
+    }
+
+    /// <summary>
+    /// IEqualityComparerRef wrapper around an EqualityComparer.
+    /// </summary>
+    /// <typeparam name="T">Type of the objects to compare and hash.</typeparam>
+    public struct WrapperEqualityComparer<T> : IEqualityComparerRef<T>
+    {
         public EqualityComparer<T> Comparer;
+        /// <summary>
+        /// Creates a default comparer for the given type.
+        /// </summary>
+        /// <param name="item">Item to compare against other items.</param>
+        /// <param name="predicate">Predicate to test against other items using the default comparer for this type.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateDefault(ref T item, out WrapperEqualityComparer<T> predicate)
+        {
+            predicate.Comparer = EqualityComparer<T>.Default;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ref T a, ref T b)
+        {
+            return Comparer.Equals(a, b);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Matches(ref T element)
+        public int GetHashCode(ref T item)
         {
-            return Comparer.Equals(element, Compared);
+            return item.GetHashCode();
         }
     }
+
+    /// <summary>
+    /// IPredicate wrapper around an EqualityComparer and an object to compare against.
+    /// </summary>
+    /// <typeparam name="T">Type of the objects to compare.</typeparam>
+    public struct WrapperPredicate<T> : IPredicate<T>
+    {
+        public T Item;
+        public EqualityComparer<T> Comparer;
+        /// <summary>
+        /// Creates a default comparer for the given type.
+        /// </summary>
+        /// <param name="item">Item to compare against other items.</param>
+        /// <param name="predicate">Predicate to test against other items using the default comparer for this type.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateDefault(ref T item, out WrapperPredicate<T> predicate)
+        {
+            predicate.Item = item;
+            predicate.Comparer = EqualityComparer<T>.Default;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Matches(ref T otherItem)
+        {
+            return Comparer.Equals(Item, otherItem);
+        }
+    }
+    
 }

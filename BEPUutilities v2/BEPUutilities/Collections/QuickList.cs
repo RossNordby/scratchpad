@@ -85,6 +85,7 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, out TSpan oldSpan)
         {
+            Debug.Assert(oldSpan.Length != newSpan.Length, "Resizing without changing the size is pretty peculiar. Is something broken?");
             Validate();
             oldSpan = Span;
             Span = newSpan;

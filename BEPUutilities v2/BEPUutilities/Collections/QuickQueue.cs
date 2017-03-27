@@ -89,6 +89,7 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public QuickQueue(ref TSpan initialSpan)
         {
+            ValidateSpanCapacity(ref initialSpan);
             Span = initialSpan;
             Count = 0;
             CapacityMask = Span.Length - 1;
@@ -105,6 +106,7 @@ namespace BEPUutilities2.Collections
         public static void Create<TPool>(TPool pool, int minimumInitialCount, out QuickQueue<T, TSpan> queue) where TPool : IMemoryPool<T, TSpan>
         {
             pool.Take(minimumInitialCount, out queue.Span);
+            queue.ValidateSpanCapacity(ref queue.Span);
             queue.Count = 0;
             queue.CapacityMask = queue.Span.Length - 1;
             queue.FirstIndex = 0;
@@ -122,6 +124,7 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize(ref TSpan newSpan, out TSpan oldSpan)
         {
+            Debug.Assert(oldSpan.Length != newSpan.Length, "Resizing without changing the size is pretty peculiar. Is something broken?");
             Validate();
             var oldQueue = this;
             //Truncate length.
