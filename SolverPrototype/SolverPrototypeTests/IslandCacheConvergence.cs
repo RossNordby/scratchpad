@@ -18,6 +18,7 @@ namespace SolverPrototypeTests
                 bodyIndex = 0;
             }
             int bodyIndex;
+            static BufferPool<int> pool = new UnsafeBufferPool<int>();
             public void Swap(int[] bodies, int islandCount)
             {
                 //Pick a body. Find all bodies of its type.
@@ -26,7 +27,7 @@ namespace SolverPrototypeTests
                     bodyIndex = 0;
                 var bodyType = bodies[bodyIndex];
                 int lowestIndex = -1;
-                var islandBodyIndices = new QuickList<int>(BufferPools<int>.Thread);
+                var islandBodyIndices = new QuickList<int>(pool);
                 for (int i = bodies.Length - 1; i >= 0; --i)
                 {
                     if (bodies[i] == bodyType)

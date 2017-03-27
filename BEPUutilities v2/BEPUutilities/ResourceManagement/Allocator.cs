@@ -40,11 +40,11 @@ namespace BEPUutilities2.ResourceManagement
         {
             this.memoryPoolSize = memoryPoolSize;
             if (idBufferPool == null)
-                idBufferPool = BufferPools<ulong>.Locking;
+                idBufferPool = new PassthroughBufferPool<ulong>();
             if (allocationBufferPool == null)
-                allocationBufferPool = BufferPools<Allocation>.Locking;
+                allocationBufferPool = new PassthroughBufferPool<Allocation>();
             if (tableBufferPool == null)
-                tableBufferPool = BufferPools<int>.Locking;
+                tableBufferPool = new PassthroughBufferPool<int>();
             allocations = new QuickDictionary<ulong, Allocation>(idBufferPool, allocationBufferPool, tableBufferPool);
         }
 
@@ -76,7 +76,7 @@ namespace BEPUutilities2.ResourceManagement
         /// <param name="size">Size of the memory to test.</param>
         /// <param name="ignoredIds">Ids of allocations to treat as nonexistent for the purposes of the test.</param>
         /// <returns>True if the size could fit, false if out of memory or if memory was too fragmented to find a spot.</returns>
-        public bool CanFit(long size, QuickList<ulong>? ignoredIds = null) //TODO: a simple predicate (genericstructy) would be a lot nicer.
+        public bool CanFit<TPredicate>(long size, TPredicate? ignoredIds = null) where TPredicate : struct, IPredicate<ulong>
         {
             if (allocations.Count == 0)
             {
@@ -97,7 +97,7 @@ namespace BEPUutilities2.ResourceManagement
                     nextAllocationIndex = allocations.IndexOf(nextAllocationId);
                     nextAllocation = allocations.Values[nextAllocationIndex];
                     nextAllocationId = nextAllocation.Next;
-                } while (ignoredIds != null && ignoredIds.Value.Contains(nextAllocationId));
+                } while (ignoredIds != null && ignoredIds.Value.Matches(ref nextAllocationId));
 
                 if (nextAllocation.Start < allocation.End)
                 {

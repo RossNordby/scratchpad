@@ -18,6 +18,7 @@ namespace BEPUutilities2
         {
             return float.IsNaN(f) || float.IsInfinity(f);
         }
+        
 
         /// <summary>
         /// Checks the value to see if it is a NaN or infinite.  If it is, an exception is thrown.
@@ -28,7 +29,7 @@ namespace BEPUutilities2
         {
             if (IsInvalid(f))
             {
-                throw new NotFiniteNumberException("Invalid value.");
+                throw new InvalidOperationException("Invalid value.");
             }
         }
 
@@ -41,7 +42,7 @@ namespace BEPUutilities2
         {
             if (IsInvalid(v.LengthSquared()))
             {
-                throw new NotFiniteNumberException("Invalid value.");
+                throw new InvalidOperationException("Invalid value.");
             }
         }
 
@@ -54,7 +55,7 @@ namespace BEPUutilities2
         {
             if (IsInvalid(v.LengthSquared()))
             {
-                throw new NotFiniteNumberException("Invalid value.");
+                throw new InvalidOperationException("Invalid value.");
             }
         }
 
@@ -93,7 +94,7 @@ namespace BEPUutilities2
         {
             if (IsInvalid(q.LengthSquared()))
             {
-                throw new NotFiniteNumberException("Invalid value.");
+                throw new InvalidOperationException("Invalid value.");
             }
         }
 
@@ -138,8 +139,7 @@ namespace BEPUutilities2
         public static void Validate(this BoundingSphere b)
         {
             b.Center.Validate();
-            if (IsInvalid(b.Radius))
-                throw new NotFiniteNumberException("Invalid value.");
+            b.Radius.Validate();
         }
         
 

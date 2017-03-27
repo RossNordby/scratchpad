@@ -120,7 +120,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\BEPUutilities\BEPUutilities2.csproj">
-      <Project>{8ecf1b4d-ed6e-4b3f-b54e-5eff9c80ee5d}</Project>
+      <Project>{b768b4b2-de74-40a5-84b4-64ea84e81992}</Project>
       <Name>BEPUutilities2</Name>
     </ProjectReference>
   </ItemGroup>

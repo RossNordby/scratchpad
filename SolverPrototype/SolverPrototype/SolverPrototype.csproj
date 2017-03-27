@@ -139,6 +139,10 @@
       <Project>{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}</Project>
       <Name>BEPUutilities2</Name>
     </ProjectReference>
+    <ProjectReference Include="..\BEPUutilities2t\BEPUutilities2t.csproj">
+      <Project>{b8b9e02a-1071-4a8e-a9a9-bab7ed9a78df}</Project>
+      <Name>BEPUutilities2t</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

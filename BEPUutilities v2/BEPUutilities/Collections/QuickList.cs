@@ -10,41 +10,22 @@ namespace BEPUutilities2.Collections
     /// Container supporting list-like behaviors built on top of pooled arrays.
     /// </summary>
     /// <remarks>Be very careful when using this type. It has sacrificed a lot upon the altar of performance; a few notable issues include:
-    /// it is a value type and copying it around will break things without extreme care, it cannot be validly default-constructed,
-    /// it exposes internal structures to user modification, it rarely checks input for errors, and the enumerator doesn't check for mid-enumeration modification.</remarks>
+    /// it is a value type and copying it around will break things without extreme care,
+    /// it cannot be validly default-constructed,
+    /// it exposes internal structures to user modification, 
+    /// it rarely checks input for errors,
+    /// the enumerator doesn't check for mid-enumeration modification,
+    /// it allows unsafe addition that can break if the user doesn't manage the capacity,
+    /// it works on top of an abstracted memory blob which might internally be a pointer that could be rugpulled, 
+    /// it does not (and is incapable of) checking that provided memory gets returned to the same pool that it came from.</remarks>
     /// <typeparam name="T">Type of the elements in the list.</typeparam>
-    public struct QuickList<T> : IDisposable, IList<T>
+    public struct QuickList<T, TSpan> where TSpan : ISpan<T>
     {
-        private int poolIndex;
         /// <summary>
-        /// Gets the buffer pool index associated with the elements array.
-        /// </summary>
-        public int PoolIndex
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return poolIndex;
-            }
-        }
-
-        private BufferPool<T> pool;
-        /// <summary>
-        /// Pool from which element arrays are pulled.
-        /// </summary>
-        public BufferPool<T> Pool
-        {
-            get
-            {
-                return pool;
-            }
-        }
-
-        /// <summary>
-        /// Gets the backing array containing the elements of the list.
+        /// Backing memory containing the elements of the list.
         /// Indices from 0 to Count-1 hold actual data. All other data is undefined.
         /// </summary>
-        public readonly T[] Elements;
+        public TSpan Span;
 
         private int count;
         /// <summary>
@@ -52,83 +33,106 @@ namespace BEPUutilities2.Collections
         /// </summary>
         public int Count
         {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return count; }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                Debug.Assert(value >= 0 && value <= Elements.Length, "Count should fit in the current backing array length.");
+                Debug.Assert(value >= 0 && value <= Span.Length, "Count should fit in the current backing array length.");
                 count = value;
             }
         }
 
 
         /// <summary>
-        /// Gets an element at the given index in the list.
+        /// Gets a reference to the element at the given index in the list.
         /// </summary>
         /// <param name="index">Index to grab an element from.</param>
         /// <returns>Element at the given index in the list.</returns>
-        public T this[int index]
+        public ref T this[int index]
         {
-            //You would think that such a trivial accessor would inline without any external suggestion.
-            //Sometimes, yes. Sometimes, no. :(
+            //TODO: check inlining in release
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
                 ValidateIndex(index);
-                return Elements[index];
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set
-            {
-                ValidateIndex(index);
-                Elements[index] = value;
+                return ref Span[index];
             }
         }
 
         /// <summary>
         /// Creates a new list.
         /// </summary>
-        /// <param name="pool">Pool from which to retrieve typed arrays.</param>
-        /// <param name="initialPoolIndex">Initial pool index to pull the backing array from. The size of the initial buffer will be 2^initialPoolIndex.</param>
-        public QuickList(BufferPool<T> pool, int initialPoolIndex = 5)
+        /// <param name="initialSpan">Span to use as backing memory to begin with.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public QuickList(TSpan initialSpan)
         {
-            this.pool = pool;
-            poolIndex = initialPoolIndex;
-            Elements = pool.TakeFromPoolIndex(poolIndex);
-
+            Span = initialSpan;
             count = 0;
+        }
 
+        /// <summary>
+        /// Creates a new list.
+        /// </summary>
+        /// <param name="pool">Pool to pull a span from.</param>
+        /// <param name="minimumInitialCount">The minimum size of the region to be pulled from the pool. Actual span may be larger.</param>
+        /// <param name="list">Created list.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Create<TPool>(TPool pool, int minimumInitialCount, out QuickList<T, TSpan> list) where TPool : IMemoryPool<T, TSpan>
+        {
+            pool.Take(minimumInitialCount, out list.Span);
+            list.count = 0;
+
+        }
+
+        /// <summary>
+        /// Resizes the list's backing array for the given size as a power of two.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <param name="newSizePower">Exponent of the size of the new memory block. New size will be 2^newSizePower.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void ResizeForPower<TPool>(int newSizePower, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            Validate();
+            Debug.Assert(Count <= (1 << newSizePower), "New pool index must contain all elements in the list.");
+            var oldSpan = Span;
+            pool.TakeForPower(newSizePower, out Span);
+            oldSpan.CopyTo(0, ref Span, 0, Count);
+
+            //The array may contain reference types.
+            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
+            //Clear it before disposal to avoid leaking references.
+            oldSpan.ClearManagedReferences(0, count);
+            pool.Return(ref oldSpan);
+        }
+
+        /// <summary>
+        /// Resizes the list's backing array for the given size.
+        /// </summary>
+        /// <typeparam name="TPool">Type of the span pool.</typeparam>
+        /// <param name="newSize">Minimum number of elements required in the new backing array. Actual capacity of the created span may exceed this size.</param>
+        /// <param name="pool">Pool to pull a new span from and return the old span to.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Resize<TPool>(int newSize, TPool pool) where TPool : IMemoryPool<T, TSpan>
+        {
+            ResizeForPower(BufferPool.GetPoolIndex(newSize), pool);
         }
 
         /// <summary>
         /// Ensures that the list has enough room to hold the specified number of elements.
         /// </summary>
+        /// <typeparam name="TPool">Type of the pool to pull from.</typeparam>
         /// <param name="count">Number of elements to hold.</param>
+        /// <param name="pool">Pool used to obtain a new span if needed.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnsureCapacity(int count)
+        public void EnsureCapacity<TPool>(int count, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
-            if (count > Elements.Length)
+            Validate();
+            if (count > Span.Length)
             {
-                Resize(BufferPool.GetPoolIndex(count));
+                ResizeForPower(BufferPool.GetPoolIndex(count), pool);
             }
-        }
-
-        private void Resize(int newPoolIndex)
-        {
-            Debug.Assert(Count <= (1 << newPoolIndex), "New pool index must contain all elements in the list.");
-            var oldList = this;
-            this = new QuickList<T>(pool, newPoolIndex);
-            Count = oldList.Count;
-            Array.Copy(oldList.Elements, Elements, Count);
-
-            //The array may contain reference types.
-            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
-            //Clear it before disposal to avoid leaking references.
-            //(TODO: This clear could be narrowed to arrays of managed types.)
-            if (!typeof(T).IsPrimitive)
-            {
-                oldList.Clear();
-            }
-            oldList.Dispose();
         }
 
         /// <summary>
@@ -136,39 +140,39 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="list">List to add.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddRange(IList<T> list)
+        public void AddRangeUnsafely(ref QuickList<T, TSpan> list)
         {
-            var newCount = count + list.Count;
-            EnsureCapacity(newCount);
-            list.CopyTo(Elements, count);
-            count = newCount;
+            Validate();
+            list.Span.CopyTo(0, ref Span, count, list.count);
+            count += list.count;
         }
 
         /// <summary>
         /// Adds the elements of a list to the QuickList.
         /// </summary>
+        /// <typeparam name="TPool">Type of the pool to pull from.</typeparam>
         /// <param name="list">List to add.</param>
+        /// <param name="pool">Pool used to obtain a new span if needed.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddRange(ref QuickList<T> list)
+        public void AddRange<TPool>(ref QuickList<T, TSpan> list, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
-            var newCount = count + list.Count;
-            EnsureCapacity(newCount);
-            list.CopyTo(Elements, count);
-            count = newCount;
+            EnsureCapacity(count + list.count, pool);
+            AddRangeUnsafely(ref list);
         }
 
         /// <summary>
         /// Adds the element to the list.
         /// </summary>
+        /// <typeparam name="TPool">Type of the pool to pull from.</typeparam>
         /// <param name="element">Item to add.</param>
+        /// <param name="pool">Pool used to obtain a new span if needed.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(T element)
+        public void Add<TPool>(T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             Validate();
-            if (Count == Elements.Length)
-                Resize(poolIndex + 1);
-            Elements[Count] = element;
-            ++Count;
+            if (Count == Span.Length)
+                Resize(Count * 2, pool);
+            AddUnsafely(element);
         }
 
         /// <summary>
@@ -179,22 +183,22 @@ namespace BEPUutilities2.Collections
         public void AddUnsafely(T element)
         {
             Validate();
-            Elements[Count] = element;
+            Span[Count] = element;
             ++Count;
         }
 
         /// <summary>
         /// Adds the element to the list.
         /// </summary>
+        /// <typeparam name="TPool">Type of the pool to pull from.</typeparam>
         /// <param name="element">Element to add.</param>
+        /// <param name="pool">Pool used to obtain a new span if needed.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(ref T element)
+        public void Add<TPool>(ref T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
-            Validate();
-            if (Count == Elements.Length)
-                Resize(poolIndex + 1);
-            Elements[Count] = element;
-            ++Count;
+            if (Count == Span.Length)
+                Resize(Count * 2, pool);
+            AddUnsafely(ref element);
         }
 
         /// <summary>
@@ -205,7 +209,7 @@ namespace BEPUutilities2.Collections
         public void AddUnsafely(ref T element)
         {
             Validate();
-            Elements[Count] = element;
+            Span[Count] = element;
             ++Count;
         }
 
@@ -218,11 +222,12 @@ namespace BEPUutilities2.Collections
         public int IndexOf(T element)
         {
             Validate();
-            return Array.IndexOf(Elements, element, 0, Count);
+            return Span.IndexOf(element, 0, Count);
         }
 
+
         /// <summary>
-        /// Gets the index of the element in the list, if present.
+        /// Gets the index of the element in the list using the default comparer, if present.
         /// </summary>
         /// <param name="element">Element to find.</param>
         /// <returns>Index of the element in the list if present, -1 otherwise.</returns>
@@ -230,7 +235,7 @@ namespace BEPUutilities2.Collections
         public int IndexOf(ref T element)
         {
             Validate();
-            return Array.IndexOf(Elements, element, 0, Count);
+            return Span.IndexOf(ref element, 0, Count);
         }
 
         /// <summary>
@@ -318,10 +323,10 @@ namespace BEPUutilities2.Collections
             if (index < Count)
             {
                 //Copy everything from the removal point onward backward one slot.
-                Array.Copy(Elements, index + 1, Elements, index, Count - index);
+                Span.CopyTo(index + 1, ref Span, index, count - index);
             }
             //Clear out the former last slot.
-            Elements[Count] = default(T);
+            Span[Count] = default(T);
         }
 
         /// <summary>
@@ -337,10 +342,10 @@ namespace BEPUutilities2.Collections
             if (index < Count)
             {
                 //Put the final element in the removed slot.
-                Elements[index] = Elements[Count];
+                Span[index] = Span[Count];
             }
             //Clear out the former last slot.
-            Elements[Count] = default(T);
+            Span[Count] = default(T);
         }
 
         /// <summary>
@@ -353,7 +358,7 @@ namespace BEPUutilities2.Collections
             Validate();
             Debug.Assert(count > 0, "It's up to the user to guarantee that the count is actually positive when using the unconditional pop.");
             Count--;
-            element = Elements[Count];
+            element = Span[Count];
         }
 
         /// <summary>
@@ -368,47 +373,12 @@ namespace BEPUutilities2.Collections
             if (Count > 0)
             {
                 Count--;
-                element = Elements[Count];
+                element = Span[Count];
                 return true;
             }
             element = default(T);
             return false;
         }
-
-        /// <summary>
-        /// Inserts an item to the <see cref="T:System.Collections.Generic.IList`1"/> at the specified index.
-        /// </summary>
-        /// <param name="index">The zero-based index at which <paramref name="element"/> should be inserted.</param>
-        /// <param name="element">The object to insert into the <see cref="T:System.Collections.Generic.IList`1"/>.</param>
-        /// <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="index"/> is not a valid index in the <see cref="T:System.Collections.Generic.IList`1"/>.</exception>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Insert(int index, T element)
-        {
-            Validate();
-            if (Count == Elements.Length)
-                Resize(poolIndex + 1);
-            Array.Copy(Elements, index, Elements, index + 1, count - index);
-            Elements[index] = element;
-            ++Count;
-        }
-
-        /// <summary>
-        /// Inserts an item to the <see cref="T:System.Collections.Generic.IList`1"/> at the specified index.
-        /// </summary>
-        /// <param name="index">The zero-based index at which <paramref name="element"/> should be inserted.</param>
-        /// <param name="element">The object to insert into the <see cref="T:System.Collections.Generic.IList`1"/>.</param>
-        /// <exception cref="T:System.ArgumentOutOfRangeException"><paramref name="index"/> is not a valid index in the <see cref="T:System.Collections.Generic.IList`1"/>.</exception>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Insert(int index, ref T element)
-        {
-            Validate();
-            if (Count == Elements.Length)
-                Resize(poolIndex + 1);
-            Array.Copy(Elements, index, Elements, index + 1, count - index);
-            Elements[index] = element;
-            ++Count;
-        }
-
 
         /// <summary>
         /// Determines whether the <see cref="T:System.Collections.Generic.ICollection`1"/> contains a specific value.
@@ -424,26 +394,16 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Determines whether the <see cref="T:System.Collections.Generic.ICollection`1"/> contains a specific value.
+        /// Determines whether the collection contains a specific value.
         /// </summary>
         /// <returns>
-        /// true if <paramref name="element"/> is found in the <see cref="T:System.Collections.Generic.ICollection`1"/>; otherwise, false.
+        /// True if <paramref name="element"/> is found in the collection; otherwise, false.
         /// </returns>
-        /// <param name="element">The object to locate in the <see cref="T:System.Collections.Generic.ICollection`1"/>.</param>
+        /// <param name="element">The object to locate in the collection.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(ref T element)
         {
             return IndexOf(ref element) >= 0;
-        }
-
-        /// <summary>
-        /// Copies the elements of the <see cref="T:System.Collections.Generic.ICollection`1"/> to an <see cref="T:System.Array"/>, starting at a particular <see cref="T:System.Array"/> index.
-        /// </summary>
-        /// <param name="array">The one-dimensional <see cref="T:System.Array"/> that is the destination of the elements copied from <see cref="T:System.Collections.Generic.ICollection`1"/>. The <see cref="T:System.Array"/> must have zero-based indexing.</param><param name="arrayIndex">The zero-based index in <paramref name="array"/> at which copying begins.</param><exception cref="T:System.ArgumentNullException"><paramref name="array"/> is null.</exception><exception cref="T:System.ArgumentOutOfRangeException"><paramref name="arrayIndex"/> is less than 0.</exception><exception cref="T:System.ArgumentException">The number of elements in the source <see cref="T:System.Collections.Generic.ICollection`1"/> is greater than the available space from <paramref name="arrayIndex"/> to the end of the destination <paramref name="array"/>.</exception>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CopyTo(T[] array, int arrayIndex)
-        {
-            Array.Copy(Elements, 0, array, arrayIndex, Count);
         }
 
 
@@ -454,31 +414,21 @@ namespace BEPUutilities2.Collections
         public void Clear()
         {
             Validate();
-            Array.Clear(Elements, 0, Count);
+            Span.Clear(0, Count);
             Count = 0;
         }
 
         /// <summary>
         /// Compacts the internal buffer to the minimum size required for the number of elements in the list.
         /// </summary>
-        public void Compact()
+        public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             Validate();
             var newPoolIndex = BufferPool.GetPoolIndex(Count);
-            if (newPoolIndex != poolIndex)
-                Resize(newPoolIndex);
+            if ((1 << newPoolIndex) != Span.Length)
+                ResizeForPower(newPoolIndex, pool);
         }
 
-        /// <summary>
-        /// Returns the list's buffer. Does not clear the buffer.
-        /// </summary>
-        public void Dispose()
-        {
-            pool.Return(Elements, poolIndex);
-#if DEBUG
-            pool = null;
-#endif
-        }
 
         [Conditional("DEBUG")]
         void ValidateIndex(int index)
@@ -490,40 +440,31 @@ namespace BEPUutilities2.Collections
         [Conditional("DEBUG")]
         private void Validate()
         {
-            Debug.Assert(pool != null, "Should not use a default-constructed or disposed QuickList.");
+            Debug.Assert(Span.Length >= 0, "Any QuickList in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
         }
 
         public Enumerator GetEnumerator()
         {
-            return new Enumerator(Elements, Count);
+            return new Enumerator(Span, Count);
         }
 
-        IEnumerator<T> IEnumerable<T>.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
 
         public struct Enumerator : IEnumerator<T>
         {
-            private readonly T[] backingArray;
+            private readonly TSpan span;
             private readonly int count;
             private int index;
 
-            public Enumerator(T[] backingArray, int count)
+            public Enumerator(TSpan span, int count)
             {
-                this.backingArray = backingArray;
+                this.span = span;
                 this.count = count;
                 index = -1;
             }
 
             public T Current
             {
-                get { return backingArray[index]; }
+                get { return span[index]; }
             }
 
             public void Dispose()
@@ -544,19 +485,6 @@ namespace BEPUutilities2.Collections
             {
                 index = -1;
             }
-        }
-
-
-
-        /// <summary>
-        /// Gets a value indicating whether the <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only.
-        /// </summary>
-        /// <returns>
-        /// true if the <see cref="T:System.Collections.Generic.ICollection`1"/> is read-only; otherwise, false.
-        /// </returns>
-        bool ICollection<T>.IsReadOnly
-        {
-            get { return false; }
         }
     }
 }
