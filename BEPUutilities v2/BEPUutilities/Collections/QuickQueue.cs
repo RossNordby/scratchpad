@@ -166,16 +166,11 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ResizeForPower<TPool>(int newSizePower, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
-            Validate();
             var oldQueue = this;
             pool.TakeForPower(newSizePower, out var newSpan);
             Resize(ref newSpan, out var oldSpan);
 
-            //The array may contain reference types.
-            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
-            //Clear it before disposal to avoid leaking references.
-            ClearSpanManaged(ref oldQueue.Span, oldQueue.FirstIndex, oldQueue.LastIndex, oldQueue.Count);
-            pool.Return(ref oldSpan);
+            oldQueue.Dispose(pool);
         }
 
         /// <summary>
@@ -191,6 +186,21 @@ namespace BEPUutilities2.Collections
             ResizeForPower(BufferPool.GetPoolIndex(newSize), pool);
         }
 
+        /// <summary>
+        /// Returns the resources associated with the queue to pools. Any managed references still contained within the queue are cleared (and some unmanaged resources may also be cleared).
+        /// </summary>
+        /// <param name="pool">Pool used for element spans.</param>   
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Dispose<TPool>(TPool pool)
+             where TPool : IMemoryPool<T, TSpan>
+        {
+            ClearSpanManaged(ref Span, FirstIndex, LastIndex, Count);
+            pool.Return(ref Span);
+#if DEBUG
+            Span = default(TSpan);
+#endif
+        }
         /// <summary>
         /// Ensures that the queue has enough room to hold the specified number of elements.
         /// </summary>
@@ -568,8 +578,8 @@ namespace BEPUutilities2.Collections
         [Conditional("DEBUG")]
         private void Validate()
         {
-            ValidateSpanCapacity(ref Span);
             Debug.Assert(Span.Length >= 0, "Any QuickQueue in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
+            ValidateSpanCapacity(ref Span);
         }
 
     }

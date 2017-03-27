@@ -106,15 +106,12 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ResizeForPower<TPool>(int newSizePower, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
+            var oldList = this;
             pool.TakeForPower(newSizePower, out var newSpan);
             Resize(ref newSpan, out var oldSpan);
             oldSpan.CopyTo(0, ref Span, 0, Count);
 
-            //The array may contain reference types.
-            //While the user can opt into leaking references if they really want to, it shouldn't be unavoidable.
-            //Clear it before disposal to avoid leaking references.
-            oldSpan.ClearManagedReferences(0, Count);
-            pool.Return(ref oldSpan);
+            oldList.Dispose(pool);
         }
 
         /// <summary>
@@ -128,6 +125,22 @@ namespace BEPUutilities2.Collections
         public void Resize<TPool>(int newSize, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             ResizeForPower(BufferPool.GetPoolIndex(newSize), pool);
+        }
+
+        /// <summary>
+        /// Returns the resources associated with the list to pools. Any managed references still contained within the list are cleared (and some unmanaged resources may also be cleared).
+        /// </summary>
+        /// <param name="pool">Pool used for element spans.</param>   
+        /// <typeparam name="TPool">Type of the pool used for element spans.</typeparam>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Dispose<TPool>(TPool pool)
+             where TPool : IMemoryPool<T, TSpan>
+        {
+            Span.ClearManagedReferences(0, Count);
+            pool.Return(ref Span);
+#if DEBUG
+            Span = default(TSpan);
+#endif
         }
 
         /// <summary>
