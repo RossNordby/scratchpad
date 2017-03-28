@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2.Collections

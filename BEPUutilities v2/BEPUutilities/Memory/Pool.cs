@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 
-namespace BEPUutilities2.ResourceManagement
+namespace BEPUutilities2.Memory
 {
     /// <summary>
     /// Manages a cache of a type of resource.

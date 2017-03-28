@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace BEPUutilities2.ResourceManagement
+namespace BEPUutilities2.Memory
 {
     /// <summary>
     /// Offers the interface of a buffer pool, but creates resources on demand and never stores them.

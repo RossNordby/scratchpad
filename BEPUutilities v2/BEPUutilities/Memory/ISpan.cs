@@ -1,12 +1,13 @@
-﻿using System;
+﻿using BEPUutilities2.Collections;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BEPUutilities2.ResourceManagement
+namespace BEPUutilities2.Memory
 {
     /// <summary>
     /// Defines a type that can act as an indexable typed wrapper for a block of memory.
@@ -34,7 +35,7 @@ namespace BEPUutilities2.ResourceManagement
         /// Gets the number of elements in the span.
         /// </summary>
         int Length { get; }
-
+        
         /// <summary>
         /// Copies elements from one span region to another.
         /// </summary>
@@ -93,138 +94,12 @@ namespace BEPUutilities2.ResourceManagement
         /// <returns>Index of the element in the span if it is present; -1 otherwise.</returns>
         int IndexOf<TPredicate>(int start, int count, ref TPredicate predicate) where TPredicate : IPredicate<T>;
 
-    }
-
-    /// <summary>
-    /// Defines a type able to match an element.
-    /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public interface IPredicate<T>
-    {
-        //We're assuming here that the inlining will be good enough that we won't pay extra for passing by ref under any circumstance. This isn't always the case.
-        bool Matches(ref T item);
-    }
-    /// <summary>
-    /// Defines a type capable of performing the hashing and equality comparisons necessary for hash based collections.
-    /// </summary>
-    /// <typeparam name="T">Type of the elements to be hashed and compared.</typeparam>
-    public interface IEqualityComparerRef<T>
-    {
-        int Hash(ref T item);
-        bool Equals(ref T a, ref T b);
-    }
-
-    /// <summary>
-    /// IEqualityComparerRef wrapper around an EqualityComparer.
-    /// </summary>
-    /// <typeparam name="T">Type of the objects to compare and hash.</typeparam>
-    public struct WrapperEqualityComparer<T> : IEqualityComparerRef<T>
-    {
-        public EqualityComparer<T> Comparer;
         /// <summary>
-        /// Creates a default comparer for the given type.
+        /// Pins the span's backing memory if it is managed.
         /// </summary>
-        /// <param name="item">Item to compare against other items.</param>
-        /// <param name="predicate">Predicate to test against other items using the default comparer for this type.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void CreateDefault(ref T item, out WrapperEqualityComparer<T> predicate)
-        {
-            predicate.Comparer = EqualityComparer<T>.Default;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(ref T a, ref T b)
-        {
-            return Comparer.Equals(a, b);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Hash(ref T item)
-        {
-            return item.GetHashCode();
-        }
-    }
-
-    /// <summary>
-    /// IPredicate wrapper around an EqualityComparer and an object to compare against.
-    /// </summary>
-    /// <typeparam name="T">Type of the objects to compare.</typeparam>
-    public struct WrapperPredicate<T> : IPredicate<T>
-    {
-        public T Item;
-        public EqualityComparer<T> Comparer;
-        /// <summary>
-        /// Creates a default comparer for the given type.
-        /// </summary>
-        /// <param name="item">Item to compare against other items.</param>
-        /// <param name="predicate">Predicate to test against other items using the default comparer for this type.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void CreateDefault(ref T item, out WrapperPredicate<T> predicate)
-        {
-            predicate.Item = item;
-            predicate.Comparer = EqualityComparer<T>.Default;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Matches(ref T otherItem)
-        {
-            return Comparer.Equals(Item, otherItem);
-        }
-    }
-
-    /// <summary>
-    /// Provides optimized equality comparison and hashing for primitive types.
-    /// </summary>
-    /// <typeparam name="T">Type to compare and hash.</typeparam>
-    public struct PrimitiveComparer<T> : IEqualityComparerRef<T> where T : struct
-    {
-        //TODO: Finish and test the types.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(ref T a, ref T b)
-        {
-            if (typeof(T) == typeof(int))
-            {
-                return Unsafe.As<T, int>(ref a) == Unsafe.As<T, int>(ref b);
-            }
-            if (typeof(T) == typeof(ulong))
-            {
-                return Unsafe.As<T, ulong>(ref a) == Unsafe.As<T, ulong>(ref b);
-            }
-            Debug.Assert(false, "Should only use the supported primitive types with the primitive comparer.");
-            return false;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Hash(ref T item)
-        {
-            if (typeof(T) == typeof(int))
-            {
-                return Unsafe.As<T, int>(ref item).GetHashCode();
-            }
-            if(typeof(T) == typeof(ulong))
-            {
-                return Unsafe.As<T, ulong>(ref item).GetHashCode();
-            }
-            Debug.Assert(false, "Should only use the supported primitive types with the primitive comparer.");
-            return 0;
-        }
-    }
-
-    public class PassthroughSpanPool<T> : IMemoryPool<T, ManagedSpan<T>>
-    {
-        public void Return(ref ManagedSpan<T> span)
-        {
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Take(int count, out ManagedSpan<T> span)
-        {
-            TakeForPower(BufferPool.GetPoolIndex(count), out span);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TakeForPower(int power, out ManagedSpan<T> span)
-        {
-            span = new ManagedSpan<T>(new T[1 << power]);
-        }
+        /// <param name="handle">Handle to the pinned memory.</param>
+        /// <returns>True if the span is backed by managed memory that is now pinned, false otherwise.</returns>
+        bool TryPin(out GCHandle handle);
     }
 
 

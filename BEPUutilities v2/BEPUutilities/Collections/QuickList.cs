@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 

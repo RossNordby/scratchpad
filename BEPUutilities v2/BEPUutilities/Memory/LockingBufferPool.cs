@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 
-namespace BEPUutilities2.ResourceManagement
+namespace BEPUutilities2.Memory
 {
     //TODO: this class should probably be entirely removed. It's only really useful when dealing with threads that weren't given a personal memory source.
     //Going forward, we should probably consider that to be a performance bug.

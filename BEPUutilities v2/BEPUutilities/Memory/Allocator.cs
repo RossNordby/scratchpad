@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System;
 
-namespace BEPUutilities2.ResourceManagement
+namespace BEPUutilities2.Memory
 {
     /// <summary>
     /// Represents a chunk of abstract memory supporting allocations and deallocations.

@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace BEPUutilities2.ResourceManagement
+namespace BEPUutilities2.Memory
 {
     /// <summary>
     /// Manages a pool of identifier values. Grabbing an id from the pool picks a number that has been picked and returned before, 
