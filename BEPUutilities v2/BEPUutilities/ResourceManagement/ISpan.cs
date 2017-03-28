@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -33,7 +34,6 @@ namespace BEPUutilities2.ResourceManagement
         /// Gets the number of elements in the span.
         /// </summary>
         int Length { get; }
-
 
         /// <summary>
         /// Copies elements from one span region to another.
@@ -110,7 +110,7 @@ namespace BEPUutilities2.ResourceManagement
     /// <typeparam name="T">Type of the elements to be hashed and compared.</typeparam>
     public interface IEqualityComparerRef<T>
     {
-        int GetHashCode(ref T item);
+        int Hash(ref T item);
         bool Equals(ref T a, ref T b);
     }
 
@@ -138,7 +138,7 @@ namespace BEPUutilities2.ResourceManagement
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int GetHashCode(ref T item)
+        public int Hash(ref T item)
         {
             return item.GetHashCode();
         }
@@ -169,5 +169,63 @@ namespace BEPUutilities2.ResourceManagement
             return Comparer.Equals(Item, otherItem);
         }
     }
-    
+
+    /// <summary>
+    /// Provides optimized equality comparison and hashing for primitive types.
+    /// </summary>
+    /// <typeparam name="T">Type to compare and hash.</typeparam>
+    public struct PrimitiveComparer<T> : IEqualityComparerRef<T> where T : struct
+    {
+        //TODO: Finish and test the types.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ref T a, ref T b)
+        {
+            if (typeof(T) == typeof(int))
+            {
+                return Unsafe.As<T, int>(ref a) == Unsafe.As<T, int>(ref b);
+            }
+            if (typeof(T) == typeof(ulong))
+            {
+                return Unsafe.As<T, ulong>(ref a) == Unsafe.As<T, ulong>(ref b);
+            }
+            Debug.Assert(false, "Should only use the supported primitive types with the primitive comparer.");
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Hash(ref T item)
+        {
+            if (typeof(T) == typeof(int))
+            {
+                return Unsafe.As<T, int>(ref item).GetHashCode();
+            }
+            if(typeof(T) == typeof(ulong))
+            {
+                return Unsafe.As<T, ulong>(ref item).GetHashCode();
+            }
+            Debug.Assert(false, "Should only use the supported primitive types with the primitive comparer.");
+            return 0;
+        }
+    }
+
+    public class PassthroughSpanPool<T> : IMemoryPool<T, ManagedSpan<T>>
+    {
+        public void Return(ref ManagedSpan<T> span)
+        {
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Take(int count, out ManagedSpan<T> span)
+        {
+            TakeForPower(BufferPool.GetPoolIndex(count), out span);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void TakeForPower(int power, out ManagedSpan<T> span)
+        {
+            span = new ManagedSpan<T>(new T[1 << power]);
+        }
+    }
+
+
 }

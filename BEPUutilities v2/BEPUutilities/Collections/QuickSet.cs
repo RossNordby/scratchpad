@@ -291,7 +291,7 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             //The table lengths are guaranteed to be a power of 2, so the modulo is a simple binary operation.
-            tableIndex = HashHelper.Rehash(EqualityComparer.GetHashCode(ref element)) & TableMask;
+            tableIndex = HashHelper.Rehash(EqualityComparer.Hash(ref element)) & TableMask;
             //0 in the table means 'not taken'; all other values are offset by 1 upward. That is, 1 is actually index 0, 2 is actually index 1, and so on.
             //This is preferred over using a negative number for flagging since clean buffers will contain all 0's.
             while ((elementIndex = Table[tableIndex]) > 0)
@@ -548,7 +548,7 @@ namespace BEPUutilities2.Collections
                 {
                     //This slot contains something. What is its actual index?
                     --moveCandidateIndex;
-                    int desiredIndex = HashHelper.Rehash(Span[moveCandidateIndex].GetHashCode()) & TableMask;
+                    int desiredIndex = HashHelper.Rehash(EqualityComparer.Hash(ref Span[moveCandidateIndex])) & TableMask;
 
                     //Would this element be closer to its actual index if it was moved to the gap?
                     //To find out, compute the clockwise distance from the gap and the clockwise distance from the ideal location.

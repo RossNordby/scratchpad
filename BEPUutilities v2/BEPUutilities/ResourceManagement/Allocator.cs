@@ -26,26 +26,20 @@ namespace BEPUutilities2.ResourceManagement
             public ulong Next;
         }
 
-        private QuickDictionary<ulong, Allocation> allocations;
+        PassthroughSpanPool<ulong> keyPool = new PassthroughSpanPool<ulong>();
+        PassthroughSpanPool<Allocation> valuePool = new PassthroughSpanPool<Allocation>();
+        PassthroughSpanPool<int> tablePool = new PassthroughSpanPool<int>();
+        private QuickDictionary<ulong, Allocation, ManagedSpan<ulong>, ManagedSpan<Allocation>, ManagedSpan<int>, PrimitiveComparer<ulong>> allocations;
 
         /// <summary>
         /// Creates a new memory pool.
         /// </summary>
         /// <param name="memoryPoolSize">Size of the pool in elements.</param>
-        /// <param name="idBufferPool">Buffer pool to use in the allocator. If null, the allocator picks.</param>
-        /// <param name="allocationBufferPool">Buffer pool to use in the allocator. If null, the allocator picks.</param>
-        /// <param name="tableBufferPool">Buffer pool to use in the allocator. If null, the allocator picks.</param>
-        public Allocator(long memoryPoolSize,
-            BufferPool<ulong> idBufferPool = null, BufferPool<Allocation> allocationBufferPool = null, BufferPool<int> tableBufferPool = null)
+        public Allocator(long memoryPoolSize, int allocationCountEstimate = 128)
         {
             this.memoryPoolSize = memoryPoolSize;
-            if (idBufferPool == null)
-                idBufferPool = new PassthroughBufferPool<ulong>();
-            if (allocationBufferPool == null)
-                allocationBufferPool = new PassthroughBufferPool<Allocation>();
-            if (tableBufferPool == null)
-                tableBufferPool = new PassthroughBufferPool<int>();
-            allocations = new QuickDictionary<ulong, Allocation>(idBufferPool, allocationBufferPool, tableBufferPool);
+            QuickDictionary<ulong, Allocation, ManagedSpan<ulong>, ManagedSpan<Allocation>, ManagedSpan<int>, PrimitiveComparer<ulong>>.Create(
+                keyPool, valuePool, tablePool, BufferPool.GetPoolIndex(allocationCountEstimate), 3, out allocations);
         }
 
         /// <summary>
@@ -154,7 +148,7 @@ namespace BEPUutilities2.ResourceManagement
             nextAllocation.Previous = id;
             //About to add a new allocation. We had space here this time, so there's a high chance we'll have some more space next time. Point the search to this index.
             searchStartIndex = allocations.Count;
-            allocations.Add(id, newAllocation);
+            allocations.Add(id, newAllocation, keyPool, valuePool, tablePool);
         }
         /// <summary>
         /// Attempts to allocate a range of memory.
@@ -172,7 +166,7 @@ namespace BEPUutilities2.ResourceManagement
                 if (size <= memoryPoolSize)
                 {
                     outputStart = 0;
-                    allocations.Add(id, new Allocation { Start = 0, End = size, Next = id, Previous = id });
+                    allocations.Add(id, new Allocation { Start = 0, End = size, Next = id, Previous = id }, keyPool, valuePool, tablePool);
                     searchStartIndex = 0;
                     return true;
                 }

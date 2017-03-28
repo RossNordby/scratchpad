@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace BEPUutilities2.ResourceManagement
 {
@@ -15,38 +17,89 @@ namespace BEPUutilities2.ResourceManagement
     }
     public struct ManagedSpan<T> : ISpan<T>
     {
-        public ref T this[int index] => throw new NotImplementedException();
+        readonly T[] array;
 
-        public int Length => throw new NotImplementedException();
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ManagedSpan(T[] array)
+        {
+            this.array = array;
+        }
 
+        public ref T this[int index]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return ref array[index];
+            }
+        }
+        public int Length
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return array.Length;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear(int start, int count)
         {
-            throw new NotImplementedException();
+            Array.Clear(array, start, count);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearManagedReferences(int start, int count)
         {
-            throw new NotImplementedException();
+            //TODO: Should check to see if it is primitive first; that's something the jit can do at compile time.
+            //Can't easily check to see if it contains *any* references recursively at compile time, though- that's trickier.
+            Array.Clear(array, start, count);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void CopyTo<TOtherSpan>(int sourceStart, ref TOtherSpan targetSpan, int targetStart, int count) where TOtherSpan : ISpan<T>
         {
-            throw new NotImplementedException();
+            //TODO: Check for jit specialization
+            if(typeof(TOtherSpan) == typeof(ManagedSpan<T>))
+            {
+                Array.Copy(array, sourceStart, Unsafe.As<TOtherSpan, ManagedSpan<T>>(ref targetSpan).array, targetStart, count);
+            }
+            else
+            {
+                
+                Debug.Assert(sourceStart + count <= Length && targetStart + count < targetSpan.Length);
+                var sourceEnd = sourceStart + count;
+                var sourceIndex = sourceStart;
+                var targetIndex = targetStart;
+                while(sourceIndex < sourceEnd)
+                {
+                    targetSpan[targetIndex++] = array[targetIndex++];
+                }
+            }
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(T element, int start, int count)
         {
-            throw new NotImplementedException();
+            return Array.IndexOf(array, element, start, count);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ref T element, int start, int count)
         {
-            throw new NotImplementedException();
+            return Array.IndexOf(array, element, start, count);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf<TPredicate>(int start, int count, ref TPredicate predicate) where TPredicate : IPredicate<T>
         {
-            throw new NotImplementedException();
+            var end = start + count;
+            for (int i = start; i < end; ++i)
+            {
+                if (predicate.Matches(ref array[i]))
+                    return i;
+            }
+            return -1;
         }
     }
     public struct PointerSpan<T> : ISpan<T>
@@ -154,5 +207,5 @@ namespace BEPUutilities2.ResourceManagement
             pool.Return(ref span);
         }
     }
-    
+
 }

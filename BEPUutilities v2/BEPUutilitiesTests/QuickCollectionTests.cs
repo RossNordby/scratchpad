@@ -1,30 +1,26 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BEPUutilitiesTests
 {
-    [TestClass]
     public static class QuickCollectionTests
     {
-        [TestMethod]
         public static void TestQueueResizing()
         {
             Random random = new Random(5);
-            UnsafeBufferPool<int> pool = new UnsafeBufferPool<int>();
-            QuickQueue<int> queue = new QuickQueue<int>(pool, 2);
+            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            QuickQueue<int, ManagedSpan<int>>.Create(pool, 4, out var queue);
             Queue<int> controlQueue = new Queue<int>();
 
             for (int iterationIndex = 0; iterationIndex < 1000000; ++iterationIndex)
             {
                 if (random.NextDouble() < 0.7)
                 {
-                    queue.Enqueue(iterationIndex);
+                    queue.Enqueue(iterationIndex, pool);
                     controlQueue.Enqueue(iterationIndex);
                 }
                 if (random.NextDouble() < 0.2)
@@ -34,37 +30,36 @@ namespace BEPUutilitiesTests
                 }
                 if (iterationIndex % 1000 == 0)
                 {
-                    queue.EnsureCapacity(queue.Count * 3);
+                    queue.EnsureCapacity(queue.Count * 3, pool);
                 }
                 else if (iterationIndex % 7777 == 0)
                 {
-                    queue.Compact();
+                    queue.Compact(pool);
                 }
             }
 
-            Assert.IsTrue(queue.Count == controlQueue.Count);
+            Debug.Assert(queue.Count == controlQueue.Count, "e");
             while (queue.Count > 0)
             {
                 var a = queue.Dequeue();
                 var b = controlQueue.Dequeue();
-                Assert.IsTrue(a == b);
-                Assert.IsTrue(queue.Count == controlQueue.Count);
+                Debug.Assert(a == b);
+                Debug.Assert(queue.Count == controlQueue.Count);
             }
         }
-
-        [TestMethod]
+        
         public static void TestListResizing()
         {
             Random random = new Random(5);
-            UnsafeBufferPool<int> pool = new UnsafeBufferPool<int>();
-            QuickList<int> list = new QuickList<int>(pool, 2);
+            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            QuickList<int, ManagedSpan<int>>.Create(pool, 4, out var list);
             List<int> controlList = new List<int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
             {
                 if (random.NextDouble() < 0.7)
                 {
-                    list.Add(iterationIndex);
+                    list.Add(iterationIndex, pool);
                     controlList.Add(iterationIndex);
                 }
                 if (random.NextDouble() < 0.2)
@@ -75,37 +70,36 @@ namespace BEPUutilitiesTests
                 }
                 if (iterationIndex % 1000 == 0)
                 {
-                    list.EnsureCapacity(list.Count * 3);
+                    list.EnsureCapacity(list.Count * 3, pool);
                 }
                 else if (iterationIndex % 7777 == 0)
                 {
-                    list.Compact();
+                    list.Compact(pool);
                 }
             }
 
-            Assert.IsTrue(list.Count == controlList.Count);
+            Debug.Assert(list.Count == controlList.Count);
             for (int i = 0; i < list.Count; ++i)
             {
                 var a = list[i];
                 var b = controlList[i];
-                Assert.IsTrue(a == b);
-                Assert.IsTrue(list.Count == controlList.Count);
+                Debug.Assert(a == b);
+                Debug.Assert(list.Count == controlList.Count);
             }
         }
-
-        [TestMethod]
+        
         public static void TestSetResizing()
         {
             Random random = new Random(5);
-            UnsafeBufferPool<int> pool = new UnsafeBufferPool<int>();
-            QuickSet<int> set = new QuickSet<int>(pool, pool);
+            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            QuickSet<int, ManagedSpan<int>, ManagedSpan<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
             HashSet<int> controlSet = new HashSet<int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
             {
                 if (random.NextDouble() < 0.7)
                 {
-                    set.Add(iterationIndex);
+                    set.Add(iterationIndex, pool, pool);
                     controlSet.Add(iterationIndex);
                 }
                 if (random.NextDouble() < 0.2)
@@ -117,38 +111,37 @@ namespace BEPUutilitiesTests
                 }
                 if (iterationIndex % 1000 == 0)
                 {
-                    set.EnsureCapacity(set.Count * 3);
+                    set.EnsureCapacity(set.Count * 3, pool, pool);
                 }
                 else if (iterationIndex % 7777 == 0)
                 {
-                    set.Compact();
+                    set.Compact(pool, pool);
                 }
             }
 
-            Assert.IsTrue(set.Count == controlSet.Count);
+            Debug.Assert(set.Count == controlSet.Count);
             for (int i = 0; i < set.Count; ++i)
             {
-                Assert.IsTrue(controlSet.Contains(set[i]));
+                Debug.Assert(controlSet.Contains(set[i]));
             }
             foreach (var element in controlSet)
             {
-                Assert.IsTrue(set.Contains(element));
+                Debug.Assert(set.Contains(element));
             }
         }
-
-        [TestMethod]
+        
         public static void TestDictionaryResizing()
         {
             Random random = new Random(5);
-            UnsafeBufferPool<int> pool = new UnsafeBufferPool<int>();
-            QuickDictionary<int, int> dictionary = new QuickDictionary<int, int>(pool, pool, pool);
+            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            QuickDictionary<int, int, ManagedSpan<int>, ManagedSpan<int>, ManagedSpan<int>, PrimitiveComparer<int>>.Create(pool, pool, pool, 2, 3, out var dictionary);
             Dictionary<int, int> controlDictionary = new Dictionary<int, int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
             {
                 if (random.NextDouble() < 0.7)
                 {
-                    dictionary.Add(iterationIndex, iterationIndex);
+                    dictionary.Add(iterationIndex, iterationIndex, pool, pool, pool);
                     controlDictionary.Add(iterationIndex, iterationIndex);
                 }
                 if (random.NextDouble() < 0.2)
@@ -160,22 +153,22 @@ namespace BEPUutilitiesTests
                 }
                 if (iterationIndex % 1000 == 0)
                 {
-                    dictionary.EnsureCapacity(dictionary.Count * 3);
+                    dictionary.EnsureCapacity(dictionary.Count * 3, pool, pool, pool);
                 }
                 else if (iterationIndex % 7777 == 0)
                 {
-                    dictionary.Compact();
+                    dictionary.Compact(pool, pool, pool);
                 }
             }
 
-            Assert.IsTrue(dictionary.Count == controlDictionary.Count);
+            Debug.Assert(dictionary.Count == controlDictionary.Count);
             for (int i = 0; i < dictionary.Count; ++i)
             {
-                Assert.IsTrue(controlDictionary.ContainsKey(dictionary.Keys[i]));
+                Debug.Assert(controlDictionary.ContainsKey(dictionary.Keys[i]));
             }
             foreach (var element in controlDictionary.Keys)
             {
-                Assert.IsTrue(dictionary.ContainsKey(element));
+                Debug.Assert(dictionary.ContainsKey(element));
             }
         }
 

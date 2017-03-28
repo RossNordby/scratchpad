@@ -1,8 +1,4 @@
-﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System;
-using System.Collections.Generic;
+﻿using System;
 
 namespace BEPUutilitiesTests
 {
@@ -11,7 +7,7 @@ namespace BEPUutilitiesTests
         static void Main(string[] args)
         {
             AllocatorTests.TestChurnStability();
-            BoundingTests.Test();
+            //BoundingTests.Test();
             Console.WriteLine();
             AffineTests.Test();
             Console.WriteLine();

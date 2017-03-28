@@ -1,22 +1,21 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.ResourceManagement;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Diagnostics;
 
 namespace BEPUutilitiesTests
 {
-    [TestClass]
     public static class AllocatorTests
     {
 
-        [TestMethod]
         public static void TestChurnStability()
         {
             var allocator = new Allocator(2048);
             var random = new Random(5);
             ulong idCounter = 0;
-            var allocatedIds = new QuickList<ulong>(BufferPools<ulong>.Locking);
-            var unallocatedIds = new QuickList<ulong>(BufferPools<ulong>.Locking);
+            var pool = new PassthroughSpanPool<ulong>();
+            QuickList<ulong, ManagedSpan<ulong>>.Create(pool, 8, out var allocatedIds);
+            QuickList<ulong, ManagedSpan<ulong>>.Create(pool, 8, out var unallocatedIds);
             for (int i = 0; i < 512; ++i)
             {
                 long start;
@@ -24,11 +23,11 @@ namespace BEPUutilitiesTests
                 //allocator.ValidatePointers();
                 if (allocator.Allocate(id, 1 + random.Next(5), out start))
                 {
-                    allocatedIds.Add(id);
+                    allocatedIds.Add(id, pool);
                 }
                 else
                 {
-                    unallocatedIds.Add(id);
+                    unallocatedIds.Add(id, pool);
                 }
                 //allocator.ValidatePointers();
             }
@@ -39,20 +38,20 @@ namespace BEPUutilitiesTests
                 {
                     var indexToRemove = random.Next(allocatedIds.Count);
                     //allocator.ValidatePointers();
-                    Assert.IsTrue(allocator.Deallocate(allocatedIds.Elements[indexToRemove]));
+                    var deallocated = allocator.Deallocate(allocatedIds[indexToRemove]);
+                    Debug.Assert(deallocated);
                     //allocator.ValidatePointers();
-                    unallocatedIds.Add(allocatedIds.Elements[indexToRemove]);
+                    unallocatedIds.Add(allocatedIds[indexToRemove], pool);
                     allocatedIds.FastRemoveAt(indexToRemove);
                 }
                 for (int i = random.Next(Math.Min(unallocatedIds.Count, 15)); i >= 0; --i)
                 {
                     var indexToAllocate = random.Next(unallocatedIds.Count);
-                    long start;
                     //allocator.ValidatePointers();
-                    if (allocator.Allocate(unallocatedIds.Elements[indexToAllocate], random.Next(3), out start))
+                    if (allocator.Allocate(unallocatedIds[indexToAllocate], random.Next(3), out long start))
                     {
                         //allocator.ValidatePointers();
-                        allocatedIds.Add(unallocatedIds.Elements[indexToAllocate]);
+                        allocatedIds.Add(unallocatedIds[indexToAllocate], pool);
                         unallocatedIds.FastRemoveAt(indexToAllocate);
                     }
                     //allocator.ValidatePointers();
@@ -60,26 +59,27 @@ namespace BEPUutilitiesTests
                 //Check to ensure that everything's still coherent.
                 for (int i = 0; i < allocatedIds.Count; ++i)
                 {
-                    Assert.IsTrue(allocator.Contains(allocatedIds.Elements[i]));
+                    Debug.Assert(allocator.Contains(allocatedIds[i]));
                 }
                 for (int i = 0; i < unallocatedIds.Count; ++i)
                 {
-                    Assert.IsFalse(allocator.Contains(unallocatedIds.Elements[i]));
+                    Debug.Assert(allocator.Contains(unallocatedIds[i]));
                 }
             }
             //Wind it down.
             for (int i = 0; i < allocatedIds.Count; ++i)
             {
-                Assert.IsTrue(allocator.Deallocate(allocatedIds.Elements[i]));
+                var deallocated = allocator.Deallocate(allocatedIds[i]);
+                Debug.Assert(deallocated);
             }
             //Confirm cleanup.
             for (int i = 0; i < allocatedIds.Count; ++i)
             {
-                Assert.IsFalse(allocator.Contains(allocatedIds.Elements[i]));
+                Debug.Assert(allocator.Contains(allocatedIds[i]));
             }
             for (int i = 0; i < unallocatedIds.Count; ++i)
             {
-                Assert.IsFalse(allocator.Contains(unallocatedIds.Elements[i]));
+                Debug.Assert(allocator.Contains(unallocatedIds[i]));
             }
         }
     }
