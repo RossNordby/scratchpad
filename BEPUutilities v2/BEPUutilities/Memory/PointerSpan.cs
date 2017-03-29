@@ -55,14 +55,13 @@ namespace BEPUutilities2.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void CopyTo<TOtherSpan>(int sourceStart, ref TOtherSpan targetSpan, int targetStart, int count) where TOtherSpan : ISpan<T>
         {
-            //TODO: Check for jit specialization   
             if (typeof(TOtherSpan) == typeof(PointerSpan<T>))
             {
                 SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, PointerSpan<T>>(ref targetSpan), targetStart, count);
             }
-            else if (typeof(TOtherSpan) == typeof(ManagedSpan<T>))
+            else if (typeof(TOtherSpan) == typeof(ArraySpan<T>))
             {
-                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, ManagedSpan<T>>(ref targetSpan), targetStart, count);
+                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, ArraySpan<T>>(ref targetSpan), targetStart, count);
             }
             else
             {
@@ -73,7 +72,6 @@ namespace BEPUutilities2.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ref T element, int start, int count)
         {
-            //TODO: Check for jit specialization 
             var end = start + count;
             if (SpanHelper.IsPrimitive<T>())
             {

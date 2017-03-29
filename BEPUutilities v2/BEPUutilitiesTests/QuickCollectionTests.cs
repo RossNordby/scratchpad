@@ -13,7 +13,7 @@ namespace BEPUutilitiesTests
         {
             Random random = new Random(5);
             PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
-            QuickQueue<int, ManagedSpan<int>>.Create(pool, 4, out var queue);
+            QuickQueue<int, ArraySpan<int>>.Create(pool, 4, out var queue);
             Queue<int> controlQueue = new Queue<int>();
 
             for (int iterationIndex = 0; iterationIndex < 1000000; ++iterationIndex)
@@ -52,7 +52,7 @@ namespace BEPUutilitiesTests
         {
             Random random = new Random(5);
             PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
-            QuickList<int, ManagedSpan<int>>.Create(pool, 4, out var list);
+            QuickList<int, ArraySpan<int>>.Create(pool, 4, out var list);
             List<int> controlList = new List<int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
@@ -92,7 +92,7 @@ namespace BEPUutilitiesTests
         {
             Random random = new Random(5);
             PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
-            QuickSet<int, ManagedSpan<int>, ManagedSpan<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
+            QuickSet<int, ArraySpan<int>, ArraySpan<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
             HashSet<int> controlSet = new HashSet<int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
@@ -134,7 +134,7 @@ namespace BEPUutilitiesTests
         {
             Random random = new Random(5);
             PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
-            QuickDictionary<int, int, ManagedSpan<int>, ManagedSpan<int>, ManagedSpan<int>, PrimitiveComparer<int>>.Create(pool, pool, pool, 2, 3, out var dictionary);
+            QuickDictionary<int, int, ArraySpan<int>, ArraySpan<int>, ArraySpan<int>, PrimitiveComparer<int>>.Create(pool, pool, pool, 2, 3, out var dictionary);
             Dictionary<int, int> controlDictionary = new Dictionary<int, int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)

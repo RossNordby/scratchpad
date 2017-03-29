@@ -14,8 +14,8 @@ namespace BEPUutilitiesTests
             var random = new Random(5);
             ulong idCounter = 0;
             var pool = new PassthroughSpanPool<ulong>();
-            QuickList<ulong, ManagedSpan<ulong>>.Create(pool, 8, out var allocatedIds);
-            QuickList<ulong, ManagedSpan<ulong>>.Create(pool, 8, out var unallocatedIds);
+            QuickList<ulong, ArraySpan<ulong>>.Create(pool, 8, out var allocatedIds);
+            QuickList<ulong, ArraySpan<ulong>>.Create(pool, 8, out var unallocatedIds);
             for (int i = 0; i < 512; ++i)
             {
                 long start;

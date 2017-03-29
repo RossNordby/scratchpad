@@ -2,23 +2,23 @@
 
 namespace BEPUutilities2.Memory
 {
-    public class PassthroughSpanPool<T> : IMemoryPool<T, ManagedSpan<T>>
+    public class PassthroughSpanPool<T> : IMemoryPool<T, ArraySpan<T>>
     {
-        public void Return(ref ManagedSpan<T> span)
+        public void Return(ref ArraySpan<T> span)
         {
             //Drop it on the floor and let the GC deal with it.
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Take(int count, out ManagedSpan<T> span)
+        public void Take(int count, out ArraySpan<T> span)
         {
             TakeForPower(BufferPool.GetPoolIndex(count), out span);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void TakeForPower(int power, out ManagedSpan<T> span)
+        public void TakeForPower(int power, out ArraySpan<T> span)
         {
-            span = new ManagedSpan<T>(new T[1 << power]);
+            span = new ArraySpan<T>(new T[1 << power]);
         }
     }
 

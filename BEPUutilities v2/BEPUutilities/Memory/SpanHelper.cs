@@ -8,24 +8,40 @@ namespace BEPUutilities2.Memory
     public static class SpanHelper
     {
         /// <summary>
-        /// Tests if a generic parameter is primitive.
+        /// Tests if a generic parameter is primitive. Fast path; specialized compilation.
         /// </summary>
         /// <typeparam name="T">Type to check for primitiveness.</typeparam>
         /// <returns>True if the type is one of the primitive types, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsPrimitive<T>()
         {
-            //TODO: Test for jit specialization.
-            return IsPrimitive(typeof(T));
+            //The jit is able to specialize this, so the whole function just becomes a constant.
+            return
+                typeof(T) == typeof(bool) ||
+                typeof(T) == typeof(byte) ||
+                typeof(T) == typeof(sbyte) ||
+                typeof(T) == typeof(ushort) ||
+                typeof(T) == typeof(short) ||
+                typeof(T) == typeof(uint) ||
+                typeof(T) == typeof(int) ||
+                typeof(T) == typeof(ulong) ||
+                typeof(T) == typeof(long) ||
+                typeof(T) == typeof(IntPtr) ||
+                typeof(T) == typeof(UIntPtr) ||
+                typeof(T) == typeof(char) ||
+                typeof(T) == typeof(double) ||
+                typeof(T) == typeof(float);
         }
+
         /// <summary>
-        /// Tests if a type is primitive.
+        /// Tests if a type is primitive. Slow path; unspecialized compilation.
         /// </summary>
         /// <param name="type">Type to check for primitiveness.</typeparam>
         /// <returns>True if the type is one of the primitive types, false otherwise.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool IsPrimitive(Type type)
         {
+            //The jit CANNOT specialize this! Without a value type generic parameter, the jit doesn't generate different versions. 
             return
                 type == typeof(bool) ||
                 type == typeof(byte) ||
@@ -63,9 +79,9 @@ namespace BEPUutilities2.Memory
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref ManagedSpan<T> source, int sourceIndex, ref ManagedSpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref ArraySpan<T> source, int sourceIndex, ref ArraySpan<T> target, int targetIndex, int count)
         {
-            Validate<T, ManagedSpan<T>, ManagedSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, ArraySpan<T>, ArraySpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var byteCount = count * Unsafe.SizeOf<T>();
             Array.Copy(source.Array, sourceIndex, target.Array, targetIndex, count);
         }
@@ -75,9 +91,9 @@ namespace BEPUutilities2.Memory
         //This will have slightly worse performance, but it doesn't matter much.
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref PointerSpan<T> source, int sourceIndex, ref ManagedSpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref PointerSpan<T> source, int sourceIndex, ref ArraySpan<T> target, int targetIndex, int count)
         {
-            Validate<T, PointerSpan<T>, ManagedSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, PointerSpan<T>, ArraySpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var arrayHandle = GCHandle.Alloc(target.Array, GCHandleType.Pinned);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(
@@ -87,9 +103,9 @@ namespace BEPUutilities2.Memory
             arrayHandle.Free();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref ManagedSpan<T> source, int sourceIndex, ref PointerSpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref ArraySpan<T> source, int sourceIndex, ref PointerSpan<T> target, int targetIndex, int count)
         {
-            Validate<T, ManagedSpan<T>, PointerSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, ArraySpan<T>, PointerSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var arrayHandle = GCHandle.Alloc(source.Array, GCHandleType.Pinned);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(
