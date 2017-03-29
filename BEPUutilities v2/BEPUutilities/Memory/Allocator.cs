@@ -26,9 +26,9 @@ namespace BEPUutilities2.Memory
             public ulong Next;
         }
 
-        PassthroughSpanPool<ulong> keyPool = new PassthroughSpanPool<ulong>();
-        PassthroughSpanPool<Allocation> valuePool = new PassthroughSpanPool<Allocation>();
-        PassthroughSpanPool<int> tablePool = new PassthroughSpanPool<int>();
+        PassthroughArrayPool<ulong> keyPool = new PassthroughArrayPool<ulong>();
+        PassthroughArrayPool<Allocation> valuePool = new PassthroughArrayPool<Allocation>();
+        PassthroughArrayPool<int> tablePool = new PassthroughArrayPool<int>();
         private QuickDictionary<ulong, Allocation, Array<ulong>, Array<Allocation>, Array<int>, PrimitiveComparer<ulong>> allocations;
 
         /// <summary>
@@ -39,7 +39,7 @@ namespace BEPUutilities2.Memory
         {
             this.memoryPoolSize = memoryPoolSize;
             QuickDictionary<ulong, Allocation, Array<ulong>, Array<Allocation>, Array<int>, PrimitiveComparer<ulong>>.Create(
-                keyPool, valuePool, tablePool, BufferPool.GetPoolIndex(allocationCountEstimate), 3, out allocations);
+                keyPool, valuePool, tablePool, SpanHelper.GetContainingPowerOf2(allocationCountEstimate), 3, out allocations);
         }
 
         /// <summary>

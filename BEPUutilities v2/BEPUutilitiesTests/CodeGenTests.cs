@@ -50,7 +50,7 @@ namespace BEPUutilitiesTests
             var memory = new byte[2048];
             fixed (byte* memoryPointer = memory)
             {
-                var span = new PointerSpan<T>(memoryPointer, memory.Length);
+                var span = new Buffer<T>(memoryPointer, memory.Length);
                 var def = default(T);
                 var index = span.IndexOf(ref def, 0, 128);
 
@@ -77,6 +77,33 @@ namespace BEPUutilitiesTests
             Console.WriteLine($"index: {index}");
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        unsafe static void TestQuickInlining()
+        {
+            {
+                var pool = new PassthroughArrayPool<double>();
+                var intPool = new PassthroughArrayPool<int>();
+                QuickSet<double, Array<double>, Array<int>, PrimitiveComparer<double>>.Create(pool, intPool, 2, 3, out var set);
+                set.AddUnsafely(5);
+                var item = set[0];
+                Console.WriteLine($"Managed Item: {item}");
+
+                var comparer = default(PrimitiveComparer<double>);
+                var hash = comparer.Hash(ref item);
+
+                Console.WriteLine($"Hash: {hash}");
+            }
+
+            {
+
+                var pool = new BufferPool().SpecializeFor<int>();
+                QuickSet<int, Buffer<int>, Buffer<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
+                set.AddUnsafely(5);
+                var item = set[0];
+            }
+
+        }
+
         public static void Test()
         {
             TestPrimitiveComparer();
@@ -89,6 +116,9 @@ namespace BEPUutilitiesTests
             TestPointerSpans<decimal>();
             TestArraySpans<object>();
             TestArraySpans<int>();
+
+            TestQuickInlining();
         }
     }
 }
+

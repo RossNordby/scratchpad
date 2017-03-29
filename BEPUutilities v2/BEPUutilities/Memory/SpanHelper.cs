@@ -8,6 +8,50 @@ namespace BEPUutilities2.Memory
     public static class SpanHelper
     {
         /// <summary>
+        /// The highest size span exponent. The largest span is 2^MaximumSpanSizePower. This avoids overflow.
+        /// </summary>
+        public const int MaximumSpanSizePower = 30;
+        /// <summary>
+        /// Computes the lowest integer N such that 2^N >= i.
+        /// </summary>
+        /// <param name="i">Integer to compute the power of .</param>
+        /// <returns>Loweset integer N such that 2^N >= i.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetContainingPowerOf2(int i)
+        {
+            Debug.Assert(i >= 0 && i < (1 << MaximumSpanSizePower), "i must be from 0 to " + ((1 << MaximumSpanSizePower) - 1) + ", inclusive.");
+            //We want the buffer which would fully contain the count, so it should be effectively Ceiling(Log(i)).
+            //Doubling the value (and subtracting one, to avoid the already-a-power-of-two case) takes care of this.
+            i = ((i > 0 ? i : 1) << 1) - 1;
+            int log = 0;
+            if ((i & 0xFFFF0000) > 0)
+            {
+                i >>= 16;
+                log |= 16;
+            }
+            if ((i & 0xFF00) > 0)
+            {
+                i >>= 8;
+                log |= 8;
+            }
+            if ((i & 0xF0) > 0)
+            {
+                i >>= 4;
+                log |= 4;
+            }
+            if ((i & 0xC) > 0)
+            {
+                i >>= 2;
+                log |= 2;
+            }
+            if ((i & 0x2) > 0)
+            {
+                log |= 1;
+            }
+            return log;
+        }
+
+        /// <summary>
         /// Tests if a generic parameter is primitive. Fast path; specialized compilation.
         /// </summary>
         /// <typeparam name="T">Type to check for primitiveness.</typeparam>
@@ -68,9 +112,9 @@ namespace BEPUutilities2.Memory
             Debug.Assert(sourceIndex >= 0 && sourceIndex + count <= source.Length, "Can't perform a copy that extends beyond the source span.");
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref PointerSpan<T> source, int sourceIndex, ref PointerSpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref Buffer<T> source, int sourceIndex, ref Buffer<T> target, int targetIndex, int count)
         {
-            Validate<T, PointerSpan<T>, PointerSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, Buffer<T>, Buffer<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(
                 source.Memory + sourceIndex * Unsafe.SizeOf<T>(),
@@ -91,9 +135,9 @@ namespace BEPUutilities2.Memory
         //This will have slightly worse performance, but it doesn't matter much.
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref PointerSpan<T> source, int sourceIndex, ref Array<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref Buffer<T> source, int sourceIndex, ref Array<T> target, int targetIndex, int count)
         {
-            Validate<T, PointerSpan<T>, Array<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, Buffer<T>, Array<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var arrayHandle = GCHandle.Alloc(target.Memory, GCHandleType.Pinned);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(
@@ -103,9 +147,9 @@ namespace BEPUutilities2.Memory
             arrayHandle.Free();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref Array<T> source, int sourceIndex, ref PointerSpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref Array<T> source, int sourceIndex, ref Buffer<T> target, int targetIndex, int count)
         {
-            Validate<T, Array<T>, PointerSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, Array<T>, Buffer<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var arrayHandle = GCHandle.Alloc(source.Memory, GCHandleType.Pinned);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(

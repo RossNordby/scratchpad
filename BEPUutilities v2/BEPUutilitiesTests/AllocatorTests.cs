@@ -13,7 +13,7 @@ namespace BEPUutilitiesTests
             var allocator = new Allocator(2048);
             var random = new Random(5);
             ulong idCounter = 0;
-            var pool = new PassthroughSpanPool<ulong>();
+            var pool = new PassthroughArrayPool<ulong>();
             QuickList<ulong, Array<ulong>>.Create(pool, 8, out var allocatedIds);
             QuickList<ulong, Array<ulong>>.Create(pool, 8, out var unallocatedIds);
             for (int i = 0; i < 512; ++i)

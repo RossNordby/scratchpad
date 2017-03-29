@@ -12,7 +12,7 @@ namespace BEPUutilitiesTests
         public static void TestQueueResizing()
         {
             Random random = new Random(5);
-            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
             QuickQueue<int, Array<int>>.Create(pool, 4, out var queue);
             Queue<int> controlQueue = new Queue<int>();
 
@@ -51,7 +51,7 @@ namespace BEPUutilitiesTests
         public static void TestListResizing()
         {
             Random random = new Random(5);
-            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
             QuickList<int, Array<int>>.Create(pool, 4, out var list);
             List<int> controlList = new List<int>();
 
@@ -91,7 +91,7 @@ namespace BEPUutilitiesTests
         public static void TestSetResizing()
         {
             Random random = new Random(5);
-            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
             QuickSet<int, Array<int>, Array<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
             HashSet<int> controlSet = new HashSet<int>();
 
@@ -133,7 +133,7 @@ namespace BEPUutilitiesTests
         public static void TestDictionaryResizing()
         {
             Random random = new Random(5);
-            PassthroughSpanPool<int> pool = new PassthroughSpanPool<int>();
+            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
             QuickDictionary<int, int, Array<int>, Array<int>, Array<int>, PrimitiveComparer<int>>.Create(pool, pool, pool, 2, 3, out var dictionary);
             Dictionary<int, int> controlDictionary = new Dictionary<int, int>();
 

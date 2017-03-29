@@ -78,6 +78,7 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Hash(ref T item)
         {
+            //Note: the jit is able to inline the GetHashCodes; no need for custom implementations.
             if (typeof(T) == typeof(bool))
             {
                 return Unsafe.As<T, bool>(ref item).GetHashCode(); 

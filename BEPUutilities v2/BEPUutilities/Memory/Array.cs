@@ -5,6 +5,10 @@ using System.Runtime.InteropServices;
 
 namespace BEPUutilities2.Memory
 {
+    /// <summary>
+    /// Span over a managed memory region.
+    /// </summary>
+    /// <typeparam name="T">Type of the memory exposed by the span.</typeparam>
     public struct Array<T> : ISpan<T>
     {
         public readonly T[] Memory;
@@ -20,6 +24,10 @@ namespace BEPUutilities2.Memory
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                //TODO: There may be an argument for using Unsafe.Add here. The idea is that spans are assumed to be unsafe anyway, so we can abandon bounds checking.
+                //By using a regular array index, we force the jit to test bounds on potentially dynamically generated indices. If we instead took the reference of index 0
+                //and offset from it, the jit would be able to elide the bounds check in almost all repeated usages. There are also ways to completely eliminate the bounds check,
+                //but it gets into a bit of brittle black magic...
                 return ref Memory[index];
             }
         }
@@ -56,9 +64,9 @@ namespace BEPUutilities2.Memory
             {
                 SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, Array<T>>(ref targetSpan), targetStart, count);
             }
-            else if (typeof(TOtherSpan) == typeof(PointerSpan<T>))
+            else if (typeof(TOtherSpan) == typeof(Buffer<T>))
             {
-                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, PointerSpan<T>>(ref targetSpan), targetStart, count);
+                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, Buffer<T>>(ref targetSpan), targetStart, count);
             }
             else
             {

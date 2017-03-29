@@ -215,10 +215,10 @@ namespace BEPUutilities2.Collections
             where TPool : IMemoryPool<T, TSpan>
             where TTablePool : IMemoryPool<int, TTableSpan>
         {
-            var oldSpanPower = BufferPool.GetPoolIndex(Span.Length);
-            var oldTableSpanPower = BufferPool.GetPoolIndex(Table.Length);
+            var oldSpanPower = SpanHelper.GetContainingPowerOf2(Span.Length);
+            var oldTableSpanPower = SpanHelper.GetContainingPowerOf2(Table.Length);
             var tablePoolOffset = oldTableSpanPower - oldSpanPower;
-            ResizeForPower(BufferPool.GetPoolIndex(newSize), tablePoolOffset, pool, tablePool);
+            ResizeForPower(SpanHelper.GetContainingPowerOf2(newSize), tablePoolOffset, pool, tablePool);
         }
 
         /// <summary>
@@ -274,7 +274,7 @@ namespace BEPUutilities2.Collections
             where TTablePool : IMemoryPool<int, TTableSpan>
         {
             Validate();
-            var minimumRequiredPoolIndex = BufferPool.GetPoolIndex(Count);
+            var minimumRequiredPoolIndex = SpanHelper.GetContainingPowerOf2(Count);
             if ((1 << minimumRequiredPoolIndex) != Span.Length)
                 Resize(Count, pool, tablePool);
         }

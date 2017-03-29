@@ -183,7 +183,7 @@ namespace BEPUutilities2.Collections
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Resize<TPool>(int newSize, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
-            ResizeForPower(BufferPool.GetPoolIndex(newSize), pool);
+            ResizeForPower(SpanHelper.GetContainingPowerOf2(newSize), pool);
         }
 
         /// <summary>
@@ -224,7 +224,7 @@ namespace BEPUutilities2.Collections
         public void Compact<TPool>(TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             Validate();
-            var newPoolIndex = BufferPool.GetPoolIndex(Count);
+            var newPoolIndex = SpanHelper.GetContainingPowerOf2(Count);
             if ((1 << newPoolIndex) != Span.Length)
                 ResizeForPower(newPoolIndex, pool);
         }
