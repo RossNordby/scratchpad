@@ -59,9 +59,9 @@ namespace BEPUutilities2.Memory
             {
                 SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, PointerSpan<T>>(ref targetSpan), targetStart, count);
             }
-            else if (typeof(TOtherSpan) == typeof(ArraySpan<T>))
+            else if (typeof(TOtherSpan) == typeof(Array<T>))
             {
-                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, ArraySpan<T>>(ref targetSpan), targetStart, count);
+                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, Array<T>>(ref targetSpan), targetStart, count);
             }
             else
             {

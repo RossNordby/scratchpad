@@ -5,14 +5,14 @@ using System.Runtime.InteropServices;
 
 namespace BEPUutilities2.Memory
 {
-    public struct ArraySpan<T> : ISpan<T>
+    public struct Array<T> : ISpan<T>
     {
-        public readonly T[] Array;
+        public readonly T[] Memory;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ArraySpan(T[] array)
+        public Array(T[] memory)
         {
-            this.Array = array;
+            this.Memory = memory;
         }
 
         public ref T this[int index]
@@ -20,7 +20,7 @@ namespace BEPUutilities2.Memory
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return ref Array[index];
+                return ref Memory[index];
             }
         }
         public int Length
@@ -28,30 +28,33 @@ namespace BEPUutilities2.Memory
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return Array.Length;
+                return Memory.Length;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear(int start, int count)
         {
-            System.Array.Clear(Array, start, count);
+            System.Array.Clear(Memory, start, count);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void ClearManagedReferences(int start, int count)
         {
-            //TODO: Should check to see if it is primitive first; that's something the jit can do at compile time.
-            //Can't easily check to see if it contains *any* references recursively at compile time, though- that's trickier.
-            System.Array.Clear(Array, start, count);
+            //Can't easily check to see if it contains *any* references recursively at compile time, but we can check for primitives with a compile time branch.
+            //TODO: Unfortunately, the jit doesn't type specialize the type checks when T is a reference type- which was somewhat expected since all reference
+            //types share the same implementation. However, no reference type is a primitive, so it seems like this is something that could be improved pretty easily...
+            //In the interim, it's still valuable to have the primitive test for the common case where the type is in fact primitive.
+            if (!SpanHelper.IsPrimitive<T>())
+                System.Array.Clear(Memory, start, count);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void CopyTo<TOtherSpan>(int sourceStart, ref TOtherSpan targetSpan, int targetStart, int count) where TOtherSpan : ISpan<T>
         {
-            if (typeof(TOtherSpan) == typeof(ArraySpan<T>))
+            if (typeof(TOtherSpan) == typeof(Array<T>))
             {
-                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, ArraySpan<T>>(ref targetSpan), targetStart, count);
+                SpanHelper.Copy(ref this, sourceStart, ref Unsafe.As<TOtherSpan, Array<T>>(ref targetSpan), targetStart, count);
             }
             else if (typeof(TOtherSpan) == typeof(PointerSpan<T>))
             {
@@ -59,20 +62,20 @@ namespace BEPUutilities2.Memory
             }
             else
             {
-                SpanHelper.CopyFallback<T, ArraySpan<T>, TOtherSpan>(ref this, sourceStart, ref targetSpan, targetStart, count);
+                SpanHelper.CopyFallback<T, Array<T>, TOtherSpan>(ref this, sourceStart, ref targetSpan, targetStart, count);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(T element, int start, int count)
         {
-            return System.Array.IndexOf(Array, element, start, count);
+            return System.Array.IndexOf(Memory, element, start, count);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ref T element, int start, int count)
         {
-            return System.Array.IndexOf(Array, element, start, count);
+            return System.Array.IndexOf(Memory, element, start, count);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -81,7 +84,7 @@ namespace BEPUutilities2.Memory
             var end = start + count;
             for (int i = start; i < end; ++i)
             {
-                if (predicate.Matches(ref Array[i]))
+                if (predicate.Matches(ref Memory[i]))
                     return i;
             }
             return -1;
@@ -89,7 +92,7 @@ namespace BEPUutilities2.Memory
 
         public bool TryPin(out GCHandle handle)
         {
-            handle = GCHandle.Alloc(Array, GCHandleType.Pinned);
+            handle = GCHandle.Alloc(Memory, GCHandleType.Pinned);
             return true;
         }
     }

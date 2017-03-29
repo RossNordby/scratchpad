@@ -11,8 +11,7 @@ namespace BEPUutilities2.Collections
     public struct PrimitiveComparer<T> : IEqualityComparerRef<T>
     {
         //using T4 templates? pfah
-
-        //TODO: Finish and test the types.
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(ref T a, ref T b)
         {

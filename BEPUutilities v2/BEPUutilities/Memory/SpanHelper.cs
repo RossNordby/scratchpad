@@ -79,11 +79,11 @@ namespace BEPUutilities2.Memory
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref ArraySpan<T> source, int sourceIndex, ref ArraySpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref Array<T> source, int sourceIndex, ref Array<T> target, int targetIndex, int count)
         {
-            Validate<T, ArraySpan<T>, ArraySpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            Validate<T, Array<T>, Array<T>>(ref source, sourceIndex, ref target, targetIndex, count);
             var byteCount = count * Unsafe.SizeOf<T>();
-            Array.Copy(source.Array, sourceIndex, target.Array, targetIndex, count);
+            Array.Copy(source.Memory, sourceIndex, target.Memory, targetIndex, count);
         }
 
         //Copies between spans of different types should be extremely rare in practice.
@@ -91,10 +91,10 @@ namespace BEPUutilities2.Memory
         //This will have slightly worse performance, but it doesn't matter much.
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref PointerSpan<T> source, int sourceIndex, ref ArraySpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref PointerSpan<T> source, int sourceIndex, ref Array<T> target, int targetIndex, int count)
         {
-            Validate<T, PointerSpan<T>, ArraySpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
-            var arrayHandle = GCHandle.Alloc(target.Array, GCHandleType.Pinned);
+            Validate<T, PointerSpan<T>, Array<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            var arrayHandle = GCHandle.Alloc(target.Memory, GCHandleType.Pinned);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(
                 source.Memory + sourceIndex * Unsafe.SizeOf<T>(),
@@ -103,10 +103,10 @@ namespace BEPUutilities2.Memory
             arrayHandle.Free();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void Copy<T>(ref ArraySpan<T> source, int sourceIndex, ref PointerSpan<T> target, int targetIndex, int count)
+        public static unsafe void Copy<T>(ref Array<T> source, int sourceIndex, ref PointerSpan<T> target, int targetIndex, int count)
         {
-            Validate<T, ArraySpan<T>, PointerSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
-            var arrayHandle = GCHandle.Alloc(source.Array, GCHandleType.Pinned);
+            Validate<T, Array<T>, PointerSpan<T>>(ref source, sourceIndex, ref target, targetIndex, count);
+            var arrayHandle = GCHandle.Alloc(source.Memory, GCHandleType.Pinned);
             var byteCount = count * Unsafe.SizeOf<T>();
             Buffer.MemoryCopy(
                 Unsafe.AsPointer(ref source[sourceIndex]),

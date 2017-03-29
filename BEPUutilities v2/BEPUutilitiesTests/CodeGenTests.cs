@@ -45,17 +45,17 @@ namespace BEPUutilitiesTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        unsafe static void TestSpans<T>()
+        unsafe static void TestPointerSpans<T>()
         {
             var memory = new byte[2048];
             fixed (byte* memoryPointer = memory)
             {
-               var span = new PointerSpan<T>(memoryPointer, memory.Length);
+                var span = new PointerSpan<T>(memoryPointer, memory.Length);
                 var def = default(T);
                 var index = span.IndexOf(ref def, 0, 128);
 
                 span.CopyTo(0, ref span, 0, 4);
-                var arraySpan = new ArraySpan<T>(new T[1024]);
+                var arraySpan = new Array<T>(new T[1024]);
                 span.CopyTo(0, ref arraySpan, 0, 4);
                 arraySpan.CopyTo(0, ref span, 0, 4);
                 arraySpan.CopyTo(0, ref arraySpan, 0, 4);
@@ -63,6 +63,20 @@ namespace BEPUutilitiesTests
                 Console.WriteLine($"index: {index}");
             }
         }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        unsafe static void TestArraySpans<T>()
+        {
+            var span = new Array<T>(new T[1024]);
+            var def = default(T);
+            var index = span.IndexOf(ref def, 0, 128);
+
+            span.CopyTo(0, ref span, 0, 4);
+            span.ClearManagedReferences(0, 4);
+
+            Console.WriteLine($"index: {index}");
+        }
+
         public static void Test()
         {
             TestPrimitiveComparer();
@@ -71,7 +85,10 @@ namespace BEPUutilitiesTests
             TestDefaultComparer(2L, 2L);
             TestDefaultComparer("hey", "sup");
 
-            TestSpans<decimal>();
+            TestPointerSpans<ulong>();
+            TestPointerSpans<decimal>();
+            TestArraySpans<object>();
+            TestArraySpans<int>();
         }
     }
 }

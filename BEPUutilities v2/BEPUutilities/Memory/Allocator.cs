@@ -29,7 +29,7 @@ namespace BEPUutilities2.Memory
         PassthroughSpanPool<ulong> keyPool = new PassthroughSpanPool<ulong>();
         PassthroughSpanPool<Allocation> valuePool = new PassthroughSpanPool<Allocation>();
         PassthroughSpanPool<int> tablePool = new PassthroughSpanPool<int>();
-        private QuickDictionary<ulong, Allocation, ArraySpan<ulong>, ArraySpan<Allocation>, ArraySpan<int>, PrimitiveComparer<ulong>> allocations;
+        private QuickDictionary<ulong, Allocation, Array<ulong>, Array<Allocation>, Array<int>, PrimitiveComparer<ulong>> allocations;
 
         /// <summary>
         /// Creates a new memory pool.
@@ -38,7 +38,7 @@ namespace BEPUutilities2.Memory
         public Allocator(long memoryPoolSize, int allocationCountEstimate = 128)
         {
             this.memoryPoolSize = memoryPoolSize;
-            QuickDictionary<ulong, Allocation, ArraySpan<ulong>, ArraySpan<Allocation>, ArraySpan<int>, PrimitiveComparer<ulong>>.Create(
+            QuickDictionary<ulong, Allocation, Array<ulong>, Array<Allocation>, Array<int>, PrimitiveComparer<ulong>>.Create(
                 keyPool, valuePool, tablePool, BufferPool.GetPoolIndex(allocationCountEstimate), 3, out allocations);
         }
 
