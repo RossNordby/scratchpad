@@ -289,6 +289,8 @@ namespace BEPUutilities2.Collections
         public void Enqueue<TPool>(T element, TPool pool) where TPool : IMemoryPool<T, TSpan>
         {
             Validate();
+            if (Count == Span.Length)
+                Resize(Span.Length * 2, pool);
             EnqueueUnsafely(element);
         }
 

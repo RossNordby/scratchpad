@@ -63,7 +63,7 @@ namespace BEPUutilitiesTests
                 }
                 for (int i = 0; i < unallocatedIds.Count; ++i)
                 {
-                    Debug.Assert(allocator.Contains(unallocatedIds[i]));
+                    Debug.Assert(!allocator.Contains(unallocatedIds[i]));
                 }
             }
             //Wind it down.
@@ -75,11 +75,11 @@ namespace BEPUutilitiesTests
             //Confirm cleanup.
             for (int i = 0; i < allocatedIds.Count; ++i)
             {
-                Debug.Assert(allocator.Contains(allocatedIds[i]));
+                Debug.Assert(!allocator.Contains(allocatedIds[i]));
             }
             for (int i = 0; i < unallocatedIds.Count; ++i)
             {
-                Debug.Assert(allocator.Contains(unallocatedIds[i]));
+                Debug.Assert(!allocator.Contains(unallocatedIds[i]));
             }
         }
     }
