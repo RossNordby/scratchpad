@@ -1,8 +1,6 @@
 ﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
@@ -22,7 +20,7 @@ namespace SolverPrototype
             }
             set
             {
-                initialConstraintCountPerBodyPower = BufferPool.GetPoolIndex(value * Unsafe.SizeOf<BodyConstraintReference>());
+                initialConstraintCountPerBodyPower = SpanHelper.GetContainingPowerOf2(value);
             }
         }
 
@@ -38,16 +36,13 @@ namespace SolverPrototype
 
         //The goal here is to reduce the cost of a GC. While the engine should never produce garbage itself during regular execution, the application using it might.
         //The cost of a GC is partially related to the number of references it has to track down. An array of reference types requires examining every one of those references.
-        //So, if you have 16384 bodies with lists stored in QuickList<int>[] representation, the GC has at least 32768 references it needs to consider!
+        //So, if you have 16384 bodies with lists stored in List<int>[] representation, the GC has at least 32768 references it needs to consider (the list, and its internal array)!
         //In contrast, if you pack the representation into a single int[] with the lists suballocated from it, the GC doesn't need to scan it- ints aren't reference types.
 
-        //So we could use a custom allocator (like, say, the BEPUutilities Allocator), but there's a much simpler way that is no more wasteful than the QuickList representation 
-        //in terms of memory use- preallocated arrays that you can pull fixed size blocks out of. 
-
-        //We'll store references to these memory blocks and treat them like the arrays we'd use for a QuickList. This will be a little ugly due to the typelessness
-        //of the backing array, but hopefully in the future we can unify things a bit more.
-        SuballocatedList[] constraintLists;
-        SuballocatedBufferPool bufferPool;
+        //QuickLists based on a pointer-backed Buffer<int> contain no references at all, so QuickList<int, Buffer<int>>[] only costs a single reference- for the top level array.
+        //The rest of it is just a bunch of value types.
+        QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>[] constraintLists;
+        BufferPool<BodyConstraintReference> bufferPool;
         Solver solver;
 
         //You could bitpack these two into 4 bytes, but the value of that is pretty darn questionable.
@@ -58,18 +53,23 @@ namespace SolverPrototype
         }
 
 
-        public ConstraintConnectivityGraph(Solver solver, int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
+        /// <summary>
+        /// Constructs a constraint connectivity graph.
+        /// </summary>
+        /// <param name="solver">Solver associated with the constraints in this graph.</param>
+        /// <param name="rawPool">Pool from which per-body lists are allocated.</param>
+        /// <param name="initialBodyCountEstimate">Initial estimate for the number of bodies which will exist in the graph.
+        /// If the number is exceeded, an internal buffer will resize and produce garbage.</param>
+        /// <param name="initialConstraintCountPerBodyEstimate">Initial estimate for the number of constraints that will exist for each body.
+        /// If the number is exceeded, the body list will be resized, but the old list will be returned to the pool for reuse.</param>
+        public ConstraintConnectivityGraph(Solver solver, BufferPool rawPool, int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
         {
             this.solver = solver;
             ConstraintCountPerBodyEstimate = initialConstraintCountPerBodyEstimate;
             var capacityInBytes = initialBodyCountEstimate * initialConstraintCountPerBodyEstimate * sizeof(int);
-            var allocator = new Pow2Allocator(16, initialBodyCountEstimate);
-            //TODO: It's often the case that sharing a pool like this among many users will reduce the overall memory use.
-            //For now, for the sake of simplicity and guaranteeing thread access, the graph has its own allocator.
-            //I suspect that there will be many uses for such a non-locked 'bookkeeping' buffer pool. 
-            bufferPool = new SuballocatedBufferPool(capacityInBytes, allocator);
+            bufferPool = rawPool.SpecializeFor<BodyConstraintReference>();
 
-            constraintLists = new SuballocatedList[initialBodyCountEstimate];
+            constraintLists = new QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>[initialBodyCountEstimate];
         }
 
         //Note that constraints only contain direct references to the memory locations of bodies, not to their handles.
@@ -97,9 +97,9 @@ namespace SolverPrototype
             if (bodyIndex >= constraintLists.Length)
             {
                 //Not enough room for this body! Resize required.
-                Array.Resize(ref constraintLists, 1 << BufferPool.GetPoolIndex(bodyIndex + 1));
+                Array.Resize(ref constraintLists, 1 << SpanHelper.GetContainingPowerOf2(bodyIndex + 1));
             }
-            SuballocatedList.Create(bufferPool, initialConstraintCountPerBodyPower, out constraintLists[bodyIndex]);
+            QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>.Create(bufferPool, initialConstraintCountPerBodyPower, out constraintLists[bodyIndex]);
         }
 
         /// <summary>
@@ -113,7 +113,7 @@ namespace SolverPrototype
         {
             ref var list = ref constraintLists[bodyIndex];
             var empty = list.Count == 0;
-            bufferPool.Free(ref list.Region);
+            list.Dispose(bufferPool);
 
             if (replacementIndex >= 0)
             {
@@ -133,14 +133,14 @@ namespace SolverPrototype
             BodyConstraintReference constraint;
             constraint.ConnectingConstraintHandle = constraintHandle;
             constraint.BodyIndexInConstraint = bodyIndexInConstraint;
-            SuballocatedList.Add(bufferPool, ref constraintLists[bodyIndex], constraint);
+            constraintLists[bodyIndex].Add(ref constraint, bufferPool);
         }
 
         struct RemovalPredicate : IPredicate<BodyConstraintReference>
         {
             public int ConstraintHandleToRemove;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public bool Test(BodyConstraintReference item)
+            public bool Matches(ref BodyConstraintReference item)
             {
                 return item.ConnectingConstraintHandle == ConstraintHandleToRemove;
             }
@@ -153,7 +153,7 @@ namespace SolverPrototype
             ref var list = ref constraintLists[bodyIndex];
             RemovalPredicate predicate;
             predicate.ConstraintHandleToRemove = constraintHandle;
-            SuballocatedList.FastRemove<BodyConstraintReference, RemovalPredicate>(bufferPool, ref list, ref predicate);
+            list.FastRemove(ref predicate);
         }
 
         //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
@@ -190,7 +190,6 @@ namespace SolverPrototype
         public void EnumerateConnectedBodies<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<int>
         {
             ref var list = ref constraintLists[bodyIndex];
-            ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
             ConstraintBodiesEnumerator<TEnumerator> constraintBodiesEnumerator;
             constraintBodiesEnumerator.InnerEnumerator = enumerator;
             constraintBodiesEnumerator.SourceBodyIndex = bodyIndex;
@@ -199,8 +198,7 @@ namespace SolverPrototype
             //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
             for (int i = list.Count - 1; i >= 0; --i)
             {
-                var constraint = Unsafe.Add(ref start, i);
-                solver.EnumerateConnectedBodyIndices(constraint.ConnectingConstraintHandle, ref constraintBodiesEnumerator);
+                solver.EnumerateConnectedBodyIndices(list[i].ConnectingConstraintHandle, ref constraintBodiesEnumerator);
             }
             //Note that we have to assume the enumerator contains state mutated by the internal loop bodies.
             //If it's a value type, those mutations won't be reflected in the original reference. 
@@ -218,13 +216,11 @@ namespace SolverPrototype
         public void EnumerateConstraints<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<BodyConstraintReference>
         {
             ref var list = ref constraintLists[bodyIndex];
-            ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
-
             //Note reverse iteration. This is useful when performing O(1) removals where the last element is put into the position of the removed element.
             //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
             for (int i = list.Count - 1; i >= 0; --i)
             {
-                enumerator.LoopBody(Unsafe.Add(ref start, i));
+                enumerator.LoopBody(list[i]);
             }
         }
         /// <summary>
@@ -240,13 +236,10 @@ namespace SolverPrototype
             //It's unclear how valuable this actually is- this shouldn't be a particularly common operation. We actually only added it for debugging purposes.
             //The only functional benefit it has over the IForEach variants is that it will early out. But you could create an early-outing enumerator.
             ref var list = ref constraintLists[bodyIndex];
-            ref var start = ref bufferPool.GetStart<BodyConstraintReference>(ref list.Region);
-
-            //Note reverse iteration. This is useful when performing O(1) removals where the last element is put into the position of the removed element.
-            //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
-            for (int i = list.Count - 1; i >= 0; --i)
+            
+            for (int i = 0; i < list.Count; ++i)
             {
-                if (Unsafe.Add(ref start, i).ConnectingConstraintHandle == constraintHandle)
+                if (list[i].ConnectingConstraintHandle == constraintHandle)
                     return true;
             }
             return false;

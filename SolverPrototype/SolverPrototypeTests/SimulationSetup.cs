@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Constraints;
 using System;
@@ -83,6 +84,7 @@ namespace SolverPrototypeTests
             out Simulation simulation, out int[] bodyHandles, out int[] constraintHandles)
         {
             simulation = new Simulation(
+                new BufferPool(),
                 initialBodyCapacity: bodyCount,
                 initialConstraintCapacity: bodyCount - 1,
                 minimumCapacityPerTypeBatch: bodyCount / 2,
@@ -135,6 +137,7 @@ namespace SolverPrototypeTests
         {
             var bodyCount = width * height * length;
             simulation = new Simulation(
+                new BufferPool(),
                 initialBodyCapacity: (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
                 initialConstraintCapacity: bodyCount * 3,
                 minimumCapacityPerTypeBatch: (bodyCount * 3) / 6,

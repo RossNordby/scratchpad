@@ -1,12 +1,9 @@
 ﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
@@ -33,11 +30,9 @@ namespace SolverPrototype
 
         Optimization nextTargetWithoutOffset;
         Optimization nextTargetWithOffset;
-
-        //Note that we could easily use a stackalloc to handle the targets, but it would actually cost more- stackallocs force a zeroing (as of this writing).
-        //Basically irrelevant in terms of total cost, though- this is just mainly to make use of the QuickList's functionality.
-        //Might also be nice to have it stored on the heap when we later use multithreaded optimizations.
-        QuickList<Optimization> targets = new QuickList<Optimization>(new PassthroughBufferPool<Optimization>());
+        
+        //Note that this is stored on the heap just to make it easier to pass to the multithreaded workers later. It doesn't truly exist outside of the scope of an update call.
+        QuickList<Optimization, Buffer<Optimization>> targets;
 
         /// <summary>
         /// If true, regions are offset by a half region width. Toggled each frame. Offsets allow the sorted regions to intermix, eventually converging to a full sort.
@@ -50,7 +45,7 @@ namespace SolverPrototype
             this.solver = solver;
         }
 
-        public void Update(int maximumRegionSizeInBundles, int regionCount)
+        public void Update(int maximumRegionSizeInBundles, int regionCount, BufferPool rawPool)
         {
             //Note that we require that all regions are bundle aligned. This is important for the typebatch sorting process, which tends to use bulk copies from bundle arrays to cache.
             //If not bundle aligned, those bulk copies would become complex due to the constraint AOSOA layout.
@@ -58,8 +53,6 @@ namespace SolverPrototype
             //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
             if (solver.Batches.Count == 0)
                 return;
-            targets.Count = 0;
-
 
             var nextTarget = shouldOffset ? nextTargetWithOffset : nextTargetWithoutOffset;
 
@@ -118,17 +111,22 @@ namespace SolverPrototype
                 }
             }
 
+
+            //Note that we can know exactly how many targets will exist thanks to the region count, so we can perform unsafe adds.
+            var pool = rawPool.SpecializeFor<Optimization>();
+            QuickList<Optimization, Buffer<Optimization>>.Create(pool, regionCount, out targets);
+
             do
             {
 
                 //Add the initial target for optimization. It's already been validated- either by the initial test, or by the previous wrap.
-                targets.Add(ref nextTarget);
+                targets.AddUnsafely(ref nextTarget);
                 nextTarget.BundleIndex += maximumRegionSizeInBundles;
                 WrapBundle(ref nextTarget);
 
                 //If the next target overlaps with the first target, the collection has wrapped around all constraints. Apparently more regions were requested
                 //than are available. Stop collection.
-                ref var firstTarget = ref targets.Elements[0];
+                ref var firstTarget = ref targets[0];
                 if (nextTarget.BatchIndex == firstTarget.BatchIndex &&
                     nextTarget.TypeBatchIndex == firstTarget.TypeBatchIndex &&
                     nextTarget.BundleIndex < firstTarget.BundleIndex + maximumRegionSizeInBundles)
@@ -157,10 +155,15 @@ namespace SolverPrototype
             //Note that having the set of optimizations computed up front makes multithreading the loop trivial.
             for (int i = 0; i < targets.Count; ++i)
             {
-                ref var target = ref targets.Elements[i];
-                var typeBatch = solver.Batches[target.BatchIndex].TypeBatches.Elements[target.TypeBatchIndex];
-                typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount);
+                ref var target = ref targets[i];
+                var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
+                //TODO: Note that we currently use the main bufferpool. That's not thread safe.
+                //When using multiple threads to sort, we should provide the function a 'parallel context' that includes both the workers dispatch interface and the memory resources.
+                typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount, rawPool);
             }
+
+            //Give the targets back to the pool.
+            targets.Dispose(pool);
         }
     }
 }

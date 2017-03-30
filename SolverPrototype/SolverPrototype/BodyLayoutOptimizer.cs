@@ -1,9 +1,9 @@
-﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using static SolverPrototype.ConstraintConnectivityGraph;
 using System;
 using System.Diagnostics;
+using BEPUutilities2.Memory;
+using BEPUutilities2.Collections;
 
 namespace SolverPrototype
 {
@@ -23,7 +23,8 @@ namespace SolverPrototype
 
             partialIslandDFSEnumerator = new PartialIslandDFSEnumerator
             {
-                traversalStack = new QuickList<int>(new PassthroughBufferPool<int>()),
+                traversalStack = new QuickList<int, Array<int>>(),
+                pool = new PassthroughArrayPool<int>(),
                 bodies = bodies,
                 graph = graph,
                 solver = solver,
@@ -135,7 +136,8 @@ namespace SolverPrototype
             public ConstraintConnectivityGraph graph;
             public Solver solver;
             //We effectively do a full traversal over multiple frames. We have to store the stack for this to work.
-            public QuickList<int> traversalStack;
+            public QuickList<int, Array<int>> traversalStack;
+            public PassthroughArrayPool<int> pool;
             //The target index is just the last recorded exclusive endpoint of the island. In other words, it's the place where the next island body will be put.
             public int targetIndex;
             public int currentBodyIndex;
@@ -153,13 +155,13 @@ namespace SolverPrototype
                     Debug.Assert(newLocation > currentBodyIndex, "The target index should always progress ahead of the traversal. Did something get reset incorrectly?");
                     SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
                     //Note that we mark the new location for traversal, since it was moved.
-                    traversalStack.Add(newLocation);
+                    traversalStack.Add(newLocation, pool);
                 }
                 else if (connectedBodyIndex > currentBodyIndex)
                 {
                     //While this body should not be swapped because it has already been swapped by an earlier traversal visit, 
                     //it is still a candidate for continued traversal. It might have children that cannot be reached by other paths.
-                    traversalStack.Add(connectedBodyIndex);
+                    traversalStack.Add(connectedBodyIndex, pool);
                 }
             }
         }
@@ -192,7 +194,7 @@ namespace SolverPrototype
                 if (partialIslandDFSEnumerator.traversalStack.Count == 0)
                 {
                     //There is no active traversal. Start one.
-                    partialIslandDFSEnumerator.traversalStack.Add(partialIslandDFSEnumerator.targetIndex++);
+                    partialIslandDFSEnumerator.traversalStack.Add(partialIslandDFSEnumerator.targetIndex++, partialIslandDFSEnumerator.pool);
                 }
                 partialIslandDFSEnumerator.traversalStack.Pop(out partialIslandDFSEnumerator.currentBodyIndex);
                 //It's possible for the target index to fall behind if no swaps are needed. 

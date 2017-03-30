@@ -1,5 +1,5 @@
 ﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
@@ -14,13 +14,15 @@ namespace SolverPrototype
     {
         internal BatchReferencedHandles BodyHandles;
         public int[] TypeIndexToTypeBatchIndex;
-        public QuickList<TypeBatch> TypeBatches;
+        PassthroughArrayPool<TypeBatch> typeBatchArrayPool;
+        public QuickList<TypeBatch, Array<TypeBatch>> TypeBatches;
 
         public ConstraintBatch(int initialReferencedHandlesEstimate = 128 * 64, int initialTypeCountEstimate = 32)
         {
             BodyHandles = new BatchReferencedHandles(initialReferencedHandlesEstimate);
             ResizeTypeMap(initialTypeCountEstimate);
-            TypeBatches = new QuickList<TypeBatch>(new PassthroughBufferPool<TypeBatch>());
+            typeBatchArrayPool = new PassthroughArrayPool<TypeBatch>();
+            QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, 16, out TypeBatches);
         }
 
         void ResizeTypeMap(int newSize)
@@ -43,8 +45,8 @@ namespace SolverPrototype
         public T GetTypeBatch<T>() where T : TypeBatch
         {
             var typeBatchIndex = TypeIndexToTypeBatchIndex[ConstraintTypeIds.GetId<T>()];
-            var typeBatch = TypeBatches.Elements[typeBatchIndex];
-            Debug.Assert(typeof(T) == TypeBatches.Elements[typeBatchIndex].GetType(), "If the type batch we have stored for this index isn't of the expected type, then something is broken.");
+            var typeBatch = TypeBatches[typeBatchIndex];
+            Debug.Assert(typeof(T) == TypeBatches[typeBatchIndex].GetType(), "If the type batch we have stored for this index isn't of the expected type, then something is broken.");
             return Unsafe.As<TypeBatch, T>(ref typeBatch);
         }
         /// <summary>
@@ -57,13 +59,13 @@ namespace SolverPrototype
         public TypeBatch GetTypeBatch(int typeId)
         {
             var typeBatchIndex = TypeIndexToTypeBatchIndex[typeId];
-            return TypeBatches.Elements[typeBatchIndex];
+            return TypeBatches[typeBatchIndex];
         }
 
         TypeBatch CreateNewTypeBatch(int typeId, TypeBatchAllocation typeBatchAllocation)
         {
             var batch = typeBatchAllocation.Take(typeId);
-            TypeBatches.Add(batch);
+            TypeBatches.Add(batch, typeBatchArrayPool);
             return batch;
         }
 
@@ -78,7 +80,7 @@ namespace SolverPrototype
         {
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
             {
-                ResizeTypeMap(1 << BufferPool.GetPoolIndex(typeId));
+                ResizeTypeMap(1 << SpanHelper.GetContainingPowerOf2(typeId));
                 TypeIndexToTypeBatchIndex[typeId] = TypeBatches.Count;
                 return CreateNewTypeBatch(typeId, typeBatchAllocation);
             }
@@ -92,8 +94,8 @@ namespace SolverPrototype
                 }
                 else
                 {
-                    Debug.Assert(ConstraintTypeIds.GetType(typeId) == TypeBatches.Elements[typeBatchIndex].GetType());
-                    return TypeBatches.Elements[typeBatchIndex];
+                    Debug.Assert(ConstraintTypeIds.GetType(typeId) == TypeBatches[typeBatchIndex].GetType());
+                    return TypeBatches[typeBatchIndex];
                 }
             }
         }
@@ -128,7 +130,7 @@ namespace SolverPrototype
                 bodyIndices[j] = bodies.HandleToIndex[bodyHandle];
             }
             reference.TypeBatch = GetOrCreateTypeBatch(typeId, typeBatchAllocation);
-            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices);
+            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices, typeBatchAllocation.BufferPool);
             //TODO: We could adjust the typeBatchAllocation capacities in response to the allocated index.
             //If it exceeds the current capacity, we could ensure the new size is still included.
             //The idea here would be to avoid resizes later by ensuring that the historically encountered size is always used to initialize.
@@ -165,7 +167,7 @@ namespace SolverPrototype
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
 
             var typeBatchIndex = TypeIndexToTypeBatchIndex[constraintTypeId];
-            var typeBatch = TypeBatches.Elements[typeBatchIndex];
+            var typeBatch = TypeBatches[typeBatchIndex];
             //Before we remove the constraint, we should locate the set the body indices referenced by the constraint and convert them into handles so that
             //they can be removed from the constraint batch's body handle set.
             var bodiesPerConstraint = typeBatch.BodiesPerConstraint;

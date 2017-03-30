@@ -113,11 +113,11 @@ namespace BEPUutilities2.Memory
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int IndexOf<TPredicate>(int start, int count, ref TPredicate predicate) where TPredicate : IPredicate<T>
+        public int IndexOf<TPredicate>(ref TPredicate predicate, int start, int count) where TPredicate : IPredicate<T>
         {
             ValidateRegion(start, count);
             var end = start + count;
-            for (int i = start; start < end; ++i)
+            for (int i = start; i < end; ++i)
                 if (predicate.Matches(ref this[i]))
                     return i;
             return -1;

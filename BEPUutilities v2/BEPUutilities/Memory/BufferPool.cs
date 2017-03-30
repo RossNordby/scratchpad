@@ -126,6 +126,8 @@ namespace BEPUutilities2.Memory
                 var neededBlockCount = (int)Math.Ceiling((double)capacity / BlockSize);
                 if (BlockCount < neededBlockCount)
                 {
+                    if (neededBlockCount > Blocks.Length)
+                        Array.Resize(ref Blocks, neededBlockCount);
                     for (int i = BlockCount; i < neededBlockCount; ++i)
                     {
                         Blocks[i] = new Block(BlockSize);
@@ -159,6 +161,9 @@ namespace BEPUutilities2.Memory
                 var indexInBlock = slot & SuballocationsPerBlockMask;
                 buffer = new RawBuffer(Blocks[blockIndex].Allocate(indexInBlock, SuballocationSize), SuballocationSize, slot);
 #if DEBUG
+                const int maximumOutstandingCapacity = 1 << 27;
+                Debug.Assert(outstandingIds.Count * SuballocationSize <= maximumOutstandingCapacity,
+                    $"Do you actually truly really need to have {maximumOutstandingCapacity} bytes taken from this power pool, or is this a memory leak?");
                 Debug.Assert(outstandingIds.Add(slot), "Should not be able to request the same slot twice.");
 #endif
             }
@@ -226,15 +231,15 @@ namespace BEPUutilities2.Memory
         }
 
         /// <summary>
-        /// Ensures that the pool associated with a given power has at least a certain amount of capacity.
+        /// Ensures that the pool associated with a given power has at least a certain amount of capacity, measured in bytes.
         /// </summary>
-        /// <param name="capacity">Minimum capacity to require for the power pool.</param>
+        /// <param name="byteCount">Minimum number of bytes to require for the power pool.</param>
         /// <param name="power">Power associated with the pool to check.</param>
-        public void EnsureCapacityForPower(int capacity, int power)
+        public void EnsureCapacityForPower(int byteCount, int power)
         {
             SpanHelper.ValidatePower(power);
             ValidatePinnedState(true);
-            pools[power].EnsureCapacity(capacity);
+            pools[power].EnsureCapacity(byteCount);
         }
 
         /// <summary>
@@ -370,7 +375,7 @@ namespace BEPUutilities2.Memory
         ~BufferPool()
         {
             var totalBlockCount = 0;
-            for (int i =0; i < pools.Length;++i)
+            for (int i = 0; i < pools.Length; ++i)
             {
                 totalBlockCount += pools[i].BlockCount;
             }

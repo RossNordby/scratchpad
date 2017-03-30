@@ -1,4 +1,5 @@
-﻿using SolverPrototype.Constraints;
+﻿using BEPUutilities2.Memory;
+using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -18,7 +19,13 @@ namespace SolverPrototype
         public Bodies Bodies { get; private set; }
         public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
+        public BatchCompressor SolverBatchCompressor { get; private set; }
         public Solver Solver { get; private set; }
+
+        /// <summary>
+        /// Gets the main memory pool used to fill persistent structures and main thread ephemeral resources across the engine.
+        /// </summary>
+        public BufferPool BufferPool { get; private set; }
 
         //You might wonder why this calls out 'full featured', since there are no other non-full featured simulations.
         //Later on, we might include such a partial simulation- for example, kinematic only, or even collision detection only.
@@ -26,6 +33,7 @@ namespace SolverPrototype
         /// <summary>
         /// Constructs a full featured simulation supporting dynamic movement and constraints.
         /// </summary>
+        /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
         /// <param name="initialBodyCapacity">Expected number of bodies. If the simulation exceeds this number, a resize of relevant resources will be performed.</param>
         /// <param name="initialConstraintCapacity">Expected number of constraints across all types. If the simulation exceeds this number, a resize of relevant resources will be performed.</param>
         /// <param name="minimumCapacityPerTypeBatch">Minimum number of constraints of one type in a constraint batch.
@@ -33,16 +41,19 @@ namespace SolverPrototype
         /// Per type estimates can be assigned within the Solver.TypeBatchAllocation.</param>
         /// <param name="initialConstraintCountPerBodyEstimate">Expected number of constraints connected to any one body. If this number is exceeded for a body, a resize of the body's list will be performed, but all affected resources are pooled.</param>
         public Simulation(
+            BufferPool bufferPool,
             int initialBodyCapacity = 4096,
             int initialConstraintCapacity = 4096,
             int minimumCapacityPerTypeBatch = 64,
             int initialConstraintCountPerBodyEstimate = 8)
         {
+            BufferPool = bufferPool;
             Bodies = new Bodies(initialBodyCapacity);
-            Solver = new Solver(Bodies, initialCapacity: initialConstraintCapacity, minimumCapacityPerTypeBatch: minimumCapacityPerTypeBatch);
-            ConstraintGraph = new ConstraintConnectivityGraph(Solver, initialBodyCapacity, initialConstraintCountPerBodyEstimate);
+            Solver = new Solver(Bodies, BufferPool, initialCapacity: initialConstraintCapacity, minimumCapacityPerTypeBatch: minimumCapacityPerTypeBatch);
+            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialBodyCapacity, initialConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
+            SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
         }
 
         public int Add(ref BodyDescription bodyDescription)
@@ -68,7 +79,7 @@ namespace SolverPrototype
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(removedIndex, movedBodyOriginalIndex);
             Debug.Assert(constraintListWasEmpty, "Removing a body without first removing its constraints results in orphaned constraints that will break stuff. Don't do it!");
-         
+
 
         }
 

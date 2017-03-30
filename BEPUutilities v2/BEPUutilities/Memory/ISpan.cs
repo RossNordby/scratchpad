@@ -88,11 +88,11 @@ namespace BEPUutilities2.Memory
         /// <summary>
         /// Gets the index of the first match of a predicate. Search proceeds from low to high indices.
         /// </summary>
+        /// <param name="predicate">Predicate to test against the elements in the span region.</param>
         /// <param name="start">Inclusive start index of the search.</param>
         /// <param name="count">Number of elements to search.</param>
-        /// <param name="predicate">Predicate to test against the elements in the span region.</param>
         /// <returns>Index of the element in the span if it is present; -1 otherwise.</returns>
-        int IndexOf<TPredicate>(int start, int count, ref TPredicate predicate) where TPredicate : IPredicate<T>;
+        int IndexOf<TPredicate>(ref TPredicate predicate, int start, int count) where TPredicate : IPredicate<T>;
 
         /// <summary>
         /// Pins the span's backing memory if it is managed.

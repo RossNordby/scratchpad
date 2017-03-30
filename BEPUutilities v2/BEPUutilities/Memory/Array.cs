@@ -88,7 +88,7 @@ namespace BEPUutilities2.Memory
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int IndexOf<TPredicate>(int start, int count, ref TPredicate predicate) where TPredicate : IPredicate<T>
+        public int IndexOf<TPredicate>(ref TPredicate predicate, int start, int count) where TPredicate : IPredicate<T>
         {
             var end = start + count;
             for (int i = start; i < end; ++i)

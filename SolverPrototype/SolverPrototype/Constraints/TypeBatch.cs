@@ -1,5 +1,4 @@
-﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.Memory;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -22,15 +21,16 @@ namespace SolverPrototype.Constraints
         /// <summary>
         /// The handles for the constraints in this type batch.
         /// </summary>
-        public int[] IndexToHandle;
+        public Buffer<int> IndexToHandle;
 
         /// <summary>
         /// Allocates a slot in the batch.
         /// </summary>
         /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
         /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
+        /// <param name="rawPool">Pool to use if the type batch has to be resized.</param>
         /// <returns>Index of the slot in the batch.</returns>
-        public unsafe abstract int Allocate(int handle, int* bodyIndices);
+        public unsafe abstract int Allocate(int handle, int* bodyIndices, BufferPool rawPool);
         public abstract void Remove(int index, ConstraintLocation[] handlesToConstraints);
 
         /// <summary>
@@ -55,10 +55,11 @@ namespace SolverPrototype.Constraints
         /// <param name="constraintCount">Number of constraints (not bundles!) to sort.</param>
         /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that needs to be updated in response to swaps.</param>
         /// <param name="bodyCount">Number of bodies in the body set.</param>
-        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount);
+        /// <param name="pool">Pool to pull cache spans from.</param>
+        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool pool);
 
-        public abstract void Initialize(int initialCapacityInBundles, int typeId);
-        public abstract void Reset();
+        public abstract void Initialize(BufferPool rawPool, int initialCapacityInBundles, int typeId);
+        public abstract void Reset(BufferPool rawPool);
 
         public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle);
         public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
@@ -86,6 +87,10 @@ namespace SolverPrototype.Constraints
         [Conditional("DEBUG")]
         public abstract void ValidateBundleCounts();
 
+        internal unsafe int Allocate(int handle, int* bodyIndices, object bufferPool)
+        {
+            throw new NotImplementedException();
+        }
     }
     //You are allowed to squint at this triple-class separation.
     //This is only really here because there are cases (e.g. adding a constraint) where it is necessary to have knowledge of TBodyReferences so that the caller (the solver, generally)
@@ -95,24 +100,24 @@ namespace SolverPrototype.Constraints
 
     public abstract class TypeBatch<TBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse> : TypeBatch
     {
-        public TBodyReferences[] BodyReferences;
-        public TPrestepData[] PrestepData;
+        public Buffer<TBodyReferences> BodyReferences;
+        public Buffer<TPrestepData> PrestepData;
         //Technically, the iteration data does not need to persist outside of the scope of the solve. We let it persist for simplicity- it does not take much space.
 
         //Projection and unprojection data required by the WarmStart and SolveIteration. Note that this data is conceptually ephemeral.
         //External users should not depend upon it outside of the solver's execution.
         //(At the moment, it does persist, but it becomes unreliable when constraints are removed, and the implementation reserves the right to make it completely temporary.)
-        protected TProjection[] Projection;
-        public TAccumulatedImpulse[] AccumulatedImpulses;
+        protected Buffer<TProjection> Projection;
+        public Buffer<TAccumulatedImpulse> AccumulatedImpulses;
 
 
-        static void IncreaseSize<T>(ref T[] array)
+        static void IncreaseSize<T>(BufferPool rawPool, ref Buffer<T> buffer)
         {
-            //Out of space. Need to resize.
-            var old = array;
-            array = BufferPools<T>.Locking.Take(array.Length << 1);
-            Array.Copy(old, array, old.Length);
-            BufferPools<T>.Locking.Return(old);
+            var pool = rawPool.SpecializeFor<T>();
+            var old = buffer;
+            pool.Take(buffer.Length * 2, out buffer);
+            old.CopyTo(0, ref buffer, 0, old.Length);
+            pool.Return(ref old);
         }
 
 
@@ -180,16 +185,16 @@ namespace SolverPrototype.Constraints
         /// </summary>
         /// <param name="handle">Handle to allocate.</param>
         /// <returns>Index in the type batch allocated for the constraint.</returns>
-        private int AllocateShared(int handle)
+        private unsafe int AllocateShared(int handle, BufferPool pool)
         {
-            Debug.Assert(Projection != null, "Should initialize the batch before allocating anything from it.");
+            Debug.Assert(Projection.Memory != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == IndexToHandle.Length)
             {
-                IncreaseSize(ref BodyReferences);
-                IncreaseSize(ref PrestepData);
-                IncreaseSize(ref Projection);
-                IncreaseSize(ref AccumulatedImpulses);
-                IncreaseSize(ref IndexToHandle);
+                IncreaseSize(pool, ref BodyReferences);
+                IncreaseSize(pool, ref PrestepData);
+                IncreaseSize(pool, ref Projection);
+                IncreaseSize(pool, ref AccumulatedImpulses);
+                IncreaseSize(pool, ref IndexToHandle);
             }
             var index = constraintCount++;
             IndexToHandle[index] = handle;
@@ -203,31 +208,33 @@ namespace SolverPrototype.Constraints
         /// </summary>
         /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
         /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
+        /// <param name="pool">Pool to use if the type batch has to be resized.</param>
         /// <returns>Index of the slot in the batch.</returns>
-        public unsafe sealed override int Allocate(int handle, int* bodyIndices)
+        public unsafe sealed override int Allocate(int handle, int* bodyIndices, BufferPool pool)
         {
-            var index = AllocateShared(handle);
+            var index = AllocateShared(handle, pool);
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
             AddBodyReferencesLane(ref bundle, innerIndex, bodyIndices);
             return index;
         }
 
-        /// <summary>
-        /// Allocates a slot in the batch without filling the body references lane for the allocated constraint. The BodyReferences.Count is incremented, though.
-        /// </summary>
-        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
-        /// <param name="allocatedBundleIndex">Bundle index for the constraint.</param>
-        /// <param name="allocatedInnerIndex">Index of the constraint within its bundle.</param>
-        /// <returns>Index of the slot in the batch.</returns>
-        internal int Allocate(int handle, out int allocatedBundleIndex, out int allocatedInnerIndex)
-        {
-            var index = AllocateShared(handle);
-            BundleIndexing.GetBundleIndices(index, out allocatedBundleIndex, out allocatedInnerIndex);
-            ref var bundle = ref BodyReferences[allocatedBundleIndex];
-            GetLanesInBundleCount(ref bundle) = allocatedInnerIndex + 1;
-            return index;
-        }
+        ///// <summary>
+        ///// Allocates a slot in the batch without filling the body references lane for the allocated constraint. The BodyReferences.Count is incremented, though.
+        ///// </summary>
+        ///// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
+        ///// <param name="pool">Pool to use if the type batch has to be resized.</param>
+        ///// <param name="allocatedBundleIndex">Bundle index for the constraint.</param>
+        ///// <param name="allocatedInnerIndex">Index of the constraint within its bundle.</param>
+        ///// <returns>Index of the slot in the batch.</returns>
+        //internal int Allocate(int handle, BufferPool pool, out int allocatedBundleIndex, out int allocatedInnerIndex)
+        //{
+        //    var index = AllocateShared(handle, pool);
+        //    BundleIndexing.GetBundleIndices(index, out allocatedBundleIndex, out allocatedInnerIndex);
+        //    ref var bundle = ref BodyReferences[allocatedBundleIndex];
+        //    GetLanesInBundleCount(ref bundle) = allocatedInnerIndex + 1;
+        //    return index;
+        //}
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -352,7 +359,7 @@ namespace SolverPrototype.Constraints
             var bodyHandles = stackalloc int[BodiesPerConstraint];
             var bodyHandleCollector = new ConstraintBodyHandleCollector(bodies, bodyHandles);
             EnumerateConnectedBodyIndices(indexInTypeBatch, ref bodyHandleCollector);
-            var targetBatch = solver.Batches.Elements[targetBatchIndex];
+            var targetBatch = solver.Batches[targetBatchIndex];
             //Allocate a spot in the new batch. Note that it does not change the Handle->Constraint mapping in the Solver; that's important when we call Solver.Remove below.
             var constraintHandle = IndexToHandle[indexInTypeBatch];
             targetBatch.Allocate(constraintHandle, ref bodyHandles[0], bodiesPerConstraint, bodies, solver.TypeBatchAllocation, typeId, out var newReference);
@@ -387,13 +394,13 @@ namespace SolverPrototype.Constraints
 
         }
 
-        public override void Initialize(int initialCapacityInBundles, int typeId)
+        public override void Initialize(BufferPool bufferPool, int initialCapacityInBundles, int typeId)
         {
-            Projection = BufferPools<TProjection>.Locking.Take(initialCapacityInBundles);
-            BodyReferences = BufferPools<TBodyReferences>.Locking.Take(initialCapacityInBundles);
-            PrestepData = BufferPools<TPrestepData>.Locking.Take(initialCapacityInBundles);
-            AccumulatedImpulses = BufferPools<TAccumulatedImpulse>.Locking.Take(initialCapacityInBundles);
-            IndexToHandle = BufferPools<int>.Locking.Take(initialCapacityInBundles * Vector<float>.Count);
+            bufferPool.SpecializeFor<TProjection>().Take(initialCapacityInBundles, out Projection);
+            bufferPool.SpecializeFor<TBodyReferences>().Take(initialCapacityInBundles, out BodyReferences);
+            bufferPool.SpecializeFor<TPrestepData>().Take(initialCapacityInBundles, out PrestepData);
+            bufferPool.SpecializeFor<TAccumulatedImpulse>().Take(initialCapacityInBundles, out AccumulatedImpulses);
+            bufferPool.SpecializeFor<int>().Take(initialCapacityInBundles * Vector<float>.Count, out IndexToHandle);
             //Including this in the typebatch is a little bit hacky; it's just useful to know the typeid without any explicit generic parameters within the type batch 
             //when doing things like the MoveConstraint above- being able to know which type batch without external help simplifies the usage.
             //Given that the initializer always knows the typeid, and given that the cost is an extra 4 bytes at the level of type batches, this hack is pretty low concern.
@@ -401,18 +408,18 @@ namespace SolverPrototype.Constraints
             this.typeId = typeId;
         }
 
-        public override void Reset()
+        public override void Reset(BufferPool bufferPool)
         {
-            BufferPools<TProjection>.Locking.Return(Projection);
-            BufferPools<TBodyReferences>.Locking.Return(BodyReferences);
-            BufferPools<TPrestepData>.Locking.Return(PrestepData);
-            BufferPools<TAccumulatedImpulse>.Locking.Return(AccumulatedImpulses);
-            BufferPools<int>.Locking.Return(IndexToHandle);
-            Projection = null;
-            BodyReferences = null;
-            AccumulatedImpulses = null;
-            AccumulatedImpulses = null;
-            IndexToHandle = null;
+            bufferPool.SpecializeFor<TProjection>().Return(ref Projection);
+            bufferPool.SpecializeFor<TBodyReferences>().Return(ref BodyReferences);
+            bufferPool.SpecializeFor<TPrestepData>().Return(ref PrestepData);
+            bufferPool.SpecializeFor<TAccumulatedImpulse>().Return(ref AccumulatedImpulses);
+            bufferPool.SpecializeFor<int>().Return(ref IndexToHandle);
+            Projection = new Buffer<TProjection>();
+            BodyReferences = new Buffer<TBodyReferences>();
+            AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
+            AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
+            IndexToHandle = new Buffer<int>();
         }
 
 

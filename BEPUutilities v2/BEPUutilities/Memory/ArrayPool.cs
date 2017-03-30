@@ -117,6 +117,11 @@ namespace BEPUutilities2.Memory
         void ValidateCount()
         {
 #if DEBUG
+            //Note the relatively low number of outstanding resources as a threshold compared to the pointer-based pool.
+            //While it's not really a problem if a user wants to suballocate ten thousand buffers from a big pinned block,
+            //it's really not kind to the GC to have many thousands of array references floating around.
+            //If you find yourself hitting this limit, consider if there's another way before just bumping up this number-
+            //could you use the pointer-based pool instead? Is there some way around having tons of regions?
             const int maximumOutstandingResources = 1000;
             Debug.Assert(outstandingResources.Count < maximumOutstandingResources, $"Do you REALLY have {maximumOutstandingResources} outstanding resources? Or is this a memory leak?");
 #endif

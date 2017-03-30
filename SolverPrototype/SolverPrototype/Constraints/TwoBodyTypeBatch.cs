@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -82,26 +83,24 @@ namespace SolverPrototype.Constraints
                 return a > b ? 1 : a < b ? -1 : 0;
             }
         }
-        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount)
+        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool rawPool)
         {
             int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
             if ((constraintCount & BundleIndexing.VectorMask) != 0)
                 ++bundleCount;
-
-            //TODO: Replace these buffer pools with new buffer pools once they're ready. Probably passed in from above to guarantee thread safety.
-            //(New pools are typeless, so no issue there. The pointer backing means we'll probably have to shift the below to blockcopies, but that's fine.)
-            var sourceIndices = BufferPools<int>.Locking.Take(constraintCount);
-            var sortKeys = BufferPools<int>.Locking.Take(constraintCount);
-            var handlesCache = BufferPools<int>.Locking.Take(constraintCount);
-            var referencesCache = BufferPools<TwoBodyReferences>.Locking.Take(bundleCount);
-            var prestepCache = BufferPools<TPrestepData>.Locking.Take(bundleCount);
-            var accumulatedImpulseCache = BufferPools<TAccumulatedImpulse>.Locking.Take(bundleCount);
+            
+            rawPool.SpecializeFor<int>().Take(constraintCount, out var sourceIndices);
+            rawPool.SpecializeFor<int>().Take(constraintCount, out var sortKeys);
+            rawPool.SpecializeFor<int>().Take(constraintCount, out var handlesCache);
+            rawPool.SpecializeFor<TwoBodyReferences>().Take(bundleCount, out var referencesCache);
+            rawPool.SpecializeFor<TPrestepData>().Take(bundleCount, out var prestepCache);
+            rawPool.SpecializeFor<TAccumulatedImpulse>().Take(bundleCount, out var accumulatedImpulseCache);
 
             //Cache the unsorted data.
-            Array.Copy(BodyReferences, bundleStartIndex, referencesCache, 0, bundleCount);
-            Array.Copy(PrestepData, bundleStartIndex, prestepCache, 0, bundleCount);
-            Array.Copy(AccumulatedImpulses, bundleStartIndex, accumulatedImpulseCache, 0, bundleCount);
-            Array.Copy(IndexToHandle, bundleStartIndex * Vector<int>.Count, handlesCache, 0, constraintCount);
+            BodyReferences.CopyTo(bundleStartIndex, ref referencesCache, 0, bundleCount);
+            PrestepData.CopyTo(bundleStartIndex, ref prestepCache, 0, bundleCount);
+            AccumulatedImpulses.CopyTo(bundleStartIndex, ref accumulatedImpulseCache, 0, bundleCount);
+            IndexToHandle.CopyTo(bundleStartIndex * Vector<int>.Count, ref handlesCache, 0, constraintCount);
 
             //First, compute the proper order of the constraints in this region by sorting their keys.
             //This minimizes the number of swaps that must be applied to the actual bundle data.
@@ -112,18 +111,13 @@ namespace SolverPrototype.Constraints
                 sourceIndices[i] = i;
                 sortKeys[i] = GetSortKey(baseIndex + i);
             }
-
-            //TODO: Later on, if you switch to pointer or ambiguously backed memory, you'll have to use a different sort.
-            //If some form of span.sort doesn't exist yet, we'll need to use our own little sort implementation. The following works reasonably well,
-            //though it is a little slower than the default sort in some scrambled cases. This isn't a big concern.
+            
             //TODO: You may want to actually change the way the optimizer handles sorting. Rather than doing a bunch of independent sorts, it could do a cooperative sort.
             //It would be slower in terms of raw coverage, but it would converge faster. The key there would be an efficient and parallel merge operation.
             //Subarrays could be sorted by any available means.
-            //var comparer = default(IntComparer);
-            //Quicksort.Sort2(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
-
-            Array.Sort(sortKeys, sourceIndices, 0, constraintCount);
-
+            var comparer = default(IntComparer);
+            Quicksort.Sort2(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
+            
             //Push the cached data into its proper sorted position.
             for (int i = 0; i < constraintCount; ++i)
             {
@@ -140,17 +134,15 @@ namespace SolverPrototype.Constraints
                     targetBundle, targetInner, targetIndex, handlesToConstraints);
 
             }
-
-
-
-            BufferPools<int>.Locking.Return(sourceIndices);
-            BufferPools<int>.Locking.Return(sortKeys);
-            BufferPools<int>.Locking.Return(handlesCache);
-            BufferPools<TwoBodyReferences>.Locking.Return(referencesCache);
-            BufferPools<TPrestepData>.Locking.Return(prestepCache);
-            BufferPools<TAccumulatedImpulse>.Locking.Return(accumulatedImpulseCache);
+            
+            rawPool.SpecializeFor<int>().Return(ref sourceIndices);
+            rawPool.SpecializeFor<int>().Return(ref sortKeys);
+            rawPool.SpecializeFor<int>().Return(ref handlesCache);
+            rawPool.SpecializeFor<TwoBodyReferences>().Return(ref referencesCache);
+            rawPool.SpecializeFor<TPrestepData>().Return(ref prestepCache);
+            rawPool.SpecializeFor<TAccumulatedImpulse>().Return(ref accumulatedImpulseCache);
         }
-        
+
         public sealed override void ValidateBundleCounts()
         {
             Debug.Assert(constraintCount > 0, "If a type batch exists, it should have constraints in it.");

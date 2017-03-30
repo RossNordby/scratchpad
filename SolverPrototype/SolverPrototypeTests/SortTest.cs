@@ -1,17 +1,15 @@
-﻿using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using SolverPrototype;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototypeTests
 {
     public static class SortTest
     {
+
         struct Comparer : IComparerRef<int>
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -25,13 +23,13 @@ namespace SolverPrototypeTests
         {
             void VerifySort(int[] keys)
             {
-                for (int i= 1; i < keys.Length; ++i)
+                for (int i = 1; i < keys.Length; ++i)
                 {
                     Debug.Assert(keys[i] >= keys[i - 1]);
                 }
             }
             const int elementCount = 262144;
-            const int elementExclusiveUpperBound = 1<<8;
+            const int elementExclusiveUpperBound = 1 << 30;
             for (int iteration = 0; iteration < 16; ++iteration)
             {
                 GC.Collect(3, GCCollectionMode.Forced, true);
@@ -41,8 +39,8 @@ namespace SolverPrototypeTests
                 for (int i = 0; i < elementCount; ++i)
                 {
                     indexMap[i] = i;
-                    keys[i] = i;
-                    //keys[i] = random.Next(elementExclusiveUpperBound);
+                    //keys[i] = i;
+                    keys[i] = random.Next(elementExclusiveUpperBound);
                 }
                 var keys2 = new int[elementCount];
                 var indexMap2 = new int[elementCount];
@@ -88,10 +86,10 @@ namespace SolverPrototypeTests
 
                 var originalIndices = new int[256];
                 //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
-                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], 1, BufferPool.GetPoolIndex(elementExclusiveUpperBound)); //prejit
+                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], 1, SpanHelper.GetContainingPowerOf2(elementExclusiveUpperBound)); //prejit
                 timer.Restart();
                 //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
-                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], elementCount, BufferPool.GetPoolIndex(elementExclusiveUpperBound));
+                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], elementCount, SpanHelper.GetContainingPowerOf2(elementExclusiveUpperBound));
                 timer.Stop();
                 VerifySort(keys4);
                 Console.WriteLine($"MSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");

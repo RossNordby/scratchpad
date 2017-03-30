@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using BEPUutilities2.Collections;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
+    //TODO: This should probably be cleaned up and moved into BEPUutilities at some point. And change it to operate on spans rather than the super duper annoying Unsafe.Add stuff.
     public static class Quicksort
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

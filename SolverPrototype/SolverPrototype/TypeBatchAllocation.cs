@@ -1,8 +1,7 @@
-﻿using BEPUutilities2.ResourceManagement;
+﻿using BEPUutilities2.Memory;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
@@ -22,14 +21,21 @@ namespace SolverPrototype
                 minimumCapacity = value;
             }
         }
+
+        /// <summary>
+        /// Pool used to initialize type batch buffers.
+        /// </summary>
+        public BufferPool BufferPool { get; private set; }
+
         int[] capacities;
         Pool<TypeBatch>[] pools;
 
-        public TypeBatchAllocation(int initialTypeCountEstimate, int minimumCapacity)
+        public TypeBatchAllocation(int initialTypeCountEstimate, int minimumCapacity, BufferPool bufferPool)
         {
             capacities = new int[initialTypeCountEstimate];
             pools = new Pool<TypeBatch>[initialTypeCountEstimate];
             this.minimumCapacity = minimumCapacity;
+            this.BufferPool = bufferPool;
         }
 
         //TODO: There is really no good reason why you couldn't have all the types defined up front. It would avoid all the last-second resizing. Not exactly a big issue,
@@ -39,7 +45,7 @@ namespace SolverPrototype
             Debug.Assert(typeId >= 0, "Type ids are nonnegative!");
             if (typeId >= capacities.Length)
             {
-                var newSize = 1 << BufferPool.GetPoolIndex(typeId);
+                var newSize = 1 << SpanHelper.GetContainingPowerOf2(typeId);
                 Array.Resize(ref capacities, newSize);
                 Array.Resize(ref pools, newSize);
             }
@@ -96,13 +102,13 @@ namespace SolverPrototype
             {
                 //The new constraint results in constructors being invoked with reflection at the moment, but we shouldn't be creating new type batches frequently.
                 //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.               
-                pools[typeId] = new Pool<TypeBatch>(() => (TypeBatch)Activator.CreateInstance(ConstraintTypeIds.GetType(typeId)), cleaner: batch => batch.Reset());
+                pools[typeId] = new Pool<TypeBatch>(() => (TypeBatch)Activator.CreateInstance(ConstraintTypeIds.GetType(typeId)), cleaner: batch => batch.Reset(BufferPool));
             }
             var typeBatch = pools[typeId].Take();
             //We didn't initialize it in the pool; do so here. (The pool COULD use an initializer, but, well, I didn't do that.)
             //TODO: In the future, the initialization would ideally take a memory source to pull from rather than just using a static BufferPool source.
             //This TypeBatchAllocation class would have a reference to that memory source so we could very conveniently pass it into the initialization.
-            typeBatch.Initialize(BundleIndexing.GetBundleCount(Math.Max(minimumCapacity, capacities[typeId])), typeId);
+            typeBatch.Initialize(BufferPool, BundleIndexing.GetBundleCount(Math.Max(minimumCapacity, capacities[typeId])), typeId);
             return typeBatch;
         }
 

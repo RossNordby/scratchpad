@@ -1,11 +1,8 @@
 ﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototypeTests
 {
@@ -18,7 +15,7 @@ namespace SolverPrototypeTests
                 bodyIndex = 0;
             }
             int bodyIndex;
-            static BufferPool<int> pool = new UnsafeBufferPool<int>();
+            static ArrayPool<int> pool = new ArrayPool<int>();
             public void Swap(int[] bodies, int islandCount)
             {
                 //Pick a body. Find all bodies of its type.
@@ -27,23 +24,23 @@ namespace SolverPrototypeTests
                     bodyIndex = 0;
                 var bodyType = bodies[bodyIndex];
                 int lowestIndex = -1;
-                var islandBodyIndices = new QuickList<int>(pool);
+                QuickList<int, Array<int>>.Create(pool, 128, out var islandBodyIndices);
                 for (int i = bodies.Length - 1; i >= 0; --i)
                 {
                     if (bodies[i] == bodyType)
                     {
                         lowestIndex = i;
-                        islandBodyIndices.Add(i);
+                        islandBodyIndices.Add(i, pool);
                     }
                 }
                 var baseIndex = Math.Min(bodies.Length - islandBodyIndices.Count, lowestIndex);
-                Array.Sort(islandBodyIndices.Elements, 0, islandBodyIndices.Count);
+                Array.Sort(islandBodyIndices.Span.Memory, 0, islandBodyIndices.Count);
                 for (int i = 0; i < islandBodyIndices.Count; ++i)
                 {
-                    IslandCacheConvergence.Swap(ref bodies[baseIndex + i], ref bodies[islandBodyIndices.Elements[i]]);
+                    IslandCacheConvergence.Swap(ref bodies[baseIndex + i], ref bodies[islandBodyIndices[i]]);
                 }
                 bodyIndex += islandBodyIndices.Count;
-                islandBodyIndices.Dispose();
+                islandBodyIndices.Dispose(pool);
             }
         }
 
@@ -173,9 +170,9 @@ namespace SolverPrototypeTests
         public static void Test()
         {
             var blindLocal = new BlindLocal();
-            Test(10, 30, 1000, 100000, ref blindLocal);
+            Test(5, 30, 100, 100000, ref blindLocal);
             var islandBlob = new IslandBlob();
-            Test(10, 30, 1000, 100000, ref islandBlob);
+            Test(5, 30, 100, 100000, ref islandBlob);
         }
     }
 }

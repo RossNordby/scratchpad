@@ -258,7 +258,7 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Gets the index of the element in the list, if present.
+        /// Gets the index of the element in the list using the default comparer, if present.
         /// </summary>
         /// <param name="element">Element to find.</param>
         /// <returns>Index of the element in the list if present, -1 otherwise.</returns>
@@ -281,6 +281,7 @@ namespace BEPUutilities2.Collections
             Validate();
             return Span.IndexOf(ref element, 0, Count);
         }
+
 
         /// <summary>
         /// Removes an element from the list. Preserves the order of elements.
@@ -319,7 +320,7 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
-        /// Removes an element from the list. Does not preserve the order of elements.
+        /// Removes an element from the list. Comparisons use the default comparer for the type. Does not preserve the order of elements.
         /// </summary>
         /// <param name="element">Element to remove from the list.</param>
         /// <returns>True if the element was present and was removed, false otherwise.</returns>
@@ -346,6 +347,24 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             var index = IndexOf(element);
+            if (index >= 0)
+            {
+                FastRemoveAt(index);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Removes the first element from the list that matches a predicate, moving from low to high indices. Does not preserve the order of elements.
+        /// </summary>
+        /// <param name="predicate">Predicate to test elements with.</param>
+        /// <returns>True if an element matched and was removed, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool FastRemove<TPredicate>(ref TPredicate predicate) where TPredicate : IPredicate<T>
+        {
+            Validate();
+            var index = Span.IndexOf(ref predicate, 0, Count);
             if (index >= 0)
             {
                 FastRemoveAt(index);

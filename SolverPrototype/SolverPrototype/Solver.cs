@@ -1,10 +1,8 @@
 ﻿using BEPUutilities2.Collections;
-using BEPUutilities2.ResourceManagement;
+using BEPUutilities2.Memory;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
@@ -33,7 +31,8 @@ namespace SolverPrototype
 
     public class Solver
     {
-        public QuickList<ConstraintBatch> Batches;
+        PassthroughArrayPool<ConstraintBatch> batchArrayPool;
+        public QuickList<ConstraintBatch, Array<ConstraintBatch>> Batches;
 
         int iterationCount;
         /// <summary>
@@ -59,13 +58,14 @@ namespace SolverPrototype
 
         public TypeBatchAllocation TypeBatchAllocation { get; private set; }
 
-        public Solver(Bodies bodies, int iterationCount = 5, int initialCapacity = 1024, int minimumCapacityPerTypeBatch = 64, int initialTypeCountEstimate = 32)
+        public Solver(Bodies bodies, BufferPool bufferPool, int iterationCount = 5, int initialCapacity = 1024, int minimumCapacityPerTypeBatch = 64, int initialTypeCountEstimate = 32)
         {
             this.iterationCount = iterationCount;
             this.bodies = bodies;
-            Batches = new QuickList<ConstraintBatch>(new PassthroughBufferPool<ConstraintBatch>());
+            batchArrayPool = new PassthroughArrayPool<ConstraintBatch>();
+            QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, 32, out Batches);
             HandlesToConstraints = new ConstraintLocation[initialCapacity];
-            TypeBatchAllocation = new TypeBatchAllocation(initialTypeCountEstimate, minimumCapacityPerTypeBatch);
+            TypeBatchAllocation = new TypeBatchAllocation(initialTypeCountEstimate, minimumCapacityPerTypeBatch, bufferPool);
         }
 
         /// <summary>
@@ -79,7 +79,7 @@ namespace SolverPrototype
         public void GetConstraintReference(int handle, out ConstraintReference reference)
         {
             ref var constraintLocation = ref HandlesToConstraints[handle];
-            reference.TypeBatch = Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId);
+            reference.TypeBatch = Batches[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId);
             reference.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
         }
 
@@ -98,7 +98,7 @@ namespace SolverPrototype
             //Find the first batch that references none of the bodies that this constraint needs.
             for (int i = 0; i < Batches.Count; ++i)
             {
-                if (Batches.Elements[i].CanFit(ref bodyHandles, bodyCount))
+                if (Batches[i].CanFit(ref bodyHandles, bodyCount))
                 {
                     targetBatchIndex = i;
                     break;
@@ -112,10 +112,10 @@ namespace SolverPrototype
                 //Batches grow and shrink like a stack since the removals only ever occur when an empty batch is in the very last slot.
                 //So, all we have to do is check the backing array slot- if there's already a batch there, use it.
                 targetBatchIndex = Batches.Count;
-                if (Batches.Elements.Length > Batches.Count && Batches.Elements[targetBatchIndex] != null)
+                if (Batches.Span.Length > Batches.Count && Batches.Span[targetBatchIndex] != null)
                 {
                     //Reusable batch found! 
-                    targetBatch = Batches.Elements[targetBatchIndex];
+                    targetBatch = Batches[targetBatchIndex];
                     Debug.Assert(targetBatch.TypeBatches.Count == 0);
                     ++Batches.Count;
                 }
@@ -123,12 +123,12 @@ namespace SolverPrototype
                 {
                     //No reusable batch found. Create a new one.
                     targetBatch = new ConstraintBatch();
-                    Batches.Add(targetBatch);
+                    Batches.Add(targetBatch, batchArrayPool);
                 }
             }
             else
             {
-                targetBatch = Batches.Elements[targetBatchIndex];
+                targetBatch = Batches[targetBatchIndex];
             }
             var handle = handlePool.Take();
             targetBatch.Allocate(handle, ref bodyHandles, bodyCount, bodies, TypeBatchAllocation, typeId, out reference);
@@ -197,7 +197,7 @@ namespace SolverPrototype
         /// <param name="indexInTypeBatch">Index of the constraint to remove within its type batch.</param>
         internal void RemoveFromBatch(int batchIndex, int typeId, int indexInTypeBatch)
         {
-            var batch = Batches.Elements[batchIndex];
+            var batch = Batches[batchIndex];
             batch.Remove(typeId, indexInTypeBatch, bodies, HandlesToConstraints, TypeBatchAllocation);
             if (batch.TypeBatches.Count == 0)
             {
@@ -220,7 +220,7 @@ namespace SolverPrototype
                 if (batchIndex == Batches.Count - 1)
                 {
                     //Note that when we remove an empty batch, it may reveal another empty batch. If that happens, remove the revealed batch(es) too.
-                    while (Batches.Count > 0 && Batches.Elements[Batches.Count - 1].TypeBatches.Count == 0)
+                    while (Batches.Count > 0 && Batches[Batches.Count - 1].TypeBatches.Count == 0)
                     {
                         //Note that we do not actually null out the batch slot. It's still there. The backing array of the Batches list acts as a pool. When a new batch is required,
                         //the add function first checks the backing array to see if a batch was already allocated for it. In effect, adding and removing batches behaves like a stack.
@@ -263,7 +263,7 @@ namespace SolverPrototype
             //The BuildDescription and ConstraintTypeId members are basically static. It would be nice if C# could express that a little more cleanly with no overhead.
             ref var location = ref HandlesToConstraints[handle];
             var dummy = default(TConstraintDescription);
-            var typeBatch = Batches.Elements[location.BatchIndex].GetTypeBatch(dummy.ConstraintTypeId);
+            var typeBatch = Batches[location.BatchIndex].GetTypeBatch(dummy.ConstraintTypeId);
             BundleIndexing.GetBundleIndices(location.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
             dummy.BuildDescription(typeBatch, bundleIndex, innerIndex, out description);
 
@@ -288,7 +288,7 @@ namespace SolverPrototype
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
-            Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, bodyIndexInConstraint, newBodyLocation);
+            Batches[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).UpdateForBodyMemoryMove(constraintLocation.IndexInTypeBatch, bodyIndexInConstraint, newBodyLocation);
         }
 
         /// <summary>
@@ -302,7 +302,7 @@ namespace SolverPrototype
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
-            Batches.Elements[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).EnumerateConnectedBodyIndices(constraintLocation.IndexInTypeBatch, ref enumerator);
+            Batches[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId).EnumerateConnectedBodyIndices(constraintLocation.IndexInTypeBatch, ref enumerator);
         }
 
         //TODO: Note that removals are a little tricky. In order to reduce the number of batches which persist, every removal
@@ -328,28 +328,28 @@ namespace SolverPrototype
             //You could technically build a separate list that ignores bodybatch boundaries. Value is unclear.
             for (int i = 0; i < Batches.Count; ++i)
             {
-                var batch = Batches.Elements[i];
+                var batch = Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches.Elements[j].Prestep(bodies.LocalInertiaBundles, dt, inverseDt);
+                    batch.TypeBatches[j].Prestep(bodies.LocalInertiaBundles, dt, inverseDt);
                 }
             }
             for (int i = 0; i < Batches.Count; ++i)
             {
-                var batch = Batches.Elements[i];
+                var batch = Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches.Elements[j].WarmStart(bodies.VelocityBundles);
+                    batch.TypeBatches[j].WarmStart(bodies.VelocityBundles);
                 }
             }
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
                 for (int i = 0; i < Batches.Count; ++i)
                 {
-                    var batch = Batches.Elements[i];
+                    var batch = Batches[i];
                     for (int j = 0; j < batch.TypeBatches.Count; ++j)
                     {
-                        batch.TypeBatches.Elements[j].SolveIteration(bodies.VelocityBundles);
+                        batch.TypeBatches[j].SolveIteration(bodies.VelocityBundles);
                     }
                 }
             }
