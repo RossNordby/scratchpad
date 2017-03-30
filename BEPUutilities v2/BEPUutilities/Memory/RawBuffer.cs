@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2.Memory
@@ -6,16 +7,24 @@ namespace BEPUutilities2.Memory
     /// <summary>
     /// Raw byte buffer with some helpers for interoperating with typed spans.
     /// </summary>
-    public unsafe struct RawBuffer
+    public unsafe struct RawBuffer : IEquatable<RawBuffer>
     {
-        public readonly byte* Memory;
-        public readonly int Length;
+        public byte* Memory;
+        public int Length;
+        //We're primarily interested in x64, so memory + length is 12 bytes. This struct would/should get padded to 16 bytes for alignment reasons anyway, 
+        //so making use of the last 4 bytes to speed up the case where the raw buffer is taken from a pool (which is basically always) is a good option.
+
+        /// <summary>
+        /// Implementation specific identifier of the raw buffer set by its source. If taken from a BufferPool, Id represents the index in the power pool from which it was taken.
+        /// </summary>
+        public int Id;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public RawBuffer(void* memory, int length)
+        public RawBuffer(void* memory, int length, int id = -1)
         {
             Memory = (byte*)memory;
             Length = length;
+            Id = id;
         }
 
         public ref byte this[int index]
@@ -70,7 +79,7 @@ namespace BEPUutilities2.Memory
         public Buffer<T> As<T>()
         {
             var count = Length / Unsafe.SizeOf<T>();
-            return new Buffer<T>(Memory, count);
+            return new Buffer<T>(Memory, count, Id);
         }
 
 
@@ -78,8 +87,8 @@ namespace BEPUutilities2.Memory
         public void Clear(int start, int count)
         {
             Unsafe.InitBlock(Memory + start, 0, (uint)count);
-        } 
-        
+        }
+
         //TODO: Some copies could be helpful, but let's wait until we actually need them.
 
         [Conditional("DEBUG")]
@@ -95,5 +104,33 @@ namespace BEPUutilities2.Memory
             Debug.Assert(start >= 0, "The start of a region must be within the buffer's extent.");
             Debug.Assert(start + count < Length, "The end of a region must be within the buffer's extent.");
         }
+
+        //These are primarily used for debug purposes in the buffer pool.
+        public override unsafe int GetHashCode()
+        {
+            if (IntPtr.Size == 4)
+            {
+                var temp = Memory;
+                return *((int*)&temp);
+            }
+            else
+            {
+                var temp = Memory;
+                return (*((long*)&temp)).GetHashCode();
+            }
+        }
+
+        public bool Equals(RawBuffer other)
+        {
+            return other.Memory == Memory && other.Length == Length;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is RawBuffer buffer)
+                return Equals(buffer);
+            return false;
+        }
+
     }
 }

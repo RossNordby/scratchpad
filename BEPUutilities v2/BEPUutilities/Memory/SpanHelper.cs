@@ -11,6 +11,12 @@ namespace BEPUutilities2.Memory
         /// The highest size span exponent. The largest span is 2^MaximumSpanSizePower. This avoids overflow.
         /// </summary>
         public const int MaximumSpanSizePower = 30;
+
+        [Conditional("DEBUG")]
+        internal static void ValidatePower(int power)
+        {
+            Debug.Assert(power >= 0 && power <= MaximumSpanSizePower, $"Power must be from 0 to {MaximumSpanSizePower}, inclusive.");
+        }
         /// <summary>
         /// Computes the lowest integer N such that 2^N >= i.
         /// </summary>

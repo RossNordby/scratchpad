@@ -1,0 +1,404 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
+namespace BEPUutilities2.Memory
+{
+    /// <summary>
+    /// Unmanaged memory pool that creates pinned blocks of memory for use in spans.
+    /// </summary>
+    /// <remarks>This currently works by allocating large managed arrays and pinning them under the assumption that they'll end up in the large object heap.</remarks>
+    public class BufferPool
+    {
+        unsafe struct Block
+        {
+            public byte[] Array;
+            public GCHandle Handle;
+            public byte* Pointer;
+
+            public Block(int blockSize)
+            {
+                Array = new byte[blockSize];
+                Handle = GCHandle.Alloc(Array, GCHandleType.Pinned);
+                Pointer = (byte*)Handle.AddrOfPinnedObject();
+            }
+
+
+            public byte* Allocate(int indexInBlock, int suballocationSize)
+            {
+                Debug.Assert(Allocated);
+                Debug.Assert(Pinned);
+                Debug.Assert(indexInBlock >= 0 && indexInBlock * suballocationSize < Array.Length);
+                return Pointer + indexInBlock * suballocationSize;
+            }
+
+            public bool Allocated
+            {
+                get
+                {
+                    return Array != null;
+                }
+            }
+
+            public bool Pinned
+            {
+                get
+                {
+                    return Array != null && Handle.IsAllocated;
+                }
+                set
+                {
+
+                    Debug.Assert(Array != null);
+                    if (value)
+                    {
+                        Debug.Assert(!Handle.IsAllocated);
+                        Handle = GCHandle.Alloc(Array);
+                        Pointer = (byte*)Handle.AddrOfPinnedObject();
+                    }
+                    else
+                    {
+                        Debug.Assert(Handle.IsAllocated);
+                        Handle.Free();
+                        Pointer = null;
+                    }
+                }
+            }
+
+            /// <summary>
+            /// Unpins and drops the reference to the underlying array.
+            /// </summary>
+            public void Clear()
+            {
+                Debug.Assert(Array != null);
+                //It's not guaranteed that the array is actually pinned if we support unpinning.
+                if (Handle.IsAllocated)
+                {
+                    Pinned = false;
+                }
+                Array = null;
+            }
+
+        }
+
+        struct PowerPool
+        {
+            public Block[] Blocks;
+            /// <summary>
+            /// Pool of slots available to this power level.
+            /// </summary>
+            public readonly IdPool Slots;
+#if DEBUG
+            HashSet<int> outstandingIds;
+#endif
+
+            public readonly int SuballocationsPerBlock;
+            public readonly int SuballocationsPerBlockShift;
+            public readonly int SuballocationsPerBlockMask;
+            public readonly int Power;
+            public readonly int SuballocationSize;
+            public readonly int BlockSize;
+            public int BlockCount;
+
+
+            public PowerPool(int power, int minimumBlockSize, int expectedPooledCount)
+            {
+                Power = power;
+                SuballocationSize = 1 << power;
+
+                BlockSize = Math.Max(SuballocationSize, minimumBlockSize);
+                Slots = new IdPool(expectedPooledCount);
+                SuballocationsPerBlock = BlockSize / SuballocationSize;
+                SuballocationsPerBlockShift = SpanHelper.GetContainingPowerOf2(SuballocationsPerBlock);
+                SuballocationsPerBlockMask = (1 << SuballocationsPerBlockShift) - 1;
+                Blocks = new Block[1];
+                BlockCount = 0;
+
+#if DEBUG
+                outstandingIds = new HashSet<int>();
+#endif
+            }
+
+            public void EnsureCapacity(int capacity)
+            {
+                var neededBlockCount = (int)Math.Ceiling((double)capacity / BlockSize);
+                if (BlockCount < neededBlockCount)
+                {
+                    for (int i = BlockCount; i < neededBlockCount; ++i)
+                    {
+                        Blocks[i] = new Block(BlockSize);
+                    }
+                    BlockCount = neededBlockCount;
+                }
+
+            }
+
+            public unsafe void Take(out RawBuffer buffer)
+            {
+                var slot = Slots.Take();
+                var blockIndex = slot >> SuballocationsPerBlockShift;
+                if (blockIndex >= Blocks.Length)
+                {
+                    Array.Resize(ref Blocks, 1 << SpanHelper.GetContainingPowerOf2(blockIndex + 1));
+                }
+                if (blockIndex >= BlockCount)
+                {
+#if DEBUG
+                    for (int i = 0; i < blockIndex; ++i)
+                    {
+                        Debug.Assert(Blocks[i].Allocated, "If a block index is found to exceed the current block count, then every block preceding the index should be allocated.");
+                    }
+#endif
+                    BlockCount = blockIndex + 1;
+                    Debug.Assert(!Blocks[blockIndex].Allocated);
+                    Blocks[blockIndex] = new Block(BlockSize);
+                }
+
+                var indexInBlock = slot & SuballocationsPerBlockMask;
+                buffer = new RawBuffer(Blocks[blockIndex].Allocate(indexInBlock, SuballocationSize), SuballocationSize, slot);
+#if DEBUG
+                Debug.Assert(outstandingIds.Add(slot), "Should not be able to request the same slot twice.");
+#endif
+            }
+
+            public unsafe void Return(ref RawBuffer buffer)
+            {
+#if DEBUG 
+                //There are a lot of ways to screw this up. Try to catch as many as possible!
+                var blockIndex = buffer.Id >> SuballocationsPerBlockShift;
+                var indexInAllocatorBlock = buffer.Id & SuballocationsPerBlockMask;
+                Debug.Assert(outstandingIds.Remove(buffer.Id),
+                    "This buffer id must have been taken from the pool previously.");
+                Debug.Assert(buffer.Length == SuballocationSize,
+                    "A buffer taken from a pool should have a specific size.");
+                Debug.Assert(blockIndex >= 0 && blockIndex < BlockCount,
+                    "The block pointed to by a returned buffer should actually exist within the pool.");
+                var memoryOffset = buffer.Memory - Blocks[blockIndex].Pointer;
+                Debug.Assert(memoryOffset >= 0 && memoryOffset < Blocks[blockIndex].Array.Length,
+                    "If a raw buffer points to a given block as its source, the address should be within the block's memory region.");
+                Debug.Assert(Blocks[blockIndex].Pointer + indexInAllocatorBlock * BlockSize == buffer.Memory,
+                    "The implied address of a buffer in its block should match its actual address.");
+                Debug.Assert(buffer.Length + indexInAllocatorBlock * BlockSize < Blocks[blockIndex].Array.Length,
+                    "The extent of the buffer should fit within the block.");
+#endif
+                Slots.Return(buffer.Id);
+            }
+
+            public void Clear()
+            {
+#if DEBUG
+                //We'll assume that the caller understands that the outstanding buffers are invalidated, so should not be returned again.
+                outstandingIds.Clear();
+#endif
+                for (int i = 0; i < BlockCount; ++i)
+                {
+                    Blocks[i].Clear();
+                }
+                BlockCount = 0;
+            }
+
+        }
+
+        private PowerPool[] pools = new PowerPool[SpanHelper.MaximumSpanSizePower + 1];
+        private int minimumBlockSize;
+
+        /// <summary>
+        /// Creates a new buffer pool.
+        /// </summary>
+        /// <param name="minimumBlockAllocationSize">Minimum size of individual block allocations. Must be a power of 2.
+        /// Pools with single allocations larger than the minimum will use the minimum value necessary to hold one element.
+        /// Buffers will be suballocated from blocks.
+        /// Use a value larger than the large object heap cutoff (85000 bytes as of this writing in the microsoft runtime)
+        /// to avoid interfering with generational garbage collection.</param>
+        /// <param name="expectedPooledResourceCount">Number of suballocations to preallocate reference space for.
+        /// This does not preallocate actual blocks, just the space to hold references that are waiting in the pool.</param>
+        public BufferPool(int minimumBlockAllocationSize = 131072, int expectedPooledResourceCount = 16)
+        {
+            if (((minimumBlockAllocationSize - 1) & minimumBlockAllocationSize) != 0)
+                throw new ArgumentException("Block allocation size must be a power of 2.");
+            minimumBlockSize = minimumBlockAllocationSize;
+            for (int power = 0; power < SpanHelper.MaximumSpanSizePower; ++power)
+            {
+                pools[power] = new PowerPool(power, minimumBlockSize, expectedPooledResourceCount);
+            }
+        }
+
+        /// <summary>
+        /// Ensures that the pool associated with a given power has at least a certain amount of capacity.
+        /// </summary>
+        /// <param name="capacity">Minimum capacity to require for the power pool.</param>
+        /// <param name="power">Power associated with the pool to check.</param>
+        public void EnsureCapacityForPower(int capacity, int power)
+        {
+            SpanHelper.ValidatePower(power);
+            pools[power].EnsureCapacity(capacity);
+        }
+
+        /// <summary>
+        /// Gets the capacity allocated for a power.
+        /// </summary>
+        /// <param name="power">Power to check.</param>
+        /// <returns>Allocated capacity for the given power.</returns>
+        public int GetCapacityForPower(int power)
+        {
+            SpanHelper.ValidatePower(power);
+            return pools[power].BlockCount * pools[power].BlockSize;
+        }
+
+        /// <summary>
+        /// Takes a buffer large enough to contain a number of bytes.
+        /// </summary>
+        /// <param name="count">Number of bytes that should fit within the buffer.</param>
+        /// <param name="buffer">Buffer that can hold the bytes.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Take(int count, out RawBuffer buffer)
+        {
+            TakeForPower(SpanHelper.GetContainingPowerOf2(count), out buffer);
+        }
+        /// <summary>
+        /// Takes a buffer large enough to contain a number of bytes given by a power, where the number of bytes is 2^power.
+        /// </summary>
+        /// <param name="count">Number of bytes that should fit within the buffer as an exponent, where the number of bytes is 2^power.</param>
+        /// <param name="buffer">Buffer that can hold the bytes.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void TakeForPower(int power, out RawBuffer buffer)
+        {
+            ValidatePinnedState(true);
+            Debug.Assert(power >= 0 && power <= SpanHelper.MaximumSpanSizePower);
+            pools[power].Take(out buffer);
+        }
+        /// <summary>
+        /// Returns a buffer to the pool.
+        /// </summary>
+        /// <param name="buffer">Buffer to return to the pool.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void Return(ref RawBuffer buffer)
+        {
+            ValidatePinnedState(true);
+            pools[SpanHelper.GetContainingPowerOf2(buffer.Length)].Return(ref buffer);
+        }
+
+        /// <summary>
+        /// Creates a wrapper around the buffer pool that creates buffers of a particular type.
+        /// </summary>
+        /// <typeparam name="T">Type contained by the buffers returned by the specialized pool.</typeparam>
+        /// <returns>Pool specialized to create typed buffers.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BufferPool<T> SpecializeFor<T>()
+        {
+            ValidatePinnedState(true);
+            return new BufferPool<T>(this);
+        }
+
+        [Conditional("DEBUG")]
+        void ValidatePinnedState(bool pinned)
+        {
+            for (int i = 0; i < pools.Length; ++i)
+            {
+                var pool = pools[i];
+                for (int j = 0; j < pool.BlockCount; ++j)
+                {
+                    Debug.Assert(pool.Blocks[j].Pinned == pinned, $"For this operation, all blocks must share the same pinned state of {pinned}.");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets whether the BufferPool's backing resources are pinned.
+        /// Setting this to false invalidates all outstanding pointers, and any attempt to take or return buffers while unpinned will fail (though not necessarily immediately).
+        /// The only valid operations while unpinned are setting Pinned to true and clearing the pool.
+        /// </summary>
+        public bool Pinned
+        {
+            get
+            {
+                //If no blocks exist, we just call it pinned- that's the default state.
+                bool pinned = true;
+                for (int i = 0; i < pools.Length; ++i)
+                {
+                    if (pools[i].BlockCount > 0)
+                        pinned = pools[i].Blocks[0].Pinned;
+                }
+                ValidatePinnedState(pinned);
+                return pinned;
+            }
+            set
+            {
+                void ChangePinnedState(bool pinned)
+                {
+                    for (int i = 0; i < pools.Length; ++i)
+                    {
+                        var pool = pools[i];
+                        for (int j = 0; j < pool.BlockCount; ++j)
+                        {
+                            pool.Blocks[j].Pinned = pinned;
+                        }
+                    }
+                }
+                if (value)
+                {
+                    if (!Pinned)
+                    {
+                        ChangePinnedState(true);
+                    }
+                }
+                else
+                {
+                    if (Pinned)
+                    {
+                        ChangePinnedState(false);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Unpins and drops reference to all memory. Any outstanding buffers will be invalidated silently.
+        /// </summary>
+        public void Clear()
+        {
+            for (int i = 0; i < pools.Length; ++i)
+            {
+                pools[i].Clear();
+            }
+        }
+    }
+
+
+    /// <summary>
+    /// Type specialized variants of the buffer pool are useful for use with quick collections and guaranteeing compile time type specialization.
+    /// </summary>
+    /// <typeparam name="T">Type of element to retrieve from the pol.</typeparam>
+    public struct BufferPool<T> : IMemoryPool<T, Buffer<T>>
+    {
+        public readonly BufferPool Pool;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public BufferPool(BufferPool pool)
+        {
+            this.Pool = pool;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Take(int count, out Buffer<T> span)
+        {
+            Pool.Take(count * Unsafe.SizeOf<T>(), out var rawBuffer);
+            span = rawBuffer.As<T>();
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void TakeForPower(int power, out Buffer<T> span)
+        {
+            //Note that we can't directly use TakeForPower from the underlying pool- the actual power needed at the byte level differs!
+            Pool.Take((1 << power) * Unsafe.SizeOf<T>(), out var rawBuffer);
+            span = rawBuffer.As<T>();
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void Return(ref Buffer<T> span)
+        {
+            //Note that we have to rederive the original allocation size, since the size of T might not have allowed size * count to equal the original byte count.
+            var rawBuffer = new RawBuffer(span.Memory, 1 << SpanHelper.GetContainingPowerOf2(Unsafe.SizeOf<T>() * span.Length));
+            Pool.Return(ref rawBuffer);
+        }
+    }
+}

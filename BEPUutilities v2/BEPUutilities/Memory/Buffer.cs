@@ -14,12 +14,20 @@ namespace BEPUutilities2.Memory
     {
         public readonly byte* Memory;
         int length;
+        //We're primarily interested in x64, so memory + length is 12 bytes. This struct would/should get padded to 16 bytes for alignment reasons anyway, 
+        //so making use of the last 4 bytes to speed up the case where the raw buffer is taken from a pool (which is basically always) is a good option.
+
+        /// <summary>
+        /// Implementation specific identifier of the raw buffer set by its source. If taken from a BufferPool, Id represents the index in the power pool from which it was taken.
+        /// </summary>
+        public int Id;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Buffer(void* memory, int length)
+        public Buffer(void* memory, int length, int id = -1)
         {
             Memory = (byte*)memory;
             this.length = length;
+            Id = id;
         }
 
         public ref T this[int index]

@@ -36,7 +36,6 @@ namespace BEPUutilities2.Memory
 
         /// <summary>
         /// Ensures that there are at least the specified number of buffers allocated for the given batch index.
-        /// Not thread safe.
         /// </summary>
         /// <param name="power">Index of the power to ensure the count of.</param>
         /// <param name="count">Minimum number of elements that need to exist in the specified pool.</param>
@@ -48,7 +47,6 @@ namespace BEPUutilities2.Memory
 
         /// <summary>
         /// Gets the number of buffers for a pool index.
-        /// Not thread safe.
         /// </summary>
         /// <param name="power">Index of the pool to count.</param>
         public int GetArrayCount(int power)
