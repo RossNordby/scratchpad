@@ -6,6 +6,7 @@ namespace BEPUutilitiesTests
     {
         static void Main(string[] args)
         {
+            SpanCodeGenTests.Test();
             CodeGenTests.Test();
             AllocatorTests.TestChurnStability();
             QuickCollectionTests.Test();

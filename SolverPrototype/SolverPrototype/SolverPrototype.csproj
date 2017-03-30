@@ -136,7 +136,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj">
-      <Project>{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}</Project>
+      <Project>{8ecf1b4d-ed6e-4b3f-b54e-5eff9c80ee5d}</Project>
       <Name>BEPUutilities2</Name>
     </ProjectReference>
   </ItemGroup>

@@ -169,7 +169,6 @@ namespace BEPUutilities2.Collections
             var oldQueue = this;
             pool.TakeForPower(newSizePower, out var newSpan);
             Resize(ref newSpan, out var oldSpan);
-
             oldQueue.Dispose(pool);
         }
 

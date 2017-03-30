@@ -24,11 +24,12 @@ namespace BEPUutilities2.Memory
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                //TODO: There may be an argument for using Unsafe.Add here. The idea is that spans are assumed to be unsafe anyway, so we can abandon bounds checking.
-                //By using a regular array index, we force the jit to test bounds on potentially dynamically generated indices. If we instead took the reference of index 0
-                //and offset from it, the jit would be able to elide the bounds check in almost all repeated usages. There are also ways to completely eliminate the bounds check,
+                //Spans are assumed to be unsafe anyway, so we can abandon bounds checking.
+                //By using a regular array index, we force the jit to test bounds on potentially dynamically generated indices. If we instead take the reference of index 0
+                //and offset from it, the jit can elide the bounds check in almost all repeated usages. There are also ways to completely eliminate the bounds check,
                 //but it gets into a bit of brittle black magic...
-                return ref Memory[index];
+                Debug.Assert(index >= 0 && index < Memory.Length);
+                return ref Unsafe.Add(ref Memory[0], index);
             }
         }
         public int Length
