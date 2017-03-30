@@ -63,6 +63,7 @@ namespace SolverPrototype
             return handle;
         }
 
+
         public void RemoveBody(int bodyHandle)
         {
             Bodies.ValidateExistingHandle(bodyHandle);
@@ -71,10 +72,7 @@ namespace SolverPrototype
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.BodyMoveConstraintEnumerator enumerator;
-                enumerator.Solver = Solver;
-                enumerator.NewLocation = removedIndex;
-                ConstraintGraph.EnumerateConstraints(movedBodyOriginalIndex, ref enumerator);
+                BodyLayoutOptimizer.UpdateConstraintsForBodyMemoryMove(movedBodyOriginalIndex, removedIndex, ConstraintGraph, Solver);
             }
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(removedIndex, movedBodyOriginalIndex);

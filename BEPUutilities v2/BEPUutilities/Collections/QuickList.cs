@@ -282,6 +282,18 @@ namespace BEPUutilities2.Collections
             return Span.IndexOf(ref element, 0, Count);
         }
 
+        /// <summary>
+        /// Gets the index of the first element in the list which matches a predicate, if any.
+        /// </summary>
+        /// <param name="predicate">Predicate to match.</param>
+        /// <returns>Index of the first matching element in the list if present, -1 otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int IndexOf<TPredicate>(ref TPredicate predicate) where TPredicate : IPredicate<T>
+        {
+            Validate();
+            return Span.IndexOf(ref predicate, 0, Count);
+        }
+
 
         /// <summary>
         /// Removes an element from the list. Preserves the order of elements.
@@ -311,6 +323,24 @@ namespace BEPUutilities2.Collections
         {
             Validate();
             var index = IndexOf(element);
+            if (index >= 0)
+            {
+                RemoveAt(index);
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Removes the first element that matches a predicate from the list. Preserves the order of elements.
+        /// </summary>
+        /// <param name="predicate">Predicate to test elements with.</param>
+        /// <returns>True if an element matched and was removed, false otherwise.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Remove<TPredicate>(ref TPredicate predicate) where TPredicate : IPredicate<T>
+        {
+            Validate();
+            var index = Span.IndexOf(ref predicate, 0, Count);
             if (index >= 0)
             {
                 RemoveAt(index);
@@ -467,6 +497,19 @@ namespace BEPUutilities2.Collections
         public bool Contains(ref T element)
         {
             return IndexOf(ref element) >= 0;
+        }
+
+        /// <summary>
+        /// Determines whether the collection contains an element that matches a predicate.
+        /// </summary>
+        /// <returns>
+        /// True if an element matching the predicate exists, otherwise false.
+        /// </returns>
+        /// <param name="predicate">The predicate to test against elements in the list.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains<TPredicate>(ref TPredicate predicate) where TPredicate : IPredicate<T>
+        {
+            return Span.IndexOf(ref predicate, 0, Count) >= 0;
         }
 
 

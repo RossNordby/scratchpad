@@ -227,50 +227,7 @@ namespace SolverPrototypeTests
             }
         }
 
-        struct ConstraintRemover : IForEach<ConstraintConnectivityGraph.BodyConstraintReference>
-        {
-            Simulation simulation;
-            int[] constraintHandlesToIdentity;
-            List<int> removedConstraints;
-            int[] constraintHandles;
-            CachedConstraint[] constraintDescriptions;
-            int iterations;
-            public ConstraintRemover(Simulation simulation, int[] constraintHandles, int[] constraintHandlesToIdentity, CachedConstraint[] constraintDescriptions, List<int> removedConstraints)
-            {
-                this.simulation = simulation;
-                this.constraintHandles = constraintHandles;
-                this.constraintHandlesToIdentity = constraintHandlesToIdentity;
-                this.removedConstraints = removedConstraints;
-                this.constraintDescriptions = constraintDescriptions;
-                iterations = 0;
-
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void LoopBody(ConstraintConnectivityGraph.BodyConstraintReference constraint)
-            {
-                RemoveConstraint(simulation, constraint.ConnectingConstraintHandle, constraintHandlesToIdentity, constraintHandles, constraintDescriptions, removedConstraints);
-                WriteLine($"Removed constraint (handle: {constraint.ConnectingConstraintHandle}) for a body removal.");
-                iterations++;
-            }
-        }
-        struct ZeroConstraintChecker : IForEach<ConstraintConnectivityGraph.BodyConstraintReference>
-        {
-            Simulation simulation;
-            int[] handleToEntryIndex;
-            public ZeroConstraintChecker(Simulation simulation, int[] handleToEntryIndex)
-            {
-                this.simulation = simulation;
-                this.handleToEntryIndex = handleToEntryIndex;
-
-            }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void LoopBody(ConstraintConnectivityGraph.BodyConstraintReference constraint)
-            {
-                Debug.Fail($"Existing constraint: {constraint.ConnectingConstraintHandle}");
-            }
-        }
-
+      
         static void RemoveConstraint(Simulation simulation, int constraintHandle, int[] constraintHandlesToIdentity, int[] constraintHandles, CachedConstraint[] constraintDescriptions, List<int> removedConstraints)
         {
             var constraintIdentity = constraintHandlesToIdentity[constraintHandle];
@@ -378,11 +335,14 @@ namespace SolverPrototypeTests
             //Remove a body.
             var removedBodyIndex = random.Next(simulation.Bodies.BodyCount);
             //All constraints associated with the body have to be removed first.
-            var constraintRemover = new ConstraintRemover(simulation, constraintHandles, constraintHandlesToIdentity, constraintDescriptions, removedConstraints);
-            simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintRemover);
+            ref var constraintList = ref simulation.ConstraintGraph.GetConstraintList(removedBodyIndex);
+            for (int i = constraintList.Count - 1; i >= 0; --i)
+            {
+                WriteLine($"Removing constraint (handle: {constraintList[i].ConnectingConstraintHandle}) for a body removal.");
+                RemoveConstraint(simulation, constraintList[i].ConnectingConstraintHandle, constraintHandlesToIdentity, constraintHandles, constraintDescriptions, removedConstraints);
+            }
 #if DEBUG
-            var constraintChecker = new ZeroConstraintChecker(simulation, bodyHandlesToIdentity);
-            simulation.ConstraintGraph.EnumerateConstraints(removedBodyIndex, ref constraintChecker);
+            Debug.Assert(constraintList.Count == 0, "After we removed all the constraints, the constraint list should be empty! (It's a ref to the actual slot!)");
 #endif
             var handle = simulation.Bodies.IndexToHandle[removedBodyIndex];
             simulation.RemoveBody(handle);

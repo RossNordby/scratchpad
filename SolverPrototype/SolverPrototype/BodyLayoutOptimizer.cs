@@ -42,15 +42,16 @@ namespace SolverPrototype
         //could be a little different, but it might end up being faster overall due to the lack of contention.
         //The same concept could apply to the broad phase optimizer too, though it's a little easier there (and the naive locking requirements are more complex per swap, too).
 
-        internal struct BodyMoveConstraintEnumerator : IForEach<BodyConstraintReference>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void UpdateConstraintsForBodyMemoryMove(int bodyIndex, int newBodyIndex, ConstraintConnectivityGraph graph, Solver solver)
         {
-            public Solver Solver;
-            public int NewLocation;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void LoopBody(BodyConstraintReference constraint)
+            ref var list = ref graph.GetConstraintList(bodyIndex);
+            for (int i = 0; i < list.Count; ++i)
             {
-                Solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, NewLocation);
+                ref var constraint = ref list[i];
+                solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, newBodyIndex);
             }
+
         }
 
         public static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
@@ -58,12 +59,9 @@ namespace SolverPrototype
             Debug.Assert(a != b, "Swapping a body with itself isn't meaningful. Whaddeyer doin?");
             //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
             //Note that references to both bodies must be changed- both bodies moved!
-            BodyMoveConstraintEnumerator enumerator;
-            enumerator.Solver = solver;
-            enumerator.NewLocation = b;
-            graph.EnumerateConstraints(a, ref enumerator);
-            enumerator.NewLocation = a;
-            graph.EnumerateConstraints(b, ref enumerator);
+            //This function does not update the actual position of the list in the graph, so we can modify both without worrying about invalidating indices.
+            UpdateConstraintsForBodyMemoryMove(a, b, graph, solver);
+            UpdateConstraintsForBodyMemoryMove(b, a, graph, solver);
 
             //Update the body and graph locations.
             bodies.Swap(a, b);

@@ -206,23 +206,18 @@ namespace SolverPrototype
             enumerator = constraintBodiesEnumerator.InnerEnumerator;
         }
 
+        //This could return a readonly span. It is public, after all. If it becomes an issue we can deal with it.
         /// <summary>
-        /// Enumerates all the constraint handles connected to a given body.
+        /// Gets the list of constraints associated with the given body.
         /// </summary>
-        /// <typeparam name="TEnumerator">Type of the enumerator to execute on each constraint handle.</typeparam>
-        /// <param name="bodyIndex">Index of the body to enumerate the constraints of.</param>
-        /// <param name="enumerator">Enumerator to execute on each constraint handle.</param>
+        /// <param name="bodyIndex">Body to look up the constraint list for.</param>
+        /// <returns>List of constraints associated with the body.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void EnumerateConstraints<TEnumerator>(int bodyIndex, ref TEnumerator enumerator) where TEnumerator : IForEach<BodyConstraintReference>
+        public ref QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>> GetConstraintList(int bodyIndex)
         {
-            ref var list = ref constraintLists[bodyIndex];
-            //Note reverse iteration. This is useful when performing O(1) removals where the last element is put into the position of the removed element.
-            //Non-reversed iteration would result in skipped elements if the loop body removed anything. This relies on convention; any remover should be aware of this order.
-            for (int i = list.Count - 1; i >= 0; --i)
-            {
-                enumerator.LoopBody(list[i]);
-            }
+            return ref constraintLists[bodyIndex];
         }
+
         /// <summary>
         /// Checks whether a body is referenced by the given constraint handle.
         /// </summary>
@@ -232,11 +227,9 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool BodyIsConstrainedBy(int bodyIndex, int constraintHandle)
         {
-            //This is a special case that bypasses the IForEach enumerators. It's not strictly necessary, but it is pretty convenient.
+            //This is a special case that bypasses the need for a predicate.
             //It's unclear how valuable this actually is- this shouldn't be a particularly common operation. We actually only added it for debugging purposes.
-            //The only functional benefit it has over the IForEach variants is that it will early out. But you could create an early-outing enumerator.
-            ref var list = ref constraintLists[bodyIndex];
-            
+            ref var list = ref constraintLists[bodyIndex];            
             for (int i = 0; i < list.Count; ++i)
             {
                 if (list[i].ConnectingConstraintHandle == constraintHandle)

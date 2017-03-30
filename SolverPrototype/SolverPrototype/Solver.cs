@@ -115,7 +115,7 @@ namespace SolverPrototype
                 if (Batches.Span.Length > Batches.Count && Batches.Span[targetBatchIndex] != null)
                 {
                     //Reusable batch found! 
-                    targetBatch = Batches[targetBatchIndex];
+                    targetBatch = Batches.Span[targetBatchIndex];
                     Debug.Assert(targetBatch.TypeBatches.Count == 0);
                     ++Batches.Count;
                 }
