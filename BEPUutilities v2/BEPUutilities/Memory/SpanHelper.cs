@@ -25,7 +25,7 @@ namespace BEPUutilities2.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int GetContainingPowerOf2(int i)
         {
-            Debug.Assert(i >= 0 && i < (1 << MaximumSpanSizePower), "i must be from 0 to " + ((1 << MaximumSpanSizePower) - 1) + ", inclusive.");
+            Debug.Assert(i >= 0 && i <= (1 << MaximumSpanSizePower), "i must be from 0 to " + ((1 << MaximumSpanSizePower) - 1) + ", inclusive.");
             //We want the buffer which would fully contain the count, so it should be effectively Ceiling(Log(i)).
             //Doubling the value (and subtracting one, to avoid the already-a-power-of-two case) takes care of this.
             i = ((i > 0 ? i : 1) << 1) - 1;

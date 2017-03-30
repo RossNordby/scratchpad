@@ -179,13 +179,15 @@ namespace SolverPrototype.Constraints
 
         protected abstract void RemoveBodyReferences(int bundleIndex, int innerIndex);
 
+
         /// <summary>
-        /// Allocates room for a constraint without setting up any of the body references information. This should be followed by some other initialization that fills in the 
-        /// body references lane and updates the count.
+        /// Allocates a slot in the batch.
         /// </summary>
-        /// <param name="handle">Handle to allocate.</param>
-        /// <returns>Index in the type batch allocated for the constraint.</returns>
-        private unsafe int AllocateShared(int handle, BufferPool pool)
+        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
+        /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
+        /// <param name="pool">Pool to use if the type batch has to be resized.</param>
+        /// <returns>Index of the slot in the batch.</returns>
+        public unsafe sealed override int Allocate(int handle, int* bodyIndices, BufferPool pool)
         {
             Debug.Assert(Projection.Memory != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == IndexToHandle.Length)
@@ -200,42 +202,11 @@ namespace SolverPrototype.Constraints
             IndexToHandle[index] = handle;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
-            return index;
-        }
-
-        /// <summary>
-        /// Allocates a slot in the batch.
-        /// </summary>
-        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
-        /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
-        /// <param name="pool">Pool to use if the type batch has to be resized.</param>
-        /// <returns>Index of the slot in the batch.</returns>
-        public unsafe sealed override int Allocate(int handle, int* bodyIndices, BufferPool pool)
-        {
-            var index = AllocateShared(handle, pool);
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
             AddBodyReferencesLane(ref bundle, innerIndex, bodyIndices);
             return index;
         }
-
-        ///// <summary>
-        ///// Allocates a slot in the batch without filling the body references lane for the allocated constraint. The BodyReferences.Count is incremented, though.
-        ///// </summary>
-        ///// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
-        ///// <param name="pool">Pool to use if the type batch has to be resized.</param>
-        ///// <param name="allocatedBundleIndex">Bundle index for the constraint.</param>
-        ///// <param name="allocatedInnerIndex">Index of the constraint within its bundle.</param>
-        ///// <returns>Index of the slot in the batch.</returns>
-        //internal int Allocate(int handle, BufferPool pool, out int allocatedBundleIndex, out int allocatedInnerIndex)
-        //{
-        //    var index = AllocateShared(handle, pool);
-        //    BundleIndexing.GetBundleIndices(index, out allocatedBundleIndex, out allocatedInnerIndex);
-        //    ref var bundle = ref BodyReferences[allocatedBundleIndex];
-        //    GetLanesInBundleCount(ref bundle) = allocatedInnerIndex + 1;
-        //    return index;
-        //}
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void CopyConstraintData(
