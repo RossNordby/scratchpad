@@ -4,16 +4,20 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilitiesTests
 {
     public static class QuickCollectionTests
     {
-        public static void TestQueueResizing()
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void TestQueueResizing<TSpan, TPool>(TPool pool)
+            where TSpan : ISpan<int>
+            where TPool : IMemoryPool<int, TSpan>
         {
             Random random = new Random(5);
-            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
-            QuickQueue<int, Array<int>>.Create(pool, 4, out var queue);
+
+            QuickQueue<int, TSpan>.Create(pool, 4, out var queue);
             Queue<int> controlQueue = new Queue<int>();
 
             for (int iterationIndex = 0; iterationIndex < 1000000; ++iterationIndex)
@@ -46,13 +50,17 @@ namespace BEPUutilitiesTests
                 Debug.Assert(a == b);
                 Debug.Assert(queue.Count == controlQueue.Count);
             }
+
+            queue.Dispose(pool);
         }
-        
-        public static void TestListResizing()
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void TestListResizing<TSpan, TPool>(TPool pool)
+            where TSpan : ISpan<int>
+            where TPool : IMemoryPool<int, TSpan>
         {
             Random random = new Random(5);
-            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
-            QuickList<int, Array<int>>.Create(pool, 4, out var list);
+            QuickList<int, TSpan>.Create(pool, 4, out var list);
             List<int> controlList = new List<int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
@@ -86,13 +94,17 @@ namespace BEPUutilitiesTests
                 Debug.Assert(a == b);
                 Debug.Assert(list.Count == controlList.Count);
             }
+
+            list.Dispose(pool);
         }
-        
-        public static void TestSetResizing()
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void TestSetResizing<TSpan, TPool>(TPool pool)
+            where TSpan : ISpan<int>
+            where TPool : IMemoryPool<int, TSpan>
         {
             Random random = new Random(5);
-            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
-            QuickSet<int, Array<int>, Array<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
+            QuickSet<int, TSpan, TSpan, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
             HashSet<int> controlSet = new HashSet<int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
@@ -128,13 +140,17 @@ namespace BEPUutilitiesTests
             {
                 Debug.Assert(set.Contains(element));
             }
+
+            set.Dispose(pool, pool);
         }
-        
-        public static void TestDictionaryResizing()
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void TestDictionaryResizing<TSpan, TPool>(TPool pool)
+            where TSpan : ISpan<int>
+            where TPool : IMemoryPool<int, TSpan>
         {
             Random random = new Random(5);
-            PassthroughArrayPool<int> pool = new PassthroughArrayPool<int>();
-            QuickDictionary<int, int, Array<int>, Array<int>, Array<int>, PrimitiveComparer<int>>.Create(pool, pool, pool, 2, 3, out var dictionary);
+            QuickDictionary<int, int, TSpan, TSpan, TSpan, PrimitiveComparer<int>>.Create(pool, pool, pool, 2, 3, out var dictionary);
             Dictionary<int, int> controlDictionary = new Dictionary<int, int>();
 
             for (int iterationIndex = 0; iterationIndex < 100000; ++iterationIndex)
@@ -170,15 +186,25 @@ namespace BEPUutilitiesTests
             {
                 Debug.Assert(dictionary.ContainsKey(element));
             }
+            dictionary.Dispose(pool, pool, pool);
         }
 
         public static void Test()
         {
-            //Could actually do a unit testing engine here. .. ... .... Or not.
-            TestQueueResizing();
-            TestListResizing();
-            TestSetResizing();
-            TestDictionaryResizing();
+            var bufferPool = new BufferPool(256).SpecializeFor<int>();
+            TestQueueResizing<Buffer<int>, BufferPool<int>>(bufferPool);
+            TestListResizing<Buffer<int>, BufferPool<int>>(bufferPool);
+            TestSetResizing<Buffer<int>, BufferPool<int>>(bufferPool);
+            TestDictionaryResizing<Buffer<int>, BufferPool<int>>(bufferPool);
+            bufferPool.Raw.Clear();
+
+            var arrayPool = new ArrayPool<int>();
+            TestQueueResizing<Array<int>, ArrayPool<int>>(arrayPool);
+            TestListResizing<Array<int>, ArrayPool<int>>(arrayPool);
+            TestSetResizing<Array<int>, ArrayPool<int>>(arrayPool);
+            TestDictionaryResizing<Array<int>, ArrayPool<int>>(arrayPool);
+            arrayPool.Clear();
+
         }
     }
 }

@@ -134,7 +134,7 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="initialKeySpan">Span to use as backing memory of the dictionary keys.</param>
         /// <param name="initialValueSpan">Span to use as backing memory of the dictionary values.</param>
-        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table. Must be zeroed.</param>
         /// <param name="comparer">Comparer to use for the dictionary.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public QuickDictionary(ref TKeySpan initialKeySpan, ref TValueSpan initialValueSpan, ref TTableSpan initialTableSpan, TEqualityComparer comparer)
@@ -147,6 +147,7 @@ namespace BEPUutilities2.Collections
             Count = 0;
             EqualityComparer = comparer;
             Debug.Assert(EqualityComparer != null);
+            ValidateTableIsCleared(ref initialTableSpan);
         }
 
         /// <summary>
@@ -154,7 +155,7 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="initialKeySpan">Span to use as backing memory of the dictionary keys.</param>
         /// <param name="initialValueSpan">Span to use as backing memory of the dictionary values.</param>
-        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table. Must be zeroed.</param>
         /// <param name="comparer">Comparer to use for the dictionary.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public QuickDictionary(ref TKeySpan initialKeySpan, ref TValueSpan initialValueSpan, ref TTableSpan initialTableSpan)
@@ -185,6 +186,8 @@ namespace BEPUutilities2.Collections
             keyPool.TakeForPower(initialElementPoolIndex, out var keySpan);
             valuePool.TakeForPower(initialElementPoolIndex, out var valueSpan);
             tablePool.TakeForPower(initialElementPoolIndex + tableSizePower, out var tableSpan);
+            //No guarantee that the table is clean; clear it.
+            tableSpan.Clear(0, tableSpan.Length);
             dictionary = new QuickDictionary<TKey, TValue, TKeySpan, TValueSpan, TTableSpan, TEqualityComparer>(ref keySpan, ref valueSpan, ref tableSpan, comparer);
         }
         /// <summary>
@@ -217,7 +220,7 @@ namespace BEPUutilities2.Collections
         /// </summary>
         /// <param name="newKeySpan">New span to use for keys.</param>
         /// <param name="newValueSpan">New span to use for values.</param>
-        /// <param name="newTableSpan">New span to use for the table.</param>
+        /// <param name="newTableSpan">New span to use for the table. Must be zeroed.</param>
         /// <param name="oldKeySpan">Previous span used for keys.</param>
         /// <param name="oldValueSpan">Previous span used for values.</param>
         /// <param name="oldTableSpan">Previous span used for the table.</param>
@@ -225,6 +228,7 @@ namespace BEPUutilities2.Collections
             out TKeySpan oldKeySpan, out TValueSpan oldValueSpan, out TTableSpan oldTableSpan)
         {
             ValidateSpanCapacity(ref newKeySpan, ref newValueSpan, ref newTableSpan);
+            ValidateTableIsCleared(ref newTableSpan);
             var oldDictionary = this;
             Keys = newKeySpan;
             Values = newValueSpan;
@@ -268,7 +272,9 @@ namespace BEPUutilities2.Collections
         {
             keyPool.TakeForPower(newSizePower, out var newKeySpan);
             valuePool.TakeForPower(newSizePower, out var newValueSpan);
-            tablePool.TakeForPower(newSizePower + tablePoolOffset, out var newTableSpan);
+            tablePool.TakeForPower(newSizePower + tablePoolOffset, out var newTableSpan);  
+            //There is no guarantee that the table retrieved from the pool is clean. Clear it!
+            newTableSpan.Clear(0, newTableSpan.Length);
             var oldDictionary = this;
             Resize(ref newKeySpan, ref newValueSpan, ref newTableSpan, out var oldKeySpan, out var oldValueSpan, out var oldTableSpan);
             oldDictionary.Dispose(keyPool, valuePool, tablePool);
@@ -836,6 +842,16 @@ namespace BEPUutilities2.Collections
             Debug.Assert(Count < Keys.Length, "Unsafe adders can only be used if the capacity is guaranteed to hold the new size.");
         }
 
+    
+
+        [Conditional("DEBUG")]
+        void ValidateTableIsCleared(ref TTableSpan span)
+        {
+            for (int i = 0; i < span.Length; ++i)
+            {
+                Debug.Assert(span[i] == 0, "The table provided to the set must be cleared.");
+            }
+        }
 
 
 

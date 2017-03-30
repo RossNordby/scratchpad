@@ -80,7 +80,7 @@ namespace BEPUutilities2.Collections
         /// Creates a new set.
         /// </summary>
         /// <param name="initialSpan">Span to use as backing memory of the set elements.</param>
-        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table. Must be zeroed out.</param>
         /// <param name="comparer">Comparer to use for the set.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public QuickSet(ref TSpan initialSpan, ref TTableSpan initialTableSpan, TEqualityComparer comparer)
@@ -92,13 +92,14 @@ namespace BEPUutilities2.Collections
             Count = 0;
             EqualityComparer = comparer;
             Debug.Assert(EqualityComparer != null);
+            ValidateTableIsCleared(ref initialTableSpan);
         }
 
         /// <summary>
         /// Creates a new set using a default constructed equality comparer.
         /// </summary>
         /// <param name="initialSpan">Span to use as backing memory of the set elements.</param>
-        /// <param name="initialTableSpan">Span to use as backing memory of the table.</param>
+        /// <param name="initialTableSpan">Span to use as backing memory of the table. Must be zeroed.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public QuickSet(ref TSpan initialSpan, ref TTableSpan initialTableSpan)
             : this(ref initialSpan, ref initialTableSpan, default(TEqualityComparer))
@@ -124,6 +125,8 @@ namespace BEPUutilities2.Collections
         {
             pool.TakeForPower(initialElementPoolIndex, out var span);
             tablePool.TakeForPower(initialElementPoolIndex + tableSizePower, out var tableSpan);
+            //No guarantee that the table is clean; clear it.
+            tableSpan.Clear(0, tableSpan.Length);
             set = new QuickSet<T, TSpan, TTableSpan, TEqualityComparer>(ref span, ref tableSpan, comparer);
         }
         /// <summary>
@@ -151,12 +154,13 @@ namespace BEPUutilities2.Collections
         /// The old span is not cleared or returned to any pool; if it needs to be pooled or cleared, the user must handle it.
         /// </summary>      
         /// <param name="newSpan">New span to use for elements.</param>
-        /// <param name="newTableSpan">New span to use for the table.</param>
+        /// <param name="newTableSpan">New span to use for the table. Must be zeroed.</param>
         /// <param name="oldSpan">Previous span used for elements.</param>
         /// <param name="oldTableSpan">Previous span used for the table.</param>
         public void Resize(ref TSpan newSpan, ref TTableSpan newTableSpan, out TSpan oldSpan, out TTableSpan oldTableSpan)
         {
             ValidateSpanCapacity(ref newSpan, ref newTableSpan);
+            ValidateTableIsCleared(ref newTableSpan);
             var oldSet = this;
             Span = newSpan;
             Table = newTableSpan;
@@ -196,6 +200,8 @@ namespace BEPUutilities2.Collections
             var oldSet = this;
             pool.TakeForPower(newSizePower, out var newSpan);
             tablePool.TakeForPower(newSizePower + tablePoolOffset, out var newTableSpan);
+            //There is no guarantee that the table retrieved from the pool is clean. Clear it!
+            newTableSpan.Clear(0, newTableSpan.Length);
             Resize(ref newSpan, ref newTableSpan, out var oldSpan, out var oldTableSpan);
 
             oldSet.Dispose(pool, tablePool);
@@ -681,7 +687,14 @@ namespace BEPUutilities2.Collections
             Debug.Assert(Count < Span.Length, "Unsafe adders can only be used if the capacity is guaranteed to hold the new size.");
         }
 
-
+        [Conditional("DEBUG")]
+        void ValidateTableIsCleared(ref TTableSpan span)
+        {
+            for (int i = 0; i < span.Length; ++i)
+            {
+                Debug.Assert(span[i] == 0, "The table provided to the set must be cleared.");
+            }
+        }
 
 
 

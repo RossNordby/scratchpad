@@ -100,6 +100,7 @@ namespace BEPUutilitiesTests
                 QuickSet<int, Buffer<int>, Buffer<int>, PrimitiveComparer<int>>.Create(pool, pool, 2, 3, out var set);
                 set.AddUnsafely(5);
                 var item = set[0];
+                pool.Raw.Clear();
             }
 
         }
@@ -118,6 +119,7 @@ namespace BEPUutilitiesTests
             TestArraySpans<int>();
 
             TestQuickInlining();
+            
         }
     }
 }

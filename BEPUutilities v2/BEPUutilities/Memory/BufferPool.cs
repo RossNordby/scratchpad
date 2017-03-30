@@ -178,9 +178,9 @@ namespace BEPUutilities2.Memory
                 var memoryOffset = buffer.Memory - Blocks[blockIndex].Pointer;
                 Debug.Assert(memoryOffset >= 0 && memoryOffset < Blocks[blockIndex].Array.Length,
                     "If a raw buffer points to a given block as its source, the address should be within the block's memory region.");
-                Debug.Assert(Blocks[blockIndex].Pointer + indexInAllocatorBlock * BlockSize == buffer.Memory,
+                Debug.Assert(Blocks[blockIndex].Pointer + indexInAllocatorBlock * SuballocationSize == buffer.Memory,
                     "The implied address of a buffer in its block should match its actual address.");
-                Debug.Assert(buffer.Length + indexInAllocatorBlock * BlockSize < Blocks[blockIndex].Array.Length,
+                Debug.Assert(buffer.Length + indexInAllocatorBlock * SuballocationSize <= Blocks[blockIndex].Array.Length,
                     "The extent of the buffer should fit within the block.");
 #endif
                 Slots.Return(buffer.Id);
@@ -219,7 +219,7 @@ namespace BEPUutilities2.Memory
             if (((minimumBlockAllocationSize - 1) & minimumBlockAllocationSize) != 0)
                 throw new ArgumentException("Block allocation size must be a power of 2.");
             minimumBlockSize = minimumBlockAllocationSize;
-            for (int power = 0; power < SpanHelper.MaximumSpanSizePower; ++power)
+            for (int power = 0; power <= SpanHelper.MaximumSpanSizePower; ++power)
             {
                 pools[power] = new PowerPool(power, minimumBlockSize, expectedPooledResourceCount);
             }
@@ -233,6 +233,7 @@ namespace BEPUutilities2.Memory
         public void EnsureCapacityForPower(int capacity, int power)
         {
             SpanHelper.ValidatePower(power);
+            ValidatePinnedState(true);
             pools[power].EnsureCapacity(capacity);
         }
 
@@ -306,7 +307,7 @@ namespace BEPUutilities2.Memory
         }
 
         /// <summary>
-        /// Gets or sets whether the BufferPool's backing resources are pinned.
+        /// Gets or sets whether the BufferPool's backing resources are pinned. If no blocks are allocated internally, this returns true.
         /// Setting this to false invalidates all outstanding pointers, and any attempt to take or return buffers while unpinned will fail (though not necessarily immediately).
         /// The only valid operations while unpinned are setting Pinned to true and clearing the pool.
         /// </summary>
@@ -364,6 +365,20 @@ namespace BEPUutilities2.Memory
                 pools[i].Clear();
             }
         }
+
+#if DEBUG
+        ~BufferPool()
+        {
+            var totalBlockCount = 0;
+            for (int i =0; i < pools.Length;++i)
+            {
+                totalBlockCount += pools[i].BlockCount;
+            }
+            //If block count is zero, pinned just returns true since that's the default. If there's a nonzero number of blocks, then they have to be explicitly unpinned
+            //in order for a finalizer to be valid.
+            Debug.Assert(totalBlockCount == 0 || !Pinned, "Memory leak warning! Don't let a buffer pool die without unpinning it!");
+        }
+#endif
     }
 
 
@@ -373,32 +388,32 @@ namespace BEPUutilities2.Memory
     /// <typeparam name="T">Type of element to retrieve from the pol.</typeparam>
     public struct BufferPool<T> : IMemoryPool<T, Buffer<T>>
     {
-        public readonly BufferPool Pool;
+        public readonly BufferPool Raw;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public BufferPool(BufferPool pool)
         {
-            this.Pool = pool;
+            Raw = pool;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Take(int count, out Buffer<T> span)
         {
-            Pool.Take(count * Unsafe.SizeOf<T>(), out var rawBuffer);
+            Raw.Take(count * Unsafe.SizeOf<T>(), out var rawBuffer);
             span = rawBuffer.As<T>();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TakeForPower(int power, out Buffer<T> span)
         {
             //Note that we can't directly use TakeForPower from the underlying pool- the actual power needed at the byte level differs!
-            Pool.Take((1 << power) * Unsafe.SizeOf<T>(), out var rawBuffer);
+            Raw.Take((1 << power) * Unsafe.SizeOf<T>(), out var rawBuffer);
             span = rawBuffer.As<T>();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Return(ref Buffer<T> span)
         {
             //Note that we have to rederive the original allocation size, since the size of T might not have allowed size * count to equal the original byte count.
-            var rawBuffer = new RawBuffer(span.Memory, 1 << SpanHelper.GetContainingPowerOf2(Unsafe.SizeOf<T>() * span.Length));
-            Pool.Return(ref rawBuffer);
+            var rawBuffer = new RawBuffer(span.Memory, 1 << SpanHelper.GetContainingPowerOf2(Unsafe.SizeOf<T>() * span.Length), span.Id);
+            Raw.Return(ref rawBuffer);
         }
     }
 }

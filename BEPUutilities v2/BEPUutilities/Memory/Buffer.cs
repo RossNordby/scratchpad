@@ -135,7 +135,7 @@ namespace BEPUutilities2.Memory
         void ValidateRegion(int start, int count)
         {
             Debug.Assert(start >= 0, "The start of a region must be within the buffer's extent.");
-            Debug.Assert(start + count < length, "The end of a region must be within the buffer's extent.");
+            Debug.Assert(start + count <= length, "The end of a region must be within the buffer's extent.");
         }
     }
 
