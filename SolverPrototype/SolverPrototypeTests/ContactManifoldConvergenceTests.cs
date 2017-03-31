@@ -15,10 +15,8 @@ namespace SolverPrototypeTests
 
             SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            var earlyTimer = Stopwatch.StartNew();
-            SimulationSetup.AddRemoveChurn(simulation, 10000000, bodyHandles, constraintHandles);
-            earlyTimer.Stop();
-            Console.WriteLine($"Churn time: {earlyTimer.Elapsed.TotalSeconds}");
+            SimulationSetup.ScrambleBodies(simulation);
+            SimulationSetup.ScrambleConstraints(simulation.Solver);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 100;
