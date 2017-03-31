@@ -1,6 +1,5 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
-using SolverPrototype;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -21,7 +20,7 @@ namespace SolverPrototypeTests
 
         public static void Test()
         {
-            void VerifySort(int[] keys)
+            void VerifySort(Array<int> keys)
             {
                 for (int i = 1; i < keys.Length; ++i)
                 {
@@ -33,8 +32,8 @@ namespace SolverPrototypeTests
             for (int iteration = 0; iteration < 16; ++iteration)
             {
                 GC.Collect(3, GCCollectionMode.Forced, true);
-                int[] keys = new int[elementCount];
-                int[] indexMap = new int[elementCount];
+                var keys = new Array<int>(new int[elementCount]);
+                var indexMap = new Array<int>(new int[elementCount]);
                 Random random = new Random(5);
                 for (int i = 0; i < elementCount; ++i)
                 {
@@ -42,32 +41,28 @@ namespace SolverPrototypeTests
                     //keys[i] = i;
                     keys[i] = random.Next(elementExclusiveUpperBound);
                 }
-                var keys2 = new int[elementCount];
-                var indexMap2 = new int[elementCount];
-                var keys3 = new int[elementCount];
-                var indexMap3 = new int[elementCount];
-                var keys4 = new int[elementCount];
-                var indexMap4 = new int[elementCount];
-                Array.Copy(indexMap, indexMap2, elementCount);
-                Array.Copy(keys, keys2, elementCount);
-                Array.Copy(indexMap, indexMap3, elementCount);
-                Array.Copy(keys, keys3, elementCount);
-                Array.Copy(indexMap, indexMap4, elementCount);
-                Array.Copy(keys, keys4, elementCount);
-
+                var keys2 = new Array<int>(new int[elementCount]);
+                var indexMap2 = new Array<int>(new int[elementCount]);
+                var keys3 = new Array<int>(new int[elementCount]);
+                var indexMap3 = new Array<int>(new int[elementCount]);
+                var keys4 = new Array<int>(new int[elementCount]);
+                var indexMap4 = new Array<int>(new int[elementCount]);
+                keys.CopyTo(0, ref keys2, 0, elementCount);
+                keys.CopyTo(0, ref keys3, 0, elementCount);
+                keys.CopyTo(0, ref keys4, 0, elementCount);
+                indexMap.CopyTo(0, ref indexMap2, 0, elementCount);
+                indexMap.CopyTo(0, ref indexMap3, 0, elementCount);
+                indexMap.CopyTo(0, ref indexMap4, 0, elementCount);
 
                 var comparer = new Comparer();
-                int swapCount = 0;
-                Quicksort.Sort2(ref keys[0], ref indexMap[0], 0, 0, ref comparer); //prejit
                 var timer = Stopwatch.StartNew();
-                Quicksort.Sort2(ref keys[0], ref indexMap[0], 0, elementCount - 1, ref comparer);
+                QuickSort.Sort<int, int, Array<int>, Array<int>, Comparer>(ref keys, ref indexMap, 0, elementCount - 1, ref comparer);
                 timer.Stop();
                 VerifySort(keys);
-                Console.WriteLine($"QSort2 time (ms): {timer.Elapsed.TotalSeconds * 1e3}, swapcount: {swapCount}");
-
-                Array.Sort(keys2, indexMap2, 0, 1); //prejit
+                Console.WriteLine($"QSort2 time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+                
                 timer.Restart();
-                Array.Sort(keys2, indexMap2, 0, elementCount);
+                Array.Sort(keys2.Memory, indexMap2.Memory, 0, elementCount);
                 timer.Stop();
                 VerifySort(keys2);
                 Console.WriteLine($"Array.Sort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
@@ -76,7 +71,6 @@ namespace SolverPrototypeTests
                 var valuesScratch = new int[elementCount];
                 var bucketCounts = new int[1024];
                 Array.Clear(bucketCounts, 0, bucketCounts.Length);
-                LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], 1); //prejit
                 timer.Restart();
                 Array.Clear(bucketCounts, 0, bucketCounts.Length);
                 LSBRadixSort.SortU32(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount);
@@ -85,8 +79,6 @@ namespace SolverPrototypeTests
                 Console.WriteLine($"LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
                 var originalIndices = new int[256];
-                //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], 1, 24); //prejit
-                MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], 1, SpanHelper.GetContainingPowerOf2(elementExclusiveUpperBound)); //prejit
                 timer.Restart();
                 //MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], ref bucketCounts[0], ref originalIndices[0], elementCount, 24);
                 MSBRadixSort.SortU32(ref keys4[0], ref indexMap4[0], elementCount, SpanHelper.GetContainingPowerOf2(elementExclusiveUpperBound));

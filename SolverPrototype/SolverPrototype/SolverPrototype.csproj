@@ -108,9 +108,6 @@
     <Compile Include="TypeBatchAllocation.cs" />
     <Compile Include="Matrix2x2Wide.cs" />
     <Compile Include="Matrix2x3Wide.cs" />
-    <Compile Include="MSBRadixSort.cs" />
-    <Compile Include="Quicksort.cs" />
-    <Compile Include="LSBRadixSort.cs" />
     <Compile Include="Simulation.cs" />
     <Compile Include="Springiness.cs" />
     <Compile Include="Constraints\TwistFriction.cs" />

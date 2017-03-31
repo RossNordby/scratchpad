@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SolverPrototype
+namespace BEPUutilities2.Collections
 {
     public static class LSBRadixSort
     {

@@ -13,7 +13,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(12, 12, 12, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
             
             double compressionTimeAccumulator = 0;
             const int iterations = 1000;

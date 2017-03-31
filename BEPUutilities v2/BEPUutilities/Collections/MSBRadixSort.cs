@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SolverPrototype
+namespace BEPUutilities2.Collections
 {
 
     public static class MSBRadixSort
@@ -18,8 +18,6 @@ namespace SolverPrototype
             a = b;
             b = temp;
         }
-
-
 
         public static void SortU32<T>(ref int keys, ref T values, ref int bucketCounts, ref int bucketOriginalStartIndices, int keyCount, int shift)
         {

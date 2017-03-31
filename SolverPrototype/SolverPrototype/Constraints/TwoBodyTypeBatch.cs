@@ -116,7 +116,7 @@ namespace SolverPrototype.Constraints
             //It would be slower in terms of raw coverage, but it would converge faster. The key there would be an efficient and parallel merge operation.
             //Subarrays could be sorted by any available means.
             var comparer = default(IntComparer);
-            Quicksort.Sort2(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
+            QuickSort.Sort<int, int, Buffer<int>, Buffer<int>, IntComparer>(ref sortKeys, ref sourceIndices, 0, constraintCount - 1, ref comparer);
             
             //Push the cached data into its proper sorted position.
             for (int i = 0; i < constraintCount; ++i)
