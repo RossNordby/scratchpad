@@ -14,10 +14,15 @@ namespace SolverPrototypeTests
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
             SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
-            
+
+            var earlyTimer = Stopwatch.StartNew();
+            SimulationSetup.AddRemoveChurn(simulation, 10000000, bodyHandles, constraintHandles);
+            earlyTimer.Stop();
+            Console.WriteLine($"Churn time: {earlyTimer.Elapsed.TotalSeconds}");
+
             double compressionTimeAccumulator = 0;
-            const int iterations = 1000;
-            const int internalCompressionIterations = 100;
+            const int iterations = 100;
+            const int internalCompressionIterations = 1000;
             for (int i = 0; i < iterations; ++i)
             {
                 SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
@@ -35,7 +40,7 @@ namespace SolverPrototypeTests
             //Attempt cache optimization.
             int bodyOptimizationIterations = bodyHandles.Length * 16;
             //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
-            //bodyOptimizer.DumbIncrementalOptimize(); //prejit
+            simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
@@ -79,7 +84,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
-            const int frameCount = 256;
+            const int frameCount = 1;
             simulation.Solver.IterationCount = iterationCount;
 
 
