@@ -35,6 +35,13 @@ namespace BEPUutilities2.Memory
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
+                //TODO: As of this writing, the codegen for this isn't perfect. It's marginally better than doing bounds checks on a regular array.
+                //Still not quite as fast as a raw Unsafe.Add on a properly typed ref, or a pure pointer index.
+                //Hopefully, coreclr's Span<T> will result in some improvement here. 
+                //No guarantee, though- they used to have a similar issue earlier in development but swapped to using internal intrinsics. 
+                //Specifically, they're using:
+                //return ref Unsafe.Add(ref _pointer.Value, index);
+                //where _pointer is a ByReference<T>, which we cannot use.
                 return ref Unsafe.Add(ref Unsafe.As<byte, T>(ref *Memory), index);
             }
         }

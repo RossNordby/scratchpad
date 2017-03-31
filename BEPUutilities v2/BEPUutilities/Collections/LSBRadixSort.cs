@@ -9,6 +9,7 @@ namespace BEPUutilities2.Collections
 {
     public static class LSBRadixSort
     {
+        //TODO: If the jit ever managed to handle ISpan indexers optimally, we could use a much more natural ISpan-based implementation.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void ReorderForByte<T>(ref int sourceKeys, ref int targetKeys, ref T sourceValues, ref T targetValues, int keyCount, ref int indices, int shift)
         {

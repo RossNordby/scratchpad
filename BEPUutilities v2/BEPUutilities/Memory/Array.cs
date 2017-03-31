@@ -30,6 +30,7 @@ namespace BEPUutilities2.Memory
                 //but it gets into a bit of brittle black magic...
                 Debug.Assert(index >= 0 && index < Memory.Length);
                 return ref Unsafe.Add(ref Memory[0], index);
+                //return ref Memory[index];
             }
         }
         public int Length
@@ -54,6 +55,7 @@ namespace BEPUutilities2.Memory
             //TODO: Unfortunately, the jit doesn't type specialize the type checks when T is a reference type- which was somewhat expected since all reference
             //types share the same implementation. However, no reference type is a primitive, so it seems like this is something that could be improved pretty easily...
             //In the interim, it's still valuable to have the primitive test for the common case where the type is in fact primitive.
+            //(RuntimeHelpers.IsReferenceOrContainsReferences could solve this if it becomes available.)
             if (!SpanHelper.IsPrimitive<T>())
                 System.Array.Clear(Memory, start, count);
         }

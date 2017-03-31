@@ -11,6 +11,7 @@ namespace BEPUutilities2.Collections
 
     public static class MSBRadixSort
     {
+        //TODO: If the jit ever managed to handle ISpan indexers optimally, we could use a much more natural ISpan-based implementation.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Swap<T>(ref T a, ref T b)
         {

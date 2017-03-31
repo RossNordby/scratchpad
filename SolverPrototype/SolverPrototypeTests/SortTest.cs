@@ -56,10 +56,21 @@ namespace SolverPrototypeTests
 
                 var comparer = new Comparer();
                 var timer = Stopwatch.StartNew();
-                QuickSort.Sort<int, int, Array<int>, Array<int>, Comparer>(ref keys, ref indexMap, 0, elementCount - 1, ref comparer);
+                unsafe
+                {
+                    fixed (int* keysPointer = keys.Memory)
+                    fixed (int* valuesPointer = indexMap.Memory)
+                    {
+                        var keysBuffer = new Buffer<int>(keysPointer, keys.Length);
+                        var valuesBuffer = new Buffer<int>(valuesPointer, indexMap.Length);
+                        timer.Restart();
+                        QuickSort.Sort(ref keysBuffer[0], ref valuesBuffer[0], 0, elementCount - 1, ref comparer);
+                    }
+                }
+                //QuickSort.Sort2(ref keys[0], ref indexMap[0], 0, elementCount - 1, ref comparer);
                 timer.Stop();
                 VerifySort(keys);
-                Console.WriteLine($"QSort2 time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+                Console.WriteLine($"QuickSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
                 
                 timer.Restart();
                 Array.Sort(keys2.Memory, indexMap2.Memory, 0, elementCount);
