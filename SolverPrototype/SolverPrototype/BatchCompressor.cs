@@ -12,6 +12,20 @@ namespace SolverPrototype
     /// </summary>
     public class BatchCompressor
     {
+        //We want to keep removes as fast as possible. So, when removing constraints, no attempt is made to pull constraints from higher constraint batches into the revealed slot.
+        //Over time, this could result in lots of extra constraint batches that ruin multithreading performance.
+        //This batch compressor solves this problem over multiple frames.
+        //The dedicated batch analysis has some pretty nice advantages:
+        //0) Removes stay (relatively) fast- no O(n) searching or complex logic.
+        //1) High churn adds/removes are extremely common during chaotic collisions, which is exactly when you need as little overhead as possible. 
+        //1.5) High churn situations will tend to rapidly invalidate the 'optimization' effort of extremely aggressive on-remove swaps.
+        //2) On-removal will often fail to make any change due to other reference blockages.
+        //3) Dedicated batch analysis can be deferred over multiple frames because the intermediate results are all fine from a correctness standpoint. 
+        //3.5) Deferred costs can be kept consistently low no matter what kind of add/remove churn is happening.
+        //4) Dedicated batch analysis can be performed asynchronously and hidden behind other stally stages which aren't the solver and don't modify the solver (e.g. broadphase, midphase).
+        //5) Even if we are in a 'suboptimal' constraint configuration (i.e. some pulldowns exist), it will rarely have an effect on performance unless it actually results in extra batches.
+        //6) Dedicated analysis could afford to perform more complex heuristics to optimize batches. This doesn't do anything clever, but in theory, it could.
+
         public Solver Solver { get; private set; }
         public Bodies Bodies { get; private set; }
         /// <summary>
