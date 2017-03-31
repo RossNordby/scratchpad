@@ -118,7 +118,7 @@
       <Name>BEPUutilities2</Name>
     </ProjectReference>
     <ProjectReference Include="..\SolverPrototype\SolverPrototype.csproj">
-      <Project>{31795c54-28fa-4dd6-8036-7aa49edda482}</Project>
+      <Project>{5445058a-86cf-42b9-a160-5a8698b9c2ab}</Project>
       <Name>SolverPrototype</Name>
     </ProjectReference>
   </ItemGroup>

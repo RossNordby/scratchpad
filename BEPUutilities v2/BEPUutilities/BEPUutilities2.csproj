@@ -10,6 +10,7 @@
     <PackageProjectUrl>https://github.com/RossNordby/scratchpad</PackageProjectUrl>
     <RepositoryUrl>https://github.com/RossNordby/scratchpad</RepositoryUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/RossNordby/bepuphysics1/master/Documentation/images/readme/bepuphysicslogo256.png</PackageIconUrl>
+    <PackageLicenseUrl>https://github.com/RossNordby/scratchpad/blob/master/LICENSE.md</PackageLicenseUrl>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
