@@ -161,7 +161,7 @@ namespace BEPUutilities2.Memory
                 var indexInBlock = slot & SuballocationsPerBlockMask;
                 buffer = new RawBuffer(Blocks[blockIndex].Allocate(indexInBlock, SuballocationSize), SuballocationSize, slot);
 #if DEBUG
-                const int maximumOutstandingCapacity = 1 << 27;
+                const int maximumOutstandingCapacity = 1 << 29;
                 Debug.Assert(outstandingIds.Count * SuballocationSize <= maximumOutstandingCapacity,
                     $"Do you actually truly really need to have {maximumOutstandingCapacity} bytes taken from this power pool, or is this a memory leak?");
                 Debug.Assert(outstandingIds.Add(slot), "Should not be able to request the same slot twice.");
