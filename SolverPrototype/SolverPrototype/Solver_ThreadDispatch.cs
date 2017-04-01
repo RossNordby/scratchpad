@@ -75,16 +75,26 @@ namespace SolverPrototype
             public int End;
         }
 
+
+        internal struct WorkerContext
+        {
+            //generics yay
+            public QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>> BlocksOwnedInBatches;
+        }
         /// <summary>
         /// Creates a set of work blocks for worker threads to operate on and steal. 
         /// </summary>
         /// <param name="workerCount">Number of thread workers available.</param>
         /// <param name="solver">Solver doing the solve.</param>
         /// <param name="bufferPool">Pool to pull temporary resources from.</param>
+        /// <param name="blockClaims">Preallocated claim flags for individual blocks.</param>
         /// <param name="workBlocks">Set of bundle regions for threads to execute.</param>
         /// <param name="batchBoundaries">Exclusive end indices of each batch's work block region.</param>
         static void CreateWorkBlocks(int workerCount, Solver solver, BufferPool bufferPool,
-             out QuickList<WorkBlock, Buffer<WorkBlock>> workBlocks, out QuickList<int, Buffer<int>> batchBoundaries)
+             ref QuickList<WorkerContext, Buffer<WorkerContext>> workerContexts,
+             out QuickList<WorkBlock, Buffer<WorkBlock>> workBlocks,
+             out QuickList<int, Buffer<int>> blockClaims,
+             out QuickList<int, Buffer<int>> batchBoundaries)
         {
             //The block size should be relatively small to give the workstealer something to do, but we don't want to go crazy with the number of blocks.
             //These values are found by empirical tuning. The optimal values may vary by architecture.
@@ -138,15 +148,180 @@ namespace SolverPrototype
                     }
                 }
                 batchBoundaries.AddUnsafely(ref workBlocks.Count);
-
             }
+
+            //Create the claims set.
+            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), workBlocks.Count, out blockClaims);
+
+            //Now that we have a set of work blocks updated for the current state of the simulation, revalidate the ownership across workers.
+            //We have three goals:
+            //1) Make ownership regions contiguous to improve spatial locality.
+            //2) Adapt to changes in the number of workers.
+            //3) Adapt to changes in work blocks.
+            //We completely ignore the previous state of work blocks- the only thing we care about is how much each individual worker was contributing to the final result.
+            //This provides a guess about how expensiv regions are. By forcing contiguity of regions, we may imbalance the load temporarily. 
+            //Workstealing will address any induced load imbalance in the short term, and over multiple frames, the initial guess should tend to converge
+            //to something reasonable that minimizes the number of required steals.
+
+
+            //Any contexts that exist and will continue to exist should have their batch capacities checked.    
+            //Note that changes in batch count do not destroy our guesses from the previous frame; the only batches that are ever removed are those which are at the very end of the list.
+            //In other words, removes don't change order. (And adds just append, so they're fine too.)
+            //So, for all the batches which still exist, the guesses we have are still associated with the same batches. 
+            //Assuming that there are no massive changes in the constraint set, this is a pretty good guess.
+            var batchCount = batchBoundaries.Count;
+            var oldBatchCount = workerContexts[0].BlocksOwnedInBatches.Count;
+            if (batchCount > oldBatchCount)
+            {
+                //There are more batches now than before. Need to initialize them on every existing worker.
+                for (int contextIndex = 0; contextIndex < Math.Min(workerCount, workerContexts.Count); ++contextIndex)
+                {
+                    ref var context = ref workerContexts[contextIndex];
+                    //The new frame has more constraint batches. We need to set up new batch ownership lists for each worker.
+                    //Note that there's no need to ensure the capacity on each batch block ownership list that already exists; the maxmimum required capacity is constant and was already set when the list was created.
+                    context.BlocksOwnedInBatches.EnsureCapacity(batchCount, bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
+                    context.BlocksOwnedInBatches.Count = batchCount;
+                    for (int i = oldBatchCount; i < batchCount; ++i)
+                    {
+                        QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), targetBlocksPerBatchPerWorker, out context.BlocksOwnedInBatches[i]);
+                    }
+                }
+            }
+            else if (batchCount < oldBatchCount)
+            {
+                //Less batches now exist. Get rid of all the extras.
+                for (int contextIndex = 0; contextIndex < Math.Min(workerCount, workerContexts.Count); ++contextIndex)
+                {
+                    ref var context = ref workerContexts[contextIndex];
+                    for (int i = batchCount; i < oldBatchCount; ++i)
+                    {
+                        context.BlocksOwnedInBatches[i].Dispose(bufferPool.SpecializeFor<int>());
+                    }
+                    context.BlocksOwnedInBatches.Count = batchCount;
+                    //We may be able to shrink the size.
+                    context.BlocksOwnedInBatches.Compact(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
+                }
+            }
+
+            //In the event that the worker count changes, the easiest thing to do is just throw out all previous guesses.
+            //This isn't optimal, but worker count changes should be really, really rare.
+            //Note that this doubles as initialization.
+            if (workerContexts.Count != workerCount)
+            {
+                if (workerCount > workerContexts.Count)
+                {
+                    //Add any new contexts that we need.
+                    workerContexts.EnsureCapacity(workerCount, bufferPool.SpecializeFor<WorkerContext>());
+                    for (int i = workerContexts.Count; i < workerCount; ++i)
+                    {
+                        WorkerContext context;
+                        QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>>.Create(
+                            bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>(), batchBoundaries.Count, out context.BlocksOwnedInBatches);
+                        for (int j = 0; j < batchBoundaries.Count; ++j)
+                        {
+                            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), targetBlocksPerBatchPerWorker, out context.BlocksOwnedInBatches[j]);
+                        }
+                        workerContexts.AddUnsafely(ref context);
+                    }
+                }
+                else
+                {
+                    //Get rid of every context beyond those that we need.
+                    for (int i = workerCount; i < workerContexts.Count; ++i)
+                    {
+                        for (int j = 0; j < workerContexts[i].BlocksOwnedInBatches.Count; ++j)
+                        {
+                            workerContexts[i].BlocksOwnedInBatches[j].Dispose(bufferPool.SpecializeFor<int>());
+                        }
+                        workerContexts[i].BlocksOwnedInBatches.Dispose(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
+                    }
+                    workerContexts.Count = workerCount;
+                    workerContexts.Compact(bufferPool.SpecializeFor<WorkerContext>());
+                }
+                //Note that we don't bother compacting the individual worker's OwnedBlocks that persist.
+                //The number of blocks allocated to each worker is bounded to a low constant value.
+
+                //Since we don't have a decent guess of where to put blocks, just evenly distribute them and shrug. Next frame will give us more information.
+                int blockIndex = 0;
+                for (int batchIndex = 0; batchIndex < batchBoundaries.Count; ++batchIndex)
+                {
+                    //Spread the blocks of the batch across the set of workers.
+                    var start = batchIndex >= 0 ? batchBoundaries[batchIndex - 1] : 0;
+                    var count = batchBoundaries[batchIndex] - start;
+
+                    var targetBlocksPerWorker = workBlocks.Count / workerCount;
+                    var remainder = workBlocks.Count - workerCount * targetBlocksPerWorker;
+                    for (int i = 0; i < workerCount; ++i)
+                    {
+                        var blockCount = remainder-- > 0 ? targetBlocksPerBatchPerWorker + 1 : targetBlocksPerBatchPerWorker;
+                        var workerRegionEnd = blockIndex + blockCount;
+                        for (; blockIndex < workerRegionEnd; ++blockIndex)
+                        {
+                            workerContexts[i].BlocksOwnedInBatches[batchIndex].AddUnsafely(blockIndex);
+                        }
+                    }
+                }
+                return;
+            }
+            //We still have the same number of threads, so we should be able to get some inspiration from the previous frame's load balancing result.
+            //Note that the constraint set may have changed arbitrarily since the previous frame, so this is not a guarantee of a good load balance.
+            //It just relies on temporal coherence.
+
+            //The idea here is to allocate blocks to workers in proportion to how many blocks they were able to handle in the previous solve.
+            //This is done per-batch; each batch could have significantly different per block costs due to different constraints being involved.
+            {
+                var blockIndex = 0;
+                for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
+                {
+                    var totalBlockCount = 0;
+                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                    {
+                        totalBlockCount += workerContexts[workerIndex].BlocksOwnedInBatches[batchIndex].Count;
+                    }
+                    //Use the fraction of the previous frame's block owned by each worker to determine how many blocks it should now have.
+                    //Two phases: the initial estimate, followed by the distribution of the remainder.
+                    var allocatedBlockCount = 0;
+                    var blockStartForBatch = batchIndex >= 0 ? batchBoundaries[batchIndex - 1] : 0;
+                    var blockCountForBatch = batchBoundaries[batchIndex] - blockStartForBatch;
+                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                    {
+                        var blockCountForWorker = (blockCountForBatch * workerContexts[workerIndex].BlocksOwnedInBatches.Count) / totalBlockCount;
+                        allocatedBlockCount += workerContexts[workerIndex].BlocksOwnedInBatches.Count = blockCountForWorker;
+                    }
+                    var targetWorker = 0;
+                    while (allocatedBlockCount < blockCountForBatch)
+                    {
+                        ++workerContexts[targetWorker++].BlocksOwnedInBatches.Count;
+                        Debug.Assert(workerContexts[targetWorker].BlocksOwnedInBatches.Count <= targetBlocksPerBatchPerWorker);
+                        ++allocatedBlockCount;
+                    }
+
+                    //We have reasonably distributed counts. Now, stick contiguous blobs of indices into each worker's list to fill it up. 
+                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                    {
+                        ref var worker = ref workerContexts[workerIndex];
+                        var workerEnd = blockIndex + worker.BlocksOwnedInBatches.Count;
+                        ref var blockList = ref worker.BlocksOwnedInBatches[batchIndex];
+                        for (int i = 0; i < worker.BlocksOwnedInBatches.Count; ++i)
+                            blockList[i] = blockIndex++;
+                    }
+                    Debug.Assert(blockIndex == batchBoundaries[batchIndex]);
+                }
+            }
+            //Note that we have no guarantee that every thread will actually have a block to work on. That's okay- everything still works. The empty threads will be doing
+            //a lot of work spinning their wheels, but at those scales, the total simulation time will be measured in microseconds anyway. It's not a big concern.
+            //The goal for multithreading is for enormous simulations to be reasonably fast, not for extremely tiny simulations to update at absurd rates.
         }
         /// <summary>
         /// Returns the temporary resources to the pool.
         /// </summary>
-        static void Return(BufferPool bufferPool, ref QuickList<WorkBlock, Buffer<WorkBlock>> workBlocks, ref QuickList<int, Buffer<int>> batchBoundaries)
+        static void Return(BufferPool bufferPool,
+            ref QuickList<WorkBlock, Buffer<WorkBlock>> workBlocks,
+            ref QuickList<int, Buffer<int>> blockClaims,
+            ref QuickList<int, Buffer<int>> batchBoundaries)
         {
             workBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
+            blockClaims.Dispose(bufferPool.SpecializeFor<int>());
             batchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
         }
     }
