@@ -152,6 +152,8 @@ namespace SolverPrototype
 
             //Create the claims set.
             QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), workBlocks.Count, out blockClaims);
+            blockClaims.Span.Clear(0, workBlocks.Count);
+            blockClaims.Count = workBlocks.Count;
 
             //Now that we have a set of work blocks updated for the current state of the simulation, revalidate the ownership across workers.
             //We have three goals:
