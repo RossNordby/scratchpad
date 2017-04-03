@@ -579,7 +579,7 @@ namespace BEPUutilities2.Collections
         [Conditional("DEBUG")]
         private void Validate()
         {
-            Debug.Assert(Span.Length >= 0, "Any QuickList in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
+            Debug.Assert(Span.Length > 0, "Any QuickList in use should have a nonzero length Span. Was this instance default constructed without further initialization?");
         }
 
         [Conditional("DEBUG")]

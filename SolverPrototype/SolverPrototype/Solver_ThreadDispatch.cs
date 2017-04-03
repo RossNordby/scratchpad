@@ -88,6 +88,7 @@ namespace SolverPrototype
         {
             public float Dt;
             public float InverseDt;
+            public Buffer<int> WorkerBatchBlockCounts;
             public QuickList<Worker, Buffer<Worker>> Workers;
             public QuickList<WorkBlock, Buffer<WorkBlock>> WorkBlocks;
             public QuickList<int, Buffer<int>> BlockClaims;
@@ -137,8 +138,6 @@ namespace SolverPrototype
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
                     var typeBatchBlockCount = typeBatch.BundleCount / targetBlockSizeInBundles;
                     var remainder = typeBatch.BundleCount - typeBatchBlockCount * targetBlockSizeInBundles;
-                    if (remainder > 0)
-                        ++typeBatchBlockCount;
                     WorkBlock block;
                     block.BatchIndex = batchIndex;
                     block.TypeBatchIndex = typeBatchIndex;
@@ -179,7 +178,9 @@ namespace SolverPrototype
             //So, for all the batches which still exist, the guesses we have are still associated with the same batches. 
             //Assuming that there are no massive changes in the constraint set, this is a pretty good guess.
             var batchCount = context.BatchBoundaries.Count;
-            var oldBatchCount = context.Workers[0].BlocksOwnedInBatches.Count;
+
+            //It's possible for there to be no workers- the previous frame might have been single threaded, or this is the first frame. Guard against it.
+            var oldBatchCount = context.Workers.Count > 0 ? context.Workers[0].BlocksOwnedInBatches.Count : 0;
             if (batchCount > oldBatchCount)
             {
                 //There are more batches now than before. Need to initialize them on every existing worker.
@@ -349,6 +350,11 @@ namespace SolverPrototype
             //This just stops the dispatch from going through because the multithreaded worker relies upon there being batches.
             if (batchCount > 0)
                 threadPool.ForLoop(0, workerCount, Work);
+
+            //Rather than storing the entire workblocks pointer set, just store the counts. It's the only information that's useful to persist since the actual block pointers
+            //can be arbitrarily invalidated in the next frame.
+            //This means that the workblock pointer sets have to be regenerated from scratch every frame, but that's a relatively small cost and it's much simpler than
+            //attempting to maintain sets.
 
 
             //Clean up all the ephemeral resources.

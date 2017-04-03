@@ -15,35 +15,35 @@ namespace SolverPrototypeTests
 
             SimulationSetup.BuildLattice(16, 16, 16, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.ScrambleBodies(simulation);
-            SimulationSetup.ScrambleConstraints(simulation.Solver);
+            //SimulationSetup.ScrambleBodies(simulation);
+            //SimulationSetup.ScrambleConstraints(simulation.Solver);
 
             double compressionTimeAccumulator = 0;
-            const int iterations = 100;
-            const int internalCompressionIterations = 1000;
-            for (int i = 0; i < iterations; ++i)
-            {
-                SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
-                GC.Collect(3, GCCollectionMode.Forced, true);
-                var start = Stopwatch.GetTimestamp();
-                for (int j = 0; j < internalCompressionIterations; ++j)
-                {
-                    simulation.SolverBatchCompressor.Compress(simulation.BufferPool);
-                }
-                compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
-            }
+            const int iterations = 1;
+            const int internalCompressionIterations = 1;
+            //for (int i = 0; i < iterations; ++i)
+            //{
+            //    SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
+            //    GC.Collect(3, GCCollectionMode.Forced, true);
+            //    var start = Stopwatch.GetTimestamp();
+            //    for (int j = 0; j < internalCompressionIterations; ++j)
+            //    {
+            //        simulation.SolverBatchCompressor.Compress(simulation.BufferPool);
+            //    }
+            //    compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
+            //}
             Console.WriteLine($"Time per compression: {1e6 * compressionTimeAccumulator / (iterations * internalCompressionIterations)} us");
             GC.Collect(3, GCCollectionMode.Forced, true);
 
             //Attempt cache optimization.
             int bodyOptimizationIterations = bodyHandles.Length * 16;
             //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
-            simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
+            //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
                 //bodyOptimizer.PartialIslandOptimizeDFS(64);
-                simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
+                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
@@ -66,12 +66,12 @@ namespace SolverPrototypeTests
                 (int)(1 * 2 * ((long)constraintCount * constraintCount /
                 ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            simulation.ConstraintLayoutOptimizer.Update(2, 1, simulation.BufferPool); //prejit
+            //simulation.ConstraintLayoutOptimizer.Update(2, 1, simulation.BufferPool); //prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool);
+                //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool);
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
