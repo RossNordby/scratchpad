@@ -4,7 +4,9 @@ using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 
 namespace SolverPrototype
 {
@@ -185,7 +187,8 @@ namespace SolverPrototype
                     context.BlocksOwnedInBatches.Count = batchCount;
                     for (int i = oldBatchCount; i < batchCount; ++i)
                     {
-                        QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), targetBlocksPerBatchPerWorker, out context.BlocksOwnedInBatches[i]);
+                        //Note that we allocate enough space to hold every block in the worst case. That could potentially happen due to workstealing.
+                        QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), maximumBlocksPerBatch, out context.BlocksOwnedInBatches[i]);
                     }
                 }
             }
@@ -221,7 +224,8 @@ namespace SolverPrototype
                             bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>(), batchBoundaries.Count, out context.BlocksOwnedInBatches);
                         for (int j = 0; j < batchBoundaries.Count; ++j)
                         {
-                            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), targetBlocksPerBatchPerWorker, out context.BlocksOwnedInBatches[j]);
+                            //Note that we allocate enough space to hold every block in the worst case. That could potentially happen due to workstealing.
+                            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), maximumBlocksPerBatch, out context.BlocksOwnedInBatches[j]);
                         }
                         workerContexts.AddUnsafely(ref context);
                     }
@@ -231,11 +235,12 @@ namespace SolverPrototype
                     //Get rid of every context beyond those that we need.
                     for (int i = workerCount; i < workerContexts.Count; ++i)
                     {
+                        ref var worker = ref workerContexts[i];
                         for (int j = 0; j < workerContexts[i].BlocksOwnedInBatches.Count; ++j)
                         {
-                            workerContexts[i].BlocksOwnedInBatches[j].Dispose(bufferPool.SpecializeFor<int>());
+                            worker.BlocksOwnedInBatches[j].Dispose(bufferPool.SpecializeFor<int>());
                         }
-                        workerContexts[i].BlocksOwnedInBatches.Dispose(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
+                        worker.BlocksOwnedInBatches.Dispose(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
                     }
                     workerContexts.Count = workerCount;
                     workerContexts.Compact(bufferPool.SpecializeFor<WorkerContext>());
@@ -253,13 +258,14 @@ namespace SolverPrototype
 
                     var targetBlocksPerWorker = workBlocks.Count / workerCount;
                     var remainder = workBlocks.Count - workerCount * targetBlocksPerWorker;
-                    for (int i = 0; i < workerCount; ++i)
+                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
+                        ref var ownedBlocksInBatch = ref workerContexts[workerIndex].BlocksOwnedInBatches[batchIndex];
                         var blockCount = remainder-- > 0 ? targetBlocksPerBatchPerWorker + 1 : targetBlocksPerBatchPerWorker;
                         var workerRegionEnd = blockIndex + blockCount;
                         for (; blockIndex < workerRegionEnd; ++blockIndex)
                         {
-                            workerContexts[i].BlocksOwnedInBatches[batchIndex].AddUnsafely(blockIndex);
+                            ownedBlocksInBatch.AddUnsafely(blockIndex);
                         }
                     }
                 }
@@ -287,25 +293,23 @@ namespace SolverPrototype
                     var blockCountForBatch = batchBoundaries[batchIndex] - blockStartForBatch;
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
-                        var blockCountForWorker = (blockCountForBatch * workerContexts[workerIndex].BlocksOwnedInBatches.Count) / totalBlockCount;
-                        allocatedBlockCount += workerContexts[workerIndex].BlocksOwnedInBatches.Count = blockCountForWorker;
+                        ref var ownedBlocksInBatch = ref workerContexts[workerIndex].BlocksOwnedInBatches[batchIndex];
+                        var blockCountForWorker = (blockCountForBatch * ownedBlocksInBatch.Count) / totalBlockCount;
+                        allocatedBlockCount += ownedBlocksInBatch.Count = blockCountForWorker;
                     }
                     var targetWorker = 0;
                     while (allocatedBlockCount < blockCountForBatch)
                     {
-                        ++workerContexts[targetWorker++].BlocksOwnedInBatches.Count;
-                        Debug.Assert(workerContexts[targetWorker].BlocksOwnedInBatches.Count <= targetBlocksPerBatchPerWorker);
+                        ++workerContexts[targetWorker++].BlocksOwnedInBatches[batchIndex].Count;
                         ++allocatedBlockCount;
                     }
 
                     //We have reasonably distributed counts. Now, stick contiguous blobs of indices into each worker's list to fill it up. 
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
-                        ref var worker = ref workerContexts[workerIndex];
-                        var workerEnd = blockIndex + worker.BlocksOwnedInBatches.Count;
-                        ref var blockList = ref worker.BlocksOwnedInBatches[batchIndex];
-                        for (int i = 0; i < worker.BlocksOwnedInBatches.Count; ++i)
-                            blockList[i] = blockIndex++;
+                        ref var ownedBlocksInBatch = ref workerContexts[workerIndex].BlocksOwnedInBatches[batchIndex];
+                        for (int i = 0; i < ownedBlocksInBatch.Count; ++i)
+                            ownedBlocksInBatch[i] = blockIndex++;
                     }
                     Debug.Assert(blockIndex == batchBoundaries[batchIndex]);
                 }
@@ -314,6 +318,8 @@ namespace SolverPrototype
             //a lot of work spinning their wheels, but at those scales, the total simulation time will be measured in microseconds anyway. It's not a big concern.
             //The goal for multithreading is for enormous simulations to be reasonably fast, not for extremely tiny simulations to update at absurd rates.
         }
+
+
         /// <summary>
         /// Returns the temporary resources to the pool.
         /// </summary>
@@ -326,5 +332,266 @@ namespace SolverPrototype
             blockClaims.Dispose(bufferPool.SpecializeFor<int>());
             batchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
         }
+
+
+        //Multithreading delegate parameters.
+        float dt;
+        float inverseDt;
+        QuickList<WorkerContext, Buffer<WorkerContext>> workerContexts;
+        QuickList<WorkBlock, Buffer<WorkBlock>> workBlocks;
+        QuickList<int, Buffer<int>> blockClaims;
+        QuickList<int, Buffer<int>> batchBoundaries;
+        QuickList<int, Buffer<int>> stageRemainingBlocks;
+        int workerCompletedCount;
+        int workerCount;
+
+
+        //TODO: There's a whole lot of unshared but pretty easily shared code here. It would be nice to combine stuff, especially if we start experimenting with different sync forms.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void TryPrestepBlock(int slot, int ownedState, int clearedState, ref int remainingBlocks)
+        {
+            if (Interlocked.CompareExchange(ref blockClaims[slot], ownedState, clearedState) == clearedState)
+            {
+                //This worker now owns the slot; we can freely execute it.
+                ref var block = ref workBlocks[slot];
+                //TODO: Note local inertias use. We don't have an integrator yet so they're always local, but that'll need to change.
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies.LocalInertiaBundles, dt, inverseDt, block.StartBundle, block.End);
+                //Decrement the available block count to allow workers to stop trying to steal. 
+                //Note that the fact that this decrement is not atomic with the CAS is not a correctness issue-
+                //it may just cause some threads to do an extra claims test or two pointlessly. The syncs required to avoid that cost more.
+                //(TODO: You COULD technically flip the conditions- decrement first, claim second. But there's no guarantee that we will be able to claim after the decrement,
+                //so that decremented slot might end up being a steal later on. A little more complex, but quite possibly worth it overall.)
+                Interlocked.Decrement(ref remainingBlocks);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void TryWarmStartBlock(int slot, int ownedState, int clearedState, ref int remainingBlocks)
+        {
+            if (Interlocked.CompareExchange(ref blockClaims[slot], ownedState, clearedState) == clearedState)
+            {
+                //This worker now owns the slot; we can freely execute it.
+                ref var block = ref workBlocks[slot];
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.VelocityBundles, block.StartBundle, block.End);
+                //Decrement the available block count to allow workers to stop trying to steal. 
+                //Note that the fact that this decrement is not atomic with the CAS is not a correctness issue-
+                //it may just cause some threads to do an extra claims test or two pointlessly. The syncs required to avoid that cost more.
+                //(TODO: You COULD technically flip the conditions- decrement first, claim second. But there's no guarantee that we will be able to claim after the decrement,
+                //so that decremented slot might end up being a steal later on. A little more complex, but quite possibly worth it overall.)
+                Interlocked.Decrement(ref remainingBlocks);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void TrySolveOwnedBlock(ref QuickList<int, Buffer<int>> ownedBlocks, int ownedIndex, int ownedState, int clearedState, ref int remainingBlocks)
+        {
+            var slot = ownedBlocks[ownedIndex]; 
+            if (Interlocked.CompareExchange(ref blockClaims[slot], ownedState, clearedState) == clearedState)
+            {
+                //This worker now owns the slot; we can freely execute it.
+                ref var block = ref workBlocks[slot];
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.VelocityBundles, block.StartBundle, block.End);
+                //Decrement the available block count to allow workers to stop trying to steal. 
+                //Note that the fact that this decrement is not atomic with the CAS is not a correctness issue-
+                //it may just cause some threads to do an extra claims test or two pointlessly. The syncs required to avoid that cost more.
+                //(TODO: You COULD technically flip the conditions- decrement first, claim second. But there's no guarantee that we will be able to claim after the decrement,
+                //so that decremented slot might end up being a steal later on. A little more complex, but quite possibly worth it overall.)
+                Interlocked.Decrement(ref remainingBlocks);
+            }
+            else
+            {
+                //This block is no longer owned by the worker. Remove it from the owned set.
+                ownedBlocks.RemoveAt(ownedIndex);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void TrySolveStolenBlock(ref QuickList<int, Buffer<int>> ownedBlocks, int slot, int ownedState, int clearedState, ref int remainingBlocks)
+        {
+            if (Interlocked.CompareExchange(ref blockClaims[slot], ownedState, clearedState) == clearedState)
+            {
+                //This worker now owns the slot; we can freely execute it.
+                ref var block = ref workBlocks[slot];
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.VelocityBundles, block.StartBundle, block.End);
+                //Decrement the available block count to allow workers to stop trying to steal. 
+                //Note that the fact that this decrement is not atomic with the CAS is not a correctness issue-
+                //it may just cause some threads to do an extra claims test or two pointlessly. The syncs required to avoid that cost more.
+                //(TODO: You COULD technically flip the conditions- decrement first, claim second. But there's no guarantee that we will be able to claim after the decrement,
+                //so that decremented slot might end up being a steal later on. A little more complex, but quite possibly worth it overall.)
+                Interlocked.Decrement(ref remainingBlocks);
+
+                //Every block list was initialized to sufficient capacity to hold every block, so we don't have to worry about running out of space.
+                ownedBlocks.AddUnsafely(slot);
+            }
+        }
+
+
+        private void InterstageSync(int stageIndex)
+        {
+            //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
+            //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
+            var neededCompletionCount = workerCount * stageIndex;
+            if (Interlocked.Increment(ref workerCompletedCount) != neededCompletionCount)
+            {
+                var wait = new SpinWait();
+                while (workerCompletedCount != neededCompletionCount)
+                    wait.SpinOnce();
+            }
+        }
+
+        void Work(int workerIndex)
+        {
+            ref var worker = ref workerContexts[workerIndex];
+            Debug.Assert(worker.BlocksOwnedInBatches.Count > 0, "Since have to check the batch count at some point, you might as well check it before dispatch to avoid wasting time.");
+
+            //Prestep first.
+            //The prestep does not need to sync at the border of batch boundaries. Just do every work block.
+            //The CAS will try to swap from cleared to owned, but after each loop we have to flip the cleared and owned states.
+            //This avoids the need for an explicit clear.
+            var claimedState = 1;
+            var clearedState = 0;
+            int syncStageIndex = 0;
+            {
+                ref var remainingBlocks = ref stageRemainingBlocks[syncStageIndex];
+
+                //TODO: you may actually want to try a 'dumb' claim system for presteps; you could use a single interlocked increment to claim slots.
+                //This would mean a worker would do a prestep of a block that it probably won't be responsible for during the iteration phase, but 
+                //the simpler sync might be a net win. Unclear without testing.
+                for (int batchIndex = 0; batchIndex < worker.BlocksOwnedInBatches.Count && Volatile.Read(ref remainingBlocks) > 0; ++batchIndex)
+                {
+                    ref var batchOwnedBlockList = ref worker.BlocksOwnedInBatches[batchIndex];
+                    for (int ownedIndex = 0; ownedIndex < batchOwnedBlockList.Count && Volatile.Read(ref remainingBlocks) > 0; ++ownedIndex)
+                    {
+                        TryPrestepBlock(batchOwnedBlockList[ownedIndex], claimedState, clearedState, ref remainingBlocks);
+                    }
+                }
+                //By this point, the worker has executed (or attempted to execute) every one of their allocated work blocks. Due to differences in the difficulty of different blocks,
+                //some workers may still not be done. This thread should try to help out with workstealing.
+
+                //Start trying to steal at the index just before the last batch owned set. Scan backwards.
+                //Starting at the end and working backwards increases the probability that an unclaimed block can be found.
+
+                if (Volatile.Read(ref remainingBlocks) > 0)
+                {
+                    var lastBatchBlocks = worker.BlocksOwnedInBatches[worker.BlocksOwnedInBatches.Count - 1];
+                    int stealSlot;
+                    if (lastBatchBlocks.Count > 0)
+                    {
+                        stealSlot = lastBatchBlocks[0] - 1;
+                        if (stealSlot < 0)
+                            stealSlot = workBlocks.Count - 1;
+                    }
+                    else
+                    {
+                        //If this thread doesn't own anything in the last batch, just use the very last index.
+                        //You could walk backwards to find earlier batches, but... this is just a heuristic, and this should be a very rare corner case anyway.
+                        stealSlot = workBlocks.Count - 1;
+                    }
+                    while (Volatile.Read(ref remainingBlocks) > 0) //Note that we don't claim a block here. We let other workers claim if they find it first.
+                    {
+                        TryPrestepBlock(stealSlot, claimedState, clearedState, ref remainingBlocks);
+                        --stealSlot;
+                        if (stealSlot < 0)
+                            stealSlot = workBlocks.Count - 1;
+                    }
+                }
+
+                //Swap the ownership flags.
+                var temp = clearedState;
+                clearedState = claimedState;
+                claimedState = temp;
+            }
+            //A sync is also required for the prestep->warmstartbatch0 transition if any of the worker's prestep blocks were stolen. 
+            //While we could check that condition easily, we would also have to stop the local worker from workstealing any other blocks unless that block's prestep has completed.
+            //That would require either checking per-block prestep completion or all-prestep completion upon every warmstart worksteal.
+            //It might be worth looking into later, but for now, let's just sync always.
+            InterstageSync(syncStageIndex);
+
+            //TODO: If the time step duration has changed since the previous frame, the cached accumulated impulses should be scaled prior to application.
+            //This isn't critical, but it does help stability.
+
+            //Warm start second.
+            for (int batchIndex = 0; batchIndex < worker.BlocksOwnedInBatches.Count; ++batchIndex)
+            {
+                ref var remainingBlocks = ref stageRemainingBlocks[syncStageIndex++];
+                ref var ownedBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
+                for (int ownedIndex = 0; ownedIndex < ownedBlocks.Count && Volatile.Read(ref remainingBlocks) > 0; ++ownedIndex)
+                {
+                    TryWarmStartBlock(ownedBlocks[ownedIndex], claimedState, clearedState, ref remainingBlocks);
+                }
+
+                //We're out of our allocated blocks. Could we steal any?
+                if (Volatile.Read(ref remainingBlocks) > 0)
+                {
+                    //It is technically possible for blocksEnd == blocksStart, but that's fine.
+                    var blocksStart = batchIndex >= 0 ? batchBoundaries[batchIndex - 1] : 0;
+                    var blocksEnd = batchBoundaries[batchIndex];
+                    //Start right before the current worker's allocated blob, as usual.
+                    int stealSlot = ownedBlocks.Count > 0 ? ownedBlocks[0] - 1 : -1;
+                    if (stealSlot < blocksStart)
+                        stealSlot = blocksEnd;
+                    while (Volatile.Read(ref remainingBlocks) > 0)
+                    {
+                        TryWarmStartBlock(stealSlot, claimedState, clearedState, ref remainingBlocks);
+                        stealSlot = stealSlot == blocksStart ? blocksEnd : stealSlot - 1;
+                    }
+
+                }
+
+                //Swap the ownership flags.
+                var temp = clearedState;
+                clearedState = claimedState;
+                claimedState = temp;
+
+                //Have to stop after every batch since warm start read/writes velocities.
+                InterstageSync(syncStageIndex);
+            }
+
+            //Solve iterations last.
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                for (int batchIndex = 0; batchIndex < worker.BlocksOwnedInBatches.Count; ++batchIndex)
+                {
+                    ref var remainingBlocks = ref stageRemainingBlocks[syncStageIndex++];
+                    ref var ownedBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
+                    for (int ownedIndex = 0; ownedIndex < ownedBlocks.Count; ++ownedIndex)
+                    {
+                        //Note that this can remove work blocks that are found to be claimed by other workers already.
+                        //Because of this, this loop CANNOT be terminated early by remainingBlocks == 0; that could result in the ownership list still containing a block that was stolen.
+                        //This is the bullet we bite by not allowing other threads to modify the local worker's owned set.
+                        TrySolveOwnedBlock(ref ownedBlocks, ownedIndex, claimedState, clearedState, ref remainingBlocks);
+                    }
+
+                    //We're out of our allocated blocks. Could we steal any?
+                    if (Volatile.Read(ref remainingBlocks) > 0)
+                    {
+                        //It is technically possible for blocksEnd == blocksStart, but that's fine.
+                        var blocksStart = batchIndex >= 0 ? batchBoundaries[batchIndex - 1] : 0;
+                        var blocksEnd = batchBoundaries[batchIndex];
+                        //Start right before the current worker's allocated blob, as usual.
+                        int stealSlot = ownedBlocks.Count > 0 ? ownedBlocks[0] - 1 : -1;
+                        if (stealSlot < blocksStart)
+                            stealSlot = blocksEnd;
+                        while (Volatile.Read(ref remainingBlocks) > 0)
+                        {
+                            //Note that this will add any stolen block to the local ownership list.
+                            TrySolveStolenBlock(ref ownedBlocks, stealSlot, claimedState, clearedState, ref remainingBlocks);
+                            stealSlot = stealSlot == blocksStart ? blocksEnd : stealSlot - 1;
+                        }
+
+                    }
+
+                    //Swap the ownership flags.
+                    var temp = clearedState;
+                    clearedState = claimedState;
+                    claimedState = temp;
+
+                    //Have to stop after every batch since solve iterations read/write velocities.
+                    InterstageSync(syncStageIndex);
+                }
+            }
+        }
+
+
     }
 }
