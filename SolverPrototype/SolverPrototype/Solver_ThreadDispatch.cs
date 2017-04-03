@@ -348,7 +348,7 @@ namespace SolverPrototype
             //You could be more aggressive with this batch count test. It doesn't matter much, though. Zero batches isn't a case worth introducing complexity for.
             //This just stops the dispatch from going through because the multithreaded worker relies upon there being batches.
             if (batchCount > 0)
-                threadPool.ForLoop(Work, 0, workerCount);
+                threadPool.ForLoop(0, workerCount, Work);
 
 
             //Clean up all the ephemeral resources.

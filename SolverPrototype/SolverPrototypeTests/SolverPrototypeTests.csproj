@@ -106,6 +106,7 @@
     <Compile Include="GatherScatterTests.cs" />
     <Compile Include="SortTest.cs" />
     <Compile Include="SuballocationTests.cs" />
+    <Compile Include="ThreadPoolTests.cs" />
     <Compile Include="VectorAccessTests.cs" />
   </ItemGroup>
   <ItemGroup>

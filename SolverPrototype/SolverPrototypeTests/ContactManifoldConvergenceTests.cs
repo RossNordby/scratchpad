@@ -90,6 +90,7 @@ namespace SolverPrototypeTests
             simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
+            var threadPool = new NotQuiteAThreadPool();
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
@@ -134,7 +135,8 @@ namespace SolverPrototypeTests
                 }
                 CacheBlaster.Blast();
                 timer.Start();
-                simulation.Solver.Update(dt, inverseDt);
+                //simulation.Solver.Update(dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
