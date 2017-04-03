@@ -88,12 +88,15 @@ namespace SolverPrototype
         {
             public float Dt;
             public float InverseDt;
+            public int OldWorkerCount;
+            //Only the WorkerBatchBlockCounts persist between frames. All the other collections are created and disposed within the scope of the MultithreadedUpdate.
+            //The base lists are only here allocated on the heap to make it easy to get the data into the worker delegate.
             public Buffer<int> WorkerBatchBlockCounts;
             public QuickList<Worker, Buffer<Worker>> Workers;
             public QuickList<WorkBlock, Buffer<WorkBlock>> WorkBlocks;
             public QuickList<int, Buffer<int>> BlockClaims;
             public QuickList<int, Buffer<int>> BatchBoundaries;
-            public QuickList<int, Buffer<int>> StageRemainingBlocks;
+            public Buffer<int> StageRemainingBlocks;
             public int WorkerCompletedCount;
             public int WorkerCount;
         }
@@ -167,99 +170,42 @@ namespace SolverPrototype
             //2) Adapt to changes in the number of workers.
             //3) Adapt to changes in work blocks.
             //We completely ignore the previous state of work blocks- the only thing we care about is how much each individual worker was contributing to the final result.
-            //This provides a guess about how expensiv regions are. By forcing contiguity of regions, we may imbalance the load temporarily. 
+            //This provides a guess about how expensive regions are. By forcing contiguity of regions, we may imbalance the load temporarily. 
             //Workstealing will address any induced load imbalance in the short term, and over multiple frames, the initial guess should tend to converge
             //to something reasonable that minimizes the number of required steals.
 
-
-            //Any contexts that exist and will continue to exist should have their batch capacities checked.    
+            //Create the set of workers from scratch.
+            QuickList<Worker, Buffer<Worker>>.Create(bufferPool.SpecializeFor<Worker>(), workerCount, out context.Workers);
+            var batchCount = context.BatchBoundaries.Count;
+            context.Workers.Count = workerCount;
+            for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            {
+                ref var worker = ref context.Workers[workerIndex];
+                QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>>.Create(
+                    bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>(), batchCount, out worker.BlocksOwnedInBatches);
+                worker.BlocksOwnedInBatches.Count = batchCount;
+                for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
+                {
+                    //Note that we allocate enough space to hold every block in the worst case. That could potentially happen due to workstealing.
+                    QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), maximumBlocksPerBatch, out worker.BlocksOwnedInBatches[batchIndex]);
+                }
+            }            
             //Note that changes in batch count do not destroy our guesses from the previous frame; the only batches that are ever removed are those which are at the very end of the list.
             //In other words, removes don't change order. (And adds just append, so they're fine too.)
             //So, for all the batches which still exist, the guesses we have are still associated with the same batches. 
             //Assuming that there are no massive changes in the constraint set, this is a pretty good guess.
-            var batchCount = context.BatchBoundaries.Count;
-
-            //It's possible for there to be no workers- the previous frame might have been single threaded, or this is the first frame. Guard against it.
-            var oldBatchCount = context.Workers.Count > 0 ? context.Workers[0].BlocksOwnedInBatches.Count : 0;
-            if (batchCount > oldBatchCount)
-            {
-                //There are more batches now than before. Need to initialize them on every existing worker.
-                for (int contextIndex = 0; contextIndex < Math.Min(workerCount, context.Workers.Count); ++contextIndex)
-                {
-                    ref var worker = ref context.Workers[contextIndex];
-                    //The new frame has more constraint batches. We need to set up new batch ownership lists for each worker.
-                    //Note that there's no need to ensure the capacity on each batch block ownership list that already exists; the maxmimum required capacity is constant and was already set when the list was created.
-                    worker.BlocksOwnedInBatches.EnsureCapacity(batchCount, bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
-                    worker.BlocksOwnedInBatches.Count = batchCount;
-                    for (int i = oldBatchCount; i < batchCount; ++i)
-                    {
-                        //Note that we allocate enough space to hold every block in the worst case. That could potentially happen due to workstealing.
-                        QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), maximumBlocksPerBatch, out worker.BlocksOwnedInBatches[i]);
-                    }
-                }
-            }
-            else if (batchCount < oldBatchCount)
-            {
-                //Less batches now exist. Get rid of all the extras.
-                for (int contextIndex = 0; contextIndex < Math.Min(workerCount, context.Workers.Count); ++contextIndex)
-                {
-                    ref var worker = ref context.Workers[contextIndex];
-                    for (int i = batchCount; i < oldBatchCount; ++i)
-                    {
-                        worker.BlocksOwnedInBatches[i].Dispose(bufferPool.SpecializeFor<int>());
-                    }
-                    worker.BlocksOwnedInBatches.Count = batchCount;
-                    //We may be able to shrink the size.
-                    worker.BlocksOwnedInBatches.Compact(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
-                }
-            }
-
+            
             //In the event that the worker count changes, the easiest thing to do is just throw out all previous guesses.
             //This isn't optimal, but worker count changes should be really, really rare.
             //Note that this doubles as initialization.
-            if (context.Workers.Count != workerCount)
-            {
-                if (workerCount > context.Workers.Count)
-                {
-                    //Add any new contexts that we need.
-                    context.Workers.EnsureCapacity(workerCount, bufferPool.SpecializeFor<Worker>());
-                    for (int i = context.Workers.Count; i < workerCount; ++i)
-                    {
-                        Worker worker;
-                        QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>>.Create(
-                            bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>(), context.BatchBoundaries.Count, out worker.BlocksOwnedInBatches);
-                        for (int j = 0; j < context.BatchBoundaries.Count; ++j)
-                        {
-                            //Note that we allocate enough space to hold every block in the worst case. That could potentially happen due to workstealing.
-                            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), maximumBlocksPerBatch, out worker.BlocksOwnedInBatches[j]);
-                        }
-                        context.Workers.AddUnsafely(ref worker);
-                    }
-                }
-                else
-                {
-                    //Get rid of every context beyond those that we need.
-                    for (int i = workerCount; i < context.Workers.Count; ++i)
-                    {
-                        ref var worker = ref context.Workers[i];
-                        for (int j = 0; j < context.Workers[i].BlocksOwnedInBatches.Count; ++j)
-                        {
-                            worker.BlocksOwnedInBatches[j].Dispose(bufferPool.SpecializeFor<int>());
-                        }
-                        worker.BlocksOwnedInBatches.Dispose(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
-                    }
-                    context.Workers.Count = workerCount;
-                    context.Workers.Compact(bufferPool.SpecializeFor<Worker>());
-                }
-                //Note that we don't bother compacting the individual worker's OwnedBlocks that persist.
-                //The number of blocks allocated to each worker is bounded to a low constant value.
-
+            if (context.OldWorkerCount != workerCount)
+            {                
                 //Since we don't have a decent guess of where to put blocks, just evenly distribute them and shrug. Next frame will give us more information.
                 int blockIndex = 0;
                 for (int batchIndex = 0; batchIndex < context.BatchBoundaries.Count; ++batchIndex)
                 {
                     //Spread the blocks of the batch across the set of workers.
-                    var start = batchIndex >= 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+                    var start = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                     var count = context.BatchBoundaries[batchIndex] - start;
 
                     var targetBlocksPerWorker = context.WorkBlocks.Count / workerCount;
@@ -275,15 +221,16 @@ namespace SolverPrototype
                         }
                     }
                 }
-                return;
             }
-            //We still have the same number of threads, so we should be able to get some inspiration from the previous frame's load balancing result.
-            //Note that the constraint set may have changed arbitrarily since the previous frame, so this is not a guarantee of a good load balance.
-            //It just relies on temporal coherence.
-
-            //The idea here is to allocate blocks to workers in proportion to how many blocks they were able to handle in the previous solve.
-            //This is done per-batch; each batch could have significantly different per block costs due to different constraints being involved.
+            else
             {
+                //We still have the same number of threads, so we should be able to get some inspiration from the previous frame's load balancing result.
+                //Note that the constraint set may have changed arbitrarily since the previous frame, so this is not a guarantee of a good load balance.
+                //It just relies on temporal coherence.
+
+                //The idea here is to allocate blocks to workers in proportion to how many blocks they were able to handle in the previous solve.
+                //This is done per-batch; each batch could have significantly different per block costs due to different constraints being involved.
+
                 var blockIndex = 0;
                 for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
                 {
@@ -295,7 +242,7 @@ namespace SolverPrototype
                     //Use the fraction of the previous frame's block owned by each worker to determine how many blocks it should now have.
                     //Two phases: the initial estimate, followed by the distribution of the remainder.
                     var allocatedBlockCount = 0;
-                    var blockStartForBatch = batchIndex >= 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+                    var blockStartForBatch = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                     var blockCountForBatch = context.BatchBoundaries[batchIndex] - blockStartForBatch;
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
@@ -328,19 +275,18 @@ namespace SolverPrototype
             //Now that we have a bunch of work blocks, we need to initialize the per-stage job counts.
             //These are precalculated for simplicity- it stops the multithreaded phase from having to worry about resetting counts for the next stage.
             var stageCount = 1 + Batches.Count + iterationCount * Batches.Count;
-            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), stageCount, out context.StageRemainingBlocks);
+            bufferPool.SpecializeFor<int>().Take(stageCount, out context.StageRemainingBlocks);
 
             //The first stage is presteps, which covers all blocks.
             context.StageRemainingBlocks[0] = context.WorkBlocks.Count;
 
             //The remaining stages are all loops over batches with sync points at the end of each batch.
             //So, just create a bunch of iterations.
-            context.StageRemainingBlocks.Count = stageCount;
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                 var blocksInBatch = context.BatchBoundaries[batchIndex] - batchStart;
-                for (int stageIndex = 1; stageIndex < context.StageRemainingBlocks.Count; stageIndex += Batches.Count)
+                for (int stageIndex = 1; stageIndex < stageCount; stageIndex += Batches.Count)
                 {
                     context.StageRemainingBlocks[stageIndex] = blocksInBatch;
                 }
@@ -355,14 +301,41 @@ namespace SolverPrototype
             //can be arbitrarily invalidated in the next frame.
             //This means that the workblock pointer sets have to be regenerated from scratch every frame, but that's a relatively small cost and it's much simpler than
             //attempting to maintain sets.
+            unsafe
+            {
+                var workerBatchCount = workerCount * batchCount;
+                if (context.WorkerBatchBlockCounts.Length != SpanHelper.GetContainingPowerOf2(workerBatchCount))
+                {
+                    //Need to create or resize the block counts.
+                    if (context.WorkerBatchBlockCounts.Memory != null)
+                        bufferPool.SpecializeFor<int>().Return(ref context.WorkerBatchBlockCounts);
+                    bufferPool.SpecializeFor<int>().Take(workerBatchCount, out context.WorkerBatchBlockCounts);
+                }
+            }
+            int workerBatchIndex = 0;
+            //Cache the counts and dispose the worker block lists.
+            for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            {
+                ref var worker = ref context.Workers[workerIndex];
+                for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
+                {
+                    ref var batchBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
+                    context.WorkerBatchBlockCounts[workerBatchIndex] = batchBlocks.Count;
+                    batchBlocks.Dispose(bufferPool.SpecializeFor<int>());
+                    ++workerBatchIndex;
+                }
+                worker.BlocksOwnedInBatches.Dispose(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
+            }
+            context.Workers.Dispose(bufferPool.SpecializeFor<Worker>());
+            context.OldWorkerCount = workerCount;
 
 
-            //Clean up all the ephemeral resources.
+            //Clean up the remaining the ephemeral resources.
             //Note that the ownership lists persist. They are used for initializing the work block allocations in the next frame.
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
             context.BlockClaims.Dispose(bufferPool.SpecializeFor<int>());
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
-            context.StageRemainingBlocks.Dispose(bufferPool.SpecializeFor<int>());
+            bufferPool.SpecializeFor<int>().Return(ref context.StageRemainingBlocks);
         }
 
 
@@ -545,7 +518,7 @@ namespace SolverPrototype
                     TryExecuteBlock(ref warmStartFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref remainingBlocks);
                 }
 
-                WorkStealAndSync<WarmStartFunction, DoNothingOnSteal>(ref warmStartFunction, ref ownedBlocks, batchIndex >= 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
+                WorkStealAndSync<WarmStartFunction, DoNothingOnSteal>(ref warmStartFunction, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
                      ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
             }
 
@@ -568,7 +541,7 @@ namespace SolverPrototype
                         }
                     }
 
-                    WorkStealAndSync<SolveFunction, TakeOwnershipOnSteal>(ref solveFunction, ref ownedBlocks, batchIndex >= 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
+                    WorkStealAndSync<SolveFunction, TakeOwnershipOnSteal>(ref solveFunction, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
                          ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
                 }
             }
