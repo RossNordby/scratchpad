@@ -236,9 +236,10 @@ namespace SolverPrototype
                 for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
                 {
                     var totalBlockCount = 0;
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                    var batchBlockCountsBaseIndex = batchIndex * workerCount;
+                    for (int batchBlockCountIndex = batchBlockCountsBaseIndex; batchBlockCountIndex < batchBlockCountsBaseIndex + workerCount; ++batchBlockCountIndex)
                     {
-                        totalBlockCount += context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex].Count;
+                        totalBlockCount += context.WorkerBatchBlockCounts[batchBlockCountIndex];
                     }
                     //Use the fraction of the previous frame's block owned by each worker to determine how many blocks it should now have.
                     //Two phases: the initial estimate, followed by the distribution of the remainder.
@@ -247,9 +248,9 @@ namespace SolverPrototype
                     var blockCountForBatch = context.BatchBoundaries[batchIndex] - blockStartForBatch;
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
-                        ref var ownedBlocksInBatch = ref context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex];
-                        var blockCountForWorker = (blockCountForBatch * ownedBlocksInBatch.Count) / totalBlockCount;
-                        allocatedBlockCount += ownedBlocksInBatch.Count = blockCountForWorker;
+                        var batchBlockCount = context.WorkerBatchBlockCounts[batchBlockCountsBaseIndex + workerIndex];
+                        var blockCountForWorker = (blockCountForBatch * batchBlockCount) / totalBlockCount;
+                        allocatedBlockCount += context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex].Count = blockCountForWorker;
                     }
                     var targetWorker = 0;
                     while (allocatedBlockCount < blockCountForBatch)
@@ -320,15 +321,20 @@ namespace SolverPrototype
             }
             int workerBatchIndex = 0;
             //Cache the counts and dispose the worker block lists.
+            //Note the order of the loops- it's grouped by batch first. This matches the initialization's access.
+            for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
+            {
+                for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                {
+                    context.WorkerBatchBlockCounts[workerBatchIndex++] = context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex].Count;
+                }
+            }
             for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
             {
                 ref var worker = ref context.Workers[workerIndex];
                 for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
                 {
-                    ref var batchBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
-                    context.WorkerBatchBlockCounts[workerBatchIndex] = batchBlocks.Count;
-                    batchBlocks.Dispose(bufferPool.SpecializeFor<int>());
-                    ++workerBatchIndex;
+                    worker.BlocksOwnedInBatches[batchIndex].Dispose(bufferPool.SpecializeFor<int>());
                 }
                 worker.BlocksOwnedInBatches.Dispose(bufferPool.SpecializeFor<QuickList<int, Buffer<int>>>());
             }
@@ -342,6 +348,7 @@ namespace SolverPrototype
             context.BlockClaims.Dispose(bufferPool.SpecializeFor<int>());
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
             bufferPool.SpecializeFor<int>().Return(ref context.StageRemainingBlocks);
+            context.WorkerCompletedCount = 0;
         }
 
 

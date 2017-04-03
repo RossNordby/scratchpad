@@ -82,7 +82,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
-            const int frameCount = 1;
+            const int frameCount = 128;
             simulation.Solver.IterationCount = iterationCount;
 
 
