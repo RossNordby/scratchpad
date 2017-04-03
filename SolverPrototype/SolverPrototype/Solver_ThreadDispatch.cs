@@ -189,17 +189,17 @@ namespace SolverPrototype
                     //Note that we allocate enough space to hold every block in the worst case. That could potentially happen due to workstealing.
                     QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), maximumBlocksPerBatch, out worker.BlocksOwnedInBatches[batchIndex]);
                 }
-            }            
+            }
             //Note that changes in batch count do not destroy our guesses from the previous frame; the only batches that are ever removed are those which are at the very end of the list.
             //In other words, removes don't change order. (And adds just append, so they're fine too.)
             //So, for all the batches which still exist, the guesses we have are still associated with the same batches. 
             //Assuming that there are no massive changes in the constraint set, this is a pretty good guess.
-            
+
             //In the event that the worker count changes, the easiest thing to do is just throw out all previous guesses.
             //This isn't optimal, but worker count changes should be really, really rare.
             //Note that this doubles as initialization.
             if (context.OldWorkerCount != workerCount)
-            {                
+            {
                 //Since we don't have a decent guess of where to put blocks, just evenly distribute them and shrug. Next frame will give us more information.
                 int blockIndex = 0;
                 for (int batchIndex = 0; batchIndex < context.BatchBoundaries.Count; ++batchIndex)
@@ -208,15 +208,16 @@ namespace SolverPrototype
                     var start = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                     var count = context.BatchBoundaries[batchIndex] - start;
 
-                    var targetBlocksPerWorker = context.WorkBlocks.Count / workerCount;
-                    var remainder = context.WorkBlocks.Count - workerCount * targetBlocksPerWorker;
+                    var targetBlocksPerWorker = count / workerCount;
+                    var remainder = count - workerCount * targetBlocksPerWorker;
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
                         ref var ownedBlocksInBatch = ref context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex];
-                        var blockCount = remainder-- > 0 ? targetBlocksPerBatchPerWorker + 1 : targetBlocksPerBatchPerWorker;
+                        var blockCount = remainder-- > 0 ? targetBlocksPerWorker + 1 : targetBlocksPerWorker;
                         var workerRegionEnd = blockIndex + blockCount;
                         for (; blockIndex < workerRegionEnd; ++blockIndex)
                         {
+                            Debug.Assert(blockIndex >= 0 && blockIndex < context.WorkBlocks.Count);
                             ownedBlocksInBatch.AddUnsafely(blockIndex);
                         }
                     }
@@ -262,10 +263,15 @@ namespace SolverPrototype
                     {
                         ref var ownedBlocksInBatch = ref context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex];
                         for (int i = 0; i < ownedBlocksInBatch.Count; ++i)
+                        {
+                            Debug.Assert(blockIndex >= 0 && blockIndex < context.WorkBlocks.Count);
                             ownedBlocksInBatch[i] = blockIndex++;
+                        }
                     }
                     Debug.Assert(blockIndex == context.BatchBoundaries[batchIndex]);
                 }
+
+
             }
             //Note that we have no guarantee that every thread will actually have a block to work on. That's okay- everything still works. The empty threads will be doing
             //a lot of work spinning their wheels, but at those scales, the total simulation time will be measured in microseconds anyway. It's not a big concern.
@@ -286,7 +292,7 @@ namespace SolverPrototype
             {
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                 var blocksInBatch = context.BatchBoundaries[batchIndex] - batchStart;
-                for (int stageIndex = 1; stageIndex < stageCount; stageIndex += Batches.Count)
+                for (int stageIndex = 1 + batchIndex; stageIndex < stageCount; stageIndex += Batches.Count)
                 {
                     context.StageRemainingBlocks[stageIndex] = blocksInBatch;
                 }
@@ -447,11 +453,6 @@ namespace SolverPrototype
                 }
             }
 
-            //Swap the ownership flags.
-            var temp = clearedState;
-            clearedState = claimedState;
-            claimedState = temp;
-
             //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
             //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
             ++syncStageIndex;
@@ -470,6 +471,8 @@ namespace SolverPrototype
             ref var worker = ref context.Workers[workerIndex];
             Debug.Assert(worker.BlocksOwnedInBatches.Count > 0, "Since have to check the batch count at some point, you might as well check it before dispatch to avoid wasting time.");
 
+
+
             //Prestep first.
             //The prestep does not need to sync at the border of batch boundaries. Just do every work block.
             //The CAS will try to swap from cleared to owned, but after each loop we have to flip the cleared and owned states.
@@ -486,10 +489,10 @@ namespace SolverPrototype
                 var prestepFunction = new PrestepFunction { Dt = context.Dt, InverseDt = context.InverseDt, Inertias = bodies.LocalInertiaBundles };
                 for (int batchIndex = 0; batchIndex < worker.BlocksOwnedInBatches.Count && Volatile.Read(ref remainingBlocks) > 0; ++batchIndex)
                 {
-                    ref var batchOwnedBlockList = ref worker.BlocksOwnedInBatches[batchIndex];
-                    for (int ownedIndex = 0; ownedIndex < batchOwnedBlockList.Count && Volatile.Read(ref remainingBlocks) > 0; ++ownedIndex)
+                    ref var ownedBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
+                    for (int ownedIndex = 0; ownedIndex < ownedBlocks.Count && Volatile.Read(ref remainingBlocks) > 0; ++ownedIndex)
                     {
-                        TryExecuteBlock(ref prestepFunction, batchOwnedBlockList[ownedIndex], claimedState, clearedState, ref remainingBlocks);
+                        TryExecuteBlock(ref prestepFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref remainingBlocks);
                     }
                 }
                 //By this point, the worker has executed (or attempted to execute) every one of their allocated work blocks. Due to differences in the difficulty of different blocks,
@@ -499,6 +502,12 @@ namespace SolverPrototype
                     0, context.WorkBlocks.Count - 1, ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
 
             }
+
+            //Swap the ownership flags.
+            var temp = clearedState;
+            clearedState = claimedState;
+            claimedState = temp;
+
             //A sync is also required for the prestep->warmstartbatch0 transition if any of the worker's prestep blocks were stolen. 
             //While we could check that condition easily, we would also have to stop the local worker from workstealing any other blocks unless that block's prestep has completed.
             //That would require either checking per-block prestep completion or all-prestep completion upon every warmstart worksteal.
@@ -522,6 +531,11 @@ namespace SolverPrototype
                      ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
             }
 
+            //Swap the ownership flags. Note that this does not occur per-batch; the claims array covers the entire block set.
+            temp = clearedState;
+            clearedState = claimedState;
+            claimedState = temp;
+
             //Solve iterations last.
             var solveFunction = new SolveFunction { Velocities = bodies.VelocityBundles };
             for (int i = 0; i < iterationCount; ++i)
@@ -544,6 +558,11 @@ namespace SolverPrototype
                     WorkStealAndSync<SolveFunction, TakeOwnershipOnSteal>(ref solveFunction, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
                          ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
                 }
+
+                //Swap the ownership flags. Note that this does not occur per-batch; the claims array covers the entire block set.
+                temp = clearedState;
+                clearedState = claimedState;
+                claimedState = temp;
             }
         }
 

@@ -403,7 +403,10 @@ namespace BEPUutilities2.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Take(int count, out Buffer<T> span)
         {
-            Raw.Take(count * Unsafe.SizeOf<T>(), out var rawBuffer);
+            //Avoid returning a zero length span because 1 byte / Unsafe.SizeOf<T>() happens to be zero.
+            if (count == 0)
+                count = 1;
+            Raw.Take(Math.Max(1, count) * Unsafe.SizeOf<T>(), out var rawBuffer);
             span = rawBuffer.As<T>();
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
