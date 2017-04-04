@@ -54,12 +54,12 @@ namespace SolverPrototype.Constraints
     public class ContactManifold4TypeBatch : TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
 
-        public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle)
+        public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {
             ref var prestepBase = ref PrestepData[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var projectionBase = ref Projection[0];
-            for (int i = startBundle; i < endBundle; ++i)
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
@@ -87,12 +87,12 @@ namespace SolverPrototype.Constraints
                 TangentFriction.Prestep(ref inertiaA, ref inertiaB, ref tangentJacobians, out projection.Tangent);
             }
         }
-        public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
+        public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
             ref var projectionBase = ref Projection[0];
-            for (int i = startBundle; i < endBundle; ++i)
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
@@ -108,12 +108,12 @@ namespace SolverPrototype.Constraints
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
-        public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
+        public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
             ref var projectionBase = ref Projection[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
-            for (int i = startBundle; i < endBundle; ++i)
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);

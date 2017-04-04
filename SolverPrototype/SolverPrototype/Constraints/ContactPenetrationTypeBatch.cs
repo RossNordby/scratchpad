@@ -9,27 +9,27 @@ namespace SolverPrototype.Constraints
     public class ContactPenetrationTypeBatch : TwoBodyTypeBatch<ContactData, Projection2Body1DOF, Vector<float>>
     {
 
-        public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int endBundle)
+        public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {
-            for (int i = startBundle; i < endBundle; ++i)
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ContactPenetrationLimit.ComputeJacobiansAndError(ref PrestepData[i], out var jacobians, out var error);
                 GatherScatter.GatherInertia(bodyInertias, ref BodyReferences[i], out var inertiaA, out var inertiaB);
                 Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref PrestepData[i].SpringSettings, ref error, dt, inverseDt, out Projection[i]);
             }
         }
-        public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
+        public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
-            for (int i = startBundle; i < endBundle; ++i)
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
                 Inequality2Body1DOF.WarmStart(ref Projection[i], ref AccumulatedImpulses[i], ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref BodyReferences[i], ref wsvA, ref wsvB);
             }
         }
-        public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle)
+        public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
-            for (int i = startBundle; i < endBundle; ++i)
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
                 Inequality2Body1DOF.Solve(ref Projection[i], ref AccumulatedImpulses[i], ref wsvA, ref wsvB);

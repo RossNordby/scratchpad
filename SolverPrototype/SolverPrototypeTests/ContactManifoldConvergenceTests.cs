@@ -3,6 +3,7 @@ using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Numerics;
+using System.Threading;
 
 namespace SolverPrototypeTests
 {
@@ -90,7 +91,8 @@ namespace SolverPrototypeTests
             simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
-            var threadPool = new TPLPool();
+            var threadPool = new TPLPool(1);
+
             //var threadPool = new NotQuiteAThreadPool();
             Console.WriteLine($"Using {threadPool.ThreadCount} workers.");
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
@@ -138,7 +140,9 @@ namespace SolverPrototypeTests
                 CacheBlaster.Blast();
                 timer.Start();
                 //simulation.Solver.Update(dt, inverseDt);
-                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();

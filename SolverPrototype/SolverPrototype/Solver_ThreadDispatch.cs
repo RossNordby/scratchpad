@@ -102,22 +102,9 @@ namespace SolverPrototype
         }
         MultithreadingParameters context;
 
-        public void MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
-        {
-            var workerCount = context.WorkerCount = threadPool.ThreadCount;
-            context.Dt = dt;
-            context.InverseDt = inverseDt;
-            //First build a set of work blocks.
-            //The block size should be relatively small to give the workstealer something to do, but we don't want to go crazy with the number of blocks.
-            //These values are found by empirical tuning. The optimal values may vary by architecture.
-            const int targetBlocksPerBatchPerWorker = 8;
-            const int minimumBlockSizeInBundles = 4;
-            //Note that on a 3770K, the most expensive constraint bundles tend to cost less than 500ns to execute an iteration for. The minimum block size 
-            //is trying to balance having pointless numbers of blocks versus the worst case length of worker idling. For example, with a block size of 8,
-            //and assuming 500ns per bundle, we risk up to 4 microseconds per iteration-batch worth of idle time.
-            //This issue isn't unique to the somewhat odd workstealing scheme we use- it would still be a concern regardless.
-            var maximumBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
 
+        private void BuildWorkBlocks(BufferPool bufferPool, int minimumBlockSizeInBundles, int maximumBlocksPerBatch)
+        {
             QuickList<WorkBlock, Buffer<WorkBlock>>.Create(bufferPool.SpecializeFor<WorkBlock>(), maximumBlocksPerBatch * Batches.Count, out context.WorkBlocks);
             QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), Batches.Count, out context.BatchBoundaries);
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
@@ -158,6 +145,24 @@ namespace SolverPrototype
                 }
                 context.BatchBoundaries.AddUnsafely(ref context.WorkBlocks.Count);
             }
+        }
+
+        public void MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
+        {
+            var workerCount = context.WorkerCount = threadPool.ThreadCount;
+            context.Dt = dt;
+            context.InverseDt = inverseDt;
+            //First build a set of work blocks.
+            //The block size should be relatively small to give the workstealer something to do, but we don't want to go crazy with the number of blocks.
+            //These values are found by empirical tuning. The optimal values may vary by architecture.
+            const int targetBlocksPerBatchPerWorker = 32;
+            const int minimumBlockSizeInBundles = 4;
+            //Note that on a 3770K, the most expensive constraint bundles tend to cost less than 500ns to execute an iteration for. The minimum block size 
+            //is trying to balance having pointless numbers of blocks versus the worst case length of worker idling. For example, with a block size of 8,
+            //and assuming 500ns per bundle, we risk up to 4 microseconds per iteration-batch worth of idle time.
+            //This issue isn't unique to the somewhat odd workstealing scheme we use- it would still be a concern regardless.
+            var maximumBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
+            BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, maximumBlocksPerBatch);
 
             //Create the claims set.
             QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), context.WorkBlocks.Count, out context.BlockClaims);
@@ -235,28 +240,39 @@ namespace SolverPrototype
                 var blockIndex = 0;
                 for (int batchIndex = 0; batchIndex < batchCount; ++batchIndex)
                 {
-                    var totalBlockCount = 0;
+                    var totalPreviousBlockCount = 0;
                     var batchBlockCountsBaseIndex = batchIndex * workerCount;
                     for (int batchBlockCountIndex = batchBlockCountsBaseIndex; batchBlockCountIndex < batchBlockCountsBaseIndex + workerCount; ++batchBlockCountIndex)
                     {
-                        totalBlockCount += context.WorkerBatchBlockCounts[batchBlockCountIndex];
+                        totalPreviousBlockCount += context.WorkerBatchBlockCounts[batchBlockCountIndex];
                     }
                     //Use the fraction of the previous frame's block owned by each worker to determine how many blocks it should now have.
                     //Two phases: the initial estimate, followed by the distribution of the remainder.
-                    var allocatedBlockCount = 0;
-                    var blockStartForBatch = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
-                    var blockCountForBatch = context.BatchBoundaries[batchIndex] - blockStartForBatch;
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                    if (totalPreviousBlockCount == 0)
                     {
-                        var batchBlockCount = context.WorkerBatchBlockCounts[batchBlockCountsBaseIndex + workerIndex];
-                        var blockCountForWorker = (blockCountForBatch * batchBlockCount) / totalBlockCount;
-                        allocatedBlockCount += context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex].Count = blockCountForWorker;
+                        //If the previous frame had no elements in this batch, we'll assume that's a reasonable guess. Chances are there are extremely few constraints or something.
+                        for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                        {
+                            context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex].Count = 0;
+                        }
                     }
-                    var targetWorker = 0;
-                    while (allocatedBlockCount < blockCountForBatch)
+                    else
                     {
-                        ++context.Workers[targetWorker++].BlocksOwnedInBatches[batchIndex].Count;
-                        ++allocatedBlockCount;
+                        var allocatedBlockCount = 0;
+                        var blockStartForBatch = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+                        var blockCountForBatch = context.BatchBoundaries[batchIndex] - blockStartForBatch;
+                        for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                        {
+                            var batchBlockCount = context.WorkerBatchBlockCounts[batchBlockCountsBaseIndex + workerIndex];
+                            var blockCountForWorker = (blockCountForBatch * batchBlockCount) / totalPreviousBlockCount;
+                            allocatedBlockCount += context.Workers[workerIndex].BlocksOwnedInBatches[batchIndex].Count = blockCountForWorker;
+                        }
+                        var targetWorker = 0;
+                        while (allocatedBlockCount < blockCountForBatch)
+                        {
+                            ++context.Workers[targetWorker++].BlocksOwnedInBatches[batchIndex].Count;
+                            ++allocatedBlockCount;
+                        }
                     }
 
                     //We have reasonably distributed counts. Now, stick contiguous blobs of indices into each worker's list to fill it up. 
@@ -304,6 +320,14 @@ namespace SolverPrototype
             if (batchCount > 0)
                 threadPool.ForLoop(0, workerCount, Work);
 
+            //for (int i = 0; i < workerCount; ++i)
+            //{
+            //    var totalOwnedBlocks = 0;
+            //    for (int batchIndex = 0; batchIndex < context.Workers[i].BlocksOwnedInBatches.Count; ++batchIndex)
+            //        totalOwnedBlocks += context.Workers[i].BlocksOwnedInBatches[batchIndex].Count;
+            //    Debug.WriteLine($"Worker {i} has {totalOwnedBlocks} jobs");
+            //}
+
             //Rather than storing the entire workblocks pointer set, just store the counts. It's the only information that's useful to persist since the actual block pointers
             //can be arbitrarily invalidated in the next frame.
             //This means that the workblock pointer sets have to be regenerated from scratch every frame, but that's a relatively small cost and it's much simpler than
@@ -311,7 +335,7 @@ namespace SolverPrototype
             unsafe
             {
                 var workerBatchCount = workerCount * batchCount;
-                if (context.WorkerBatchBlockCounts.Length != SpanHelper.GetContainingPowerOf2(workerBatchCount))
+                if (context.WorkerBatchBlockCounts.Length != (1 << SpanHelper.GetContainingPowerOf2(workerBatchCount)))
                 {
                     //Need to create or resize the block counts.
                     if (context.WorkerBatchBlockCounts.Memory != null)
@@ -352,13 +376,11 @@ namespace SolverPrototype
         }
 
 
-
-
         interface IBlockFunction
         {
             //Note that the second parameter can either be an index into the ownedBlocks, or into the workBlocks.
             //It depends on the user. TryWorkSteal provides an index into the workBlocks, while an owned execution uses 
-            void ExecuteBlock(TypeBatch batch, int startBundle, int endBundle);
+            void ExecuteBlock(TypeBatch batch, int startBundle, int exclusiveEndBundle);
         }
 
         struct PrestepFunction : IBlockFunction
@@ -367,9 +389,9 @@ namespace SolverPrototype
             public float InverseDt;
             public BodyInertias[] Inertias;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void ExecuteBlock(TypeBatch batch, int startBundle, int endBundle)
+            public void ExecuteBlock(TypeBatch batch, int startBundle, int exclusiveEndBundle)
             {
-                batch.Prestep(Inertias, Dt, InverseDt, startBundle, endBundle);
+                batch.Prestep(Inertias, Dt, InverseDt, startBundle, exclusiveEndBundle);
             }
         }
 
@@ -377,9 +399,9 @@ namespace SolverPrototype
         {
             public BodyVelocities[] Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void ExecuteBlock(TypeBatch batch, int startBundle, int endBundle)
+            public void ExecuteBlock(TypeBatch batch, int startBundle, int exclusiveEndBundle)
             {
-                batch.WarmStart(Velocities, startBundle, endBundle);
+                batch.WarmStart(Velocities, startBundle, exclusiveEndBundle);
             }
         }
 
@@ -387,9 +409,9 @@ namespace SolverPrototype
         {
             public BodyVelocities[] Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void ExecuteBlock(TypeBatch batch, int startBundle, int endBundle)
+            public void ExecuteBlock(TypeBatch batch, int startBundle, int exclusiveEndBundle)
             {
-                batch.SolveIteration(Velocities, startBundle, endBundle);
+                batch.SolveIteration(Velocities, startBundle, exclusiveEndBundle);
             }
         }
 
@@ -464,6 +486,12 @@ namespace SolverPrototype
             //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
             ++syncStageIndex;
             var neededCompletionCount = context.WorkerCount * syncStageIndex;
+            Spin(neededCompletionCount);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        void Spin(int neededCompletionCount)
+        {
             if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
             {
                 //var wait = new SpinWait();
