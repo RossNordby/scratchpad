@@ -53,18 +53,22 @@ namespace SolverPrototype.Constraints
     /// </summary>
     public class ContactManifold4TypeBatch : TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
-
         public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {
             ref var prestepBase = ref PrestepData[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var projectionBase = ref Projection[0];
+            //var prestep = new ContactManifold4PrestepData();
+            //var bodyReferences = new TwoBodyReferences();
+            //var projection = new ContactManifold4Projection();
+
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-                
+                //ContactManifold4Projection projection;
+
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
                 ContactPenetrationLimit4.Prestep(ref inertiaA, ref inertiaB, ref prestep, dt, inverseDt, out projection.Penetration);
                 TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref prestep.Normal, out projection.Twist);
@@ -85,6 +89,8 @@ namespace SolverPrototype.Constraints
                 projection.PremultipliedFrictionCoefficient = scale * prestep.FrictionCoefficient;
                 TangentFriction.ComputeJacobians(ref prestep.TangentX, ref prestep.TangentY, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, out var tangentJacobians);
                 TangentFriction.Prestep(ref inertiaA, ref inertiaB, ref tangentJacobians, out projection.Tangent);
+
+                //Unsafe.Add(ref projectionBase, i) = projection;
             }
         }
         public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
