@@ -7,9 +7,18 @@ using System.Threading.Tasks;
 
 namespace SolverPrototypeTests
 {
-    public class ThreadPoolTests : IThreadPool
+    public class TPLPool : IThreadPool
     {
-        public int ThreadCount => Environment.ProcessorCount;
+        public int ThreadCount { get; set; }
+        public TPLPool(int threadCount)
+        {
+            ThreadCount = threadCount;
+        }
+
+        public TPLPool()
+            : this(Environment.ProcessorCount)
+        {
+        }
 
         public void ForLoop(int startIndex, int exclusiveEndIndex, Action<int> loopBody)
         {
@@ -23,7 +32,8 @@ namespace SolverPrototypeTests
 
         public void ForLoop(int startIndex, int exclusiveEndIndex, Action<int> loopBody)
         {
-            loopBody(0);
+            for (int i = startIndex; i < exclusiveEndIndex; ++i)
+                loopBody(i);
         }
     }
 

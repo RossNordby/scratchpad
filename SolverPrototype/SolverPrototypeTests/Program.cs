@@ -16,9 +16,9 @@ namespace SolverPrototypeTests
             //ContactPenetration1DOFTests.Test();
             //PenetrationConvergenceTests.Test();
             ContactManifoldConvergenceTests.Test();
-            SortTest.Test();
-            IslandCacheConvergence.Test();
-            SuballocationTests.Test();
+            //SortTest.Test();
+            //IslandCacheConvergence.Test();
+            //SuballocationTests.Test();
 
         }
     }

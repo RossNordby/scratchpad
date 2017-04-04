@@ -110,8 +110,8 @@ namespace SolverPrototype
             //First build a set of work blocks.
             //The block size should be relatively small to give the workstealer something to do, but we don't want to go crazy with the number of blocks.
             //These values are found by empirical tuning. The optimal values may vary by architecture.
-            const int targetBlocksPerBatchPerWorker = 16;
-            const int minimumBlockSizeInBundles = 8;
+            const int targetBlocksPerBatchPerWorker = 8;
+            const int minimumBlockSizeInBundles = 4;
             //Note that on a 3770K, the most expensive constraint bundles tend to cost less than 500ns to execute an iteration for. The minimum block size 
             //is trying to balance having pointless numbers of blocks versus the worst case length of worker idling. For example, with a block size of 8,
             //and assuming 500ns per bundle, we risk up to 4 microseconds per iteration-batch worth of idle time.
@@ -437,7 +437,7 @@ namespace SolverPrototype
 
 
         void WorkStealAndSync<TBlockFunction, TOnStealSuccessFunction>(ref TBlockFunction blockFunction, ref QuickList<int, Buffer<int>> ownedBlocks,
-           int blocksStart, int blocksEnd,
+           int blocksStart, int exclusiveBlocksEnd,
            ref int syncStageIndex, ref int claimedState, ref int clearedState, ref int remainingBlocks)
            where TBlockFunction : IBlockFunction
            where TOnStealSuccessFunction : IOnStealFunction
@@ -449,10 +449,10 @@ namespace SolverPrototype
                 //Starting at the end and working backwards increases the probability that an unclaimed block can be found.
                 int stealSlot = ownedBlocks.Count > 0 ? ownedBlocks[0] - 1 : -1;
                 if (stealSlot < blocksStart)
-                    stealSlot = blocksEnd;
+                    stealSlot = exclusiveBlocksEnd - 1;
                 while (Volatile.Read(ref remainingBlocks) > 0)
                 {
-                    stealSlot = stealSlot == blocksStart ? blocksEnd : stealSlot - 1;
+                    stealSlot = stealSlot == blocksStart ? exclusiveBlocksEnd - 1 : stealSlot - 1;
                     if (TryExecuteBlock(ref blockFunction, stealSlot, claimedState, clearedState, ref remainingBlocks))
                     {
                         default(TOnStealSuccessFunction).OnSteal(ref ownedBlocks, stealSlot);
@@ -466,9 +466,11 @@ namespace SolverPrototype
             var neededCompletionCount = context.WorkerCount * syncStageIndex;
             if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
             {
-                var wait = new SpinWait();
-                while (context.WorkerCompletedCount != neededCompletionCount)
-                    wait.SpinOnce();
+                //var wait = new SpinWait();
+                while (Volatile.Read(ref context.WorkerCompletedCount) < neededCompletionCount)
+                {
+                    //wait.SpinOnce();
+                }
             }
         }
 
@@ -506,7 +508,7 @@ namespace SolverPrototype
                 //some workers may still not be done. This thread should try to help out with workstealing.
 
                 WorkStealAndSync<PrestepFunction, DoNothingOnSteal>(ref prestepFunction, ref worker.BlocksOwnedInBatches[worker.BlocksOwnedInBatches.Count - 1],
-                    0, context.WorkBlocks.Count - 1, ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
+                    0, context.WorkBlocks.Count, ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
 
             }
 

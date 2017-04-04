@@ -13,7 +13,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(16, 16, 16, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.ScrambleBodies(simulation);
             //SimulationSetup.ScrambleConstraints(simulation.Solver);
@@ -90,7 +90,9 @@ namespace SolverPrototypeTests
             simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
-            var threadPool = new NotQuiteAThreadPool();
+            var threadPool = new TPLPool();
+            //var threadPool = new NotQuiteAThreadPool();
+            Console.WriteLine($"Using {threadPool.ThreadCount} workers.");
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
@@ -119,8 +121,8 @@ namespace SolverPrototypeTests
                     GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
                     GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
 
-                    if (i == 0)
-                        Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
+                    //if (i == 0)
+                    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
 
                 }
 
@@ -141,7 +143,7 @@ namespace SolverPrototypeTests
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
             Console.WriteLine($"Time (ms): {(1e3 * timer.Elapsed.TotalSeconds)}");
