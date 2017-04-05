@@ -15,7 +15,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 4, 32, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.ScrambleBodies(simulation);
             //SimulationSetup.ScrambleConstraints(simulation.Solver);         
@@ -84,7 +84,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
-            const int frameCount = 128;
+            const int frameCount = 32;
             simulation.Solver.IterationCount = iterationCount;
 
 
@@ -92,11 +92,11 @@ namespace SolverPrototypeTests
             simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
-            var threadPool = new TPLPool(8);
+            var threadPool = new TPLPool(1);
 
             //var threadPool = new NotQuiteAThreadPool();
             Console.WriteLine($"Using {threadPool.ThreadCount} workers.");
-            double blockTime = 0;
+            double solveTime = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 //var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
@@ -143,7 +143,7 @@ namespace SolverPrototypeTests
                 //GC.Collect(3, GCCollectionMode.Forced, true);
                 timer.Start();
                 //simulation.Solver.Update(dt, inverseDt);
-                blockTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
@@ -154,7 +154,7 @@ namespace SolverPrototypeTests
             }
 
             Console.WriteLine($"Time (ms): {(1e3 * timer.Elapsed.TotalSeconds)}");
-            Console.WriteLine($"Blocktime (ms): {1e3 * blockTime}");
+            Console.WriteLine($"Solve time (ms): {1e3 * solveTime}");
 
 
             simulation.BufferPool.Clear();

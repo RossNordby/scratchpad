@@ -153,13 +153,12 @@ namespace SolverPrototype
             //and assuming 500ns per bundle, we risk up to 4 microseconds per iteration-batch worth of idle time.
             //This issue isn't unique to the somewhat odd workstealing scheme we use- it would still be a concern regardless.
             var maximumBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
-            var start = Stopwatch.GetTimestamp();
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, maximumBlocksPerBatch);
-            var end = Stopwatch.GetTimestamp();
-            ValidateWorkBlocks();
+            //ValidateWorkBlocks();
 
             manualNaiveBlockIndex = 0;
             manualNaiveExclusiveEndIndex = context.WorkBlocks.Count;
+            var start = Stopwatch.GetTimestamp();
             threadPool.ForLoop(0, threadPool.ThreadCount, ManualNaivePrestep);
 
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
@@ -179,6 +178,7 @@ namespace SolverPrototype
                 }
             }
 
+            var end = Stopwatch.GetTimestamp();
 
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
