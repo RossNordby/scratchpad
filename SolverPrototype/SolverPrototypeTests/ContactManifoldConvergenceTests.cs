@@ -92,7 +92,8 @@ namespace SolverPrototypeTests
             simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
-            var threadPool = new TPLPool(1);
+            //var threadPool = new TPLPool(8);
+            var threadPool = new SimpleThreadPool(8);
 
             //var threadPool = new NotQuiteAThreadPool();
             Console.WriteLine($"Using {threadPool.ThreadCount} workers.");

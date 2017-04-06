@@ -146,7 +146,7 @@ namespace SolverPrototype
             //First build a set of work blocks.
             //The block size should be relatively small to give the workstealer something to do, but we don't want to go crazy with the number of blocks.
             //These values are found by empirical tuning. The optimal values may vary by architecture.
-            const int targetBlocksPerBatchPerWorker = 1;
+            const int targetBlocksPerBatchPerWorker = 4;
             const int minimumBlockSizeInBundles = 4;
             //Note that on a 3770K, the most expensive constraint bundles tend to cost less than 500ns to execute an iteration for. The minimum block size 
             //is trying to balance having pointless numbers of blocks versus the worst case length of worker idling. For example, with a block size of 8,
