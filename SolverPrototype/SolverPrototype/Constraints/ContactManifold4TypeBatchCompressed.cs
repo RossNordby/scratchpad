@@ -18,14 +18,15 @@ namespace SolverPrototype.Constraints
 
     public struct ContactManifold4ProjectionCompressed
     {
+        public Vector<float> PremultipliedFrictionCoefficient;
+        public TangentFrictionProjectionCompressed Tangent;
+        public ContactPenetrationLimit4ProjectionCompressed Penetration;
+        //Lever arms aren't included in the twist projection because the number of arms required varies independently of the twist projection itself.
         public Vector<float> LeverArm0;
         public Vector<float> LeverArm1;
         public Vector<float> LeverArm2;
         public Vector<float> LeverArm3;
-        public Vector<float> PremultipliedFrictionCoefficient;
-        public TwistFrictionProjection Twist;
-        public TangentFrictionProjection Tangent;
-        public ContactPenetrationLimit4Projection Penetration;
+        public TwistFrictionProjectionCompressed Twist;
     }
     
     /// <summary>
@@ -41,6 +42,16 @@ namespace SolverPrototype.Constraints
             
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
+                //Some speculative compression options not (yet) pursued:
+                //1) Store the normal+basis compressed as a 32 bit quaternion. (We don't have sufficient SIMD bitfiddling instructions available to make this reasonable.)
+                //Compared to storing two full precision axes, it would save 5 floats per constraint. A single full precision quaternion is more doable and saves 2 floats per constraint.
+                //We could drop one float and reconstruct with a normalize.
+                //Quaternion->basis isn't supercheap (~24 ops), but saving 2 floats per constraint would reduce bundle size by 64 bytes on 256 bit SIMD.
+                //When bandwidth constrained, 24 high throughput ops (add/mul) with good ILP could easily complete faster than loading 64 bytes. At a 6700K's peak bandwidth,
+                //loading 64 bytes would take 8 cycles. In 8 cycles it could do 16 MULSS. Even if it doesn't turn out to be a great thing for a single thread, consider
+                //multiple threads- where even 128 bit wide SIMD can easily hit bandwidth bottlenecks. And now think about the AVX512-including future.
+                //(Note that the 2-axis requires reconstructing a tangent, which costs 6 mul and 3 sub anyway. If you loaded a full 3 axis basis, the difference is
+                //5 floats- 160 bytes for 256 bit SIMD, which is enough time for 40 MULSS.)
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);

@@ -62,6 +62,17 @@ namespace SolverPrototype
         //doesn't have the same performance characteristics as a full solve iteration and so can't be used as a reliable profiling data source. In other words,
         //neither the prestep nor warmstart can *modify* the work block allocation usefully, but ideally they still *use* it initially, but also perform work stealing some other way.
 
+        //3) Core-data stickiness doesn't really offer much value for L1/L2 caches. It doesn't take much to evict the entirety of the old data- a 3770K only holds 256KB in its L2.
+        //Even if we optimized every constraint to require no more than 350B per iteration for the heaviest constraint 
+        //(when this was written, it was at 602B per iteration), a single core's L2 could only hold up to about 750 constraints. 
+        //So, the 3770K under ideal circumstances would avoid evicting on a per-iteration basis if the simulation had a total of less than 3000 such constraints.
+        //A single thread of a 3700K at 4.5ghz could do prestep-warmstart-8iterations for that in ~2.6 milliseconds. In other words, it's a pretty small simulation.
+
+        //Sticky scheduling only becomes more useful when dealing with multiprocessor systems (or multiprocessor-ish systems, like ryzen) and big datasets, like you might find in an MMO server.
+        //A 3770K has 8MB of L3 cache shared across all cores, enough to hold a little under 24000 large constraint solves worth of data between iterations, which is a pretty large chunk.
+        //If you had four similar processors, you could ideally handle almost 100,000 constraints without suffering significant evictions in each processor's L3 during iterations.
+        //Without sticky scheduling, memory bandwidth use could skyrocket during iterations as the L3 gets missed over and over.
+
 
         internal struct WorkBlock
         {
