@@ -34,15 +34,14 @@ namespace SolverPrototype
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void TransformWithoutOverlap(ref Vector3Wide v, ref Matrix2x3Wide m, out Vector3Wide result)
+        public static void TransformWithoutOverlap(ref Vector2Wide v, ref Matrix2x2Wide m, out Vector2Wide result)
         {
             result.X = v.X * m.X.X + v.Y * m.Y.X;
             result.Y = v.X * m.X.Y + v.Y * m.Y.Y;
-            result.Z = v.X * m.X.Z + v.Y * m.Y.Z;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Transform(ref Vector3Wide v, ref Matrix2x3Wide m, out Vector3Wide result)
+        public static void Transform(ref Vector2Wide v, ref Matrix2x2Wide m, out Vector2Wide result)
         {
             TransformWithoutOverlap(ref v, ref m, out var temp);
             result = temp;
@@ -76,6 +75,21 @@ namespace SolverPrototype
             Vector2Wide.Add(ref a.X, ref b.X, out result.X);
             Vector2Wide.Add(ref a.Y, ref b.Y, out result.Y);
         }
+
+        /// <summary>
+        /// Subtracts the components of one matrix from another.
+        /// </summary>
+        /// <param name="a">Matrix to be subtracted from..</param>
+        /// <param name="b">Matrix to subtract from the other.</param>
+        /// <param name="result">Result of the subtraction.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Subtract(ref Matrix2x2Wide a, ref Matrix2x2Wide b, out Matrix2x2Wide result)
+        {
+            Vector2Wide.Subtract(ref a.X, ref b.X, out result.X);
+            Vector2Wide.Subtract(ref a.Y, ref b.Y, out result.Y);
+        }
+
+
 
         /// <summary>
         /// Inverts the given matix.

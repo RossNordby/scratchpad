@@ -201,7 +201,7 @@ namespace SolverPrototype.Constraints
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection.Penetration2, ref normal, ref projection.SoftnessImpulseScale, ref accumulatedImpulse2, out var correctiveCSI2);
             ApplyImpulse(ref projection.Penetration2, ref inertiaA, ref inertiaB, ref normal, ref correctiveCSI2, ref wsvA, ref wsvB);
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection.Penetration3, ref normal, ref projection.SoftnessImpulseScale, ref accumulatedImpulse3, out var correctiveCSI3);
-            ApplyImpulse(ref projection.Penetration3, ref inertiaA, ref inertiaB, ref normal, ref correctiveCSI3, ref wsvA, ref wsvB);
+            ApplyImpulse(ref projection.Penetration3, ref inertiaA, ref inertiaB, ref normal, ref correctiveCSI3, ref wsvA, ref wsvB);  
         }
 
     }
