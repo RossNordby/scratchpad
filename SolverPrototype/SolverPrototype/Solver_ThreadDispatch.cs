@@ -114,9 +114,10 @@ namespace SolverPrototype
         MultithreadingParameters context;
 
 
-        private void BuildWorkBlocks(BufferPool bufferPool, int minimumBlockSizeInBundles, int maximumBlocksPerBatch)
+        private void BuildWorkBlocks(BufferPool bufferPool, int minimumBlockSizeInBundles, int targetBlocksPerBatch)
         {
-            QuickList<WorkBlock, Buffer<WorkBlock>>.Create(bufferPool.SpecializeFor<WorkBlock>(), maximumBlocksPerBatch * Batches.Count, out context.WorkBlocks);
+            var blockPool = bufferPool.SpecializeFor<WorkBlock>();
+            QuickList<WorkBlock, Buffer<WorkBlock>>.Create(blockPool, targetBlocksPerBatch * Batches.Count, out context.WorkBlocks);
             QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), Batches.Count, out context.BatchBoundaries);
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
@@ -127,8 +128,8 @@ namespace SolverPrototype
                     bundleCount += batch.TypeBatches[typeBatchIndex].BundleCount;
                 }
                 //Create a goal size for the blocks based on the number of bundles present.
-                var targetBlockSizeInBundles = bundleCount / maximumBlocksPerBatch;
-                if (bundleCount - targetBlockSizeInBundles * maximumBlocksPerBatch > 0)
+                var targetBlockSizeInBundles = bundleCount / targetBlocksPerBatch;
+                if (bundleCount - targetBlockSizeInBundles * targetBlocksPerBatch > 0)
                     ++targetBlockSizeInBundles;
                 if (targetBlockSizeInBundles < minimumBlockSizeInBundles)
                     targetBlockSizeInBundles = minimumBlockSizeInBundles;
@@ -138,23 +139,28 @@ namespace SolverPrototype
                 {
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
                     var typeBatchBlockCount = typeBatch.BundleCount / targetBlockSizeInBundles;
-                    var remainder = typeBatch.BundleCount - typeBatchBlockCount * targetBlockSizeInBundles;
+                    if (typeBatchBlockCount == 0)
+                        typeBatchBlockCount = 1;
+
+                    var blockSize = typeBatch.BundleCount / typeBatchBlockCount;
+                    var remainder = typeBatch.BundleCount - blockSize * typeBatchBlockCount;
+
                     WorkBlock block;
                     block.BatchIndex = batchIndex;
                     block.TypeBatchIndex = typeBatchIndex;
                     block.End = 0;
                     for (int i = 0; i < typeBatchBlockCount; ++i)
                     {
-                        int blockBundleCount = remainder-- > 0 ? targetBlockSizeInBundles + 1 : targetBlockSizeInBundles;
+                        int blockBundleCount = remainder-- > 0 ? blockSize + 1 : blockSize;
                         //Use the previous end as the new start.
                         block.StartBundle = block.End;
                         block.End = block.StartBundle + blockBundleCount;
                         Debug.Assert(block.StartBundle >= 0 && block.StartBundle < typeBatch.BundleCount);
-                        Debug.Assert(block.End >= block.StartBundle + minimumBlockSizeInBundles && block.End <= typeBatch.BundleCount);
-                        context.WorkBlocks.AddUnsafely(ref block);
+                        Debug.Assert(block.End >= block.StartBundle + Math.Min(minimumBlockSizeInBundles, typeBatch.BundleCount) && block.End <= typeBatch.BundleCount);
+                        context.WorkBlocks.Add(ref block, blockPool);
                     }
                 }
-                context.BatchBoundaries.AddUnsafely(ref context.WorkBlocks.Count);
+                context.BatchBoundaries.AddUnsafely(context.WorkBlocks.Count);
             }
         }
 

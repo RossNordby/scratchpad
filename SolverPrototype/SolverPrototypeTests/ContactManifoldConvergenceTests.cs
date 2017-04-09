@@ -15,7 +15,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32,32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.ScrambleBodies(simulation);
             //SimulationSetup.ScrambleConstraints(simulation.Solver);         
@@ -93,53 +93,60 @@ namespace SolverPrototypeTests
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
             //var threadPool = new TPLPool(8);
-            var threadPool = new SimpleThreadPool(8);
+            var threadPool = new SimpleThreadPool(1);
 
             //var threadPool = new NotQuiteAThreadPool();
             Console.WriteLine($"Using {threadPool.ThreadCount} workers.");
             double solveTime = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                //var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
-                ////Update the penetration depths associated with the constraints.
-                ////This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
-                //for (int i = 0; i < constraintHandles.Length; ++i)
+                var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
+                //Update the penetration depths associated with the constraints.
+                //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
+                for (int i = 0; i < constraintHandles.Length; ++i)
+                {
+                    simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
+                    var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
+
+
+                    BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
+                    ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];
+                    var bodyBundleIndexA = GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex);
+                    var bodyBundleIndexB = GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex);
+                    var innerIndexA = GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex);
+                    var innerIndexB = GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex);
+                    var velocityA = GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Y, innerIndexA);
+                    var velocityB = GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Y, innerIndexB);
+                    var penetrationChange = dt * (velocityA - velocityB);
+                    ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
+                    penetrationDepth += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact1.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
+
+                    //if (i == 0)
+                        //if (penetrationDepth > 0.2)
+                        //Console.WriteLine($"manifold[{i}] penetration: {penetrationDepth}, velocityA: {velocityA}, velocityB: {velocityB}");
+
+                }
+                //for (int i = 0; i < bodyHandles.Length; ++i)
                 //{
-                //    simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
-                //    var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
-
-
-                //    BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-                //    ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];
-                //    var velocityA =
-                //        GatherScatter.Get(
-                //            ref simulation.Bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex)].LinearVelocity.Y,
-                //            GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex));
-                //    var velocityB =
-                //        GatherScatter.Get(
-                //            ref simulation.Bodies.VelocityBundles[GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex)].LinearVelocity.Y,
-                //            GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex));
-                //    var penetrationChange = dt * (velocityA - velocityB);
-                //    ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
-                //    penetrationDepth += penetrationChange;
-                //    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact1.PenetrationDepth, innerIndex) += penetrationChange;
-                //    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
-                //    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
-
-                //    //if (i == 0)
-                //    //    Console.WriteLine($"contact[{i}] penetration: {penetrationDepth}, velocity: {velocityB}");
-
+                //    simulation.Bodies.GetVelocity(bodyHandles[i], out var velocities);
+                //    if (velocities.Linear.LengthSquared() > 2)
+                //    {
+                //        Console.WriteLine($"Body handle {bodyHandles[i]} moving too fast: {velocities.Linear.Y}");
+                //    }
                 //}
 
 
                 //Apply some gravity so we can simulate sorta-kinda stacking.
-                //var bodyBundleCount = simulation.Bodies.BodyCount >> BundleIndexing.VectorShift;
-                //var impulse = new Vector<float>(-10 * dt);
-                //for (int i = 0; i < bodyBundleCount; ++i)
-                //{
-                //    //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
-                //    simulation.Bodies.VelocityBundles[i].LinearVelocity.Y += simulation.Bodies.LocalInertiaBundles[i].InverseMass * impulse;
-                //}
+                var bodyBundleCount = simulation.Bodies.BodyCount >> BundleIndexing.VectorShift;
+                var impulse = new Vector<float>(-10 * dt);
+                for (int i = 0; i < bodyBundleCount; ++i)
+                {
+                    //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
+                    simulation.Bodies.VelocityBundles[i].LinearVelocity.Y += simulation.Bodies.LocalInertiaBundles[i].InverseMass * impulse;
+                }
                 //CacheBlaster.Blast();
                 //GC.Collect(3, GCCollectionMode.Forced, true);
                 timer.Start();
@@ -148,7 +155,7 @@ namespace SolverPrototypeTests
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
-                //var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
+                var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
                 //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");

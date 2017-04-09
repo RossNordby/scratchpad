@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Constraints
@@ -108,23 +109,24 @@ namespace SolverPrototype.Constraints
             Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseA, ref inertiaA.InverseInertiaTensor, out correctiveVelocityA.AngularVelocity);
             Vector3Wide.Scale(ref linearImpulseA, ref inertiaB.InverseMass, out correctiveVelocityB.LinearVelocity);
             Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseB, ref inertiaB.InverseInertiaTensor, out correctiveVelocityB.AngularVelocity);
-            Vector3Wide.Add(ref correctiveVelocityA.LinearVelocity, ref wsvA.LinearVelocity, out wsvA.LinearVelocity);
-            Vector3Wide.Add(ref correctiveVelocityA.AngularVelocity, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
-            Vector3Wide.Subtract(ref correctiveVelocityB.LinearVelocity, ref wsvB.LinearVelocity, out wsvB.LinearVelocity); //note subtract- we based it on the LinearA jacobian.
-            Vector3Wide.Add(ref correctiveVelocityB.AngularVelocity, ref wsvB.AngularVelocity, out wsvB.AngularVelocity);
+            Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityA.LinearVelocity, out wsvA.LinearVelocity);
+            Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityA.AngularVelocity, out wsvA.AngularVelocity);
+            Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveVelocityB.LinearVelocity, out wsvB.LinearVelocity); //note subtract- we based it on the LinearA jacobian.
+            Vector3Wide.Add(ref wsvB.AngularVelocity, ref correctiveVelocityB.AngularVelocity, out wsvB.AngularVelocity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(ref Jacobians jacobians, ref BodyInertias inertiaA, ref BodyInertias inertiaB,
+        public static void WarmStart(ref Vector3Wide normal, ref TangentFrictionProjectionCompressed projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB,
             ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
+            ComputeJacobians(ref normal, ref projection.TangentX, ref projection.OffsetA, ref projection.OffsetB, out var jacobians);
             //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
             //To compensate for this, the accumulated impulse should be scaled if dt changes.
             ApplyImpulse(ref jacobians, ref inertiaA, ref inertiaB, ref accumulatedImpulse, ref wsvA, ref wsvB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionProjectionCompressed data, ref Jacobians jacobians, 
+        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TangentFrictionProjectionCompressed data, ref Jacobians jacobians,
             ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, out Vector2Wide correctiveCSI)
         {
             Matrix2x3Wide.TransformByTransposeWithoutOverlap(ref wsvA.LinearVelocity, ref jacobians.LinearA, out var csvaLinear);
@@ -150,7 +152,7 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref TangentFrictionProjectionCompressed projection, Vector3Wide normal, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Solve(ref Vector3Wide normal, ref TangentFrictionProjectionCompressed projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector<float> maximumImpulse, ref Vector2Wide accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             ComputeJacobians(ref normal, ref projection.TangentX, ref projection.OffsetA, ref projection.OffsetB, out var jacobians);
             ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection, ref jacobians, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);

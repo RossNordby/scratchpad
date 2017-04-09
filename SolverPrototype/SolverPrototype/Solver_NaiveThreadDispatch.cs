@@ -74,7 +74,7 @@ namespace SolverPrototype
         void ManualNaivePrestep(int workerIndex)
         {
             int blockIndex;
-            while((blockIndex = Interlocked.Increment(ref manualNaiveBlockIndex)) <= manualNaiveExclusiveEndIndex)
+            while ((blockIndex = Interlocked.Increment(ref manualNaiveBlockIndex)) <= manualNaiveExclusiveEndIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
                 Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies.LocalInertiaBundles, context.Dt, context.InverseDt, block.StartBundle, block.End);
@@ -125,13 +125,14 @@ namespace SolverPrototype
                 }
             }
 
-            for (int blockIndex = 0; blockIndex < context.WorkBlocks.Count; ++blockIndex)
+            for (int batchIndex = 0; batchIndex < batches.Length; ++batchIndex)
             {
-                ref var block = ref context.WorkBlocks[blockIndex];
-                for (int bundleIndex = block.StartBundle; bundleIndex < block.End; ++bundleIndex)
+                for (int typeBatchIndex = 0; typeBatchIndex < batches[batchIndex].Length; ++typeBatchIndex)
                 {
-                    ref var visitedCount = ref batches[block.BatchIndex][block.TypeBatchIndex][bundleIndex];
-                    Debug.Assert(visitedCount == 1);
+                    for (int constraintIndex = 0; constraintIndex < batches[batchIndex][typeBatchIndex].Length; ++constraintIndex)
+                    {
+                        Debug.Assert(batches[batchIndex][typeBatchIndex][constraintIndex] == 1);
+                    }
                 }
             }
 
@@ -154,7 +155,7 @@ namespace SolverPrototype
             //This issue isn't unique to the somewhat odd workstealing scheme we use- it would still be a concern regardless.
             var maximumBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, maximumBlocksPerBatch);
-            //ValidateWorkBlocks();
+            ValidateWorkBlocks();
 
             manualNaiveBlockIndex = 0;
             manualNaiveExclusiveEndIndex = context.WorkBlocks.Count;

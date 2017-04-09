@@ -51,7 +51,7 @@ namespace SolverPrototype.Constraints
     /// <summary>
     /// Handles the solve iterations of a bunch of 4-contact convex manifold constraints.
     /// </summary>
-    public class ContactManifold4TypeBatch : TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
+    public class ContactManifold4TypeBatchOld : TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
         public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {

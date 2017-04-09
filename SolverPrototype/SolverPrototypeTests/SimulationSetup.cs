@@ -17,7 +17,7 @@ namespace SolverPrototypeTests
             var description = new ContactManifold4Constraint
             {
                 //By convention, normal faces from B to A.
-                Normal = new Vector3(0, -1, 0),
+                Normal = -up,
                 SpringSettings = new SpringSettingsAOS
                 {
                     NaturalFrequency = (float)(Math.PI * 2 * 60),
@@ -25,8 +25,8 @@ namespace SolverPrototypeTests
                     MaximumRecoveryVelocity = 1f
                 },
                 FrictionCoefficient = 1,
-                TangentX = new Vector3(1, 0, 0),
-                TangentY = new Vector3(0, 0, 1),
+                TangentX = right,
+                TangentY = forward,
             };
 
             for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
@@ -143,6 +143,10 @@ namespace SolverPrototypeTests
                 minimumCapacityPerTypeBatch: (bodyCount * 3) / 6,
                 initialConstraintCountPerBodyEstimate: 6);
             bodyHandles = new int[bodyCount];
+            int ToId(int columnIndex, int rowIndex, int sliceIndex)
+            {
+                return sliceIndex * (height * width) + rowIndex * width + columnIndex;
+            }
             for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
             {
                 for (int rowIndex = 0; rowIndex < height; ++rowIndex)
@@ -150,7 +154,8 @@ namespace SolverPrototypeTests
                     for (int columnIndex = 0; columnIndex < width; ++columnIndex)
                     {
                         var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 } };
-                        bodyHandles[sliceIndex * (height * width) + rowIndex * width + columnIndex] = simulation.Add(ref bodyDescription);
+                        var id = ToId(columnIndex, rowIndex, sliceIndex);
+                        bodyHandles[id] = simulation.Add(ref bodyDescription);
                     }
                 }
             }
@@ -165,21 +170,24 @@ namespace SolverPrototypeTests
             int constraintIndex = 0;
             for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
             {
+                //The bottom rows are all kinematic, so don't create connections between them.
                 for (int rowIndex = 1; rowIndex < height; ++rowIndex)
                 {
                     for (int columnIndex = 0; columnIndex < width; ++columnIndex)
                     {
-                        var bodyAIndex = sliceIndex * (height * width) + rowIndex * width + columnIndex;
+                        var bodyAIndex = ToId(columnIndex, rowIndex, sliceIndex);
                         //For each lower neighbor, create a connection.
-                        //The bottom rows are all kinematic, so don't create connections between them.
                         if (columnIndex > 0)
                         {
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - 1], bodyHandles[bodyAIndex], simulation, ref forward, ref right, ref up);
+                            var previousColumnId = ToId(columnIndex - 1, rowIndex, sliceIndex);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousColumnId], bodyHandles[bodyAIndex], simulation, ref forward, ref right, ref up);
                         }
-                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - width], bodyHandles[bodyAIndex], simulation, ref right, ref up, ref forward);
+                        var previousRowId = ToId(columnIndex, rowIndex - 1, sliceIndex);
+                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousRowId], bodyHandles[bodyAIndex], simulation, ref right, ref up, ref forward);
                         if (sliceIndex > 0)
                         {
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[bodyAIndex - height * width], bodyHandles[bodyAIndex], simulation, ref right, ref forward, ref up);
+                            var previousSliceId = ToId(columnIndex, rowIndex, sliceIndex - 1);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousSliceId], bodyHandles[bodyAIndex], simulation, ref right, ref forward, ref up);
                         }
 
 
@@ -227,7 +235,7 @@ namespace SolverPrototypeTests
             }
         }
 
-      
+
         static void RemoveConstraint(Simulation simulation, int constraintHandle, int[] constraintHandlesToIdentity, int[] constraintHandles, CachedConstraint[] constraintDescriptions, List<int> removedConstraints)
         {
             var constraintIdentity = constraintHandlesToIdentity[constraintHandle];
