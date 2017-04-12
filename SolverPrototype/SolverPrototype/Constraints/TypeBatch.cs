@@ -84,13 +84,6 @@ namespace SolverPrototype.Constraints
             SolveIteration(bodyVelocities, 0, bundleCount);
         }
 
-        [Conditional("DEBUG")]
-        public abstract void ValidateBundleCounts();
-
-        internal unsafe int Allocate(int handle, int* bodyIndices, object bufferPool)
-        {
-            throw new NotImplementedException();
-        }
     }
     //You are allowed to squint at this triple-class separation.
     //This is only really here because there are cases (e.g. adding a constraint) where it is necessary to have knowledge of TBodyReferences so that the caller (the solver, generally)
@@ -347,8 +340,6 @@ namespace SolverPrototype.Constraints
             GatherScatter.CopyLane(ref AccumulatedImpulses[sourceBundle], sourceInner, ref targetTypeBatch.AccumulatedImpulses[targetBundle], targetInner);
 
             //Now we can get rid of the old allocation.
-            //note that this validation has to come before the removal, since the removal will mutate this type batch!
-            ValidateBundleCounts();
             //Note the use of RemoveFromBatch instead of Remove. Solver.Remove returns the handle to the pool, which we do not want!
             //It may look a bit odd to use a solver-level function here, given that we are operating on batches and handling the solver state directly for the most part. 
             //However, removes can result in empty batches that require resource reclamation. 
@@ -361,7 +352,6 @@ namespace SolverPrototype.Constraints
             constraintLocation.BatchIndex = targetBatchIndex;
             constraintLocation.IndexInTypeBatch = newReference.IndexInTypeBatch;
             constraintLocation.TypeId = typeId;
-            targetTypeBatch.ValidateBundleCounts();
 
         }
 

@@ -295,7 +295,6 @@ namespace SolverPrototypeTests
                         enumerator.Simulation = simulation;
                         typeBatch.EnumerateConnectedBodyIndices(indexInTypeBatch, ref enumerator);
                     }
-                    typeBatch.ValidateBundleCounts();
                 }
             }
             var constraintCount = 0;

@@ -62,7 +62,7 @@ namespace SolverPrototype.Constraints
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
-                ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
 
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
@@ -95,7 +95,7 @@ namespace SolverPrototype.Constraints
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-                ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 ContactPenetrationLimit4.WarmStart(ref projection.Penetration,
@@ -116,9 +116,9 @@ namespace SolverPrototype.Constraints
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-                ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
-                GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
+                GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 var maximumTwistImpulse = projection.PremultipliedFrictionCoefficient * (
                     accumulatedImpulses.Penetration0 * projection.LeverArm0 +
                     accumulatedImpulses.Penetration1 * projection.LeverArm1 +

@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2;
+using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -150,7 +151,7 @@ namespace SolverPrototype
         /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex) where TVector : struct
+        public static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex) where TVector : struct
         {
             //Note the truncation. This is used on some types that aren't evenly divisible.
             //This should be folded into a single constant by the jit.
@@ -174,7 +175,7 @@ namespace SolverPrototype
         /// For performance critical operations, a specialized implementation should be used. This uses a loop with stride equal to a Vector.
         /// </remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex, int count) where TVector : struct
+        public static void ClearLane<TOuter, TVector>(ref TOuter bundle, int innerIndex, int count) where TVector : struct
         {
             ref var laneBase = ref Unsafe.Add(ref Unsafe.As<TOuter, TVector>(ref bundle), innerIndex);
             for (int i = 0; i < count; ++i)
@@ -184,7 +185,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref TwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
+        public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref UnpackedTwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
         {
             velocitiesA = new BodyVelocities();
             velocitiesB = new BodyVelocities();
@@ -227,7 +228,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref TwoBodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref UnpackedTwoBodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
         {
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
             ref var baseInnerA = ref Unsafe.As<Vector<int>, int>(ref references.InnerIndexA);
@@ -269,7 +270,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GatherInertia(BodyInertias[] bodyInertias, ref TwoBodyReferences references,
+        public static void GatherInertia(BodyInertias[] bodyInertias, ref UnpackedTwoBodyReferences references,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
             //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.

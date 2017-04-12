@@ -1,4 +1,5 @@
 ﻿using SolverPrototype;
+using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -12,7 +13,7 @@ namespace SolverPrototypeTests
         struct Context
         {
             public BodyVelocities[] BodyVelocities;
-            public TwoBodyReferences[] BodyReferences;
+            public UnpackedTwoBodyReferences[] BodyReferences;
             public int ConstraintCount;
         }
         struct ConstraintBodies
@@ -37,7 +38,7 @@ namespace SolverPrototypeTests
                 //Sorting the connections should increase the probability that at least one of the two bodies associated with a constraint will be in the cache already from earlier prefetches.
                 Array.Sort(connections, sortComparison);
             }
-            context.BodyReferences = new TwoBodyReferences[constraintCount];
+            context.BodyReferences = new UnpackedTwoBodyReferences[constraintCount];
             for (int iterationIndex = 0; iterationIndex < constraintCount; ++iterationIndex)
             {
                 var baseSourceIndex = iterationIndex << BundleIndexing.VectorShift;

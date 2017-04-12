@@ -56,7 +56,7 @@ namespace SolverPrototype.Constraints
                 //(Note that the 2-axis requires reconstructing a tangent, which costs 6 mul and 3 sub anyway. If you loaded a full 3 axis basis, the difference is
                 //5 floats- 160 bytes for 256 bit SIMD, which is enough time for 40 MULSS.)
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
-                ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
 
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
@@ -89,7 +89,7 @@ namespace SolverPrototype.Constraints
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-                ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 TangentFrictionCompressed.WarmStart(ref projection.Normal, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
@@ -111,10 +111,10 @@ namespace SolverPrototype.Constraints
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
-                ref var bodyReferences = ref Unsafe.Add(ref bodyReferencesBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
 
-                GatherScatter.GatherVelocities(bodyVelocities, ref BodyReferences[i], out var wsvA, out var wsvB);
+                GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
 
                 var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
