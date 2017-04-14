@@ -93,5 +93,34 @@ namespace SolverPrototype
             result.Z.Z = m.Z.Z * scale;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFromQuaternion(ref QuaternionWide quaternion, out Matrix3x3Wide result)
+        {
+            var qX2 = quaternion.X + quaternion.X;
+            var qY2 = quaternion.Y + quaternion.Y;
+            var qZ2 = quaternion.Z + quaternion.Z;
+            var XX = qX2 * quaternion.X;
+            var YY = qY2 * quaternion.Y;
+            var ZZ = qZ2 * quaternion.Z;
+            var XY = qX2 * quaternion.Y;
+            var XZ = qX2 * quaternion.Z;
+            var XW = qX2 * quaternion.W;
+            var YZ = qY2 * quaternion.Z;
+            var YW = qY2 * quaternion.W;
+            var ZW = qZ2 * quaternion.W;
+
+            result.X.X = Vector<float>.One - YY - ZZ;
+            result.X.Y = XY + ZW;
+            result.X.Z = XZ - YW;
+
+            result.Y.X = XY - ZW;
+            result.Y.Y = Vector<float>.One - XX - ZZ;
+            result.Y.Z = YZ + XW;
+            
+            result.Z.X = XZ + YW;
+            result.Z.Y = YZ - XW;
+            result.Z.Z = Vector<float>.One - XX - YY;
+        }
+
     }
 }
