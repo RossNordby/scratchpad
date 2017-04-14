@@ -13,28 +13,58 @@ namespace SolverPrototype.Constraints
     /// </summary>
     public struct TwoBodyReferences
     {
-        //Unfortunately, there does not exist any Vector<int>.Shift instruction yet, so we cannot efficiently derive the bundle and inner indices from the 'true' indices on the fly.
-        //Instead, group references are preconstructed and cached in a nonvectorized way.
-        public Vector<int> BundleIndexA;
-        public Vector<int> InnerIndexA;
-        public Vector<int> BundleIndexB;
-        public Vector<int> InnerIndexB;
-        //TODO: despite having no simd-accelerated shift, it may still be a net win to use scalar instructions to extract bundle/inner.
-        //By combining, we save 8 bytes per constraint. In a bandwidth constrained case, a 6700K supporting AVX2 with 8.75GBps bandwidth available per core 
-        //can load the needed 8 bytes in about a nanosecond. We add a bitwise AND and shift. Two bitwise ands and shifts will likely take less than a nanosecond on a 6700K or any other
-        //modern system. In fact, the throughput on ANDs on skylake is up to four instructions per cycle. And there are about 4 cycles in a nanosecond.
-        //So, even though you'd have to do 16 ands and 16 shifts for AVX512, that would still very likely take less than 16 cycles (~4 nanoseconds).
-        //At 8.75GBps, the resulting savings of 8 * 4 * 2 = 64 bytes would have otherwise taken ~7 nanoseconds. So it's a net win for multithreaded use.
-        //Notably, AVX512 systems will tend to have higher memory bandwidth. It's not yet clear what will happen for consumer tier parts, but it's likely that a similar bandwidth bump will occur.
-        //If we ever get a Vector.Shift, there is no doubt that recomputing the inner index is the right choice.
+        public Vector<int> IndexA;
+        public Vector<int> IndexB;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void Unpack(int bundleIndex, int constraintCount, out UnpackedTwoBodyReferences unpacked)
+        //Despite having no simd-accelerated shift, it's still a net win to use scalar instructions to extract bundle indices on the fly.
+        //By doing the bundle-inner extraction at runtime, we save 8 bytes per constraint. A 6700K supporting AVX2 with 8.75 GBps bandwidth per core can load 
+        //the required (8 floats per bundle) * (4 bytes per float) * (2 bodies) = 64 bytes in ~7.3ns.
+        //At the base clock rate of 4ghz, that's 29 cycles. On modern processors, many instructions will execute in parallel, so that 7.3ns could be enough time
+        //for well over 50 instructions. Considering that all we have to add is 2 SIMD bitwise ANDs and 16 scalar shifts (for AVX2, given current lack of SIMD shift),
+        //it's a pretty clear win for any bandwidth constrained use.
+        //And, while as of this writing the CoreCLR does not support AVX512, we should expect it someday- and memory bandwidth is going to be even a bigger concern.
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void Unpack(int bundleIndex, int constraintCount, out UnpackedTwoBodyReferences unpacked)
         {
-            unpacked.BundleIndexA = BundleIndexA;
-            unpacked.InnerIndexA = InnerIndexA;
-            unpacked.BundleIndexB = BundleIndexB;
-            unpacked.InnerIndexB = InnerIndexB;
+            //Having access to SIMD shift would be really nice. (There's not actually hardware support for int divide, so... per-slot shift it is.)
+            ref var bundleA = ref Unsafe.As<Vector<int>, int>(ref unpacked.BundleIndexA);
+            ref var bundleB = ref Unsafe.As<Vector<int>, int>(ref unpacked.BundleIndexB);
+            ref var indexA = ref Unsafe.As<Vector<int>, int>(ref IndexA);
+            ref var indexB = ref Unsafe.As<Vector<int>, int>(ref IndexB);
+            //Note that we don't bother using the bundle's count here. 
+            //That would only be helpful in one bundle per type batch, so the branching would just be (a tiny amount of) wasted effort almost always.
+            Debug.Assert((Vector<int>.Count & 3) == 0, "No current hardware has a non-4-multiple width of 32 bit types, but just in case, note that this requires a width that is a multiple of 4!");
+
+            bundleA = indexA >> BundleIndexing.VectorShift;
+            bundleB = indexB >> BundleIndexing.VectorShift;
+            Unsafe.Add(ref bundleA, 1) = Unsafe.Add(ref indexA, 1) >> BundleIndexing.VectorShift;
+            Unsafe.Add(ref bundleB, 1) = Unsafe.Add(ref indexB, 1) >> BundleIndexing.VectorShift;
+            Unsafe.Add(ref bundleA, 2) = Unsafe.Add(ref indexA, 2) >> BundleIndexing.VectorShift;
+            Unsafe.Add(ref bundleB, 2) = Unsafe.Add(ref indexB, 2) >> BundleIndexing.VectorShift;
+            Unsafe.Add(ref bundleA, 3) = Unsafe.Add(ref indexA, 3) >> BundleIndexing.VectorShift;
+            Unsafe.Add(ref bundleB, 3) = Unsafe.Add(ref indexB, 3) >> BundleIndexing.VectorShift;
+
+            for (int i = 4; i < Vector<int>.Count; i += 4)
+            {
+                ref var targetA = ref Unsafe.Add(ref bundleA, i);
+                ref var targetB = ref Unsafe.Add(ref bundleB, i);
+                ref var sourceA = ref Unsafe.Add(ref indexA, i);
+                ref var sourceB = ref Unsafe.Add(ref indexB, i);
+                targetA = sourceA >> BundleIndexing.VectorShift;
+                targetB = sourceB >> BundleIndexing.VectorShift;
+                Unsafe.Add(ref targetA, 1) = Unsafe.Add(ref sourceA, 1) >> BundleIndexing.VectorShift;
+                Unsafe.Add(ref targetB, 1) = Unsafe.Add(ref sourceB, 1) >> BundleIndexing.VectorShift;
+                Unsafe.Add(ref targetA, 2) = Unsafe.Add(ref sourceA, 2) >> BundleIndexing.VectorShift;
+                Unsafe.Add(ref targetB, 2) = Unsafe.Add(ref sourceB, 2) >> BundleIndexing.VectorShift;
+                Unsafe.Add(ref targetA, 3) = Unsafe.Add(ref sourceA, 3) >> BundleIndexing.VectorShift;
+                Unsafe.Add(ref targetB, 3) = Unsafe.Add(ref sourceB, 3) >> BundleIndexing.VectorShift;
+
+            }
+            
+            var mask = new Vector<int>(BundleIndexing.VectorMask);
+            unpacked.InnerIndexA = Vector.BitwiseAnd(mask, IndexA);
+            unpacked.InnerIndexB = Vector.BitwiseAnd(mask, IndexB);
             unpacked.Count = bundleIndex == (constraintCount >> BundleIndexing.VectorShift) ? constraintCount & BundleIndexing.VectorMask : Vector<float>.Count;
         }
     }
@@ -64,27 +94,22 @@ namespace SolverPrototype.Constraints
         {
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
 
-            ref var bundleIndexA = ref GatherScatter.Get(ref BodyReferences[constraintBundleIndex].BundleIndexA, constraintInnerIndex);
-            ref var innerIndexA = ref Unsafe.Add(ref bundleIndexA, Vector<int>.Count);
-            ref var bundleIndexB = ref Unsafe.Add(ref bundleIndexA, 2 * Vector<int>.Count);
-            ref var innerIndexB = ref Unsafe.Add(ref bundleIndexA, 3 * Vector<int>.Count);
+            ref var indexA = ref GatherScatter.Get(ref BodyReferences[constraintBundleIndex].IndexA, constraintInnerIndex);
+            ref var indexB = ref Unsafe.Add(ref indexA, Vector<int>.Count);
 
             //Note that the variables are ref locals! This is important for correctness, because every execution of LoopBody could result in a swap.
             //Ref locals aren't the only solution, but if you ever change this, make sure you account for the potential mutation in the enumerator.
-            enumerator.LoopBody((bundleIndexA << BundleIndexing.VectorShift) | innerIndexA);
-            enumerator.LoopBody((bundleIndexB << BundleIndexing.VectorShift) | innerIndexB);
+            enumerator.LoopBody(indexA);
+            enumerator.LoopBody(indexB);
         }
 
         public sealed override void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation)
         {
+
             BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
-            BundleIndexing.GetBundleIndices(newBodyLocation, out var bodyBundleIndex, out var bodyInnerIndex);
 
             //Note that this relies on the bodyreferences memory layout. It uses the stride of vectors to skip to the next body based on the bodyIndexInConstraint.
-            ref var bundleIndex = ref GatherScatter.Get(ref BodyReferences[constraintBundleIndex].BundleIndexA, constraintInnerIndex + bodyIndexInConstraint * (Vector<int>.Count * 2));
-            ref var innerIndex = ref Unsafe.Add(ref bundleIndex, Vector<int>.Count);
-            bundleIndex = bodyBundleIndex;
-            innerIndex = bodyInnerIndex;
+            GatherScatter.Get(ref BodyReferences[constraintBundleIndex].IndexA, constraintInnerIndex + bodyIndexInConstraint * Vector<int>.Count) = newBodyLocation;
         }
 
         protected sealed override void RemoveBodyReferences(int bundleIndex, int innerIndex)
@@ -106,13 +131,9 @@ namespace SolverPrototype.Constraints
             //We sort based on the body references within the constraint. 
             //Sort based on the smaller body index in a constraint. Note that it is impossible for there to be two references to the same body within a constraint batch, 
             //so there's no need to worry about the case where the comparison is equal.
-            ref var bundleIndexA = ref GatherScatter.Get(ref bundleReferences.BundleIndexA, innerIndex);
-            ref var innerIndexA = ref Unsafe.Add(ref bundleIndexA, Vector<int>.Count);
-            ref var bundleIndexB = ref Unsafe.Add(ref bundleIndexA, 2 * Vector<int>.Count);
-            ref var innerIndexB = ref Unsafe.Add(ref bundleIndexA, 3 * Vector<int>.Count);
-            var bodyIndexA = (bundleIndexA << BundleIndexing.VectorShift) | innerIndexA;
-            var bodyIndexB = (bundleIndexB << BundleIndexing.VectorShift) | innerIndexB;
-            return bodyIndexA < bodyIndexB ? bodyIndexA : bodyIndexB;
+            ref var indexA = ref GatherScatter.Get(ref bundleReferences.IndexA, innerIndex);
+            ref var indexB = ref Unsafe.Add(ref indexA, innerIndex);
+            return indexA < indexB ? indexA : indexB;
         }
         struct IntComparer : IComparerRef<int>
         {

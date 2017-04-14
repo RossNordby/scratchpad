@@ -107,9 +107,8 @@ namespace SolverPrototypeTests
                     simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
                     var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
 
-
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-                    ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];
+                    typeBatch.BodyReferences[bundleIndex].Unpack(bundleIndex, typeBatch.ConstraintCount, out var bodyReferences);
                     var bodyBundleIndexA = GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex);
                     var bodyBundleIndexB = GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex);
                     var innerIndexA = GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex);
@@ -165,7 +164,7 @@ namespace SolverPrototypeTests
 
 
             simulation.BufferPool.Clear();
-            
+
         }
 
 

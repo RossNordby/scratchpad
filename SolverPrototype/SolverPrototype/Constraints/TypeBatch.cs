@@ -120,33 +120,27 @@ namespace SolverPrototype.Constraints
             //The jit should be able to fold almost all of the size-related calculations and address fiddling.
             ref var start = ref Unsafe.As<TBodyReferences, int>(ref bundle);
             ref var targetLane = ref Unsafe.Add(ref start, innerIndex);
-            var stride = Vector<int>.Count * 2;
+            var stride = Vector<int>.Count;
             //We assume that the body references struct is organized in memory like Bundle0, Inner0, ... BundleN, InnerN, Count
             //Assuming contiguous storage, Count is then located at start + stride * BodyCount.
             var bodyCount = Unsafe.SizeOf<TBodyReferences>() / (stride * 4);
-            Debug.Assert(innerIndex == 0 || Unsafe.Add(ref start, stride * bodyCount) == innerIndex,
-                "Either this bundle hasn't been initialized yet (and so has unknown count), or it should match the new inner index.");
-            for (int i = 0; i < bodyCount; ++i)
+            targetLane = *bodyIndices;
+            for (int i = 1; i < bodyCount; ++i)
             {
-                BundleIndexing.GetBundleIndices(bodyIndices[i], out var bodyBundleIndex, out var bodyInnerIndex);
-                //Body references, by convention, are stored in bundle-inner-bundle-inner interleaved order.
-                Unsafe.Add(ref targetLane, i * stride) = bodyBundleIndex;
-                Unsafe.Add(ref targetLane, i * stride + Vector<int>.Count) = bodyInnerIndex;
+                Unsafe.Add(ref targetLane, i * stride) = bodyIndices[i];
             }
-            //When adding a lane to a body references struct, it is always at the end. So, the count is one beyond the inner index we just set.
-            Unsafe.Add(ref start, stride * bodyCount) = innerIndex + 1;
-            Debug.Assert(Unsafe.Add(ref start, stride * bodyCount) <= Vector<int>.Count && Unsafe.Add(ref start, stride * bodyCount) >= 0,
-                "If the inner index was valid, the resulting bundle count will be within the bundle limits.");
 
 #if DEBUG
-            for (int i = 0; i < Unsafe.Add(ref start, stride * bodyCount) - 1; ++i)
+            //The inner index is the last slot in the bundle, since adds always append and constraints are always a contiguous block.
+            //Loop through the indices of the bundle and confirm that none of the indices are the same.
+            for (int i = 0; i <= innerIndex; ++i)
             {
-                var aIndex = (Unsafe.Add(ref start, i) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, i + Vector<int>.Count);
-                var bIndex = (Unsafe.Add(ref start, i + 2 * Vector<int>.Count) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, i + 3 * Vector<int>.Count);
-                for (int j = i + 1; j < Unsafe.Add(ref start, stride * bodyCount); ++j)
+                var aIndex = Unsafe.Add(ref start, i);
+                var bIndex = Unsafe.Add(ref start, i + Vector<int>.Count);
+                for (int j = i + 1; j <= innerIndex; ++j)
                 {
-                    var aIndex2 = (Unsafe.Add(ref start, j) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, j + Vector<int>.Count);
-                    var bIndex2 = (Unsafe.Add(ref start, j + 2 * Vector<int>.Count) << BundleIndexing.VectorShift) | Unsafe.Add(ref start, j + 3 * Vector<int>.Count);
+                    var aIndex2 = Unsafe.Add(ref start, j);
+                    var bIndex2 = Unsafe.Add(ref start, j + Vector<int>.Count);
                     Debug.Assert(!(
                         aIndex == bIndex || aIndex2 == bIndex2 ||
                         aIndex == aIndex2 || aIndex == bIndex2 ||
