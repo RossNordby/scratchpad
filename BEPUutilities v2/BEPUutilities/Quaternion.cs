@@ -95,11 +95,12 @@ namespace BEPUutilities2
         }
 
         /// <summary>
-        /// Multiplies two quaternions together in opposite order.
+        /// Concatenates the transforms of two quaternions together such that the resulting quaternion, applied as an orientation to a vector v, is equivalent to
+        /// transformed = (v * a) * b.
         /// </summary>
-        /// <param name="a">First quaternion to multiply.</param>
-        /// <param name="b">Second quaternion to multiply.</param>
-        /// <param name="result">Product of the multiplication.</param>
+        /// <param name="a">First quaternion to concatenate.</param>
+        /// <param name="b">Second quaternion to concatenate.</param>
+        /// <param name="result">Product of the concatenation.</param>
         public static void Concatenate(ref Quaternion a, ref Quaternion b, out Quaternion result)
         {
             float aX = a.X;
@@ -191,43 +192,6 @@ namespace BEPUutilities2
                 }
             }
             Scale(ref q, 0.5f / (float)Math.Sqrt(t), out q);
-            //float trace = r.X.X + r.Y.Y + r.Z.Z;
-            //if (trace >= 0)
-            //{
-            //    var S = (float)Math.Sqrt(trace + 1.0) * 2; // S=4*qw 
-            //    var inverseS = 1 / S;
-            //    q.W = 0.25f * S;
-            //    q.X = (r.Y.Z - r.Z.Y) * inverseS;
-            //    q.Y = (r.Z.X - r.X.Z) * inverseS;
-            //    q.Z = (r.X.Y - r.Y.X) * inverseS;
-            //}
-            //else if ((r.X.X > r.Y.Y) & (r.X.X > r.Z.Z))
-            //{
-            //    var S = (float)Math.Sqrt(1.0 + r.X.X - r.Y.Y - r.Z.Z) * 2; // S=4*qx 
-            //    var inverseS = 1 / S;
-            //    q.W = (r.Y.Z - r.Z.Y) * inverseS;
-            //    q.X = 0.25f * S;
-            //    q.Y = (r.Y.X + r.X.Y) * inverseS;
-            //    q.Z = (r.Z.X + r.X.Z) * inverseS;
-            //}
-            //else if (r.Y.Y > r.Z.Z)
-            //{
-            //    var S = (float)Math.Sqrt(1.0 + r.Y.Y - r.X.X - r.Z.Z) * 2; // S=4*qy
-            //    var inverseS = 1 / S;
-            //    q.W = (r.Z.X - r.X.Z) * inverseS;
-            //    q.X = (r.Y.X + r.X.Y) * inverseS;
-            //    q.Y = 0.25f * S;
-            //    q.Z = (r.Z.Y + r.Y.Z) * inverseS;
-            //}
-            //else
-            //{
-            //    var S = (float)Math.Sqrt(1.0 + r.Z.Z - r.X.X - r.Y.Y) * 2; // S=4*qz
-            //    var inverseS = 1 / S;
-            //    q.W = (r.X.Y - r.Y.X) * inverseS;
-            //    q.X = (r.Z.X + r.X.Z) * inverseS;
-            //    q.Y = (r.Z.Y + r.Y.Z) * inverseS;
-            //    q.Z = 0.25f * S;
-            //}
         }
 
         /// <summary>

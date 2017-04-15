@@ -96,28 +96,27 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CreateFromQuaternion(ref QuaternionWide quaternion, out Matrix3x3Wide result)
         {
-            //TODO: May be worth trying out some alternative implementations. There's one that requires a square root, but simplifies the rest...
             var qX2 = quaternion.X + quaternion.X;
             var qY2 = quaternion.Y + quaternion.Y;
             var qZ2 = quaternion.Z + quaternion.Z;
-            var XX = qX2 * quaternion.X;
+
             var YY = qY2 * quaternion.Y;
             var ZZ = qZ2 * quaternion.Z;
-            var XY = qX2 * quaternion.Y;
-            var XZ = qX2 * quaternion.Z;
-            var XW = qX2 * quaternion.W;
-            var YZ = qY2 * quaternion.Z;
-            var YW = qY2 * quaternion.W;
-            var ZW = qZ2 * quaternion.W;
-
             result.X.X = Vector<float>.One - YY - ZZ;
+            var XY = qX2 * quaternion.Y;
+            var ZW = qZ2 * quaternion.W;
             result.X.Y = XY + ZW;
+            var XZ = qX2 * quaternion.Z;
+            var YW = qY2 * quaternion.W;
             result.X.Z = XZ - YW;
 
+            var XX = qX2 * quaternion.X;
             result.Y.X = XY - ZW;
             result.Y.Y = Vector<float>.One - XX - ZZ;
+            var XW = qX2 * quaternion.W;
+            var YZ = qY2 * quaternion.Z;
             result.Y.Z = YZ + XW;
-            
+
             result.Z.X = XZ + YW;
             result.Z.Y = YZ - XW;
             result.Z.Z = Vector<float>.One - XX - YY;

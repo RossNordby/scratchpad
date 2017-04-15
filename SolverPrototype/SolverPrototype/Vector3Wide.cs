@@ -52,6 +52,14 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Abs(ref Vector3Wide vector, out Vector3Wide result)
+        {
+            result.X = Vector.Abs(vector.X);
+            result.Y = Vector.Abs(vector.Y);
+            result.Z = Vector.Abs(vector.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Negate(ref Vector3Wide v, out Vector3Wide result)
         {
             result.X = -v.X;
@@ -85,6 +93,14 @@ namespace SolverPrototype
         {
             Subtract(ref b, ref a, out var offset);
             Length(ref offset, out distance);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Normalize(ref Vector3Wide v, out Vector3Wide result)
+        {
+            GetLength(ref v, out var length);
+            var scale = Vector<float>.One / length;
+            Scale(ref v, ref scale, out result);
         }
     }
 }
