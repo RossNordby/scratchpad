@@ -11,6 +11,17 @@ namespace SolverPrototype
         public Vector<float> Z;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetLengthSquared(ref Vector3Wide v, out Vector<float> lengthSquared)
+        {
+            lengthSquared = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetLength(ref Vector3Wide v, out Vector<float> length)
+        {
+            length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Add(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
         {
             result.X = a.X + b.X;

@@ -86,7 +86,7 @@ namespace BEPUutilities2
         /// <param name="q">Quaternion to multiply.</param>
         /// <param name="scale">Amount to multiply each component of the quaternion by.</param>
         /// <param name="result">Scaled quaternion.</param>
-        public static void Multiply(ref Quaternion q, float scale, out Quaternion result)
+        public static void Scale(ref Quaternion q, float scale, out Quaternion result)
         {
             result.X = q.X * scale;
             result.Y = q.Y * scale;
@@ -144,9 +144,6 @@ namespace BEPUutilities2
         }
 
 
-
-
-
         /// <summary>
         /// Constructs a quaternion from a rotation matrix.
         /// </summary>
@@ -154,46 +151,83 @@ namespace BEPUutilities2
         /// <param name="q">Quaternion based on the rotation matrix.</param>
         public static void CreateFromRotationMatrix(ref Matrix3x3 r, out Quaternion q)
         {
-            float trace = r.X.X + r.Y.Y + r.Z.Z;
-#if !WINDOWS
-            q = new Quaternion();
-#endif
-            if (trace >= 0)
+            float t;
+            if (r.Z.Z < 0)
             {
-                var S = (float)Math.Sqrt(trace + 1.0) * 2; // S=4*qw 
-                var inverseS = 1 / S;
-                q.W = 0.25f * S;
-                q.X = (r.Y.Z - r.Z.Y) * inverseS;
-                q.Y = (r.Z.X - r.X.Z) * inverseS;
-                q.Z = (r.X.Y - r.Y.X) * inverseS;
-            }
-            else if ((r.X.X > r.Y.Y) & (r.X.X > r.Z.Z))
-            {
-                var S = (float)Math.Sqrt(1.0 + r.X.X - r.Y.Y - r.Z.Z) * 2; // S=4*qx 
-                var inverseS = 1 / S;
-                q.W = (r.Y.Z - r.Z.Y) * inverseS;
-                q.X = 0.25f * S;
-                q.Y = (r.Y.X + r.X.Y) * inverseS;
-                q.Z = (r.Z.X + r.X.Z) * inverseS;
-            }
-            else if (r.Y.Y > r.Z.Z)
-            {
-                var S = (float)Math.Sqrt(1.0 + r.Y.Y - r.X.X - r.Z.Z) * 2; // S=4*qy
-                var inverseS = 1 / S;
-                q.W = (r.Z.X - r.X.Z) * inverseS;
-                q.X = (r.Y.X + r.X.Y) * inverseS;
-                q.Y = 0.25f * S;
-                q.Z = (r.Z.Y + r.Y.Z) * inverseS;
+                if (r.X.X > r.Y.Y)
+                {
+                    t = 1 + r.X.X - r.Y.Y - r.Z.Z;
+                    q.X = t;
+                    q.Y = r.X.Y + r.Y.X;
+                    q.Z = r.Z.X + r.X.Z;
+                    q.W = r.Y.Z - r.Z.Y;
+                }
+                else
+                {
+                    t = 1 - r.X.X + r.Y.Y - r.Z.Z;
+                    q.X = r.X.Y + r.Y.X;
+                    q.Y = t;
+                    q.Z = r.Y.Z + r.Z.Y;
+                    q.W = r.Z.X - r.X.Z;
+                }
             }
             else
             {
-                var S = (float)Math.Sqrt(1.0 + r.Z.Z - r.X.X - r.Y.Y) * 2; // S=4*qz
-                var inverseS = 1 / S;
-                q.W = (r.X.Y - r.Y.X) * inverseS;
-                q.X = (r.Z.X + r.X.Z) * inverseS;
-                q.Y = (r.Z.Y + r.Y.Z) * inverseS;
-                q.Z = 0.25f * S;
+                if(r.X.X < -r.Y.Y)
+                {
+                    t = 1 - r.X.X - r.Y.Y + r.Z.Z;
+                    q.X = r.Z.X + r.X.Z;
+                    q.Y = r.Y.Z + r.Z.Y;
+                    q.Z = t;
+                    q.W = r.X.Y - r.Y.X;
+                }
+                else
+                {
+                    t = 1 + r.X.X + r.Y.Y + r.Z.Z;
+                    q.X = r.Y.Z - r.Z.Y;
+                    q.Y = r.Z.X - r.X.Z;
+                    q.Z = r.X.Y - r.Y.X;
+                    q.W = t;
+                }
             }
+            Scale(ref q, 0.5f / (float)Math.Sqrt(t), out q);
+            //float trace = r.X.X + r.Y.Y + r.Z.Z;
+            //if (trace >= 0)
+            //{
+            //    var S = (float)Math.Sqrt(trace + 1.0) * 2; // S=4*qw 
+            //    var inverseS = 1 / S;
+            //    q.W = 0.25f * S;
+            //    q.X = (r.Y.Z - r.Z.Y) * inverseS;
+            //    q.Y = (r.Z.X - r.X.Z) * inverseS;
+            //    q.Z = (r.X.Y - r.Y.X) * inverseS;
+            //}
+            //else if ((r.X.X > r.Y.Y) & (r.X.X > r.Z.Z))
+            //{
+            //    var S = (float)Math.Sqrt(1.0 + r.X.X - r.Y.Y - r.Z.Z) * 2; // S=4*qx 
+            //    var inverseS = 1 / S;
+            //    q.W = (r.Y.Z - r.Z.Y) * inverseS;
+            //    q.X = 0.25f * S;
+            //    q.Y = (r.Y.X + r.X.Y) * inverseS;
+            //    q.Z = (r.Z.X + r.X.Z) * inverseS;
+            //}
+            //else if (r.Y.Y > r.Z.Z)
+            //{
+            //    var S = (float)Math.Sqrt(1.0 + r.Y.Y - r.X.X - r.Z.Z) * 2; // S=4*qy
+            //    var inverseS = 1 / S;
+            //    q.W = (r.Z.X - r.X.Z) * inverseS;
+            //    q.X = (r.Y.X + r.X.Y) * inverseS;
+            //    q.Y = 0.25f * S;
+            //    q.Z = (r.Z.Y + r.Y.Z) * inverseS;
+            //}
+            //else
+            //{
+            //    var S = (float)Math.Sqrt(1.0 + r.Z.Z - r.X.X - r.Y.Y) * 2; // S=4*qz
+            //    var inverseS = 1 / S;
+            //    q.W = (r.X.Y - r.Y.X) * inverseS;
+            //    q.X = (r.Z.X + r.X.Z) * inverseS;
+            //    q.Y = (r.Z.Y + r.Y.Z) * inverseS;
+            //    q.Z = 0.25f * S;
+            //}
         }
 
         /// <summary>
@@ -446,8 +480,8 @@ namespace BEPUutilities2
             b.Y = -a.Y;
             b.Z = -a.Z;
             b.W = -a.W;
-        }      
-        
+        }
+
         /// <summary>
         /// Negates the components of a quaternion.
         /// </summary>
@@ -857,7 +891,7 @@ namespace BEPUutilities2
             Concatenate(ref startInverse, ref end, out relative);
         }
 
-        
+
         /// <summary>
         /// Transforms the rotation into the local space of the target basis such that rotation = Quaternion.Concatenate(localRotation, targetBasis)
         /// </summary>

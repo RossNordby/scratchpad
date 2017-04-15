@@ -96,6 +96,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CreateFromQuaternion(ref QuaternionWide quaternion, out Matrix3x3Wide result)
         {
+            //TODO: May be worth trying out some alternative implementations. There's one that requires a square root, but simplifies the rest...
             var qX2 = quaternion.X + quaternion.X;
             var qY2 = quaternion.Y + quaternion.Y;
             var qZ2 = quaternion.Z + quaternion.Z;

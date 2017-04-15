@@ -96,6 +96,7 @@
     <Compile Include="AutoTester.cs" />
     <Compile Include="CacheBlaster.cs" />
     <Compile Include="ContactManifoldConvergenceTests.cs" />
+    <Compile Include="MathTests.cs" />
     <Compile Include="UnpackCodegenTest.cs" />
     <Compile Include="HackCodegenTest.cs" />
     <Compile Include="IslandCacheConvergence.cs" />
