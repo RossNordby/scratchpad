@@ -21,7 +21,7 @@ namespace SolverPrototype
         {
             //Since we can't branch, we're going to end up calculating the possible states of all branches.
             //This requires doing more ALU work than the branching implementation, but there are a lot of common terms across the branches, and (random-ish) branches aren't free.
-            //Overall, this turns out to be about 2.5 more expensive per call than the scalar version, but it handles multiple lanes, so it's a net win.
+            //Overall, this turns out to be about 2x-2.5x more expensive per call than the scalar version, but it handles multiple lanes, so it's a net win.
             var oneAddX = Vector<float>.One + r.X.X;
             var oneSubX = Vector<float>.One - r.X.X;
             var yAddZ = r.Y.Y + r.Z.Z;

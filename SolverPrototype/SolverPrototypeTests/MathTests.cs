@@ -43,10 +43,10 @@ namespace SolverPrototypeTests
                 q.W = (float)random.NextDouble() * 2 - 1;
 
                 Quaternion.Normalize(ref q, out q);
-                Matrix3x3.CreateFromQuaternion(ref q, out var r);
 
                 for (int i = 0; i < innerIterations; ++i)
                 {
+                    Matrix3x3.CreateFromQuaternion(ref q, out var r);
                     Quaternion.CreateFromRotationMatrix(ref r, out var qTest);
 
 #if DEBUG
@@ -87,10 +87,10 @@ namespace SolverPrototypeTests
                 q.W = new Vector<float>((float)random.NextDouble() * 2 - 1);
 
                 QuaternionWide.Normalize(ref q, out q);
-                Matrix3x3Wide.CreateFromQuaternion(ref q, out var r);
 
                 for (int i = 0; i < innerIterations; ++i)
                 {
+                    Matrix3x3Wide.CreateFromQuaternion(ref q, out var r);
                     QuaternionWide.CreateFromRotationMatrix(ref r, out var qTest);
 #if DEBUG
                     const float epsilon = 1e-6f;

@@ -5,7 +5,38 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Constraints
 {
+    public struct ManifoldContactData
+    {
+        public Vector3Wide OffsetA;
+        public Vector3Wide OffsetB;
+        public Vector<float> PenetrationDepth;
+    }
+    public struct ContactManifold4PrestepData
+    {
+        //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.
+        //If you modify this layout, be sure to update the associated ContactManifold4Constraint.
+        //In a convex manifold, all contacts share the same normal.
+        public Vector3Wide Normal;
+        public ManifoldContactData Contact0;
+        public ManifoldContactData Contact1;
+        public ManifoldContactData Contact2;
+        public ManifoldContactData Contact3;
+        //All contacts also share the spring settings.
+        public SpringSettings SpringSettings;
+        public Vector3Wide TangentX;
+        public Vector3Wide TangentY;
+        public Vector<float> FrictionCoefficient;
+    }
 
+    public struct ContactManifold4AccumulatedImpulses
+    {
+        public Vector<float> Twist;
+        public Vector2Wide Tangent;
+        public Vector<float> Penetration0;
+        public Vector<float> Penetration1;
+        public Vector<float> Penetration2;
+        public Vector<float> Penetration3;
+    }
     //The key observation here is that we have 7DOFs worth of constraints that all share the exact same bodies.
     //Despite the potential premultiplication optimizations, we focus on a few big wins:
     //1) Sharing the inverse mass for the impulse->velocity projection across all constraints.
@@ -16,7 +47,7 @@ namespace SolverPrototype.Constraints
     //In fact, a hypothetical CLR and machine that supported AVX512 would hit memory bandwidth limits on the older implementation that used 2032 bytes per bundle for projection data...
     //on a single thread.
 
-    public struct ContactManifold4ProjectionCompressed
+    public struct ContactManifold4Projection
     {
         public BodyInertias InertiaA;
         public BodyInertias InertiaB;
@@ -35,7 +66,7 @@ namespace SolverPrototype.Constraints
     /// <summary>
     /// Handles the solve iterations of a bunch of 4-contact convex manifold constraints.
     /// </summary>
-    public class ContactManifold4TypeBatch : TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4ProjectionCompressed, ContactManifold4AccumulatedImpulses>
+    public class ContactManifold4TypeBatch : TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
         public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {
