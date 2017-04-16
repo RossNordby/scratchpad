@@ -27,7 +27,7 @@ namespace SolverPrototypeTests
                     Debug.Assert(keys[i] >= keys[i - 1]);
                 }
             }
-            const int elementCount = 262144;
+            const int elementCount = 1024;
             const int elementExclusiveUpperBound = 1 << 30;
             for (int iteration = 0; iteration < 16; ++iteration)
             {
@@ -38,8 +38,8 @@ namespace SolverPrototypeTests
                 for (int i = 0; i < elementCount; ++i)
                 {
                     indexMap[i] = i;
-                    keys[i] = i;
-                    //keys[i] = random.Next(elementExclusiveUpperBound);
+                    //keys[i] = i;
+                    keys[i] = random.Next(elementExclusiveUpperBound);
                 }
                 var keys2 = new Array<int>(new int[elementCount]);
                 var indexMap2 = new Array<int>(new int[elementCount]);

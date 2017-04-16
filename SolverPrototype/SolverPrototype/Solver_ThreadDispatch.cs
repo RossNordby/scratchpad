@@ -110,6 +110,9 @@ namespace SolverPrototype
             public Buffer<int> StageRemainingBlocks;
             public int WorkerCompletedCount;
             public int WorkerCount;
+
+
+            public Buffer<int> StageIndices; //Used by the intermediate dispatcher.
         }
         MultithreadingParameters context;
 
