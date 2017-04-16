@@ -11,6 +11,14 @@ namespace SolverPrototype
         public Vector<float> Z;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateFrom(ref Vector3 source, out Vector3Wide broadcasted)
+        {
+            broadcasted.X = new Vector<float>(source.X);
+            broadcasted.Y = new Vector<float>(source.Y);
+            broadcasted.Z = new Vector<float>(source.Z);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GetLengthSquared(ref Vector3Wide v, out Vector<float> lengthSquared)
         {
             lengthSquared = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
@@ -65,6 +73,15 @@ namespace SolverPrototype
             result.X = -v.X;
             result.Y = -v.Y;
             result.Z = -v.Z;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static ref Vector3Wide Negate(ref Vector3Wide v)
+        {
+            v.X = -v.X;
+            v.Y = -v.Y;
+            v.Z = -v.Z;
+            return ref v;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

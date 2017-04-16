@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-
+using Quaternion = BEPUutilities2.Quaternion;
 namespace SolverPrototype.Constraints
 {
 
@@ -25,14 +25,12 @@ namespace SolverPrototype.Constraints
         //TODO: In a 'real' use case, we will likely split the description for contact manifolds into two parts: mutable contact data and initialize-once spring/friction data.
         //SpringSettings and FrictionCoefficient don't usually change over the lifetime of the constraint, so there's no reason to set them every time.
         //For now, though, we'll use this combined representation.]
-        public Vector3 Normal;
+        public Quaternion SurfaceBasis;
         public ManifoldContactDataAOS Contact0;
         public ManifoldContactDataAOS Contact1;
         public ManifoldContactDataAOS Contact2;
         public ManifoldContactDataAOS Contact3;
         public SpringSettingsAOS SpringSettings;
-        public Vector3 TangentX;
-        public Vector3 TangentY;
         public float FrictionCoefficient;
 
         public void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex, ref ContactManifold4Constraint description)
@@ -50,53 +48,46 @@ namespace SolverPrototype.Constraints
             //Note that we use an unsafe cast.
             Debug.Assert(batch is ContactManifold4TypeBatch, "The type batch passed to the description must match the description's expected type.");
             var typedBatch = Unsafe.As<ContactManifold4TypeBatch>(batch);
-            ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].Normal.X, innerIndex);
-            lane = Normal.X;
-            Unsafe.Add(ref lane, Vector<float>.Count) = Normal.Y;
-            Unsafe.Add(ref lane, 2 * Vector<float>.Count) = Normal.Z;
+            ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].SurfaceBasis.X, innerIndex);
+            lane = SurfaceBasis.X;
+            Unsafe.Add(ref lane, Vector<float>.Count) = SurfaceBasis.Y;
+            Unsafe.Add(ref lane, 2 * Vector<float>.Count) = SurfaceBasis.Z;
+            Unsafe.Add(ref lane, 3 * Vector<float>.Count) = SurfaceBasis.W;
 
-            Unsafe.Add(ref lane, 3 * Vector<float>.Count) = Contact0.OffsetA.X;
-            Unsafe.Add(ref lane, 4 * Vector<float>.Count) = Contact0.OffsetA.Y;
-            Unsafe.Add(ref lane, 5 * Vector<float>.Count) = Contact0.OffsetA.Z;
-            Unsafe.Add(ref lane, 6 * Vector<float>.Count) = Contact0.OffsetB.X;
-            Unsafe.Add(ref lane, 7 * Vector<float>.Count) = Contact0.OffsetB.Y;
-            Unsafe.Add(ref lane, 8 * Vector<float>.Count) = Contact0.OffsetB.Z;
-            Unsafe.Add(ref lane, 9 * Vector<float>.Count) = Contact0.PenetrationDepth;
-            Unsafe.Add(ref lane, 10 * Vector<float>.Count) = Contact1.OffsetA.X;
-            Unsafe.Add(ref lane, 11 * Vector<float>.Count) = Contact1.OffsetA.Y;
-            Unsafe.Add(ref lane, 12 * Vector<float>.Count) = Contact1.OffsetA.Z;
-            Unsafe.Add(ref lane, 13 * Vector<float>.Count) = Contact1.OffsetB.X;
-            Unsafe.Add(ref lane, 14 * Vector<float>.Count) = Contact1.OffsetB.Y;
-            Unsafe.Add(ref lane, 15 * Vector<float>.Count) = Contact1.OffsetB.Z;
-            Unsafe.Add(ref lane, 16 * Vector<float>.Count) = Contact1.PenetrationDepth;
-            Unsafe.Add(ref lane, 17 * Vector<float>.Count) = Contact2.OffsetA.X;
-            Unsafe.Add(ref lane, 18 * Vector<float>.Count) = Contact2.OffsetA.Y;
-            Unsafe.Add(ref lane, 19 * Vector<float>.Count) = Contact2.OffsetA.Z;
-            Unsafe.Add(ref lane, 20 * Vector<float>.Count) = Contact2.OffsetB.X;
-            Unsafe.Add(ref lane, 21 * Vector<float>.Count) = Contact2.OffsetB.Y;
-            Unsafe.Add(ref lane, 22 * Vector<float>.Count) = Contact2.OffsetB.Z;
-            Unsafe.Add(ref lane, 23 * Vector<float>.Count) = Contact2.PenetrationDepth;
-            Unsafe.Add(ref lane, 24 * Vector<float>.Count) = Contact3.OffsetA.X;
-            Unsafe.Add(ref lane, 25 * Vector<float>.Count) = Contact3.OffsetA.Y;
-            Unsafe.Add(ref lane, 26 * Vector<float>.Count) = Contact3.OffsetA.Z;
-            Unsafe.Add(ref lane, 27 * Vector<float>.Count) = Contact3.OffsetB.X;
-            Unsafe.Add(ref lane, 28 * Vector<float>.Count) = Contact3.OffsetB.Y;
-            Unsafe.Add(ref lane, 29 * Vector<float>.Count) = Contact3.OffsetB.Z;
-            Unsafe.Add(ref lane, 30 * Vector<float>.Count) = Contact3.PenetrationDepth;
+            Unsafe.Add(ref lane, 4 * Vector<float>.Count) = Contact0.OffsetA.X;
+            Unsafe.Add(ref lane, 5 * Vector<float>.Count) = Contact0.OffsetA.Y;
+            Unsafe.Add(ref lane, 6 * Vector<float>.Count) = Contact0.OffsetA.Z;
+            Unsafe.Add(ref lane, 7 * Vector<float>.Count) = Contact0.OffsetB.X;
+            Unsafe.Add(ref lane, 8 * Vector<float>.Count) = Contact0.OffsetB.Y;
+            Unsafe.Add(ref lane, 9 * Vector<float>.Count) = Contact0.OffsetB.Z;
+            Unsafe.Add(ref lane, 10 * Vector<float>.Count) = Contact0.PenetrationDepth;
+            Unsafe.Add(ref lane, 11 * Vector<float>.Count) = Contact1.OffsetA.X;
+            Unsafe.Add(ref lane, 12 * Vector<float>.Count) = Contact1.OffsetA.Y;
+            Unsafe.Add(ref lane, 13 * Vector<float>.Count) = Contact1.OffsetA.Z;
+            Unsafe.Add(ref lane, 14 * Vector<float>.Count) = Contact1.OffsetB.X;
+            Unsafe.Add(ref lane, 15 * Vector<float>.Count) = Contact1.OffsetB.Y;
+            Unsafe.Add(ref lane, 16 * Vector<float>.Count) = Contact1.OffsetB.Z;
+            Unsafe.Add(ref lane, 17 * Vector<float>.Count) = Contact1.PenetrationDepth;
+            Unsafe.Add(ref lane, 18 * Vector<float>.Count) = Contact2.OffsetA.X;
+            Unsafe.Add(ref lane, 19 * Vector<float>.Count) = Contact2.OffsetA.Y;
+            Unsafe.Add(ref lane, 20 * Vector<float>.Count) = Contact2.OffsetA.Z;
+            Unsafe.Add(ref lane, 21 * Vector<float>.Count) = Contact2.OffsetB.X;
+            Unsafe.Add(ref lane, 22 * Vector<float>.Count) = Contact2.OffsetB.Y;
+            Unsafe.Add(ref lane, 23 * Vector<float>.Count) = Contact2.OffsetB.Z;
+            Unsafe.Add(ref lane, 24 * Vector<float>.Count) = Contact2.PenetrationDepth;
+            Unsafe.Add(ref lane, 25 * Vector<float>.Count) = Contact3.OffsetA.X;
+            Unsafe.Add(ref lane, 26 * Vector<float>.Count) = Contact3.OffsetA.Y;
+            Unsafe.Add(ref lane, 27 * Vector<float>.Count) = Contact3.OffsetA.Z;
+            Unsafe.Add(ref lane, 28 * Vector<float>.Count) = Contact3.OffsetB.X;
+            Unsafe.Add(ref lane, 29 * Vector<float>.Count) = Contact3.OffsetB.Y;
+            Unsafe.Add(ref lane, 30 * Vector<float>.Count) = Contact3.OffsetB.Z;
+            Unsafe.Add(ref lane, 31 * Vector<float>.Count) = Contact3.PenetrationDepth;
 
-            Unsafe.Add(ref lane, 31 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
-            Unsafe.Add(ref lane, 32 * Vector<float>.Count) = SpringSettings.DampingRatio;
-            Unsafe.Add(ref lane, 33 * Vector<float>.Count) = SpringSettings.MaximumRecoveryVelocity;
+            Unsafe.Add(ref lane, 32 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
+            Unsafe.Add(ref lane, 33 * Vector<float>.Count) = SpringSettings.DampingRatio;
+            Unsafe.Add(ref lane, 34 * Vector<float>.Count) = SpringSettings.MaximumRecoveryVelocity;
 
-            Unsafe.Add(ref lane, 34 * Vector<float>.Count) = TangentX.X;
-            Unsafe.Add(ref lane, 35 * Vector<float>.Count) = TangentX.Y;
-            Unsafe.Add(ref lane, 36 * Vector<float>.Count) = TangentX.Z;
-
-            Unsafe.Add(ref lane, 37 * Vector<float>.Count) = TangentY.X;
-            Unsafe.Add(ref lane, 38 * Vector<float>.Count) = TangentY.Y;
-            Unsafe.Add(ref lane, 39 * Vector<float>.Count) = TangentY.Z;
-
-            Unsafe.Add(ref lane, 40 * Vector<float>.Count) = FrictionCoefficient;
+            Unsafe.Add(ref lane, 35 * Vector<float>.Count) = FrictionCoefficient;
 
         }
 
@@ -105,53 +96,46 @@ namespace SolverPrototype.Constraints
         {
             Debug.Assert(batch is ContactManifold4TypeBatch, "The type batch passed to the description must match the description's expected type.");
             var typedBatch = Unsafe.As<ContactManifold4TypeBatch>(batch);
-            ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].Normal.X, innerIndex);
-            description.Normal.X = lane;
-            description.Normal.Y = Unsafe.Add(ref lane, Vector<float>.Count);
-            description.Normal.Z = Unsafe.Add(ref lane, 2 * Vector<float>.Count);
+            ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].SurfaceBasis.X, innerIndex);
+            description.SurfaceBasis.X = lane;
+            description.SurfaceBasis.Y = Unsafe.Add(ref lane, Vector<float>.Count);
+            description.SurfaceBasis.Z = Unsafe.Add(ref lane, 2 * Vector<float>.Count);
+            description.SurfaceBasis.W = Unsafe.Add(ref lane, 3 * Vector<float>.Count);
 
-            description.Contact0.OffsetA.X = Unsafe.Add(ref lane, 3 * Vector<float>.Count);
-            description.Contact0.OffsetA.Y = Unsafe.Add(ref lane, 4 * Vector<float>.Count);
-            description.Contact0.OffsetA.Z = Unsafe.Add(ref lane, 5 * Vector<float>.Count);
-            description.Contact0.OffsetB.X = Unsafe.Add(ref lane, 6 * Vector<float>.Count);
-            description.Contact0.OffsetB.Y = Unsafe.Add(ref lane, 7 * Vector<float>.Count);
-            description.Contact0.OffsetB.Z = Unsafe.Add(ref lane, 8 * Vector<float>.Count);
-            description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 9 * Vector<float>.Count);
-            description.Contact1.OffsetA.X = Unsafe.Add(ref lane, 10 * Vector<float>.Count);
-            description.Contact1.OffsetA.Y = Unsafe.Add(ref lane, 11 * Vector<float>.Count);
-            description.Contact1.OffsetA.Z = Unsafe.Add(ref lane, 12 * Vector<float>.Count);
-            description.Contact1.OffsetB.X = Unsafe.Add(ref lane, 13 * Vector<float>.Count);
-            description.Contact1.OffsetB.Y = Unsafe.Add(ref lane, 14 * Vector<float>.Count);
-            description.Contact1.OffsetB.Z = Unsafe.Add(ref lane, 15 * Vector<float>.Count);
-            description.Contact1.PenetrationDepth = Unsafe.Add(ref lane, 16 * Vector<float>.Count);
-            description.Contact2.OffsetA.X = Unsafe.Add(ref lane, 17 * Vector<float>.Count);
-            description.Contact2.OffsetA.Y = Unsafe.Add(ref lane, 18 * Vector<float>.Count);
-            description.Contact2.OffsetA.Z = Unsafe.Add(ref lane, 19 * Vector<float>.Count);
-            description.Contact2.OffsetB.X = Unsafe.Add(ref lane, 20 * Vector<float>.Count);
-            description.Contact2.OffsetB.Y = Unsafe.Add(ref lane, 21 * Vector<float>.Count);
-            description.Contact2.OffsetB.Z = Unsafe.Add(ref lane, 22 * Vector<float>.Count);
-            description.Contact2.PenetrationDepth = Unsafe.Add(ref lane, 23 * Vector<float>.Count);
-            description.Contact3.OffsetA.X = Unsafe.Add(ref lane, 24 * Vector<float>.Count);
-            description.Contact3.OffsetA.Y = Unsafe.Add(ref lane, 25 * Vector<float>.Count);
-            description.Contact3.OffsetA.Z = Unsafe.Add(ref lane, 26 * Vector<float>.Count);
-            description.Contact3.OffsetB.X = Unsafe.Add(ref lane, 27 * Vector<float>.Count);
-            description.Contact3.OffsetB.Z = Unsafe.Add(ref lane, 29 * Vector<float>.Count);
-            description.Contact3.OffsetB.Y = Unsafe.Add(ref lane, 28 * Vector<float>.Count);
-            description.Contact3.PenetrationDepth = Unsafe.Add(ref lane, 30 * Vector<float>.Count);
+            description.Contact0.OffsetA.X = Unsafe.Add(ref lane, 4 * Vector<float>.Count);
+            description.Contact0.OffsetA.Y = Unsafe.Add(ref lane, 5 * Vector<float>.Count);
+            description.Contact0.OffsetA.Z = Unsafe.Add(ref lane, 6 * Vector<float>.Count);
+            description.Contact0.OffsetB.X = Unsafe.Add(ref lane, 7 * Vector<float>.Count);
+            description.Contact0.OffsetB.Y = Unsafe.Add(ref lane, 8 * Vector<float>.Count);
+            description.Contact0.OffsetB.Z = Unsafe.Add(ref lane, 9 * Vector<float>.Count);
+            description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 10 * Vector<float>.Count);
+            description.Contact1.OffsetA.X = Unsafe.Add(ref lane, 11 * Vector<float>.Count);
+            description.Contact1.OffsetA.Y = Unsafe.Add(ref lane, 12 * Vector<float>.Count);
+            description.Contact1.OffsetA.Z = Unsafe.Add(ref lane, 13 * Vector<float>.Count);
+            description.Contact1.OffsetB.X = Unsafe.Add(ref lane, 14 * Vector<float>.Count);
+            description.Contact1.OffsetB.Y = Unsafe.Add(ref lane, 15 * Vector<float>.Count);
+            description.Contact1.OffsetB.Z = Unsafe.Add(ref lane, 16 * Vector<float>.Count);
+            description.Contact1.PenetrationDepth = Unsafe.Add(ref lane, 17 * Vector<float>.Count);
+            description.Contact2.OffsetA.X = Unsafe.Add(ref lane, 18 * Vector<float>.Count);
+            description.Contact2.OffsetA.Y = Unsafe.Add(ref lane, 19 * Vector<float>.Count);
+            description.Contact2.OffsetA.Z = Unsafe.Add(ref lane, 20 * Vector<float>.Count);
+            description.Contact2.OffsetB.X = Unsafe.Add(ref lane, 21 * Vector<float>.Count);
+            description.Contact2.OffsetB.Y = Unsafe.Add(ref lane, 22 * Vector<float>.Count);
+            description.Contact2.OffsetB.Z = Unsafe.Add(ref lane, 23 * Vector<float>.Count);
+            description.Contact2.PenetrationDepth = Unsafe.Add(ref lane, 24 * Vector<float>.Count);
+            description.Contact3.OffsetA.X = Unsafe.Add(ref lane, 25 * Vector<float>.Count);
+            description.Contact3.OffsetA.Y = Unsafe.Add(ref lane, 26 * Vector<float>.Count);
+            description.Contact3.OffsetA.Z = Unsafe.Add(ref lane, 27 * Vector<float>.Count);
+            description.Contact3.OffsetB.X = Unsafe.Add(ref lane, 28 * Vector<float>.Count);
+            description.Contact3.OffsetB.Y = Unsafe.Add(ref lane, 29 * Vector<float>.Count);
+            description.Contact3.OffsetB.Z = Unsafe.Add(ref lane, 30 * Vector<float>.Count);
+            description.Contact3.PenetrationDepth = Unsafe.Add(ref lane, 31 * Vector<float>.Count);
 
-            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 31 * Vector<float>.Count);
-            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 32 * Vector<float>.Count);
-            description.SpringSettings.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 33 * Vector<float>.Count);
+            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 32 * Vector<float>.Count);
+            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 33 * Vector<float>.Count);
+            description.SpringSettings.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 34 * Vector<float>.Count);
 
-            description.TangentX.X = Unsafe.Add(ref lane, 34 * Vector<float>.Count);
-            description.TangentX.Y = Unsafe.Add(ref lane, 35 * Vector<float>.Count);
-            description.TangentX.Z = Unsafe.Add(ref lane, 36 * Vector<float>.Count);
-
-            description.TangentY.X = Unsafe.Add(ref lane, 37 * Vector<float>.Count);
-            description.TangentY.Y = Unsafe.Add(ref lane, 38 * Vector<float>.Count);
-            description.TangentY.Z = Unsafe.Add(ref lane, 39 * Vector<float>.Count);
-
-            description.FrictionCoefficient = Unsafe.Add(ref lane, 40 * Vector<float>.Count);
+            description.FrictionCoefficient = Unsafe.Add(ref lane, 35 * Vector<float>.Count);
 
         }
 

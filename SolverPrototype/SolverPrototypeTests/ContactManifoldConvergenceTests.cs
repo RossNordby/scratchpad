@@ -82,8 +82,8 @@ namespace SolverPrototypeTests
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 8;
-            const int frameCount = 32;
+            const int iterationCount = 32;
+            const int frameCount = 256;
             simulation.Solver.IterationCount = iterationCount;
 
 
@@ -122,9 +122,9 @@ namespace SolverPrototypeTests
                     GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
                     GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
 
-                    //if (i == 0)
-                    //if (penetrationDepth > 0.2)
-                    //Console.WriteLine($"manifold[{i}] penetration: {penetrationDepth}, velocityA: {velocityA}, velocityB: {velocityB}");
+                    if (i == 0)
+                        //if (penetrationDepth > 0.2)
+                        Console.WriteLine($"manifold[{i}] penetration: {penetrationDepth}, velocityA: {velocityA}, velocityB: {velocityB}");
 
                 }
                 //for (int i = 0; i < bodyHandles.Length; ++i)
@@ -156,7 +156,7 @@ namespace SolverPrototypeTests
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");
-                //Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
+                Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
             Console.WriteLine($"Time (ms): {(1e3 * timer.Elapsed.TotalSeconds)}");

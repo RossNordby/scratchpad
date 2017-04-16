@@ -8,11 +8,9 @@ namespace SolverPrototype.Constraints
 
     public struct TwistFrictionProjection
     {
-        public Vector3Wide WSVtoCSIAngularA;
-        public Vector3Wide WSVtoCSIAngularB;
-        public Vector3Wide CSIToWSVAngularA;
-        public Vector3Wide CSIToWSVAngularB;
-    }    
+        //Jacobians and inertia are shared with other constraints.
+        public Vector<float> EffectiveMass;
+    }
 
     /// <summary>
     /// Handles the tangent friction implementation.
@@ -23,13 +21,12 @@ namespace SolverPrototype.Constraints
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide angularJacobianA,
             out TwistFrictionProjection projection)
         {
-
             //Compute effective mass matrix contributions. No linear contributions for the twist constraint.
-            Matrix3x3Wide.Transform(ref angularJacobianA, ref inertiaA.InverseInertiaTensor, out projection.CSIToWSVAngularA);
-            Vector3Wide.Negate(ref angularJacobianA, out var angularJacobianB);
-            Matrix3x3Wide.Transform(ref angularJacobianB, ref inertiaB.InverseInertiaTensor, out projection.CSIToWSVAngularB);
-            Vector3Wide.Dot(ref projection.CSIToWSVAngularA, ref angularJacobianA, out var angularA);
-            Vector3Wide.Dot(ref projection.CSIToWSVAngularB, ref angularJacobianB, out var angularB);
+            //Note that we use the angularJacobianA (that is, the normal) for both, despite angularJacobianB = -angularJacobianA. That's fine- J * M * JT is going to be positive regardless.
+            Matrix3x3Wide.Transform(ref angularJacobianA, ref inertiaA.InverseInertiaTensor, out var aIntermediate);
+            Matrix3x3Wide.Transform(ref angularJacobianA, ref inertiaB.InverseInertiaTensor, out var bIntermediate);
+            Vector3Wide.Dot(ref aIntermediate, ref angularJacobianA, out var angularA);
+            Vector3Wide.Dot(ref bIntermediate, ref angularJacobianA, out var angularB);
 
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
             //Note that we have to guard against two bodies with infinite inertias. This is a valid state! 
@@ -38,42 +35,42 @@ namespace SolverPrototype.Constraints
             //Invalid conditions can't arise dynamically.)
             var inverseEffectiveMass = angularA + angularB;
             var inverseIsZero = Vector.Equals(Vector<float>.Zero, inverseEffectiveMass);
-            var effectiveMass = Vector.ConditionalSelect(inverseIsZero, Vector<float>.Zero, Vector<float>.One / (angularA + angularB));
-                
+            projection.EffectiveMass = Vector.ConditionalSelect(inverseIsZero, Vector<float>.Zero, Vector<float>.One / (angularA + angularB));
+
             //Note that friction constraints have no bias velocity. They target zero velocity.
 
-            //Finally, compute the (transposed) transform for constraint space impulse to world space.
-            Vector3Wide.Scale(ref angularJacobianA, ref effectiveMass, out projection.WSVtoCSIAngularA);
-            Vector3Wide.Scale(ref angularJacobianB, ref effectiveMass, out projection.WSVtoCSIAngularB);
 
         }
 
         /// <summary>
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
-        public static void ApplyImpulse(ref TwistFrictionProjection data, ref Vector<float> correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ApplyImpulse(ref Vector3Wide angularJacobianA, ref BodyInertias inertiaA, ref BodyInertias inertiaB,
+            ref Vector<float> correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            Vector3Wide.Scale(ref data.CSIToWSVAngularA, ref correctiveImpulse, out var correctiveVelocityA);
-            Vector3Wide.Scale(ref data.CSIToWSVAngularB, ref correctiveImpulse, out var correctiveVelocityB);
-            Vector3Wide.Add(ref correctiveVelocityA, ref wsvA.AngularVelocity, out wsvA.AngularVelocity);
-            Vector3Wide.Add(ref correctiveVelocityB, ref wsvB.AngularVelocity, out wsvB.AngularVelocity);
+            Vector3Wide.Scale(ref angularJacobianA, ref correctiveImpulse, out var worldCorrectiveImpulseA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref worldCorrectiveImpulseA, ref inertiaA.InverseInertiaTensor, out var worldCorrectiveVelocityA);
+            Matrix3x3Wide.TransformWithoutOverlap(ref worldCorrectiveImpulseA, ref inertiaB.InverseInertiaTensor, out var worldCorrectiveVelocityB);
+            Vector3Wide.Add(ref wsvA.AngularVelocity, ref worldCorrectiveVelocityA, out wsvA.AngularVelocity);
+            Vector3Wide.Subtract(ref wsvB.AngularVelocity, ref worldCorrectiveVelocityB, out wsvB.AngularVelocity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WarmStart(ref TwistFrictionProjection data, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void WarmStart(ref Vector3Wide angularJacobianA, ref BodyInertias inertiaA, ref BodyInertias inertiaB,
+            ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            //TODO: If the previous frame and current frame are associated with different time steps, the previous frame's solution won't be a good solution anymore.
-            //To compensate for this, the accumulated impulse should be scaled if dt changes.
-            ApplyImpulse(ref data, ref accumulatedImpulse, ref wsvA, ref wsvB);
+            ApplyImpulse(ref angularJacobianA, ref inertiaA, ref inertiaB, ref accumulatedImpulse, ref wsvA, ref wsvB);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref TwistFrictionProjection data, ref Vector<float> maximumImpulse,
+        public static void ComputeCorrectiveImpulse(ref Vector3Wide angularJacobianA, ref TwistFrictionProjection projection, 
+            ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Vector<float> maximumImpulse,
             ref Vector<float> accumulatedImpulse, out Vector<float> correctiveCSI)
         {
-            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref data.WSVtoCSIAngularA, out var csia);
-            Vector3Wide.Dot(ref wsvB.AngularVelocity, ref data.WSVtoCSIAngularB, out var csib);
-            var negativeCSI = csia + csib; //Since there is no bias or softness to give us the negative, we just do it when we apply to the accumulated impulse.
+            Vector3Wide.Dot(ref wsvA.AngularVelocity, ref angularJacobianA, out var csvA);
+            Vector3Wide.Dot(ref wsvB.AngularVelocity, ref angularJacobianA, out var negatedCSVB);
+            var negativeCSI = (csvA + negatedCSVB) * projection.EffectiveMass; //Since there is no bias or softness to give us the negative, we just do it when we apply to the accumulated impulse.
 
             var previousAccumulated = accumulatedImpulse;
             //The maximum force of friction depends upon the normal impulse.
@@ -84,10 +81,11 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref TwistFrictionProjection projection, ref Vector<float> maximumImpulse, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Solve(ref Vector3Wide angularJacobianA, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwistFrictionProjection projection, 
+            ref Vector<float> maximumImpulse, ref Vector<float> accumulatedImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
-            ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref projection, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);
-            ApplyImpulse(ref projection, ref correctiveCSI, ref wsvA, ref wsvB);
+            ComputeCorrectiveImpulse(ref angularJacobianA, ref projection, ref wsvA, ref wsvB, ref maximumImpulse, ref accumulatedImpulse, out var correctiveCSI);
+            ApplyImpulse(ref angularJacobianA, ref inertiaA, ref inertiaB, ref correctiveCSI, ref wsvA, ref wsvB);
 
         }
 

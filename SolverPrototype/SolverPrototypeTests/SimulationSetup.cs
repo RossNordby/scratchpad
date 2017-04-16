@@ -8,16 +8,17 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
+using Quaternion = BEPUutilities2.Quaternion;
+
 namespace SolverPrototypeTests
 {
     static class SimulationSetup
     {
-        static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Simulation simulation, ref Vector3 right, ref Vector3 up, ref Vector3 forward)
+        static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Simulation simulation, ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ)
         {
             var description = new ContactManifold4Constraint
             {
                 //By convention, normal faces from B to A.
-                Normal = -up,
                 SpringSettings = new SpringSettingsAOS
                 {
                     NaturalFrequency = (float)(Math.PI * 2 * 60),
@@ -25,9 +26,13 @@ namespace SolverPrototypeTests
                     MaximumRecoveryVelocity = 1f
                 },
                 FrictionCoefficient = 1,
-                TangentX = right,
-                TangentY = forward,
             };
+            Matrix3x3 basisMatrix;
+            basisMatrix.X = unitX;
+            basisMatrix.Y = -unitY;
+            basisMatrix.Z = -unitZ;
+            Debug.Assert(basisMatrix.Determinant() == 1);
+            Quaternion.CreateFromRotationMatrix(ref basisMatrix, out description.SurfaceBasis);
 
             for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
             {
@@ -37,8 +42,8 @@ namespace SolverPrototypeTests
                 var z = ((contactIndex & 2) >> 1) - 0.5f;
                 var localOffsetA = new Vector3(x, 0.5f, z);
                 var localOffsetB = new Vector3(x, -0.5f, z);
-                var worldOffsetA = localOffsetA.X * right + localOffsetA.Y * up + localOffsetA.Z * forward;
-                var worldOffsetB = localOffsetB.X * right + localOffsetB.Y * up + localOffsetB.Z * forward;
+                var worldOffsetA = localOffsetA.X * unitX + localOffsetA.Y * unitY + localOffsetA.Z * unitZ;
+                var worldOffsetB = localOffsetB.X * unitX + localOffsetB.Y * unitY + localOffsetB.Z * unitZ;
                 contact.OffsetA = worldOffsetA;
                 contact.OffsetB = worldOffsetB;
                 contact.PenetrationDepth = 0.00f;
@@ -162,9 +167,9 @@ namespace SolverPrototypeTests
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
 
 
-            var right = new Vector3(1, 0, 0);
-            var up = new Vector3(0, 1, 0);
-            var forward = new Vector3(0, 0, -1);
+            var unitX = new Vector3(1, 0, 0);
+            var unitY = new Vector3(0, 1, 0);
+            var unitZ = new Vector3(0, 0, 1);
             //Note super lazy count initialization. Since we do some wonky stuff with the base we'll just resize later.
             constraintHandles = new int[width * height * length * 3];
             int constraintIndex = 0;
@@ -180,14 +185,14 @@ namespace SolverPrototypeTests
                         if (columnIndex > 0)
                         {
                             var previousColumnId = ToId(columnIndex - 1, rowIndex, sliceIndex);
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousColumnId], bodyHandles[bodyAIndex], simulation, ref forward, ref right, ref up);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousColumnId], bodyHandles[bodyAIndex], simulation, ref unitZ, ref unitX, ref unitY);
                         }
                         var previousRowId = ToId(columnIndex, rowIndex - 1, sliceIndex);
-                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousRowId], bodyHandles[bodyAIndex], simulation, ref right, ref up, ref forward);
+                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousRowId], bodyHandles[bodyAIndex], simulation, ref unitX, ref unitY, ref unitZ);
                         if (sliceIndex > 0)
                         {
                             var previousSliceId = ToId(columnIndex, rowIndex, sliceIndex - 1);
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousSliceId], bodyHandles[bodyAIndex], simulation, ref right, ref forward, ref up);
+                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousSliceId], bodyHandles[bodyAIndex], simulation, ref unitY, ref unitZ, ref unitX);
                         }
 
 

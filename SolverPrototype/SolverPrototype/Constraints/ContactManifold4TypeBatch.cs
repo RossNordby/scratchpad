@@ -16,20 +16,21 @@ namespace SolverPrototype.Constraints
         //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.
         //If you modify this layout, be sure to update the associated ContactManifold4Constraint.
         //In a convex manifold, all contacts share the same normal.
-        public Vector3Wide Normal;
+        public QuaternionWide SurfaceBasis;
         public ManifoldContactData Contact0;
         public ManifoldContactData Contact1;
         public ManifoldContactData Contact2;
         public ManifoldContactData Contact3;
         //All contacts also share the spring settings.
         public SpringSettings SpringSettings;
-        public Vector3Wide TangentX;
-        public Vector3Wide TangentY;
         public Vector<float> FrictionCoefficient;
     }
 
     public struct ContactManifold4AccumulatedImpulses
     {
+        //TODO: For obscure reasons I have not yet cared to look into,
+        //something about the fact that these values are not in the same order as the order in which they are used is critical for performance.
+        //Trying to order them consistently results in a 15% perf hit. There is likely some weird codegen going on.
         public Vector<float> Twist;
         public Vector2Wide Tangent;
         public Vector<float> Penetration0;
@@ -52,15 +53,15 @@ namespace SolverPrototype.Constraints
         public BodyInertias InertiaA;
         public BodyInertias InertiaB;
         public Vector<float> PremultipliedFrictionCoefficient;
-        public Vector3Wide Normal;
-        public TangentFrictionProjectionCompressed Tangent;
-        public ContactPenetrationLimit4ProjectionCompressed Penetration;
+        public QuaternionWide SurfaceBasis;
+        public TangentFrictionProjection Tangent;
+        public ContactPenetrationLimit4Projection Penetration;
         //Lever arms aren't included in the twist projection because the number of arms required varies independently of the twist projection itself.
         public Vector<float> LeverArm0;
         public Vector<float> LeverArm1;
         public Vector<float> LeverArm2;
         public Vector<float> LeverArm3;
-        public TwistFrictionProjectionCompressed Twist;
+        public TwistFrictionProjection Twist;
     }
 
     /// <summary>
@@ -77,23 +78,21 @@ namespace SolverPrototype.Constraints
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 //Some speculative compression options not (yet) pursued:
-                //1) Store the normal+basis compressed as a 32 bit quaternion. (We don't have sufficient SIMD bitfiddling instructions available to make this reasonable.)
-                //Compared to storing two full precision axes, it would save 5 floats per constraint. A single full precision quaternion is more doable and saves 2 floats per constraint.
-                //We could drop one float and reconstruct with a normalize.
-                //Quaternion->basis isn't supercheap (~24 ops), but saving 2 floats per constraint would reduce bundle size by 64 bytes on 256 bit SIMD.
-                //When bandwidth constrained, 24 high throughput ops (add/mul) with good ILP could easily complete faster than loading 64 bytes. At a 6700K's peak bandwidth,
-                //loading 64 bytes would take 8 cycles. In 8 cycles it could do 16 MULSS. Even if it doesn't turn out to be a great thing for a single thread, consider
-                //multiple threads- where even 128 bit wide SIMD can easily hit bandwidth bottlenecks. And now think about the AVX512-including future.
-                //(Note that the 2-axis requires reconstructing a tangent, which costs 6 mul and 3 sub anyway. If you loaded a full 3 axis basis, the difference is
-                //5 floats- 160 bytes for 256 bit SIMD, which is enough time for 40 MULSS.)
+                //1) Store the surface basis in a compressed fashion. It could be stored within 32 bits by using standard compression schemes, but we lack the necessary
+                //instructions to properly SIMDify the decode operation (e.g. shift). Even with the potential savings of 3 floats (relative to uncompressed storage), it would be questionable.
+                //We could drop one of the four components of the quaternion and reconstruct it relatively easily- that would just require that the encoder ensures the W component is positive.
+                //It would require a square root, but it might still be a net win. On an IVB, sqrt has a 7 cycle throughput. 4 bytes saved * 4 lanes = 16 bytes, which takes 
+                //about 16 / 5.5GBps = 2.9ns, where 5.5 is roughly the per-core bandwidth on a 3770K. 7 cycles is only 2ns at 3.5ghz. 
+                //There are a couple of other instructions necessary to decode, but sqrt is by far the heaviest; it's likely a net win.
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
 
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
-                projection.Normal = prestep.Normal;
-                ContactPenetrationLimit4Compressed.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep, dt, inverseDt, out projection.Penetration);
-                TwistFrictionCompressed.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, out projection.Twist);
+                projection.SurfaceBasis = prestep.SurfaceBasis;
+                Matrix3x3Wide.CreateFromQuaternion(ref prestep.SurfaceBasis, out var surfaceBasis);
+                ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, inverseDt, out projection.Penetration);
+                TwistFriction.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, out projection.Twist);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetA, ref prestep.Contact1.OffsetA, out var a01);
                 Vector3Wide.Add(ref prestep.Contact2.OffsetA, ref prestep.Contact3.OffsetA, out var a23);
                 Vector3Wide.Add(ref prestep.Contact0.OffsetB, ref prestep.Contact1.OffsetB, out var b01);
@@ -109,7 +108,7 @@ namespace SolverPrototype.Constraints
                 Vector3Wide.Distance(ref prestep.Contact2.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm2);
                 Vector3Wide.Distance(ref prestep.Contact3.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm3);
                 projection.PremultipliedFrictionCoefficient = scale * prestep.FrictionCoefficient;
-                TangentFrictionCompressed.Prestep(ref prestep.Normal, ref prestep.TangentX, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
+                TangentFriction.Prestep(ref surfaceBasis.X, ref surfaceBasis.Z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
             }
         }
         public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
@@ -123,14 +122,15 @@ namespace SolverPrototype.Constraints
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                TangentFrictionCompressed.WarmStart(ref projection.Normal, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
-                ContactPenetrationLimit4Compressed.WarmStart(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB,
-                    ref projection.Normal,
+                Matrix3x3Wide.CreateFromQuaternion(ref projection.SurfaceBasis, out var surfaceBasis);
+                TangentFriction.WarmStart(ref surfaceBasis.X, ref surfaceBasis.Z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                ContactPenetrationLimit4.WarmStart(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB,
+                    ref surfaceBasis.Y,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
                     ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
-                TwistFrictionCompressed.WarmStart(ref projection.Normal, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TwistFriction.WarmStart(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
@@ -147,13 +147,14 @@ namespace SolverPrototype.Constraints
 
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
 
+                Matrix3x3Wide.CreateFromQuaternion(ref projection.SurfaceBasis, out var surfaceBasis);
                 var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
-                TangentFrictionCompressed.Solve(ref projection.Normal, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref maximumTangentImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TangentFriction.Solve(ref surfaceBasis.X, ref surfaceBasis.Z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref maximumTangentImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
-                ContactPenetrationLimit4Compressed.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref projection.Normal,
+                ContactPenetrationLimit4.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
@@ -164,7 +165,7 @@ namespace SolverPrototype.Constraints
                     accumulatedImpulses.Penetration1 * projection.LeverArm1 +
                     accumulatedImpulses.Penetration2 * projection.LeverArm2 +
                     accumulatedImpulses.Penetration3 * projection.LeverArm3);
-                TwistFrictionCompressed.Solve(ref projection.Normal, ref projection.InertiaA, ref projection.InertiaB, ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TwistFriction.Solve(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }

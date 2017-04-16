@@ -1,6 +1,8 @@
 ﻿using SolverPrototype;
+using SolverPrototype.Constraints;
 using System;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace SolverPrototypeTests
 {
