@@ -92,6 +92,7 @@ namespace SolverPrototype
         {
             //generics yay
             public QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>> BlocksOwnedInBatches;
+            public int ClaimedCount;
         }
 
         //Just bundling these up to avoid polluting the this. intellisense.
@@ -167,7 +168,7 @@ namespace SolverPrototype
             }
         }
 
-        public void MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
+        public double MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
             context.Dt = dt;
@@ -337,9 +338,10 @@ namespace SolverPrototype
 
             //You could be more aggressive with this batch count test. It doesn't matter much, though. Zero batches isn't a case worth introducing complexity for.
             //This just stops the dispatch from going through because the multithreaded worker relies upon there being batches.
+            var startStamp = Stopwatch.GetTimestamp();
             if (batchCount > 0)
                 threadPool.ForLoop(0, workerCount, Work);
-
+            var stopStamp = Stopwatch.GetTimestamp();
             //for (int i = 0; i < workerCount; ++i)
             //{
             //    var totalOwnedBlocks = 0;
@@ -393,6 +395,8 @@ namespace SolverPrototype
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
             bufferPool.SpecializeFor<int>().Return(ref context.StageRemainingBlocks);
             context.WorkerCompletedCount = 0;
+
+            return (stopStamp - startStamp) / (double)Stopwatch.Frequency;
         }
 
 
@@ -436,11 +440,13 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool TryExecuteBlock<TBlockFunction>(ref TBlockFunction function, int slot, int claimedState, int clearedState, ref int remainingBlocks)
+        bool TryExecuteBlock<TBlockFunction>(ref TBlockFunction function, int slot, int claimedState, int clearedState, ref int workerClaimedCount, ref int remainingBlocks)
             where TBlockFunction : IBlockFunction
         {
             if (Interlocked.CompareExchange(ref context.BlockClaims[slot], claimedState, clearedState) == clearedState)
             {
+                //This increment does not need to be atomic. Other threads may read it (and may get a stale result), but that's fine.
+                ++workerClaimedCount;
                 //This worker now owns the slot; we can freely execute it.
                 ref var block = ref context.WorkBlocks[slot];
                 function.ExecuteBlock(Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex], block.StartBundle, block.End);
@@ -478,27 +484,68 @@ namespace SolverPrototype
         }
 
 
-        void WorkStealAndSync<TBlockFunction, TOnStealSuccessFunction>(ref TBlockFunction blockFunction, ref QuickList<int, Buffer<int>> ownedBlocks,
-           int blocksStart, int exclusiveBlocksEnd,
+        void WorkStealAndSync<TBlockFunction, TOnStealSuccessFunction>(ref TBlockFunction blockFunction, int workerIndex, int batchIndexStart, int batchIndexInclusiveEnd,
+            ref QuickList<int, Buffer<int>> ownedBlocks, int blocksStart, int exclusiveBlocksEnd,
            ref int syncStageIndex, ref int claimedState, ref int clearedState, ref int remainingBlocks)
            where TBlockFunction : IBlockFunction
            where TOnStealSuccessFunction : IOnStealFunction
         {
             //We're out of our allocated blocks. Could we steal any?
+            ref var workerClaimedCount = ref context.Workers[workerIndex].ClaimedCount;
             if (Volatile.Read(ref remainingBlocks) > 0)
             {
-                //Start trying to steal at the index just before the owned batch blob. Scan backwards.
-                //Starting at the end and working backwards increases the probability that an unclaimed block can be found.
-                int stealSlot = ownedBlocks.Count > 0 ? ownedBlocks[0] - 1 : -1;
-                if (stealSlot < blocksStart)
-                    stealSlot = exclusiveBlocksEnd - 1;
-                while (Volatile.Read(ref remainingBlocks) > 0)
+                ////Start trying to steal at the index just before the owned batch blob. Scan backwards.
+                ////Starting at the end and working backwards increases the probability that an unclaimed block can be found.
+                //int stealSlot = ownedBlocks.Count > 0 ? ownedBlocks[0] - 1 : -1;
+                //if (stealSlot < blocksStart)
+                //    stealSlot = exclusiveBlocksEnd - 1;
+                //while (Volatile.Read(ref remainingBlocks) > 0)
+                //{
+                //    stealSlot = stealSlot == blocksStart ? exclusiveBlocksEnd - 1 : stealSlot - 1;
+                //    if (TryExecuteBlock(ref blockFunction, stealSlot, claimedState, clearedState, ref workerClaimedCount, ref remainingBlocks))
+                //    {
+                //        default(TOnStealSuccessFunction).OnSteal(ref ownedBlocks, stealSlot);
+                //    }
+                //}
+
+                //Note that we start at the previous worker to increase the probability that the stolen blocks will be contiguous. That helps with later iterations.
+                var victimWorkerIndex = workerIndex - 1;
+                var workersVisitedWithNoJobsRemaining = 1; //The local worker has no jobs remaining!
+                while (true)
                 {
-                    stealSlot = stealSlot == blocksStart ? exclusiveBlocksEnd - 1 : stealSlot - 1;
-                    if (TryExecuteBlock(ref blockFunction, stealSlot, claimedState, clearedState, ref remainingBlocks))
+                    if (victimWorkerIndex < 0)
+                        victimWorkerIndex += context.Workers.Count;
+                    ref var victim = ref context.Workers[victimWorkerIndex];
+
+                    //Start at the opposite end from the owning worker to avoid high probability conflicts.
+                    for (int batchIndex = batchIndexStart; batchIndex <= batchIndexInclusiveEnd && Volatile.Read(ref remainingBlocks) >= 0; ++batchIndex)
                     {
-                        default(TOnStealSuccessFunction).OnSteal(ref ownedBlocks, stealSlot);
+                        ref var victimOwnedBlocks = ref victim.BlocksOwnedInBatches[batchIndex];
+                        unsafe
+                        {
+                            if (victim.BlocksOwnedInBatches.Span.Length == 0)
+                                throw new Exception("Custom wgn32");
+                            if (victimOwnedBlocks.Span.Memory == null)
+                                throw new Exception("Custom wgn");
+                        }
+                        for (int i = victimOwnedBlocks.Count - 1; i >= Volatile.Read(ref victim.ClaimedCount) && Volatile.Read(ref remainingBlocks) >= 0; --i)
+                        {
+                            //It's possible that this block is not yet taken by the victim.
+
+                            var stealSlot = victimOwnedBlocks.Span[i];
+                            if (TryExecuteBlock(ref blockFunction, stealSlot, claimedState, clearedState, ref workerClaimedCount, ref remainingBlocks))
+                            {
+                                default(TOnStealSuccessFunction).OnSteal(ref ownedBlocks, stealSlot);
+                            }
+                        }
                     }
+                    //No more jobs available from this victim.
+                    if (++workersVisitedWithNoJobsRemaining == context.Workers.Count)
+                    {
+                        //No more jobs exist. We're done workstealing.
+                        break;
+                    }
+                    --victimWorkerIndex;
                 }
             }
 
@@ -507,6 +554,9 @@ namespace SolverPrototype
             ++syncStageIndex;
             var neededCompletionCount = context.WorkerCount * syncStageIndex;
             Spin(neededCompletionCount);
+
+            //Reset the claimed count for the next stage.
+            workerClaimedCount = 0;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -514,10 +564,24 @@ namespace SolverPrototype
         {
             if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
             {
-                //var wait = new SpinWait();
+                var wait = new SpinWait();
                 while (Volatile.Read(ref context.WorkerCompletedCount) < neededCompletionCount)
                 {
-                    //wait.SpinOnce();
+                    //We know that the wait is going to be short by design. Any call to Thread.Sleep(0) or, much worse, Thread.Sleep(1) would be a terrible mistake-
+                    //both will introduce heavy context switches and potentially evict the cache. 
+                    //We want to stick primarily to Thread.SpinWaits with the occasional fallback Thread.Yield. Thread.Yield only surrenders control to a thread
+                    //that's on the same processor, so we don't have the same risk of evicting the cache.
+                    //So, we reset the wait after every yield.
+                    //(We could be a little more direct with access to Thread.SpinWait and Thread.Yield, but those aren't public in .NET Standard 1.4.
+                    //We could require the user to provide a SpinWait and Yield implementation within the IThreadPool or something, but not every user's target platform will
+                    //support direct access either...)
+
+                    //(The SpinWait has a very simple internal structure. You could technically just fiddle with the internal count to force a spin wait of the desired length
+                    //or a yield. But we don't really want to take a dependency on the internal memory representation of types that aren't under our control if we can avoid it.)
+                    var shouldReset = wait.NextSpinWillYield;
+                    wait.SpinOnce();
+                    if (shouldReset)
+                        wait.Reset();
                 }
             }
         }
@@ -549,13 +613,13 @@ namespace SolverPrototype
                     ref var ownedBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
                     for (int ownedIndex = 0; ownedIndex < ownedBlocks.Count && Volatile.Read(ref remainingBlocks) > 0; ++ownedIndex)
                     {
-                        TryExecuteBlock(ref prestepFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref remainingBlocks);
+                        TryExecuteBlock(ref prestepFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref worker.ClaimedCount, ref remainingBlocks);
                     }
                 }
                 //By this point, the worker has executed (or attempted to execute) every one of their allocated work blocks. Due to differences in the difficulty of different blocks,
                 //some workers may still not be done. This thread should try to help out with workstealing.
 
-                WorkStealAndSync<PrestepFunction, DoNothingOnSteal>(ref prestepFunction, ref worker.BlocksOwnedInBatches[worker.BlocksOwnedInBatches.Count - 1],
+                WorkStealAndSync<PrestepFunction, DoNothingOnSteal>(ref prestepFunction, workerIndex, 0, Batches.Count - 1, ref worker.BlocksOwnedInBatches[worker.BlocksOwnedInBatches.Count - 1],
                     0, context.WorkBlocks.Count, ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
 
             }
@@ -581,10 +645,10 @@ namespace SolverPrototype
                 ref var ownedBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
                 for (int ownedIndex = 0; ownedIndex < ownedBlocks.Count && Volatile.Read(ref remainingBlocks) > 0; ++ownedIndex)
                 {
-                    TryExecuteBlock(ref warmStartFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref remainingBlocks);
+                    TryExecuteBlock(ref warmStartFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref worker.ClaimedCount, ref remainingBlocks);
                 }
 
-                WorkStealAndSync<WarmStartFunction, DoNothingOnSteal>(ref warmStartFunction, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
+                WorkStealAndSync<WarmStartFunction, DoNothingOnSteal>(ref warmStartFunction, workerIndex, batchIndex, batchIndex, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
                      ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
             }
 
@@ -603,7 +667,7 @@ namespace SolverPrototype
                     ref var ownedBlocks = ref worker.BlocksOwnedInBatches[batchIndex];
                     for (int ownedIndex = 0; ownedIndex < ownedBlocks.Count; ++ownedIndex)
                     {
-                        if (!TryExecuteBlock(ref solveFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref remainingBlocks))
+                        if (!TryExecuteBlock(ref solveFunction, ownedBlocks[ownedIndex], claimedState, clearedState, ref worker.ClaimedCount, ref remainingBlocks))
                         {
                             //The block was already claimed by another thread. Remove it from the local worker's ownership. 
                             ownedBlocks.RemoveAt(ownedIndex);
@@ -612,7 +676,7 @@ namespace SolverPrototype
                         }
                     }
 
-                    WorkStealAndSync<SolveFunction, TakeOwnershipOnSteal>(ref solveFunction, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
+                    WorkStealAndSync<SolveFunction, TakeOwnershipOnSteal>(ref solveFunction, workerIndex, batchIndex, batchIndex, ref ownedBlocks, batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0, context.BatchBoundaries[batchIndex],
                          ref syncStageIndex, ref claimedState, ref clearedState, ref remainingBlocks);
                 }
 
