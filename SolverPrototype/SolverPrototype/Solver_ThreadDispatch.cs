@@ -91,22 +91,34 @@ namespace SolverPrototype
         internal struct Worker
         {
             //generics yay
+            //Used by ThreadDispatch
             public QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>> BlocksOwnedInBatches;
             public int ClaimedCount;
-        }
 
+            //Used by ContiguousClaimDispatch
+            public int PrestepStart;
+            public Buffer<int> BatchStarts;
+        }
+        internal struct WorkerCache
+        {
+            //Used by ContiguousClaimDispatch
+            public float CompletedPrestepBlocks;
+            public Buffer<float> CompletedBatchBlocks;
+        }
         //Just bundling these up to avoid polluting the this. intellisense.
         struct MultithreadingParameters
         {
             public float Dt;
             public float InverseDt;
             public int OldWorkerCount;
+            public int OldBatchCount;
+            public Buffer<WorkerCache> WorkerCaches;
             //Only the WorkerBatchBlockCounts persist between frames. All the other collections are created and disposed within the scope of the MultithreadedUpdate.
             //The base lists are only here allocated on the heap to make it easy to get the data into the worker delegate.
             public Buffer<int> WorkerBatchBlockCounts;
             public QuickList<Worker, Buffer<Worker>> Workers;
             public QuickList<WorkBlock, Buffer<WorkBlock>> WorkBlocks;
-            public QuickList<int, Buffer<int>> BlockClaims;
+            public Buffer<int> BlockClaims;
             public QuickList<int, Buffer<int>> BatchBoundaries;
             public Buffer<int> StageRemainingBlocks;
             public int WorkerCompletedCount;
@@ -114,6 +126,7 @@ namespace SolverPrototype
 
 
             public Buffer<int> StageIndices; //Used by the intermediate dispatcher.
+
         }
         MultithreadingParameters context;
 
@@ -186,9 +199,8 @@ namespace SolverPrototype
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, maximumBlocksPerBatch);
 
             //Create the claims set.
-            QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), context.WorkBlocks.Count, out context.BlockClaims);
-            context.BlockClaims.Span.Clear(0, context.WorkBlocks.Count);
-            context.BlockClaims.Count = context.WorkBlocks.Count;
+            bufferPool.SpecializeFor<int>().Take(context.WorkBlocks.Count, out context.BlockClaims);
+            context.BlockClaims.Clear(0, context.WorkBlocks.Count);
 
             //Now that we have a set of work blocks updated for the current state of the simulation, revalidate the ownership across workers.
             //We have three goals:
@@ -391,7 +403,7 @@ namespace SolverPrototype
             //Clean up the remaining the ephemeral resources.
             //Note that the ownership lists persist. They are used for initializing the work block allocations in the next frame.
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
-            context.BlockClaims.Dispose(bufferPool.SpecializeFor<int>());
+            bufferPool.SpecializeFor<int>().Return(ref context.BlockClaims);
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
             bufferPool.SpecializeFor<int>().Return(ref context.StageRemainingBlocks);
             context.WorkerCompletedCount = 0;
