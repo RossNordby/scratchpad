@@ -53,17 +53,23 @@ namespace SolverPrototype
         {
             Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
             if (workerStart < batchStart)
-                throw new Exception("Bad start index; before batch start.");
+                throw new Exception($"PRE Bad start index {workerStart}; before batch start [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
             if (workerStart > inclusiveBatchEnd)
-                throw new Exception("Bad start index; after batch end.");
+                throw new Exception($"PRE Bad start index {workerStart}; after batch end [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
             var blockIndex = workerStart;
+            if ((blockIndex <= previousWorkerStart && previousWorkerStart < nextWorkerStart) ||
+                (blockIndex >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
+                throw new Exception($"PRE Nonsteal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
             //Note that the block index (and later steal index) are barred from progressing beyond the neighbor start locations.
             //This stops a corner case where the worker fails to claim anything before its start is stolen.
             //There are more elegant ways to fix this, but it works.
             while (blockIndex != nextWorkerStart && Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) == unclaimedState)
             {
-                if (blockIndex < 0 || blockIndex > inclusiveBatchEnd)
-                    throw new Exception("Bad job index.");
+                if ((blockIndex <= previousWorkerStart && previousWorkerStart < nextWorkerStart) || 
+                    (blockIndex >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
+                    throw new Exception($"Nonsteal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
+                if (blockIndex < batchStart || blockIndex > inclusiveBatchEnd)
+                    throw new Exception($"Bad job index {blockIndex}, bounds [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
                 stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
                 //Increment and wrap around.
                 blockIndex = blockIndex == inclusiveBatchEnd ? batchStart : blockIndex + 1;
@@ -72,16 +78,26 @@ namespace SolverPrototype
             var stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
             while (stealIndex != previousWorkerStart && Interlocked.CompareExchange(ref context.BlockClaims[stealIndex], claimedState, unclaimedState) == unclaimedState)
             {
+                if ((stealIndex <= previousWorkerStart && previousWorkerStart < nextWorkerStart) ||
+                    (stealIndex >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
+                    throw new Exception($"Steal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
                 //Note that the worker slot is only changed once the steal slot has managed to actually claim something.
                 //If you modified the worker start without checking the claim you could end up pushing the worker start into what should be another worker's domain.
                 workerStart = stealIndex;
                 if (workerStart < 0 || workerStart >= context.WorkBlocks.Count)
-                    throw new Exception("Bad work steal index.");
+                    throw new Exception($"Bad work steal index {workerStart}, bounds [{batchStart}, {inclusiveBatchEnd}]");
                 stageFunction.Execute(ref context.WorkBlocks[workerStart]);
                 //Decrement and wrap around.
                 stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
             }
+            if ((workerStart <= previousWorkerStart && previousWorkerStart < nextWorkerStart) ||
+                (workerStart >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
+                throw new Exception($"Poststeal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
             Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
+            if (workerStart < batchStart)
+                throw new Exception($"POST Bad start index {workerStart}; before batch start [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
+            if (workerStart > inclusiveBatchEnd)
+                throw new Exception($"POST Bad start index {workerStart}; after batch end [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
             InterstageSync(ref syncStage);
         }
         //This works by distributing start indices across the work blocks based on the previous frame's results. Then, during every stage, the workers
@@ -238,12 +254,20 @@ namespace SolverPrototype
                     var batchEnd = context.BatchBoundaries[batchIndex];
                     var batchCount = batchEnd - batchStart;
                     var previousExclusiveEnd = batchStart;
+
+                    var total = 0.0;
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                     {
                         context.Workers[workerIndex].BatchStarts[batchIndex] = previousExclusiveEnd;
+                        total += context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex];
                         previousExclusiveEnd += (int)(context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] * batchCount);
+                        if (previousExclusiveEnd < batchStart || previousExclusiveEnd > batchEnd)
+                            throw new Exception($"IN ITERATION Invalid batch END {previousExclusiveEnd} for worker {workerIndex}, total % {total}, bounds [{batchStart}, {batchEnd}).");
                         Debug.Assert(previousExclusiveEnd <= batchEnd);
                     }
+                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                        if (context.Workers[workerIndex].BatchStarts[batchIndex] < batchStart || context.Workers[workerIndex].BatchStarts[batchIndex] >= batchEnd)
+                            throw new Exception($"PRE REMAINDER Invalid batch start {context.Workers[workerIndex].BatchStarts[batchIndex]}, bounds [{batchStart}, {batchEnd - 1}].");
                     //Fix up the remainder. Note that it's numerically possible to end up with more remainder than workers due to floating point issues.
                     //Exceptionally rare, but handle it.
                     var remainder = batchEnd - previousExclusiveEnd;
@@ -258,8 +282,8 @@ namespace SolverPrototype
                     }
 
                     for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                        if (context.Workers[workerIndex].BatchStarts[batchIndex] < 0 || context.Workers[workerIndex].BatchStarts[batchIndex] >= context.WorkBlocks.Count)
-                            throw new Exception("Invalid batch start.");
+                        if (context.Workers[workerIndex].BatchStarts[batchIndex] < batchStart || context.Workers[workerIndex].BatchStarts[batchIndex] >= batchEnd)
+                            throw new Exception($"POST REMAINDER Invalid batch start {context.Workers[workerIndex].BatchStarts[batchIndex]}, bounds [{batchStart}, {batchEnd - 1}].");
                 }
                 for (int batchIndex = batchesWithAvailableGuessesCount; batchIndex < Batches.Count; ++batchIndex)
                 {
@@ -329,6 +353,8 @@ namespace SolverPrototype
                 Debug.Assert(batchEnd - batchStart > 0);
                 float inverseBatchBlockCount = 1f / (batchEnd - batchStart);
                 float total = 0;
+                int totalBlocks = 0;
+                int inversionCount = 0;
                 for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
                 {
                     var nextWorkerIndex = workerIndex == workerCount - 1 ? 0 : workerIndex + 1;
@@ -343,11 +369,17 @@ namespace SolverPrototype
                     }
                     else
                     {
-                        workerBlocksInBatch = (nextWorkerStart - batchStart) + (batchEnd - workerStart);
+                        if (++inversionCount > 1)
+                            throw new Exception($"Inversion count exceeded: {inversionCount}");
+                           workerBlocksInBatch = (nextWorkerStart - batchStart) + (batchEnd - workerStart);
                     }
+                    totalBlocks += workerBlocksInBatch;
+                    //if(totalBlocks > batchEnd - batchStart)
+                    //    throw new Exception($"Invalid accumulated block count: {totalBlocks}, max {batchEnd - batchStart}.");
                     total += context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] = workerBlocksInBatch * inverseBatchBlockCount;
-                    Debug.WriteLine($"Size: {context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex]}");
-                    Debug.Assert(total >= 0 && total <= 1);
+                    //if (total < 0 || total > 1.0001)
+                    //    throw new Exception($"Invalid total: {total}");
+                    Debug.Assert(total >= 0 && total <= 1.0001);
                     Debug.Assert(context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] >= 0 && context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] <= 1);
                 }
             }
