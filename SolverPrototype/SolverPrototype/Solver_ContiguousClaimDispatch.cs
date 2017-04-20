@@ -48,56 +48,54 @@ namespace SolverPrototype
 
 
         private void ContiguousClaimStage<TStageFunction>(ref TStageFunction stageFunction,
-            int batchStart, int inclusiveBatchEnd, ref int workerStart, int previousWorkerStart, int nextWorkerStart, ref int syncStage, int claimedState, int unclaimedState)
+            int batchStart, int inclusiveBatchEnd, ref int workerStart, int nextStageWorkerStart, ref int syncStage, int claimedState, int unclaimedState)
             where TStageFunction : IStageFunction
         {
-            Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
-            if (workerStart < batchStart)
-                throw new Exception($"PRE Bad start index {workerStart}; before batch start [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
-            if (workerStart > inclusiveBatchEnd)
-                throw new Exception($"PRE Bad start index {workerStart}; after batch end [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
-            var blockIndex = workerStart;
-            if ((blockIndex <= previousWorkerStart && previousWorkerStart < nextWorkerStart) ||
-                (blockIndex >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
-                throw new Exception($"PRE Nonsteal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
-            //Note that the block index (and later steal index) are barred from progressing beyond the neighbor start locations.
-            //This stops a corner case where the worker fails to claim anything before its start is stolen.
-            //There are more elegant ways to fix this, but it works.
-            while (blockIndex != nextWorkerStart && Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) == unclaimedState)
+            //It is possible for a worker to not have any job available in a particular batch. This can only happen when there are more workers than work blocks in the batch.
+            //The workers with indices beyond the available work blocks will have their starts all set to -1 by the scheduler.
+            //All previous workers will have tightly packed contiguous indices and won't be able to worksteal at all.
+            if (workerStart > -1)
             {
-                if ((blockIndex <= previousWorkerStart && previousWorkerStart < nextWorkerStart) || 
-                    (blockIndex >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
-                    throw new Exception($"Nonsteal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
-                if (blockIndex < batchStart || blockIndex > inclusiveBatchEnd)
-                    throw new Exception($"Bad job index {blockIndex}, bounds [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
+                Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
+                var blockIndex = workerStart;
+                //The first block is guaranteed to be claimed by the preclaim process- either via the main thread for the prestep, or the previous stage for all later stages.
+                //The preclaim process stops workers from overrunning their neighbor's domains. While this limits their workstealing capacity a bit, it maintains contiguity
+                //and simplifies scheduling.
+                //Note that the code 2 is to avoid conflicting with the 0 and 1 claim/unclaim codes.
+                Debug.Assert(2 != unclaimedState, "The unclaimed state should never equal the preclaim state.");
+                Debug.Assert(context.BlockClaims[blockIndex] == 2, "This block must have been preclaimed for this worker.");
                 stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
-                //Increment and wrap around.
-                blockIndex = blockIndex == inclusiveBatchEnd ? batchStart : blockIndex + 1;
+                var originalWorkerStart = blockIndex;
+                while (true)
+                {
+                    //Increment and wrap around.
+                    blockIndex = blockIndex == inclusiveBatchEnd ? batchStart : blockIndex + 1;
+                    if (Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) != unclaimedState)
+                        break;
+                    stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
+                }
+                //By now, we've reached the end of the contiguous region in the forward direction. Try walking the other way.
+                var stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
+                while (Interlocked.CompareExchange(ref context.BlockClaims[stealIndex], claimedState, unclaimedState) == unclaimedState)
+                {
+                    //Note that the worker slot is only changed once the steal slot has managed to actually claim something.
+                    //If you modified the worker start without checking the claim you could end up pushing the worker start into what should be another worker's domain.
+                    workerStart = stealIndex;
+                    Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
+                    stageFunction.Execute(ref context.WorkBlocks[workerStart]);
+                    //Decrement and wrap around.
+                    stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
+                }
+
+                //The original worker start claim is using the special worker-specific coding. It needs to be changed to the normal claim type so that it can be claimed by the next stage.
+                context.BlockClaims[originalWorkerStart] = claimedState;
+
+                Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
             }
-            //By now, we've reached the end of the contiguous region in the forward direction. Try walking the other way.
-            var stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
-            while (stealIndex != previousWorkerStart && Interlocked.CompareExchange(ref context.BlockClaims[stealIndex], claimedState, unclaimedState) == unclaimedState)
-            {
-                if ((stealIndex <= previousWorkerStart && previousWorkerStart < nextWorkerStart) ||
-                    (stealIndex >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
-                    throw new Exception($"Steal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
-                //Note that the worker slot is only changed once the steal slot has managed to actually claim something.
-                //If you modified the worker start without checking the claim you could end up pushing the worker start into what should be another worker's domain.
-                workerStart = stealIndex;
-                if (workerStart < 0 || workerStart >= context.WorkBlocks.Count)
-                    throw new Exception($"Bad work steal index {workerStart}, bounds [{batchStart}, {inclusiveBatchEnd}]");
-                stageFunction.Execute(ref context.WorkBlocks[workerStart]);
-                //Decrement and wrap around.
-                stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
-            }
-            if ((workerStart <= previousWorkerStart && previousWorkerStart < nextWorkerStart) ||
-                (workerStart >= nextWorkerStart && nextWorkerStart > previousWorkerStart))
-                throw new Exception($"Poststeal guarantee failed. (P, C, N): ({previousWorkerStart}, {blockIndex}, {nextWorkerStart}), batch bounds [{batchStart}, {inclusiveBatchEnd}]");
-            Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
-            if (workerStart < batchStart)
-                throw new Exception($"POST Bad start index {workerStart}; before batch start [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
-            if (workerStart > inclusiveBatchEnd)
-                throw new Exception($"POST Bad start index {workerStart}; after batch end [{batchStart}, {inclusiveBatchEnd}]. Stage: {typeof(TStageFunction)}");
+            //The next stage's worker start needs to be changed to the preclaimed state. Note that this does not enable neighbors to worksteal; it's never equal to the unclaimed state.
+            //Guarad against the possibility that the next stage didn't have enough blocks to provide this worker any jobs.
+            if (nextStageWorkerStart >= 0)
+                context.BlockClaims[nextStageWorkerStart] = 2;
             InterstageSync(ref syncStage);
         }
         //This works by distributing start indices across the work blocks based on the previous frame's results. Then, during every stage, the workers
@@ -117,20 +115,22 @@ namespace SolverPrototype
             var prestepStage = new PrestepStageFunction { Dt = context.Dt, InverseDt = context.InverseDt, Solver = this };
             ref var previousWorker = ref context.Workers[workerIndex == 0 ? context.WorkerCount - 1 : workerIndex - 1];
             ref var nextWorker = ref context.Workers[workerIndex == context.WorkerCount - 1 ? 0 : workerIndex + 1];
-            ContiguousClaimStage(ref prestepStage, 0, context.WorkBlocks.Count - 1,
-                ref worker.PrestepStart, previousWorker.PrestepStart, nextWorker.PrestepStart,
-                ref syncStage, claimedState, unclaimedState);
+            Debug.Assert(Batches.Count > 0, "Don't dispatch if there are no constraints.");
+            ContiguousClaimStage(ref prestepStage, 0, context.WorkBlocks.Count - 1, ref worker.PrestepStart, worker.BatchStarts[0], ref syncStage, claimedState, unclaimedState);
             claimedState = 0;
             unclaimedState = 1;
+
+            Debug.Assert(context.BlockClaims[worker.BatchStarts[0]] == 2);
 
             var warmStartStage = new WarmStartStageFunction { Solver = this };
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                 var inclusiveBatchEnd = context.BatchBoundaries[batchIndex] - 1;
-                ContiguousClaimStage(ref warmStartStage, batchStart, inclusiveBatchEnd,
-                    ref worker.BatchStarts[batchIndex], previousWorker.BatchStarts[batchIndex], nextWorker.BatchStarts[batchIndex],
-                    ref syncStage, claimedState, unclaimedState);
+                var nextBatchIndex = batchIndex + 1;
+                if (nextBatchIndex == Batches.Count)
+                    nextBatchIndex = 0;
+                ContiguousClaimStage(ref warmStartStage, batchStart, inclusiveBatchEnd, ref worker.BatchStarts[batchIndex], worker.BatchStarts[nextBatchIndex], ref syncStage, claimedState, unclaimedState);
             }
             claimedState = 1;
             unclaimedState = 0;
@@ -142,9 +142,10 @@ namespace SolverPrototype
                 {
                     var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                     var inclusiveBatchEnd = context.BatchBoundaries[batchIndex] - 1;
-                    ContiguousClaimStage(ref solveStage, batchStart, inclusiveBatchEnd,
-                        ref worker.BatchStarts[batchIndex], previousWorker.BatchStarts[batchIndex], nextWorker.BatchStarts[batchIndex],
-                        ref syncStage, claimedState, unclaimedState);
+                    var nextBatchIndex = batchIndex + 1;
+                    if (nextBatchIndex == Batches.Count)
+                        nextBatchIndex = 0;
+                    ContiguousClaimStage(ref solveStage, batchStart, inclusiveBatchEnd, ref worker.BatchStarts[batchIndex], worker.BatchStarts[nextBatchIndex], ref syncStage, claimedState, unclaimedState);
                     InterstageSync(ref syncStage);
                 }
 
@@ -190,19 +191,49 @@ namespace SolverPrototype
             {
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                 var batchCount = context.BatchBoundaries[batchIndex] - batchStart;
-                var blocksPerWorker = batchCount / workerCount;
-                var remainder = batchCount - blocksPerWorker * workerCount;
-                var previousExclusiveEnd = batchStart;
-                for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+
+                if (batchCount < workerCount)
                 {
-                    Debug.Assert(previousExclusiveEnd >= batchStart && previousExclusiveEnd <= batchStart + batchCount);
-                    context.Workers[workerIndex].BatchStarts[batchIndex] = previousExclusiveEnd;
-                    previousExclusiveEnd += remainder-- > 0 ? blocksPerWorker + 1 : blocksPerWorker;
+                    //Too few blocks to give every worker a job.
+                    for (int workerIndex = 0; workerIndex < batchCount; ++workerIndex)
+                    {
+                        context.Workers[workerIndex].BatchStarts[batchIndex] = batchIndex + workerIndex;
+                    }
+                    //All remaining workers should just spinwait; -1 start is a code for short circuiting.
+                    for (int workerIndex = batchCount; workerIndex < workerCount; ++workerIndex)
+                    {
+                        context.Workers[workerIndex].BatchStarts[batchIndex] = -1;
+                    }
+                }
+                else
+                {
+                    var blocksPerWorker = batchCount / workerCount;
+                    var remainder = batchCount - blocksPerWorker * workerCount;
+                    var previousExclusiveEnd = batchStart;
+                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+                    {
+                        Debug.Assert(previousExclusiveEnd >= batchStart && previousExclusiveEnd <= batchStart + batchCount);
+                        context.Workers[workerIndex].BatchStarts[batchIndex] = previousExclusiveEnd;
+                        previousExclusiveEnd += remainder-- > 0 ? blocksPerWorker + 1 : blocksPerWorker;
+                    }
                 }
             }
-            if (workerCount != context.OldWorkerCount)
+            void CreateUniformDistributionForPrestep()
             {
-                //Our old guess for the distribution of blocks won't work. Regenerate an even distribution.
+                if (context.WorkBlocks.Count < workerCount)
+                {
+                    //Too few blocks to give every worker a job.
+                    for (int workerIndex = 0; workerIndex < context.WorkBlocks.Count; ++workerIndex)
+                    {
+                        context.Workers[workerIndex].PrestepStart = workerIndex;
+                    }
+                    //All remaining workers should just spinwait; -1 start is a code for short circuiting.
+                    for (int workerIndex = context.WorkBlocks.Count; workerIndex < workerCount; ++workerIndex)
+                    {
+                        context.Workers[workerIndex].PrestepStart = -1;
+                    }
+                }
+                else
                 {
                     var previousExclusiveEnd = 0;
                     var blocksPerWorker = context.WorkBlocks.Count / workerCount;
@@ -213,176 +244,232 @@ namespace SolverPrototype
                         previousExclusiveEnd += remainder-- > 0 ? blocksPerWorker + 1 : blocksPerWorker;
                     }
                 }
-
+            }
+            //if (workerCount != context.OldWorkerCount)
+            {
+                CreateUniformDistributionForPrestep();
                 for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
                 {
                     CreateUniformDistributionForBatch(batchIndex);
                 }
             }
-            else
+            //else
+            //{
+            //if (context.OldPrestepCacheInvalid || context.WorkBlocks.Count <= workerCount)
+            //{
+            //    CreateUniformDistributionForPrestep();
+            //}
+            //else
+            //{
+            //    //Generate a new distribution based on the number of blocks each thread completed relative to the old whole.
+            //    //First, figure out how much each worker managed to finish in the previous frame.
+            //    {
+            //        var previousExclusiveEnd = 0;
+            //        for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            //        {
+            //            context.Workers[workerIndex].PrestepStart = previousExclusiveEnd;
+            //            previousExclusiveEnd += (int)(Math.Max(1, context.WorkerCaches[workerIndex].CompletedPrestepBlocks * context.WorkBlocks.Count));
+            //        }
+            //        //Fix up the remainder. Note that it's numerically possible to end up with more remainder than workers due to floating point issues.
+            //        //Exceptionally rare, but handle it.
+            //        var remainder = context.WorkBlocks.Count - previousExclusiveEnd;
+            //        if (remainder < 0)
+            //        {
+            //            //It's possible to end up with a negative remainder- caused by the requirement that no worker has fewer than 1 block.
+            //            //In this case, previous workers have to give up jobs.
+            //            int pullBack = 1;
+            //        }
+            //        else
+            //        {
+            //            var remainderPerWorker = remainder / workerCount;
+            //            var remainderRemainder = remainder - remainderPerWorker * workerCount;
+            //            for (int workerIndex = workerCount - 1; remainder > 1; --workerIndex)
+            //            {
+            //                Debug.Assert(workerIndex > 0);
+            //                var remainderToDistribute = remainderRemainder-- > 0 ? remainderPerWorker + 1 : remainderPerWorker;
+            //                remainder -= remainderToDistribute;
+            //                context.Workers[workerIndex].PrestepStart += remainder;
+            //            }
+            //        }
+            //    }
+            //}
+
+            //for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
+            //{
+            //    var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+            //    var batchEnd = context.BatchBoundaries[batchIndex];
+            //    var batchCount = batchEnd - batchStart;
+            //    if (batchIndex >= context.OldBatchCount || context.OldBatchCacheInvalid[batchIndex] || batchCount < workerCount)
+            //    {
+            //        CreateUniformDistributionForBatch(batchIndex);
+            //    }
+            //    else
+            //    {
+            //        var previousExclusiveEnd = batchStart;
+            //        var total = 0.0;
+            //        for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            //        {
+            //            context.Workers[workerIndex].BatchStarts[batchIndex] = previousExclusiveEnd;
+            //            total += context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex];
+            //            previousExclusiveEnd += (int)(context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] * batchCount);
+            //            Debug.Assert(previousExclusiveEnd <= batchEnd);
+            //        }
+            //        //Fix up the remainder. Note that it's numerically possible to end up with more remainder than workers due to floating point issues.
+            //        //Exceptionally rare, but handle it.
+            //        var remainder = batchEnd - previousExclusiveEnd;
+            //        var remainderPerWorker = remainder / workerCount;
+            //        var remainderRemainder = remainder - remainderPerWorker * workerCount;
+            //        for (int workerIndex = workerCount - 1; remainder > 1; --workerIndex)
+            //        {
+            //            Debug.Assert(workerIndex > 0);
+            //            var remainderToDistribute = remainderRemainder-- > 0 ? remainderPerWorker + 1 : remainderPerWorker;
+            //            remainder -= remainderToDistribute;
+            //            context.Workers[workerIndex].BatchStarts[batchIndex] += remainder;
+            //        }
+            //    }
+            //}
+            //}
+
+            //Preclaim the prestep slots in the claims sets using the current prestep starts. 
+            for (int i = 0; i < workerCount; ++i)
             {
-                //Same worker count, so we can generate a new distribution based on the number of blocks each thread completed relative to the old whole.
-                //First, figure out how much each worker managed to finish in the previous frame.
-                {
-                    var previousExclusiveEnd = 0;
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                    {
-                        context.Workers[workerIndex].PrestepStart = previousExclusiveEnd;
-                        previousExclusiveEnd += (int)(context.WorkerCaches[workerIndex].CompletedPrestepBlocks * context.WorkBlocks.Count);
-                    }
-                    //Fix up the remainder. Note that it's numerically possible to end up with more remainder than workers due to floating point issues.
-                    //Exceptionally rare, but handle it.
-                    var remainder = context.WorkBlocks.Count - previousExclusiveEnd;
-                    var remainderPerWorker = remainder / workerCount;
-                    var remainderRemainder = remainder - remainderPerWorker * workerCount;
-                    for (int workerIndex = workerCount - 1; remainder > 1; --workerIndex)
-                    {
-                        Debug.Assert(workerIndex > 0);
-                        var remainderToDistribute = remainderRemainder-- > 0 ? remainderPerWorker + 1 : remainderPerWorker;
-                        remainder -= remainderToDistribute;
-                        context.Workers[workerIndex].PrestepStart += remainder;
-                    }
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                        if (context.Workers[workerIndex].PrestepStart < 0 || context.Workers[workerIndex].PrestepStart >= context.WorkBlocks.Count)
-                            throw new Exception("Invalid prestep start.");
-                }
-
-                var batchesWithAvailableGuessesCount = Math.Min(Batches.Count, context.OldBatchCount);
-                for (int batchIndex = 0; batchIndex < batchesWithAvailableGuessesCount; ++batchIndex)
-                {
-                    var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
-                    var batchEnd = context.BatchBoundaries[batchIndex];
-                    var batchCount = batchEnd - batchStart;
-                    var previousExclusiveEnd = batchStart;
-
-                    var total = 0.0;
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                    {
-                        context.Workers[workerIndex].BatchStarts[batchIndex] = previousExclusiveEnd;
-                        total += context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex];
-                        previousExclusiveEnd += (int)(context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] * batchCount);
-                        if (previousExclusiveEnd < batchStart || previousExclusiveEnd > batchEnd)
-                            throw new Exception($"IN ITERATION Invalid batch END {previousExclusiveEnd} for worker {workerIndex}, total % {total}, bounds [{batchStart}, {batchEnd}).");
-                        Debug.Assert(previousExclusiveEnd <= batchEnd);
-                    }
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                        if (context.Workers[workerIndex].BatchStarts[batchIndex] < batchStart || context.Workers[workerIndex].BatchStarts[batchIndex] >= batchEnd)
-                            throw new Exception($"PRE REMAINDER Invalid batch start {context.Workers[workerIndex].BatchStarts[batchIndex]}, bounds [{batchStart}, {batchEnd - 1}].");
-                    //Fix up the remainder. Note that it's numerically possible to end up with more remainder than workers due to floating point issues.
-                    //Exceptionally rare, but handle it.
-                    var remainder = batchEnd - previousExclusiveEnd;
-                    var remainderPerWorker = remainder / workerCount;
-                    var remainderRemainder = remainder - remainderPerWorker * workerCount;
-                    for (int workerIndex = workerCount - 1; remainder > 1; --workerIndex)
-                    {
-                        Debug.Assert(workerIndex > 0);
-                        var remainderToDistribute = remainderRemainder-- > 0 ? remainderPerWorker + 1 : remainderPerWorker;
-                        remainder -= remainderToDistribute;
-                        context.Workers[workerIndex].BatchStarts[batchIndex] += remainder;
-                    }
-
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                        if (context.Workers[workerIndex].BatchStarts[batchIndex] < batchStart || context.Workers[workerIndex].BatchStarts[batchIndex] >= batchEnd)
-                            throw new Exception($"POST REMAINDER Invalid batch start {context.Workers[workerIndex].BatchStarts[batchIndex]}, bounds [{batchStart}, {batchEnd - 1}].");
-                }
-                for (int batchIndex = batchesWithAvailableGuessesCount; batchIndex < Batches.Count; ++batchIndex)
-                {
-                    CreateUniformDistributionForBatch(batchIndex);
-                }
+                //Only preclaim those slots that have workers actually associated with them. Negative starts correspond to cases where not enough work blocks were available.
+                if (context.Workers[i].PrestepStart >= 0)
+                    context.BlockClaims[context.Workers[i].PrestepStart] = 2;
             }
 
             var start = Stopwatch.GetTimestamp();
-            threadPool.ForLoop(0, threadPool.ThreadCount, ContiguousClaimWork);
+            if (Batches.Count > 0) // While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
+                threadPool.ForLoop(0, threadPool.ThreadCount, ContiguousClaimWork);
             var end = Stopwatch.GetTimestamp();
 
-            //Update the cached block counts so that we can build a good starting guess for the next frame.
-            unsafe
-            {
-                if (context.WorkerCaches.Memory != null)
-                {
-                    bufferPool.SpecializeFor<WorkerCache>().Return(ref context.WorkerCaches);
-                    for (int i = 0; i < context.OldWorkerCount; ++i)
-                        bufferPool.SpecializeFor<float>().Return(ref context.WorkerCaches[i].CompletedBatchBlocks);
-                }
-            }
-            bufferPool.SpecializeFor<WorkerCache>().Take(workerCount, out context.WorkerCaches);
+            //            //Update the cached block counts so that we can build a good starting guess for the next frame.
+            //            unsafe
+            //            {
+            //                if (context.WorkerCaches.Memory != null)
+            //                {
+            //                    bufferPool.SpecializeFor<WorkerCache>().Return(ref context.WorkerCaches);
+            //                    for (int i = 0; i < context.OldWorkerCount; ++i)
+            //                        bufferPool.SpecializeFor<float>().Return(ref context.WorkerCaches[i].CompletedBatchBlocks);
+            //                }
+            //            }
+            //            bufferPool.SpecializeFor<WorkerCache>().Take(workerCount, out context.WorkerCaches);
 
-            //It's possible for the number of work blocks to be zero- an empty simulation.
-            //Protect against a division by zero.
-            if (context.WorkBlocks.Count > 0)
-            {
-                var inverseBlockCount = 1f / context.WorkBlocks.Count;
-                var total = 0f;
-                for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                {
-                    var nextWorkerIndex = workerIndex == workerCount - 1 ? 0 : workerIndex + 1;
-                    var workerStart = context.Workers[workerIndex].PrestepStart;
-                    var nextWorkerStart = context.Workers[nextWorkerIndex].PrestepStart;
-                    int workerBlocksInPrestep;
-                    if (nextWorkerStart > workerStart)
-                    {
-                        workerBlocksInPrestep = nextWorkerStart - workerStart;
-                    }
-                    else
-                    {
-                        workerBlocksInPrestep = nextWorkerStart + context.WorkBlocks.Count - workerStart;
-                    }
-                    total += context.WorkerCaches[workerIndex].CompletedPrestepBlocks = workerBlocksInPrestep * inverseBlockCount;
-                    Debug.Assert(total >= 0 && total <= 1.00001);
-                    Debug.Assert(context.WorkerCaches[workerIndex].CompletedPrestepBlocks >= 0 && context.WorkerCaches[workerIndex].CompletedPrestepBlocks <= 1);
-                }
-                context.OldWorkerCount = workerCount;
-            }
-            else
-            {
-                //If there are no blocks, the next frame will still be expecting a guess. 
-                //By setting the old worker count to -1, we guarantee that the next frame will just generate a uniform distribution.
-                context.OldWorkerCount = -1;
-            }
+            //            //It's possible for the number of work blocks to be zero- an empty simulation.
+            //            //Protect against a division by zero.
+            //            if (context.WorkBlocks.Count > 0)
+            //            {
+            //                var inverseBlockCount = 1f / context.WorkBlocks.Count;
+            //                var total = 0f;
+            //                for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            //                {
+            //                    var workerStart = context.Workers[workerIndex].PrestepStart;
+            //                    if (workerStart == -1)
+            //                    {
+            //#if DEBUG
+            //                        //Worker starts are negative when there were fewer available work blocks in the batch than workers.
+            //                        //The first set of workers up to the work block count will each have one block, contiguously stored.
+            //                        //All workers beyond the work block count should have workerStart == -1.
+            //                        Debug.Assert(context.WorkBlocks.Count < workerCount);
+            //                        for (int i = 0; i < workerIndex; ++i)
+            //                        {
+            //                            Debug.Assert(context.Workers[i].PrestepStart == i);
+            //                        }
+            //                        for (int i = workerIndex + 1; i < workerCount; ++i)
+            //                        {
+            //                            Debug.Assert(context.Workers[i].PrestepStart == -1);
+            //                        }
+            //#endif
+            //                        context.WorkerCaches[workerIndex].CompletedPrestepBlocks = 0;
 
-            for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-            {
-                bufferPool.SpecializeFor<float>().Take(workerCount, out context.WorkerCaches[workerIndex].CompletedBatchBlocks);
-            }
+            //                    }
+            //                    else
+            //                    {
+            //                        var nextWorkerIndex = workerIndex == workerCount - 1 ? 0 : workerIndex + 1;
+            //                        var nextWorkerStart = context.Workers[nextWorkerIndex].PrestepStart;
+            //                        int workerBlocksInPrestep;
+            //                        if (nextWorkerStart > workerStart)
+            //                        {
+            //                            workerBlocksInPrestep = nextWorkerStart - workerStart;
+            //                        }
+            //                        else
+            //                        {
+            //                            workerBlocksInPrestep = nextWorkerStart + context.WorkBlocks.Count - workerStart;
+            //                        }
+            //                        total += context.WorkerCaches[workerIndex].CompletedPrestepBlocks = workerBlocksInPrestep * inverseBlockCount;
+            //                        Debug.Assert(total >= 0 && total <= 1.00001);
+            //                        Debug.Assert(context.WorkerCaches[workerIndex].CompletedPrestepBlocks >= 0 && context.WorkerCaches[workerIndex].CompletedPrestepBlocks <= 1);
+            //                    }
+            //                }
+            //                context.OldWorkerCount = workerCount;
+            //            }
+            //            else
+            //            {
+            //                //If there are no blocks, the next frame will still be expecting a guess. 
+            //                //By setting the old worker count to -1, we guarantee that the next frame will just generate a uniform distribution.
+            //                context.OldWorkerCount = -1;
+            //            }
 
-            for (int batchIndex = 0; batchIndex < context.BatchBoundaries.Count; ++batchIndex)
-            {
-                var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
-                var batchEnd = context.BatchBoundaries[batchIndex];
-                //There can be no batch without a workblock in the batch, so this division does not require protection.
-                Debug.Assert(batchEnd - batchStart > 0);
-                float inverseBatchBlockCount = 1f / (batchEnd - batchStart);
-                float total = 0;
-                int totalBlocks = 0;
-                int inversionCount = 0;
-                for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                {
-                    var nextWorkerIndex = workerIndex == workerCount - 1 ? 0 : workerIndex + 1;
-                    var workerStart = context.Workers[workerIndex].BatchStarts[batchIndex];
-                    var nextWorkerStart = context.Workers[nextWorkerIndex].BatchStarts[batchIndex];
-                    Debug.Assert(workerStart >= batchStart && workerStart < batchEnd);
-                    Debug.Assert(nextWorkerStart >= batchStart && nextWorkerStart < batchEnd);
-                    int workerBlocksInBatch;
-                    if (nextWorkerStart > workerStart)
-                    {
-                        workerBlocksInBatch = nextWorkerStart - workerStart;
-                    }
-                    else
-                    {
-                        if (++inversionCount > 1)
-                            throw new Exception($"Inversion count exceeded: {inversionCount}");
-                           workerBlocksInBatch = (nextWorkerStart - batchStart) + (batchEnd - workerStart);
-                    }
-                    totalBlocks += workerBlocksInBatch;
-                    //if(totalBlocks > batchEnd - batchStart)
-                    //    throw new Exception($"Invalid accumulated block count: {totalBlocks}, max {batchEnd - batchStart}.");
-                    total += context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] = workerBlocksInBatch * inverseBatchBlockCount;
-                    //if (total < 0 || total > 1.0001)
-                    //    throw new Exception($"Invalid total: {total}");
-                    Debug.Assert(total >= 0 && total <= 1.0001);
-                    Debug.Assert(context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] >= 0 && context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] <= 1);
-                }
-            }
+            //            for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            //            {
+            //                bufferPool.SpecializeFor<float>().Take(workerCount, out context.WorkerCaches[workerIndex].CompletedBatchBlocks);
+            //            }
+
+            //            for (int batchIndex = 0; batchIndex < context.BatchBoundaries.Count; ++batchIndex)
+            //            {
+            //                var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+            //                var batchEnd = context.BatchBoundaries[batchIndex];
+            //                //There can be no batch without a workblock in the batch, so this division does not require protection.
+            //                Debug.Assert(batchEnd - batchStart > 0);
+            //                float inverseBatchBlockCount = 1f / (batchEnd - batchStart);
+            //                int totalBlocks = 0;
+            //                int inversionCount = 0;
+            //                for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
+            //                {
+            //                    var workerStart = context.Workers[workerIndex].BatchStarts[batchIndex];
+            //                    if (workerStart == -1)
+            //                    {
+            //#if DEBUG
+            //                        //Worker starts are negative when there were fewer available work blocks in the batch than workers.
+            //                        //The first set of workers up to the work block count will each have one block, contiguously stored.
+            //                        //All workers beyond the work block count should have workerStart == -1.
+            //                        Debug.Assert(batchEnd - batchStart < workerCount);
+            //                        for (int i = 0; i < workerIndex; ++i)
+            //                        {
+            //                            Debug.Assert(context.Workers[i].BatchStarts[batchIndex] == batchStart + i);
+            //                        }
+            //                        for (int i = workerIndex + 1; i < workerCount; ++i)
+            //                        {
+            //                            Debug.Assert(context.Workers[i].BatchStarts[batchIndex] == -1);
+            //                        }
+            //#endif
+            //                        context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] = 0;
+
+            //                    }
+            //                    else
+            //                    {
+            //                        var nextWorkerIndex = workerIndex == workerCount - 1 ? 0 : workerIndex + 1;
+            //                        var nextWorkerStart = context.Workers[nextWorkerIndex].BatchStarts[batchIndex];
+            //                        Debug.Assert(workerStart >= batchStart && workerStart < batchEnd);
+            //                        Debug.Assert(nextWorkerStart >= batchStart && nextWorkerStart < batchEnd);
+            //                        int workerBlocksInBatch;
+            //                        if (nextWorkerStart > workerStart)
+            //                        {
+            //                            workerBlocksInBatch = nextWorkerStart - workerStart;
+            //                        }
+            //                        else
+            //                        {
+            //                            if (++inversionCount > 1)
+            //                                throw new Exception($"Inversion count exceeded: {inversionCount}");
+            //                            workerBlocksInBatch = (nextWorkerStart - batchStart) + (batchEnd - workerStart);
+            //                        }
+            //                        totalBlocks += workerBlocksInBatch;
+            //                        Debug.Assert(totalBlocks < batchEnd - batchStart);
+            //                        context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] = workerBlocksInBatch * inverseBatchBlockCount;
+            //                        Debug.Assert(context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] >= 0 && context.WorkerCaches[workerIndex].CompletedBatchBlocks[batchIndex] <= 1);
+            //                    }
+            //                }
+            //            }
 
             //Note that we always just toss the old workers/batch starts sets and start again. This simplifies things at a very, very small cost.
             for (int i = 0; i < workerCount; ++i)
