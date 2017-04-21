@@ -127,6 +127,11 @@ namespace SolverPrototype
 
             public Buffer<int> StageIndices; //Used by the intermediate dispatcher.
 
+
+            //Pingpong claims buffers used by contiguous claim dispatch.
+            public Buffer<int> BlockClaimsA;
+            public Buffer<int> BlockClaimsB;
+
         }
         MultithreadingParameters context;
 

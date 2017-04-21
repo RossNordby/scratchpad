@@ -48,7 +48,8 @@ namespace SolverPrototype
 
 
         private void ContiguousClaimStage<TStageFunction>(ref TStageFunction stageFunction,
-            int batchStart, int inclusiveBatchEnd, ref int workerStart, int nextStageWorkerStart, ref int syncStage, int claimedState, int unclaimedState)
+            int batchStart, int inclusiveBatchEnd, ref int workerStart, int nextStageWorkerStart, ref int syncStage,
+            ref Buffer<int> blockClaims, ref Buffer<int> nextBlockClaims, int claimedState, int unclaimedState)
             where TStageFunction : IStageFunction
         {
             //It is possible for a worker to not have any job available in a particular batch. This can only happen when there are more workers than work blocks in the batch.
@@ -57,45 +58,51 @@ namespace SolverPrototype
             if (workerStart > -1)
             {
                 Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
-                var blockIndex = workerStart;
+                var originalWorkerStart = workerStart;
                 //The first block is guaranteed to be claimed by the preclaim process- either via the main thread for the prestep, or the previous stage for all later stages.
                 //The preclaim process stops workers from overrunning their neighbor's domains. While this limits their workstealing capacity a bit, it maintains contiguity
                 //and simplifies scheduling.
                 //Note that the code 2 is to avoid conflicting with the 0 and 1 claim/unclaim codes.
                 Debug.Assert(2 != unclaimedState, "The unclaimed state should never equal the preclaim state.");
-                Debug.Assert(context.BlockClaims[blockIndex] == 2, "This block must have been preclaimed for this worker.");
-                stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
-                var originalWorkerStart = blockIndex;
+                Debug.Assert(blockClaims[originalWorkerStart] == 2, "This block must have been preclaimed for this worker.");
+                stageFunction.Execute(ref context.WorkBlocks[originalWorkerStart]);
+                var blockIndex = originalWorkerStart;
                 while (true)
                 {
                     //Increment and wrap around.
                     blockIndex = blockIndex == inclusiveBatchEnd ? batchStart : blockIndex + 1;
-                    if (Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) != unclaimedState)
+                    if (Interlocked.CompareExchange(ref blockClaims[blockIndex], claimedState, unclaimedState) != unclaimedState)
                         break;
+                    Debug.Assert(blockClaims[blockIndex] == claimedState);
                     stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
                 }
                 //By now, we've reached the end of the contiguous region in the forward direction. Try walking the other way.
                 var stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
-                while (Interlocked.CompareExchange(ref context.BlockClaims[stealIndex], claimedState, unclaimedState) == unclaimedState)
+                while (Interlocked.CompareExchange(ref blockClaims[stealIndex], claimedState, unclaimedState) == unclaimedState)
                 {
                     //Note that the worker slot is only changed once the steal slot has managed to actually claim something.
                     //If you modified the worker start without checking the claim you could end up pushing the worker start into what should be another worker's domain.
                     workerStart = stealIndex;
                     Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
+                    Debug.Assert(blockClaims[workerStart] == claimedState);
                     stageFunction.Execute(ref context.WorkBlocks[workerStart]);
                     //Decrement and wrap around.
                     stealIndex = workerStart == batchStart ? inclusiveBatchEnd : workerStart - 1;
                 }
 
                 //The original worker start claim is using the special worker-specific coding. It needs to be changed to the normal claim type so that it can be claimed by the next stage.
-                context.BlockClaims[originalWorkerStart] = claimedState;
+                Debug.Assert(blockClaims[originalWorkerStart] == 2);
+                blockClaims[originalWorkerStart] = claimedState;
+                Debug.Assert(blockClaims[originalWorkerStart] == claimedState);
 
                 Debug.Assert(workerStart >= batchStart && workerStart <= inclusiveBatchEnd);
             }
             //The next stage's worker start needs to be changed to the preclaimed state. Note that this does not enable neighbors to worksteal; it's never equal to the unclaimed state.
             //Guarad against the possibility that the next stage didn't have enough blocks to provide this worker any jobs.
             if (nextStageWorkerStart >= 0)
-                context.BlockClaims[nextStageWorkerStart] = 2;
+            {
+                nextBlockClaims[nextStageWorkerStart] = 2;
+            }
             InterstageSync(ref syncStage);
         }
         //This works by distributing start indices across the work blocks based on the previous frame's results. Then, during every stage, the workers
@@ -107,20 +114,23 @@ namespace SolverPrototype
         {
             ref var worker = ref context.Workers[workerIndex];
             int syncStage = 0;
-            //The claimed and unclaimed state swap on every stage to allow faster
+            //The claimed and unclaimed state swap after every usage of both pingpong claims buffers.
             int claimedState = 1;
             int unclaimedState = 0;
+            //The claims buffers are just immutable memory pointers, so swapping them doesn't hurt anything.
+            var claims = context.BlockClaimsA;
+            var claimsBackBuffer = context.BlockClaimsB;
             //Note that every batch has a different start position. Each covers a different subset of constraints, so they require different start locations.
             //The same concept applies to the prestep- the prestep covers all constraints at once, rather than batch by batch.
             var prestepStage = new PrestepStageFunction { Dt = context.Dt, InverseDt = context.InverseDt, Solver = this };
             ref var previousWorker = ref context.Workers[workerIndex == 0 ? context.WorkerCount - 1 : workerIndex - 1];
             ref var nextWorker = ref context.Workers[workerIndex == context.WorkerCount - 1 ? 0 : workerIndex + 1];
             Debug.Assert(Batches.Count > 0, "Don't dispatch if there are no constraints.");
-            ContiguousClaimStage(ref prestepStage, 0, context.WorkBlocks.Count - 1, ref worker.PrestepStart, worker.BatchStarts[0], ref syncStage, claimedState, unclaimedState);
-            claimedState = 0;
-            unclaimedState = 1;
+            ContiguousClaimStage(ref prestepStage, 0, context.WorkBlocks.Count - 1,
+                ref worker.PrestepStart, worker.BatchStarts[0], ref syncStage,
+                ref claims, ref claimsBackBuffer, claimedState, unclaimedState);
 
-            Debug.Assert(context.BlockClaims[worker.BatchStarts[0]] == 2);
+            Debug.Assert(claimsBackBuffer[worker.BatchStarts[0]] == 2);
 
             var warmStartStage = new WarmStartStageFunction { Solver = this };
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
@@ -128,12 +138,28 @@ namespace SolverPrototype
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                 var inclusiveBatchEnd = context.BatchBoundaries[batchIndex] - 1;
                 var nextBatchIndex = batchIndex + 1;
+                Buffer<int> nextClaimsBuffer;
                 if (nextBatchIndex == Batches.Count)
+                {
                     nextBatchIndex = 0;
-                ContiguousClaimStage(ref warmStartStage, batchStart, inclusiveBatchEnd, ref worker.BatchStarts[batchIndex], worker.BatchStarts[nextBatchIndex], ref syncStage, claimedState, unclaimedState);
+                    //When we reach the last batch, the next batch will be in the next stage- which uses a different claims buffer.
+                    nextClaimsBuffer = claims;
+                }
+                else
+                {
+                    nextClaimsBuffer = claimsBackBuffer;
+                }
+                //Don't use the warm start to guess at the solve iteration work distribution.
+                var workerBatchStartCopy = worker.BatchStarts[batchIndex];
+                ContiguousClaimStage(ref warmStartStage, batchStart, inclusiveBatchEnd,
+                    ref workerBatchStartCopy, worker.BatchStarts[nextBatchIndex], ref syncStage,
+                    ref claimsBackBuffer, ref nextClaimsBuffer, claimedState, unclaimedState);
             }
-            claimedState = 1;
-            unclaimedState = 0;
+            //Two claims buffers have been filled, flip claim states.
+            //Note that we didn't explicitly flip the buffers- instead, we just passed them in reversed during the warm start.
+            claimedState = 0;
+            unclaimedState = 1;
+            int claimBufferIndex = 0;
 
             var solveStage = new SolveStageFunction { Solver = this };
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
@@ -143,14 +169,35 @@ namespace SolverPrototype
                     var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                     var inclusiveBatchEnd = context.BatchBoundaries[batchIndex] - 1;
                     var nextBatchIndex = batchIndex + 1;
+                    Buffer<int> nextClaimsBuffer;
                     if (nextBatchIndex == Batches.Count)
+                    {
                         nextBatchIndex = 0;
-                    ContiguousClaimStage(ref solveStage, batchStart, inclusiveBatchEnd, ref worker.BatchStarts[batchIndex], worker.BatchStarts[nextBatchIndex], ref syncStage, claimedState, unclaimedState);
-                    InterstageSync(ref syncStage);
+                        //When we reach the last batch, the next batch will be in the next iteration- which uses a different claims buffer.
+                        nextClaimsBuffer = claimsBackBuffer;
+                    }
+                    else
+                    {
+                        nextClaimsBuffer = claims;
+                    }
+                    
+                    ContiguousClaimStage(ref solveStage, batchStart, inclusiveBatchEnd,
+                        ref worker.BatchStarts[batchIndex], worker.BatchStarts[nextBatchIndex], ref syncStage, 
+                        ref claims, ref nextClaimsBuffer, claimedState, unclaimedState);
+
                 }
 
-                claimedState = claimedState ^ 1;
-                unclaimedState = unclaimedState ^ 1;
+                //Swap the claims buffers after every iteration; one whole buffer has been filled.
+                var tempClaims = claims;
+                claims = claimsBackBuffer;
+                claimsBackBuffer = tempClaims;
+                if (++claimBufferIndex == 2)
+                {
+                    claimBufferIndex = 0;
+                    //Two claims buffers have been filled, flip claim states.
+                    claimedState ^= 1;
+                    unclaimedState ^= 1;
+                }
 
             }
         }
@@ -167,16 +214,21 @@ namespace SolverPrototype
             //These values are found by empirical tuning. The optimal values may vary by architecture.
             //The goal here is to have just enough blocks that, in the event that we end up some underpowered threads (due to competition or hyperthreading), 
             //there are enough blocks that workstealing will still generally allow the extra threads to be useful.
-            const int targetBlocksPerBatchPerWorker = 6;
+            const int targetBlocksPerBatchPerWorker = 16;
             const int minimumBlockSizeInBundles = 4;
 
             var maximumBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, maximumBlocksPerBatch);
             ValidateWorkBlocks();
 
-            //Create the claims set.
-            bufferPool.SpecializeFor<int>().Take(context.WorkBlocks.Count, out context.BlockClaims);
-            context.BlockClaims.Clear(0, context.WorkBlocks.Count);
+            //Create the claims set. Note that we use two; we'll ping pong between them.
+            //This is necessary because every worker 'preclaims' its own start location before the beginning of the next processing stage.
+            //When using only one claims buffer, this preclaim could conflict any time the next stage and the current stage overlap 
+            //(every prestep->warmstart, any time there is only one constraint batch, or when using flip-flop traversal after every iteration). 
+            bufferPool.SpecializeFor<int>().Take(context.WorkBlocks.Count, out context.BlockClaimsA);
+            bufferPool.SpecializeFor<int>().Take(context.WorkBlocks.Count, out context.BlockClaimsB);
+            context.BlockClaimsA.Clear(0, context.WorkBlocks.Count);
+            context.BlockClaimsB.Clear(0, context.WorkBlocks.Count);
 
 
 
@@ -335,7 +387,7 @@ namespace SolverPrototype
             {
                 //Only preclaim those slots that have workers actually associated with them. Negative starts correspond to cases where not enough work blocks were available.
                 if (context.Workers[i].PrestepStart >= 0)
-                    context.BlockClaims[context.Workers[i].PrestepStart] = 2;
+                    context.BlockClaimsA[context.Workers[i].PrestepStart] = 2;
             }
 
             var start = Stopwatch.GetTimestamp();
@@ -480,7 +532,8 @@ namespace SolverPrototype
 
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
-            bufferPool.SpecializeFor<int>().Return(ref context.BlockClaims);
+            bufferPool.SpecializeFor<int>().Return(ref context.BlockClaimsA);
+            bufferPool.SpecializeFor<int>().Return(ref context.BlockClaimsB);
             context.OldBatchCount = Batches.Count;
             return (end - start) / (double)Stopwatch.Frequency;
         }
