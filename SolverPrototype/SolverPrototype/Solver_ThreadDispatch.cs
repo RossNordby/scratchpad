@@ -132,6 +132,10 @@ namespace SolverPrototype
             public Buffer<int> BlockClaimsA;
             public Buffer<int> BlockClaimsB;
 
+            //Used by the LastDispatch
+            public Buffer<WorkerBounds> WorkerBounds;
+            public Buffer<WorkerBounds> PreviousWorkerBounds;
+
         }
         MultithreadingParameters context;
 
