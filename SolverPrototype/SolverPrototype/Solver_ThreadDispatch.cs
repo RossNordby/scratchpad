@@ -132,9 +132,9 @@ namespace SolverPrototype
             public Buffer<int> BlockClaimsA;
             public Buffer<int> BlockClaimsB;
 
-            //Used by the LastDispatch
-            public Buffer<WorkerBounds> WorkerBounds;
-            public Buffer<WorkerBounds> PreviousWorkerBounds;
+            //Used by the LastDispatch. Pingponged.
+            public Buffer<WorkerBounds> WorkerBoundsA;
+            public Buffer<WorkerBounds> WorkerBoundsB;
 
         }
         MultithreadingParameters context;
