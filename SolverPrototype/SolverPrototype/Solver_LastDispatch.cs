@@ -149,10 +149,12 @@ namespace SolverPrototype
                 //Traverse backwards.
                 while (bounds.Min > batchStart)
                 {
-                    TraverseBackwardUntilBlocked(ref stageFunction, bounds.Min, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
+                    //Note bounds.Min - 1; Min is inclusive, so in order to access a new location, it must be pushed out.
+                    //Note that the above condition uses a > to handle this.
+                    TraverseBackwardUntilBlocked(ref stageFunction, bounds.Min - 1, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
                 }
 
-                Debug.Assert(bounds.Min >= batchStart && bounds.Max <= batchEnd);
+                Debug.Assert(bounds.Min == batchStart && bounds.Max == batchEnd);
 
                 //Clear the previous bounds array before the sync so the next stage has fresh data.
                 previousWorkerBounds[workerIndex].Min = int.MaxValue;
@@ -187,6 +189,8 @@ namespace SolverPrototype
             ExecuteStage(ref prestepStage, ref bounds, ref boundsBackBuffer, workerIndex, 0, context.WorkBlocks.Count,
                 ref worker.PrestepStart, ref syncStage, claimedState, unclaimedState);
 
+            claimedState = 0;
+            unclaimedState = 1;
             var warmStartStage = new WarmStartStageFunction { Solver = this };
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
@@ -196,10 +200,8 @@ namespace SolverPrototype
                 ExecuteStage(ref warmStartStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
                     ref workerBatchStartCopy, ref syncStage, claimedState, unclaimedState);
             }
-            //Two claims buffers have been filled, flip claim states.
-            //Note that we didn't explicitly flip the buffers- instead, we just passed them in reversed during the warm start.
-            claimedState = 0;
-            unclaimedState = 1;
+            claimedState = 1;
+            unclaimedState = 0;
 
             var solveStage = new SolveStageFunction { Solver = this };
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
@@ -210,6 +212,8 @@ namespace SolverPrototype
                     ExecuteStage(ref solveStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
                         ref worker.BatchStarts[batchIndex], ref syncStage, claimedState, unclaimedState);
                 }
+                claimedState ^= 1;
+                unclaimedState ^= 1;
             }
         }
 
