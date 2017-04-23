@@ -143,7 +143,14 @@ namespace SolverPrototype
         private void BuildWorkBlocks(BufferPool bufferPool, int minimumBlockSizeInBundles, int targetBlocksPerBatch)
         {
             var blockPool = bufferPool.SpecializeFor<WorkBlock>();
-            QuickList<WorkBlock, Buffer<WorkBlock>>.Create(blockPool, targetBlocksPerBatch * Batches.Count, out context.WorkBlocks);
+
+            var maximumBlockCount = 0;
+            for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
+            {
+                var typeBatchCount = Batches[batchIndex].TypeBatches.Count;
+                maximumBlockCount += typeBatchCount > targetBlocksPerBatch ? typeBatchCount : targetBlocksPerBatch;
+            }
+            QuickList<WorkBlock, Buffer<WorkBlock>>.Create(blockPool, maximumBlockCount, out context.WorkBlocks);
             QuickList<int, Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), Batches.Count, out context.BatchBoundaries);
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
@@ -183,7 +190,7 @@ namespace SolverPrototype
                         block.End = block.StartBundle + blockBundleCount;
                         Debug.Assert(block.StartBundle >= 0 && block.StartBundle < typeBatch.BundleCount);
                         Debug.Assert(block.End >= block.StartBundle + Math.Min(minimumBlockSizeInBundles, typeBatch.BundleCount) && block.End <= typeBatch.BundleCount);
-                        context.WorkBlocks.Add(ref block, blockPool);
+                        context.WorkBlocks.AddUnsafely(ref block);
                     }
                 }
                 context.BatchBoundaries.AddUnsafely(context.WorkBlocks.Count);

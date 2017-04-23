@@ -297,8 +297,8 @@ namespace SolverPrototype
             const int targetBlocksPerBatchPerWorker = 16;
             const int minimumBlockSizeInBundles = 4;
 
-            var maximumBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
-            BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, maximumBlocksPerBatch);
+            var targetBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
+            BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, targetBlocksPerBatch);
             ValidateWorkBlocks();
 
             //Note the clear; the block claims must be initialized to 0 so that the first worker stage knows that the data is available to claim.

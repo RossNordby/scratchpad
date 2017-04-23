@@ -1,10 +1,12 @@
-﻿using SolverPrototype;
+﻿using BEPUutilities2.Memory;
+using SolverPrototype;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using static SolverPrototype.Solver;
 
 namespace SolverPrototypeTests
 {

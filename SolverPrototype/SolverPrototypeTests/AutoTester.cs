@@ -31,16 +31,15 @@ namespace SolverPrototypeTests
             simulation.Solver.IterationCount = iterationCount;
 
 
-            //prejit
-            simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
-            var timer = Stopwatch.StartNew();
+            var timer = new Stopwatch();
             //var threadPool = new TPLPool(8);
             var threadPool = new SimpleThreadPool(threadCount);
             //var threadPool = new NotQuiteAThreadPool();
             double solveTime = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
+                //CacheBlaster.Blast();
                 timer.Start();
                 //simulation.Solver.Update(dt, inverseDt);
                 //solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
@@ -75,7 +74,7 @@ namespace SolverPrototypeTests
                 for (int i = 0; i < testsPerVariant; ++i)
                 {
                     var candidateTimings = Solve(width, height, length, frameCount, threadCount);
-                    if (candidateTimings.SolveTime < timingsForThreadCount.SolveTime)
+                    if (candidateTimings.SetupAndSolveTime < timingsForThreadCount.SetupAndSolveTime)
                         timingsForThreadCount = candidateTimings;
                 }
                 WriteLine(writer, $"{threadCount}T: {Math.Round(timingsForThreadCount.SetupAndSolveTime * 1e3, 2)}, {Math.Round((timingsForThreadCount.SetupAndSolveTime - timingsForThreadCount.SolveTime) * 1e3, 2)}");
