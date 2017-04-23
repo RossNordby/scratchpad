@@ -58,14 +58,17 @@ namespace SolverPrototype
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void TraverseForwardUntilBlocked<TStageFunction>(ref TStageFunction stageFunction, int blockIndex, ref WorkerBounds bounds, ref Buffer<WorkerBounds> allWorkerBounds, int workerIndex,
+        int TraverseForwardUntilBlocked<TStageFunction>(ref TStageFunction stageFunction, int blockIndex, ref WorkerBounds bounds, ref Buffer<WorkerBounds> allWorkerBounds, int workerIndex,
             int batchEnd, int claimedState, int unclaimedState)
             where TStageFunction : IStageFunction
         {
+            //If no claim is made, this defaults to an invalid interval endpoint.
+            int highestLocallyClaimedIndex = -1;
             while (true)
             {
                 if (Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) == unclaimedState)
                 {
+                    highestLocallyClaimedIndex = blockIndex;
                     bounds.Max = blockIndex + 1; //Exclusive bound.
                     Debug.Assert(blockIndex <= batchEnd);
                     stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
@@ -81,16 +84,20 @@ namespace SolverPrototype
                 }
             }
             MergeWorkerBounds(ref bounds, ref allWorkerBounds, workerIndex);
+            return highestLocallyClaimedIndex;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void TraverseBackwardUntilBlocked<TStageFunction>(ref TStageFunction stageFunction, int blockIndex, ref WorkerBounds bounds, ref Buffer<WorkerBounds> allWorkerBounds, int workerIndex,
+        int TraverseBackwardUntilBlocked<TStageFunction>(ref TStageFunction stageFunction, int blockIndex, ref WorkerBounds bounds, ref Buffer<WorkerBounds> allWorkerBounds, int workerIndex,
             int batchStart, int claimedState, int unclaimedState)
             where TStageFunction : IStageFunction
         {
+            //If no claim is made, this defaults to an invalid interval endpoint.
+            int lowestLocallyClaimedIndex = context.WorkBlocks.Count;
             while (true)
             {
                 if (Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) == unclaimedState)
                 {
+                    lowestLocallyClaimedIndex = blockIndex;
                     bounds.Min = blockIndex;
                     Debug.Assert(blockIndex >= batchStart);
                     stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
@@ -107,6 +114,7 @@ namespace SolverPrototype
                 }
             }
             MergeWorkerBounds(ref bounds, ref allWorkerBounds, workerIndex);
+            return lowestLocallyClaimedIndex;
         }
         private void ExecuteStage<TStageFunction>(ref TStageFunction stageFunction, ref Buffer<WorkerBounds> allWorkerBounds, ref Buffer<WorkerBounds> previousWorkerBounds, int workerIndex,
             int batchStart, int batchEnd, ref int workerStart, ref int syncStage,
@@ -128,22 +136,45 @@ namespace SolverPrototype
                 bounds.Min = blockIndex;
 
                 //Note that initialization guarantees a start index in the batch; no test required.
+                //Note that we track the largest contiguous region over the course of the stage execution. The batch start of this worker will be set to the 
+                //minimum slot of the largest contiguous region so that following iterations will tend to have a better initial work distribution with less work stealing.
                 Debug.Assert(batchStart <= blockIndex && batchEnd > blockIndex);
-                TraverseForwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
+                var highestLocalClaim = TraverseForwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
 
                 //By now, we've reached the end of the contiguous region in the forward direction. Try walking the other way.
                 blockIndex = workerStart - 1;
                 //Note that there is no guarantee that the block will be in the batch- this could be the leftmost worker.
+                int lowestLocalClaim;
                 if (blockIndex >= batchStart)
                 {
-                    TraverseBackwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
+                    lowestLocalClaim = TraverseBackwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
                 }
+                else
+                {
+                    lowestLocalClaim = batchStart;
+                }
+                //These are actually two inclusive bounds, so this is count - 1, but as long as we're consistent it's fine.
+                //For this first region, we need to check that it's actually a valid region- if the claims were blocked, it might not be.
+                var largestContiguousRegionSize = highestLocalClaim - lowestLocalClaim;
+                if (largestContiguousRegionSize >= 0)
+                    workerStart = lowestLocalClaim;
+                else
+                    largestContiguousRegionSize = 0; //It was an invalid region, but later invalid regions should be rejected by size. Setting to zero guarantees that later regions have to have at least one open slot.
+
 
                 //All contiguous slots have been claimed. Now just traverse to the end along the right direction.
                 while (bounds.Max < batchEnd)
                 {
-                    TraverseForwardUntilBlocked(ref stageFunction, bounds.Max, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
-
+                    //Each of these iterations may find a contiguous region larger than our previous attempt.
+                    lowestLocalClaim = bounds.Max;
+                    highestLocalClaim = TraverseForwardUntilBlocked(ref stageFunction, bounds.Max, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
+                    //If the claim at index lowestLocalClaim was blocked, highestLocalClaim will be -1, so the size will be negative.
+                    var regionSize = highestLocalClaim - lowestLocalClaim; //again, actually count - 1
+                    if (regionSize > largestContiguousRegionSize)
+                    {
+                        workerStart = lowestLocalClaim;
+                        largestContiguousRegionSize = regionSize;
+                    }
                 }
 
                 //Traverse backwards.
@@ -151,7 +182,15 @@ namespace SolverPrototype
                 {
                     //Note bounds.Min - 1; Min is inclusive, so in order to access a new location, it must be pushed out.
                     //Note that the above condition uses a > to handle this.
-                    TraverseBackwardUntilBlocked(ref stageFunction, bounds.Min - 1, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
+                    highestLocalClaim = bounds.Min - 1;
+                    lowestLocalClaim = TraverseBackwardUntilBlocked(ref stageFunction, highestLocalClaim, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
+                    //If the claim at highestLocalClaim was blocked, lowestLocalClaim will be workblocks.Count, so the size will be negative.
+                    var regionSize = highestLocalClaim - lowestLocalClaim; //again, actually count - 1
+                    if (regionSize > largestContiguousRegionSize)
+                    {
+                        workerStart = lowestLocalClaim;
+                        largestContiguousRegionSize = regionSize;
+                    }
                 }
 
                 Debug.Assert(bounds.Min == batchStart && bounds.Max == batchEnd);
@@ -186,6 +225,7 @@ namespace SolverPrototype
             //The same concept applies to the prestep- the prestep covers all constraints at once, rather than batch by batch.
             var prestepStage = new PrestepStageFunction { Dt = context.Dt, InverseDt = context.InverseDt, Solver = this };
             Debug.Assert(Batches.Count > 0, "Don't dispatch if there are no constraints.");
+            //Technically this could mutate prestep starts, but at the moment we rebuild starts every frame anyway so it doesn't matter oen way or the other.
             ExecuteStage(ref prestepStage, ref bounds, ref boundsBackBuffer, workerIndex, 0, context.WorkBlocks.Count,
                 ref worker.PrestepStart, ref syncStage, claimedState, unclaimedState);
 
