@@ -30,7 +30,7 @@ namespace SolverPrototypeTests
             const int iterationCount = 8;
             simulation.Solver.IterationCount = iterationCount;
 
-
+            
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             var timer = new Stopwatch();
             //var threadPool = new TPLPool(8);
@@ -39,7 +39,7 @@ namespace SolverPrototypeTests
             double solveTime = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                //CacheBlaster.Blast();
+                CacheBlaster.Blast();
                 timer.Start();
                 //simulation.Solver.Update(dt, inverseDt);
                 //solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);

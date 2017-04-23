@@ -23,10 +23,15 @@ namespace SolverPrototypeTests
         {
             //We don't have a guarantee that the processor is using pure LRU replacement. Some modern processors are a little trickier.
             //Scrambling the accesses should make it harder for the CPU to keep stuff cached.
-            for (int i = 0; i < longCount; ++i)
+            const int iterationsPerJob = 32;
+            Parallel.For(0, longCount / iterationsPerJob, jobIndex =>
             {
-                writeblob[i] = readblob[(i * 104395303) & mask];
-            }
+                var baseIndex = jobIndex * iterationsPerJob;
+                for (int i = baseIndex; i < baseIndex + iterationsPerJob; ++i)
+                {
+                    writeblob[i] = readblob[(i * 104395303) & mask];
+                }
+            });
         }
     }
 }
