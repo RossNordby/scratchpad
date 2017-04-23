@@ -207,14 +207,39 @@ namespace SolverPrototype
 
 
         }
-        //This works by distributing start indices across the work blocks based on the previous frame's results. Then, during every stage, the workers
-        //start at the indices and work along one direction until they reach another claim. At that point they'll revert back to their start position and work the other way.
-        //In the next stage, the workers will start at one end of the previously claimed set and work their way across contiguously.
-        //This limits the ability of workers to steal jobs from other workers, but very simply guarantees the contiguity of jobs. It also requires very little overhead.
-        //Every work block claim test only requires a single interlocked operation. 
+
         void LastWork(int workerIndex)
         {
             ref var worker = ref context.Workers[workerIndex];
+            if (context.WorkBlocks.Count <= context.WorkerCount)
+            {
+                //Too few blocks to give every worker a job; give the jobs to the first context.WorkBlocks.Count workers.
+                worker.PrestepStart = workerIndex < context.WorkBlocks.Count ? workerIndex : -1;
+            }
+            else
+            {
+                var blocksPerWorker = context.WorkBlocks.Count / context.WorkerCount;
+                var remainder = context.WorkBlocks.Count - blocksPerWorker * context.WorkerCount;
+                worker.PrestepStart = blocksPerWorker * workerIndex + Math.Min(remainder, workerIndex);
+            }
+            for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
+            {
+                var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+                var batchCount = context.BatchBoundaries[batchIndex] - batchStart;
+
+                if (batchCount <= context.WorkerCount)
+                {
+                    //Too few blocks to give every worker a job; give the jobs to the first context.WorkBlocks.Count workers.
+                    worker.BatchStarts[batchIndex] = workerIndex < batchCount ? batchStart + workerIndex : -1;
+                }
+                else
+                {
+                    var blocksPerWorker = batchCount / context.WorkerCount;
+                    var remainder = batchCount - blocksPerWorker * context.WorkerCount;
+                    worker.BatchStarts[batchIndex] = batchStart + blocksPerWorker * workerIndex + Math.Min(remainder, workerIndex);
+                }
+            }
+
             int syncStage = 0;
             //The claimed and unclaimed state swap after every usage of both pingpong claims buffers.
             int claimedState = 1;
@@ -281,74 +306,15 @@ namespace SolverPrototype
             context.BlockClaims.Clear(0, context.WorkBlocks.Count);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsA);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsB);
-
-
-
+                        
+            //Even though the batch starts are filled on the worker thread, we allocate on the main thread since stackallocs require localinit at the moment.
             QuickList<Worker, Buffer<Worker>>.Create(bufferPool.SpecializeFor<Worker>(), workerCount, out context.Workers);
             context.Workers.Count = workerCount;
             for (int i = 0; i < workerCount; ++i)
             {
                 bufferPool.SpecializeFor<int>().Take(Batches.Count, out context.Workers[i].BatchStarts);
             }
-
-
-
-            if (context.WorkBlocks.Count < workerCount)
-            {
-                //Too few blocks to give every worker a job.
-                for (int workerIndex = 0; workerIndex < context.WorkBlocks.Count; ++workerIndex)
-                {
-                    context.Workers[workerIndex].PrestepStart = workerIndex;
-                }
-                //All remaining workers should just spinwait; -1 start is a code for short circuiting.
-                for (int workerIndex = context.WorkBlocks.Count; workerIndex < workerCount; ++workerIndex)
-                {
-                    context.Workers[workerIndex].PrestepStart = -1;
-                }
-            }
-            else
-            {
-                var previousExclusiveEnd = 0;
-                var blocksPerWorker = context.WorkBlocks.Count / workerCount;
-                var remainder = context.WorkBlocks.Count - blocksPerWorker * workerCount;
-                for (int i = 0; i < workerCount; ++i)
-                {
-                    context.Workers[i].PrestepStart = previousExclusiveEnd;
-                    previousExclusiveEnd += remainder-- > 0 ? blocksPerWorker + 1 : blocksPerWorker;
-                }
-            }
-            for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
-            {
-                var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
-                var batchCount = context.BatchBoundaries[batchIndex] - batchStart;
-
-                if (batchCount < workerCount)
-                {
-                    //Too few blocks to give every worker a job.
-                    for (int workerIndex = 0; workerIndex < batchCount; ++workerIndex)
-                    {
-                        context.Workers[workerIndex].BatchStarts[batchIndex] = batchIndex + workerIndex;
-                    }
-                    //All remaining workers should just spinwait; -1 start is a code for short circuiting.
-                    for (int workerIndex = batchCount; workerIndex < workerCount; ++workerIndex)
-                    {
-                        context.Workers[workerIndex].BatchStarts[batchIndex] = -1;
-                    }
-                }
-                else
-                {
-                    var blocksPerWorker = batchCount / workerCount;
-                    var remainder = batchCount - blocksPerWorker * workerCount;
-                    var previousExclusiveEnd = batchStart;
-                    for (int workerIndex = 0; workerIndex < workerCount; ++workerIndex)
-                    {
-                        Debug.Assert(previousExclusiveEnd >= batchStart && previousExclusiveEnd <= batchStart + batchCount);
-                        context.Workers[workerIndex].BatchStarts[batchIndex] = previousExclusiveEnd;
-                        previousExclusiveEnd += remainder-- > 0 ? blocksPerWorker + 1 : blocksPerWorker;
-                    }
-                }
-            }
-
+            
             var start = Stopwatch.GetTimestamp();
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
             if (Batches.Count > 0)

@@ -78,24 +78,25 @@ namespace SolverPrototypeTests
                     if (candidateTimings.SolveTime < timingsForThreadCount.SolveTime)
                         timingsForThreadCount = candidateTimings;
                 }
-                WriteLine(writer, $"{threadCount} threads: {timingsForThreadCount.SolveTime}");
+                WriteLine(writer, $"{threadCount}T: {Math.Round(timingsForThreadCount.SetupAndSolveTime * 1e3, 2)}, {Math.Round((timingsForThreadCount.SetupAndSolveTime - timingsForThreadCount.SolveTime) * 1e3, 2)}");
             }
             int slowestIndex = 0;
             int fastestIndex = 0;
             for (int i = 1; i < timings.Length; ++i)
             {
-                if (timings[i].SolveTime < timings[fastestIndex].SolveTime)
+                if (timings[i].SolveTime < timings[fastestIndex].SetupAndSolveTime)
                     fastestIndex = i;
-                if (timings[i].SolveTime > timings[slowestIndex].SolveTime)
+                if (timings[i].SolveTime > timings[slowestIndex].SetupAndSolveTime)
                     slowestIndex = i;
             }
-            WriteLine(writer, $"Scaling: {timings[slowestIndex].SolveTime / timings[fastestIndex].SolveTime}");
+            WriteLine(writer, $"Scaling: {timings[slowestIndex].SetupAndSolveTime / timings[fastestIndex].SetupAndSolveTime}");
         }
 
         public static void Test()
         {
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
+            WriteLine(writer, "N threads: total solve+setup time in ms, setup time in ms");
             Subtest(32, 32, 32, 8, writer);
             Subtest(26, 26, 26, 12, writer);
             Subtest(20, 20, 20, 20, writer);
