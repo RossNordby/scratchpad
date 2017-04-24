@@ -96,8 +96,8 @@ namespace SolverPrototypeTests
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
             WriteLine(writer, "N threads: total solve+setup time in ms, setup time in ms");
-            Subtest(32, 32, 32, 8, writer);
-            Subtest(26, 26, 26, 12, writer);
+            //Subtest(32, 32, 32, 8, writer);
+            //Subtest(26, 26, 26, 12, writer);
             Subtest(20, 20, 20, 20, writer);
             Subtest(16, 16, 16, 30, writer);
             Subtest(13, 13, 13, 45, writer);
