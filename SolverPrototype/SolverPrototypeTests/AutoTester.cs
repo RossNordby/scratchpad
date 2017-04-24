@@ -14,14 +14,17 @@ namespace SolverPrototypeTests
     {
         public struct TestTimings
         {
-            public double SetupAndSolveTime;
-            public double SolveTime;
+            public double Total;
+            public double Min;
+            public double Max;
+            public double Average;
+            public double StdDev;
         }
-        public static TestTimings Solve(int width, int height, int length , int frameCount, int threadCount)
+        public static TestTimings Solve(int width, int height, int length, int frameCount, int threadCount)
         {
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
-
+            GC.Collect(3, GCCollectionMode.Forced, true);
             SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
 
@@ -30,31 +33,46 @@ namespace SolverPrototypeTests
             const int iterationCount = 8;
             simulation.Solver.IterationCount = iterationCount;
 
-            
-            //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
-            var timer = new Stopwatch();
+
             //var threadPool = new TPLPool(8);
             var threadPool = new SimpleThreadPool(threadCount);
             //var threadPool = new NotQuiteAThreadPool();
-            double solveTime = 0;
+            double totalTime = 0;
+            double sumOfSquares = 0.0;
+            TestTimings testTimings;
+            testTimings.Min = double.MaxValue;
+            testTimings.Max = double.MinValue;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 CacheBlaster.Blast();
-                timer.Start();
+                var frameStartTime = Stopwatch.GetTimestamp();
                 //simulation.Solver.Update(dt, inverseDt);
-                //solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //solveTime += simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //solveTime += simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //solveTime += simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                solveTime += simulation.Solver.LastMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                timer.Stop();
+                //simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                var frameEndTime = Stopwatch.GetTimestamp();
+                var frameTime = (frameEndTime - frameStartTime) / (double)Stopwatch.Frequency;
+                if (frameTime < testTimings.Min)
+                    testTimings.Min = frameTime;
+                if (frameTime > testTimings.Max)
+                    testTimings.Max = frameTime;
+                //Console.WriteLine($"F{frameIndex}: {1e3 * frameTime}");
+                totalTime += frameTime;
+                sumOfSquares += frameTime * frameTime;
             }
 
             threadPool.Dispose();
             simulation.BufferPool.Clear();
 
-            return new TestTimings { SetupAndSolveTime = timer.Elapsed.TotalSeconds, SolveTime = solveTime };
+            testTimings.Average = totalTime / frameCount;
+            testTimings.Total = totalTime;
+            testTimings.StdDev = Math.Sqrt(sumOfSquares / frameCount - testTimings.Average * testTimings.Average);
+
+            return testTimings;
         }
 
         static void WriteLine(StreamWriter writer, string text)
@@ -70,38 +88,36 @@ namespace SolverPrototypeTests
             for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
             {
                 ref var timingsForThreadCount = ref timings[threadCount - 1];
-                timingsForThreadCount = new TestTimings { SetupAndSolveTime = double.MaxValue, SolveTime = double.MaxValue };
+                timingsForThreadCount = new TestTimings { Total = double.MaxValue };
                 for (int i = 0; i < testsPerVariant; ++i)
                 {
                     var candidateTimings = Solve(width, height, length, frameCount, threadCount);
-                    if (candidateTimings.SetupAndSolveTime < timingsForThreadCount.SetupAndSolveTime)
+                    //WriteLine(writer, $"{threadCount}T {i}: {Math.Round(candidateTimings.SetupAndSolveTime * 1e3, 2)}, {Math.Round((candidateTimings.SetupAndSolveTime - candidateTimings.SolveTime) * 1e3, 2)}");
+                    WriteLine(writer, $"{i} AVE: {Math.Round(1e3 * candidateTimings.Average, 2)}, MIN: {Math.Round(1e3 * candidateTimings.Min, 2)}, MAX: {Math.Round(1e3 * candidateTimings.Max, 2)}, STD DEV: {Math.Round(1e3 * candidateTimings.StdDev, 3)}, ");
+                    if (candidateTimings.Total < timingsForThreadCount.Total)
                         timingsForThreadCount = candidateTimings;
                 }
-                WriteLine(writer, $"{threadCount}T: {Math.Round(timingsForThreadCount.SetupAndSolveTime * 1e3, 2)}, {Math.Round((timingsForThreadCount.SetupAndSolveTime - timingsForThreadCount.SolveTime) * 1e3, 2)}");
+                WriteLine(writer, $"{threadCount}T: {Math.Round(timingsForThreadCount.Total * 1e3, 2)}");
             }
-            int slowestIndex = 0;
             int fastestIndex = 0;
             for (int i = 1; i < timings.Length; ++i)
             {
-                if (timings[i].SolveTime < timings[fastestIndex].SetupAndSolveTime)
+                if (timings[i].Total < timings[fastestIndex].Total)
                     fastestIndex = i;
-                if (timings[i].SolveTime > timings[slowestIndex].SetupAndSolveTime)
-                    slowestIndex = i;
             }
-            WriteLine(writer, $"Scaling: {timings[slowestIndex].SetupAndSolveTime / timings[fastestIndex].SetupAndSolveTime}");
+            WriteLine(writer, $"Scaling: {timings[0].Total / timings[fastestIndex].Total}");
         }
 
         public static void Test()
         {
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
-            WriteLine(writer, "N threads: total solve+setup time in ms, setup time in ms");
-            //Subtest(32, 32, 32, 8, writer);
+            Subtest(32, 32, 32, 8, writer);
             //Subtest(26, 26, 26, 12, writer);
-            Subtest(20, 20, 20, 20, writer);
-            Subtest(16, 16, 16, 30, writer);
-            Subtest(13, 13, 13, 45, writer);
-            Subtest(10, 10, 10, 70, writer);
+            //Subtest(20, 20, 20, 20, writer);
+            //Subtest(16, 16, 16, 30, writer);
+            //Subtest(13, 13, 13, 45, writer);
+            //Subtest(10, 10, 10, 70, writer);
             writer.Flush();
             var path = "log.txt";
             using (var stream = File.OpenWrite(path))
