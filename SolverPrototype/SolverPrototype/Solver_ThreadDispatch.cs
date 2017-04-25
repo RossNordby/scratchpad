@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
@@ -145,11 +146,6 @@ namespace SolverPrototype
             }
         }
 
-        internal struct Worker
-        {
-            public int PrestepStart;
-            public Buffer<int> BatchStarts;
-        }
 
         struct WorkerBounds
         {
@@ -190,7 +186,6 @@ namespace SolverPrototype
         {
             public float Dt;
             public float InverseDt;
-            public QuickList<Worker, Buffer<Worker>> Workers;
             public QuickList<WorkBlock, Buffer<WorkBlock>> WorkBlocks;
             public Buffer<int> BlockClaims;
             public QuickList<int, Buffer<int>> BatchBoundaries;
@@ -310,7 +305,7 @@ namespace SolverPrototype
             }
         }
 
-        
+
         void InterstageSync(ref int syncStageIndex)
         {
             //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
@@ -446,17 +441,27 @@ namespace SolverPrototype
 
         void Work(int workerIndex)
         {
-            ref var worker = ref context.Workers[workerIndex];
+            int prestepStart;
             if (context.WorkBlocks.Count <= context.WorkerCount)
             {
                 //Too few blocks to give every worker a job; give the jobs to the first context.WorkBlocks.Count workers.
-                worker.PrestepStart = workerIndex < context.WorkBlocks.Count ? workerIndex : -1;
+                prestepStart = workerIndex < context.WorkBlocks.Count ? workerIndex : -1;
             }
             else
             {
                 var blocksPerWorker = context.WorkBlocks.Count / context.WorkerCount;
                 var remainder = context.WorkBlocks.Count - blocksPerWorker * context.WorkerCount;
-                worker.PrestepStart = blocksPerWorker * workerIndex + Math.Min(remainder, workerIndex);
+                prestepStart = blocksPerWorker * workerIndex + Math.Min(remainder, workerIndex);
+            }
+            Buffer<int> batchStarts;
+            unsafe
+            {
+                //stackalloc is actually a little bit slow since the localsinit behavior forces a zeroing.
+                //Fortunately, this executes once per thread per frame. With 32 batches, it would add... a few nanoseconds per frame. We can accept that overhead.
+                //This is preferred over preallocating on the heap- we might write to these values and we don't want to risk false sharing for no reason. 
+                //A single instance of false sharing would cost far more than the overhead of zeroing out the array.
+                var data = stackalloc int[Batches.Count];
+                batchStarts = new Buffer<int>(data, Batches.Count, Batches.Count);
             }
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
@@ -466,13 +471,13 @@ namespace SolverPrototype
                 if (batchCount <= context.WorkerCount)
                 {
                     //Too few blocks to give every worker a job; give the jobs to the first context.WorkBlocks.Count workers.
-                    worker.BatchStarts[batchIndex] = workerIndex < batchCount ? batchStart + workerIndex : -1;
+                    batchStarts[batchIndex] = workerIndex < batchCount ? batchStart + workerIndex : -1;
                 }
                 else
                 {
                     var blocksPerWorker = batchCount / context.WorkerCount;
                     var remainder = batchCount - blocksPerWorker * context.WorkerCount;
-                    worker.BatchStarts[batchIndex] = batchStart + blocksPerWorker * workerIndex + Math.Min(remainder, workerIndex);
+                    batchStarts[batchIndex] = batchStart + blocksPerWorker * workerIndex + Math.Min(remainder, workerIndex);
                 }
             }
 
@@ -488,7 +493,7 @@ namespace SolverPrototype
             Debug.Assert(Batches.Count > 0, "Don't dispatch if there are no constraints.");
             //Technically this could mutate prestep starts, but at the moment we rebuild starts every frame anyway so it doesn't matter oen way or the other.
             ExecuteStage(ref prestepStage, ref bounds, ref boundsBackBuffer, workerIndex, 0, context.WorkBlocks.Count,
-                ref worker.PrestepStart, ref syncStage, claimedState, unclaimedState);
+                ref prestepStart, ref syncStage, claimedState, unclaimedState);
 
             claimedState = 0;
             unclaimedState = 1;
@@ -497,7 +502,7 @@ namespace SolverPrototype
             {
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                 //Don't use the warm start to guess at the solve iteration work distribution.
-                var workerBatchStartCopy = worker.BatchStarts[batchIndex];
+                var workerBatchStartCopy = batchStarts[batchIndex];
                 ExecuteStage(ref warmStartStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
                     ref workerBatchStartCopy, ref syncStage, claimedState, unclaimedState);
             }
@@ -511,7 +516,7 @@ namespace SolverPrototype
                 {
                     var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
                     ExecuteStage(ref solveStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
-                        ref worker.BatchStarts[batchIndex], ref syncStage, claimedState, unclaimedState);
+                        ref batchStarts[batchIndex], ref syncStage, claimedState, unclaimedState);
                 }
                 claimedState ^= 1;
                 unclaimedState ^= 1;
@@ -554,7 +559,7 @@ namespace SolverPrototype
             }
 
         }
-        
+
         public double MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
@@ -567,7 +572,7 @@ namespace SolverPrototype
             //The goal here is to have just enough blocks that, in the event that we end up some underpowered threads (due to competition or hyperthreading), 
             //there are enough blocks that workstealing will still generally allow the extra threads to be useful.
             const int targetBlocksPerBatchPerWorker = 16;
-            const int minimumBlockSizeInBundles = 1;
+            const int minimumBlockSizeInBundles = 4;
 
             var targetBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, targetBlocksPerBatch);
@@ -579,26 +584,11 @@ namespace SolverPrototype
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsA);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsB);
 
-            //Even though the batch starts are filled on the worker thread, we allocate on the main thread since stackallocs require localinit at the moment.
-            QuickList<Worker, Buffer<Worker>>.Create(bufferPool.SpecializeFor<Worker>(), workerCount, out context.Workers);
-            context.Workers.Count = workerCount;
-            for (int i = 0; i < workerCount; ++i)
-            {
-                bufferPool.SpecializeFor<int>().Take(Batches.Count, out context.Workers[i].BatchStarts);
-            }
-
             var start = Stopwatch.GetTimestamp();
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
             if (Batches.Count > 0)
                 threadPool.ForLoop(0, threadPool.ThreadCount, Work);
             var end = Stopwatch.GetTimestamp();
-
-            //Note that we always just toss the old workers/batch starts sets and start again. This simplifies things at a very, very small cost.
-            for (int i = 0; i < workerCount; ++i)
-            {
-                bufferPool.SpecializeFor<int>().Return(ref context.Workers[i].BatchStarts);
-            }
-            context.Workers.Dispose(bufferPool.SpecializeFor<Worker>());
 
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
