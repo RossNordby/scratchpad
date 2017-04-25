@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
+using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -227,8 +228,9 @@ namespace SolverPrototype
                 {
                     highestLocallyClaimedIndex = blockIndex;
                     bounds.Max = blockIndex + 1; //Exclusive bound.
-                    Debug.Assert(blockIndex <= batchEnd);
-                    stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
+                    Debug.Assert(blockIndex < batchEnd);
+                    ref var block = ref context.WorkBlocks[blockIndex];
+                    stageFunction.Execute(Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex], block.StartBundle, block.End);
                     //Increment or exit.
                     if (++blockIndex == batchEnd)
                         break;
@@ -257,7 +259,8 @@ namespace SolverPrototype
                     lowestLocallyClaimedIndex = blockIndex;
                     bounds.Min = blockIndex;
                     Debug.Assert(blockIndex >= batchStart);
-                    stageFunction.Execute(ref context.WorkBlocks[blockIndex]);
+                    ref var block = ref context.WorkBlocks[blockIndex];
+                    stageFunction.Execute(Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex], block.StartBundle, block.End);
                     //Decrement or exit.
                     if (blockIndex == batchStart)
                         break;
@@ -275,68 +278,39 @@ namespace SolverPrototype
         }
         interface IStageFunction
         {
-            void Execute(ref WorkBlock block);
+            void Execute(TypeBatch typeBatch, int start, int end);
         }
         struct PrestepStageFunction : IStageFunction
         {
             public float Dt, InverseDt;
-            public Solver Solver;
+            public BodyInertias[] Inertias;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Execute(ref WorkBlock block)
+            public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                Solver.Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(Solver.bodies.LocalInertiaBundles, Dt, InverseDt, block.StartBundle, block.End);
+                typeBatch.Prestep(Inertias, Dt, InverseDt, start, end);
             }
         }
 
         struct WarmStartStageFunction : IStageFunction
         {
-            public Solver Solver;
+            public BodyVelocities[] Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Execute(ref WorkBlock block)
+            public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                Solver.Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(Solver.bodies.VelocityBundles, block.StartBundle, block.End);
+                typeBatch.WarmStart(Velocities, start, end);
             }
         }
         struct SolveStageFunction : IStageFunction
         {
-            public Solver Solver;
+            public BodyVelocities[] Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Execute(ref WorkBlock block)
+            public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                Solver.Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].SolveIteration(Solver.bodies.VelocityBundles, block.StartBundle, block.End);
+                typeBatch.SolveIteration(Velocities, start, end);
             }
         }
-        //void InterstageSync(ref int syncStageIndex)
-        //{
-        //    //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
-        //    //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
-        //    ++syncStageIndex;
-        //    var neededCompletionCount = context.WorkerCount * syncStageIndex;
-        //    if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
-        //    {
-        //        var wait = new SpinWait();
-        //        while (Volatile.Read(ref context.WorkerCompletedCount) < neededCompletionCount)
-        //        {
-        //            //We know that the wait is going to be short by design. Any call to Thread.Sleep(0) or, much worse, Thread.Sleep(1) would be a terrible mistake-
-        //            //both will introduce heavy context switches and potentially evict the cache. 
-        //            //We want to stick primarily to Thread.SpinWaits with the occasional fallback Thread.Yield. Thread.Yield only surrenders control to a thread
-        //            //that's on the same processor, so we don't have the same risk of evicting the cache.
-        //            //So, we reset the wait after every yield.
-        //            //(We could be a little more direct with access to Thread.SpinWait and Thread.Yield, but those aren't public in .NET Standard 1.4.
-        //            //We could require the user to provide a SpinWait and Yield implementation within the IThreadPool or something, but not every user's target platform will
-        //            //support direct access either...)
 
-        //            //(The SpinWait has a very simple internal structure. You could technically just fiddle with the internal count to force a spin wait of the desired length
-        //            //or a yield. But we don't really want to take a dependency on the internal memory representation of types that aren't under our control if we can avoid it.)
-        //            var shouldReset = wait.NextSpinWillYield;
-        //            wait.SpinOnce();
-        //            if (shouldReset)
-        //                wait.Reset();
-
-        //        }
-        //    }
-        //}
-
+        
         void InterstageSync(ref int syncStageIndex)
         {
             //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
@@ -360,7 +334,6 @@ namespace SolverPrototype
                 ref var waitCount = ref Unsafe.As<SpinWait, int>(ref wait);
                 while (Volatile.Read(ref context.WorkerCompletedCount) < neededCompletionCount)
                 {
-
                     //Empirically, being pretty aggressive about yielding produces the best results. This is pretty reasonable- 
                     //a single constraint bundle can take hundreds of nanoseconds to finish.
                     //That would be a whole lot of spinning that could be used by some other thread. At worst, we're being friendlier to other applications on the system.
@@ -378,90 +351,6 @@ namespace SolverPrototype
                 }
             }
         }
-
-        //object sync = new object();
-        //void InterstageSync(ref int syncStageIndex)
-        //{
-        //    //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
-        //    //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
-        //    ++syncStageIndex;
-        //    var neededCompletionCount = context.WorkerCount * syncStageIndex;
-
-        //    lock (sync)
-        //    {
-        //        ++context.WorkerCompletedCount;
-        //        if(context.WorkerCompletedCount == neededCompletionCount)
-        //        {
-        //            //Given the lock, it is only possible for this to be reached if all other threads have already called Monitor.Wait below.
-        //            //So, we can PulseAll and all other threads are guaranteed to return to activity.
-        //            Monitor.PulseAll(sync);
-        //        }
-        //        else
-        //        {
-        //            Monitor.Wait(sync);
-        //        }
-        //    }
-        //}
-
-        //ManualResetEvent resetEvent0 = new ManualResetEvent(false);
-        //ManualResetEvent resetEvent1 = new ManualResetEvent(false);
-        //void InterstageSync(ref int syncStageIndex)
-        //{
-        //    //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
-        //    //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
-        //    ++syncStageIndex;
-        //    var neededCompletionCount = context.WorkerCount * syncStageIndex;
-        //    if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
-        //    {
-        //        if ((syncStageIndex & 1) == 0)
-        //            resetEvent0.WaitOne();
-        //        else
-        //            resetEvent1.WaitOne();
-        //    }
-        //    else
-        //    {
-        //        if ((syncStageIndex & 1) == 0)
-        //        {
-        //            resetEvent1.Reset();
-        //            resetEvent0.Set();
-        //        }
-        //        else
-        //        {
-        //            resetEvent0.Reset();
-        //            resetEvent1.Set();
-        //        }
-        //    }
-        //}
-
-        //ManualResetEventSlim resetEvent0 = new ManualResetEventSlim(false);
-        //ManualResetEventSlim resetEvent1 = new ManualResetEventSlim(false);
-        //void InterstageSync(ref int syncStageIndex)
-        //{
-        //    //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
-        //    //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
-        //    ++syncStageIndex;
-        //    var neededCompletionCount = context.WorkerCount * syncStageIndex;
-        //    if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
-        //    {
-        //        if ((syncStageIndex & 1) == 0)
-        //            resetEvent0.Wait();
-        //        else
-        //            resetEvent1.Wait();
-        //    }
-        //    else
-        //    {
-        //        if ((syncStageIndex & 1) == 0)
-        //        {
-        //            resetEvent1.Reset();
-        //            resetEvent0.Set();
-        //        }
-        //        else
-        //        {
-        //            resetEvent0.Reset();
-        //            resetEvent1.Set();
-        //        }
-        //    }
-        //}
 
         private void ExecuteStage<TStageFunction>(ref TStageFunction stageFunction, ref Buffer<WorkerBounds> allWorkerBounds, ref Buffer<WorkerBounds> previousWorkerBounds, int workerIndex,
             int batchStart, int batchEnd, ref int workerStart, ref int syncStage,
@@ -595,7 +484,7 @@ namespace SolverPrototype
             var boundsBackBuffer = context.WorkerBoundsB;
             //Note that every batch has a different start position. Each covers a different subset of constraints, so they require different start locations.
             //The same concept applies to the prestep- the prestep covers all constraints at once, rather than batch by batch.
-            var prestepStage = new PrestepStageFunction { Dt = context.Dt, InverseDt = context.InverseDt, Solver = this };
+            var prestepStage = new PrestepStageFunction { Dt = context.Dt, InverseDt = context.InverseDt, Inertias = bodies.LocalInertiaBundles };
             Debug.Assert(Batches.Count > 0, "Don't dispatch if there are no constraints.");
             //Technically this could mutate prestep starts, but at the moment we rebuild starts every frame anyway so it doesn't matter oen way or the other.
             ExecuteStage(ref prestepStage, ref bounds, ref boundsBackBuffer, workerIndex, 0, context.WorkBlocks.Count,
@@ -603,7 +492,7 @@ namespace SolverPrototype
 
             claimedState = 0;
             unclaimedState = 1;
-            var warmStartStage = new WarmStartStageFunction { Solver = this };
+            var warmStartStage = new WarmStartStageFunction { Velocities = bodies.VelocityBundles };
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
                 var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
@@ -615,7 +504,7 @@ namespace SolverPrototype
             claimedState = 1;
             unclaimedState = 0;
 
-            var solveStage = new SolveStageFunction { Solver = this };
+            var solveStage = new SolveStageFunction { Velocities = bodies.VelocityBundles };
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
             {
                 for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
@@ -665,7 +554,7 @@ namespace SolverPrototype
             }
 
         }
-
+        
         public double MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
@@ -703,7 +592,6 @@ namespace SolverPrototype
             if (Batches.Count > 0)
                 threadPool.ForLoop(0, threadPool.ThreadCount, Work);
             var end = Stopwatch.GetTimestamp();
-
 
             //Note that we always just toss the old workers/batch starts sets and start again. This simplifies things at a very, very small cost.
             for (int i = 0; i < workerCount; ++i)

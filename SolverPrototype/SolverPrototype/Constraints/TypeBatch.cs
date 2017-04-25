@@ -62,8 +62,8 @@ namespace SolverPrototype.Constraints
         public abstract void Reset(BufferPool rawPool);
 
         public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle);
-        public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
-        public abstract void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int endBundle);
+        public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle);
+        public abstract void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle);
 
 
 

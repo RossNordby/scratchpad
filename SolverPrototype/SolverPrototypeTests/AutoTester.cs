@@ -30,7 +30,7 @@ namespace SolverPrototypeTests
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 8;
+            const int iterationCount = 1;
             simulation.Solver.IterationCount = iterationCount;
 
 
@@ -44,16 +44,16 @@ namespace SolverPrototypeTests
             testTimings.Max = double.MinValue;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                //CacheBlaster.Blast();
+                CacheBlaster.Blast();
                 var frameStartTime = Stopwatch.GetTimestamp();
                 //simulation.Solver.Update(dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 var frameEndTime = Stopwatch.GetTimestamp();
                 var frameTime = (frameEndTime - frameStartTime) / (double)Stopwatch.Frequency;
                 if (frameTime < testTimings.Min)
@@ -85,6 +85,7 @@ namespace SolverPrototypeTests
             const int testsPerVariant = 8;
             WriteLine(writer, $"{width}x{height}x{length} lattice, {frameCount} frames:");
             var timings = new TestTimings[Environment.ProcessorCount];
+            //for (int threadCount = 1; threadCount <= 1; ++threadCount)
             for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
             {
                 ref var timingsForThreadCount = ref timings[threadCount - 1];
@@ -92,8 +93,7 @@ namespace SolverPrototypeTests
                 for (int i = 0; i < testsPerVariant; ++i)
                 {
                     var candidateTimings = Solve(width, height, length, frameCount, threadCount);
-                    //WriteLine(writer, $"{threadCount}T {i}: {Math.Round(candidateTimings.SetupAndSolveTime * 1e3, 2)}, {Math.Round((candidateTimings.SetupAndSolveTime - candidateTimings.SolveTime) * 1e3, 2)}");
-                    WriteLine(writer, $"{i} AVE: {Math.Round(1e3 * candidateTimings.Average, 2)}, MIN: {Math.Round(1e3 * candidateTimings.Min, 2)}, MAX: {Math.Round(1e3 * candidateTimings.Max, 2)}, STD DEV: {Math.Round(1e3 * candidateTimings.StdDev, 3)}, ");
+                    //WriteLine(writer, $"{i} AVE: {Math.Round(1e3 * candidateTimings.Average, 2)}, MIN: {Math.Round(1e3 * candidateTimings.Min, 2)}, MAX: {Math.Round(1e3 * candidateTimings.Max, 2)}, STD DEV: {Math.Round(1e3 * candidateTimings.StdDev, 3)}, ");
                     if (candidateTimings.Total < timingsForThreadCount.Total)
                         timingsForThreadCount = candidateTimings;
                 }
@@ -112,12 +112,12 @@ namespace SolverPrototypeTests
         {
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
-            //Subtest(32, 32, 32, 8, writer);
-            //Subtest(26, 26, 26, 12, writer);
-            //Subtest(20, 20, 20, 20, writer);
-            //Subtest(16, 16, 16, 30, writer);
-            //Subtest(13, 13, 13, 45, writer);
-            Subtest(10, 10, 10, 70, writer);
+            Subtest(32, 32, 32, 8  * 4 , writer);
+            Subtest(26, 26, 26, 12 * 4, writer);
+            Subtest(20, 20, 20, 20 * 4, writer);
+            Subtest(16, 16, 16, 30 * 4, writer);
+            Subtest(13, 13, 13, 45 * 4, writer);
+            Subtest(10, 10, 10, 70 * 4, writer);
             writer.Flush();
             var path = "log.txt";
             using (var stream = File.OpenWrite(path))
