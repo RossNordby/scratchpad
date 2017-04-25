@@ -44,16 +44,16 @@ namespace SolverPrototypeTests
             testTimings.Max = double.MinValue;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                CacheBlaster.Blast();
+                //CacheBlaster.Blast();
                 var frameStartTime = Stopwatch.GetTimestamp();
                 //simulation.Solver.Update(dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 var frameEndTime = Stopwatch.GetTimestamp();
                 var frameTime = (frameEndTime - frameStartTime) / (double)Stopwatch.Frequency;
                 if (frameTime < testTimings.Min)
@@ -112,12 +112,12 @@ namespace SolverPrototypeTests
         {
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
-            Subtest(32, 32, 32, 8, writer);
+            //Subtest(32, 32, 32, 8, writer);
             //Subtest(26, 26, 26, 12, writer);
             //Subtest(20, 20, 20, 20, writer);
             //Subtest(16, 16, 16, 30, writer);
             //Subtest(13, 13, 13, 45, writer);
-            //Subtest(10, 10, 10, 70, writer);
+            Subtest(10, 10, 10, 70, writer);
             writer.Flush();
             var path = "log.txt";
             using (var stream = File.OpenWrite(path))

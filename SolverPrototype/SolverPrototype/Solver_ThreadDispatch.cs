@@ -337,6 +337,48 @@ namespace SolverPrototype
         //    }
         //}
 
+        void InterstageSync(ref int syncStageIndex)
+        {
+            //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
+            //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
+            ++syncStageIndex;
+            var neededCompletionCount = context.WorkerCount * syncStageIndex;
+            if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
+            {
+                //TODO: This is a superhack and you should assume that it will break at some point. 
+                //It should be replaced by a direct usage of Thread.Yield/Thread.SpinWait once .NET Standard 2.0 is available.
+                //Rationale: the SpinWait wait type distribution is a poor fit for this dispatch system.
+                //1) We never, ever want to Sleep(1). The only value of Sleep(1) is surrendering a timeslice to a lower priority thread, but it guarantees that the
+                //thread won't be scheduled again within a reasonable timespan. When talking about individual stages measured in a handful of microseconds, 1 millisecond is huge.
+                //2) While making use of the NextSpinWillYield property can be used to detect when we've entered the yielding phase, it doesn't provide any control over how much spinning
+                //precedes that phase nor does it allow us to avoid sleeps. 
+                //(Notably, Sleep(0) often doesn't cause much of a problem on larger simulations on single-socket systems since L2 evicted anyway, but Sleep(1) is devastating.)
+
+                //So, we take a dependency on the internal memory layout of SpinWait (by assuming it has a count int in the first 4 bytes), and also
+                //on the internal YIELD_THRESHOLD (10, so count of 11 -> yield).
+                var wait = new SpinWait();
+                ref var waitCount = ref Unsafe.As<SpinWait, int>(ref wait);
+                while (Volatile.Read(ref context.WorkerCompletedCount) < neededCompletionCount)
+                {
+
+                    //Empirically, being pretty aggressive about yielding produces the best results. This is pretty reasonable- 
+                    //a single constraint bundle can take hundreds of nanoseconds to finish.
+                    //That would be a whole lot of spinning that could be used by some other thread. At worst, we're being friendlier to other applications on the system.
+                    //This thread will likely be rescheduled on the same core, so it's unlikely that we'll lose any cache warmth (that we wouldn't have lost anyway).
+                    if (waitCount >= 3)
+                    {
+                        waitCount = 11;
+                        Debug.Assert(wait.NextSpinWillYield, "Uh oh did SpinWait's internals change before you got a chance to update this?");
+                    }
+                    else
+                    {
+                        Debug.Assert(!wait.NextSpinWillYield, "Uh oh did SpinWait's internals change before you got a chance to update this?");
+                    }
+                    wait.SpinOnce();
+                }
+            }
+        }
+
         //object sync = new object();
         //void InterstageSync(ref int syncStageIndex)
         //{
@@ -391,36 +433,35 @@ namespace SolverPrototype
         //    }
         //}
 
-
-        ManualResetEventSlim resetEvent0 = new ManualResetEventSlim(false);
-        ManualResetEventSlim resetEvent1 = new ManualResetEventSlim(false);
-        void InterstageSync(ref int syncStageIndex)
-        {
-            //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
-            //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
-            ++syncStageIndex;
-            var neededCompletionCount = context.WorkerCount * syncStageIndex;
-            if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
-            {
-                if ((syncStageIndex & 1) == 0)
-                    resetEvent0.Wait();
-                else
-                    resetEvent1.Wait();
-            }
-            else
-            {
-                if ((syncStageIndex & 1) == 0)
-                {
-                    resetEvent1.Reset();
-                    resetEvent0.Set();
-                }
-                else
-                {
-                    resetEvent0.Reset();
-                    resetEvent1.Set();
-                }
-            }
-        }
+        //ManualResetEventSlim resetEvent0 = new ManualResetEventSlim(false);
+        //ManualResetEventSlim resetEvent1 = new ManualResetEventSlim(false);
+        //void InterstageSync(ref int syncStageIndex)
+        //{
+        //    //No more work is available to claim, but not every thread is necessarily done with the work they claimed. So we need a dedicated sync- upon completing its local work,
+        //    //a worker increments the 'workerCompleted' counter, and the spins on that counter reaching workerCount * stageIndex.
+        //    ++syncStageIndex;
+        //    var neededCompletionCount = context.WorkerCount * syncStageIndex;
+        //    if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
+        //    {
+        //        if ((syncStageIndex & 1) == 0)
+        //            resetEvent0.Wait();
+        //        else
+        //            resetEvent1.Wait();
+        //    }
+        //    else
+        //    {
+        //        if ((syncStageIndex & 1) == 0)
+        //        {
+        //            resetEvent1.Reset();
+        //            resetEvent0.Set();
+        //        }
+        //        else
+        //        {
+        //            resetEvent0.Reset();
+        //            resetEvent1.Set();
+        //        }
+        //    }
+        //}
 
         private void ExecuteStage<TStageFunction>(ref TStageFunction stageFunction, ref Buffer<WorkerBounds> allWorkerBounds, ref Buffer<WorkerBounds> previousWorkerBounds, int workerIndex,
             int batchStart, int batchEnd, ref int workerStart, ref int syncStage,
@@ -637,7 +678,7 @@ namespace SolverPrototype
             //The goal here is to have just enough blocks that, in the event that we end up some underpowered threads (due to competition or hyperthreading), 
             //there are enough blocks that workstealing will still generally allow the extra threads to be useful.
             const int targetBlocksPerBatchPerWorker = 16;
-            const int minimumBlockSizeInBundles = 4;
+            const int minimumBlockSizeInBundles = 1;
 
             var targetBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, targetBlocksPerBatch);
