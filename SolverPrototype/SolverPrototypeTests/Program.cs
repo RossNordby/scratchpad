@@ -10,6 +10,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            LocalsinitCodegen.Test();
             //MathTests.Test();
             //UnpackCodegenTest.Test();
             //SpanCodeGenTests.Test();
@@ -20,7 +21,7 @@ namespace SolverPrototypeTests
             //ContactPenetration1DOFTests.Test();
             //PenetrationConvergenceTests.Test();
             //ContactManifoldConvergenceTests.Test();
-            AutoTester.Test();
+            //AutoTester.Test();
             //SortTest.Test();
             //IslandCacheConvergence.Test();
             //SuballocationTests.Test();
