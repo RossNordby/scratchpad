@@ -3,13 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26403.7
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolverPrototypeTests", "SolverPrototypeTests\SolverPrototypeTests.csproj", "{780865AA-7B4C-46FA-97F7-AA27F3D5A914}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BEPUutilities2", "..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj", "{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SolverPrototype", "SolverPrototype\SolverPrototype.csproj", "{5445058A-86CF-42B9-A160-5A8698B9C2AB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolverPrototypeCoreTests", "SolverPrototypeCoreTests\SolverPrototypeCoreTests.csproj", "{50512973-9A19-4BF4-9E1A-A0A30D5876B1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SolverPrototypeTests", "SolverPrototypeTests\SolverPrototypeTests.csproj", "{50512973-9A19-4BF4-9E1A-A0A30D5876B1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,18 +19,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Debug|x64.ActiveCfg = Debug|x64
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Debug|x64.Build.0 = Debug|x64
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Debug|x86.ActiveCfg = Debug|x86
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Debug|x86.Build.0 = Debug|x86
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Release|Any CPU.Build.0 = Release|Any CPU
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Release|x64.ActiveCfg = Release|x64
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Release|x64.Build.0 = Release|x64
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Release|x86.ActiveCfg = Release|x86
-		{780865AA-7B4C-46FA-97F7-AA27F3D5A914}.Release|x86.Build.0 = Release|x86
 		{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8ECF1B4D-ED6E-4B3F-B54E-5EFF9C80EE5D}.Debug|x64.ActiveCfg = Debug|x64

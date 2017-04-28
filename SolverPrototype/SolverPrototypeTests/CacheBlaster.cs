@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SolverPrototypeTests
 {
-    public unsafe static class CacheBlaster
+    public static class CacheBlaster
     {
         const int byteCount = (1 << 24); //16.7MB is bigger than most desktop last level caches. You'll want to pick something higher if you're running this on some ginormo xeon.
         const int intCount = byteCount / 4;
@@ -23,7 +23,7 @@ namespace SolverPrototypeTests
         /// Doesn't do a whole lot for simulations so large that they significantly exceed the cache size.
         /// </summary>
         [MethodImpl(MethodImplOptions.NoOptimization)]
-        public unsafe static void Blast()
+        public static void Blast()
         {
             //We don't have a guarantee that the processor is using pure LRU replacement. Some modern processors are a little trickier.
             //Scrambling the accesses should make it harder for the CPU to keep stuff cached.

@@ -9,24 +9,7 @@ using System.Threading.Tasks;
 
 namespace SolverPrototypeTests
 {
-    public class TPLPool : IThreadPool
-    {
-        public int ThreadCount { get; set; }
-        public TPLPool(int threadCount)
-        {
-            ThreadCount = threadCount;
-        }
-
-        public TPLPool()
-            : this(Environment.ProcessorCount)
-        {
-        }
-
-        public void ForLoop(int startIndex, int exclusiveEndIndex, Action<int> loopBody)
-        {
-            Parallel.For(startIndex, exclusiveEndIndex, loopBody);
-        }
-    }
+   
 
     public class NotQuiteAThreadPool : IThreadPool
     {
@@ -66,7 +49,7 @@ namespace SolverPrototypeTests
         }
 
         int jobIndexCounter;
-        int completedWorkerCounter; 
+        int completedWorkerCounter;
         volatile Action<int> loopBody;
         volatile int exclusiveJobEndIndex;
 
@@ -128,7 +111,7 @@ namespace SolverPrototypeTests
                 disposed = true;
                 SignalThreads();
                 foreach (var worker in workers)
-                { 
+                {
                     worker.Thread.Join();
                     worker.Signal.Dispose();
                 }
