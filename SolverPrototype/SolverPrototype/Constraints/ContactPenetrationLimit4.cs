@@ -102,19 +102,13 @@ namespace SolverPrototype.Constraints
             //Linear effective mass contribution notes:
             //1) The J * M^-1 * JT can be reordered to J * JT * M^-1 for the linear components, since M^-1 is a scalar and dot(n * scalar, n) = dot(n, n) * scalar.
             //2) dot(normal, normal) == 1, so the contribution from each body is just its inverse mass.
-            var linear = inertiaA.InverseMass + inertiaB.InverseMass;
-            var effectiveMass0 = Vector<float>.One / (linear + angularA0 + angularB0);
-            var effectiveMass1 = Vector<float>.One / (linear + angularA1 + angularB1);
-            var effectiveMass2 = Vector<float>.One / (linear + angularA2 + angularB2);
-            var effectiveMass3 = Vector<float>.One / (linear + angularA3 + angularB3);
-
             Springiness.ComputeSpringiness(ref prestep.SpringSettings, dt, 4f, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
-
+            var linear = inertiaA.InverseMass + inertiaB.InverseMass;
             //Note that we don't precompute the JT * effectiveMass term. Since the jacobians are shared, we have to do that multiply anyway.
-            projection.Penetration0.EffectiveMass = effectiveMass0 * effectiveMassCFMScale;
-            projection.Penetration1.EffectiveMass = effectiveMass1 * effectiveMassCFMScale;
-            projection.Penetration2.EffectiveMass = effectiveMass2 * effectiveMassCFMScale;
-            projection.Penetration3.EffectiveMass = effectiveMass3 * effectiveMassCFMScale;
+            projection.Penetration0.EffectiveMass = effectiveMassCFMScale / (linear + angularA0 + angularB0);
+            projection.Penetration1.EffectiveMass = effectiveMassCFMScale / (linear + angularA1 + angularB1);
+            projection.Penetration2.EffectiveMass = effectiveMassCFMScale / (linear + angularA2 + angularB2);
+            projection.Penetration3.EffectiveMass = effectiveMassCFMScale / (linear + angularA3 + angularB3);            
 
             projection.Penetration0.BiasVelocity = Vector.Min(prestep.Contact0.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
             projection.Penetration1.BiasVelocity = Vector.Min(prestep.Contact1.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
