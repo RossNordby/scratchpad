@@ -495,32 +495,32 @@ namespace SolverPrototype
             ExecuteStage(ref prestepStage, ref bounds, ref boundsBackBuffer, workerIndex, 0, context.WorkBlocks.Count,
                 ref prestepStart, ref syncStage, claimedState, unclaimedState);
 
-            claimedState = 0;
-            unclaimedState = 1;
-            var warmStartStage = new WarmStartStageFunction { Velocities = bodies.VelocityBundles };
-            for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
-            {
-                var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
-                //Don't use the warm start to guess at the solve iteration work distribution.
-                var workerBatchStartCopy = batchStarts[batchIndex];
-                ExecuteStage(ref warmStartStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
-                    ref workerBatchStartCopy, ref syncStage, claimedState, unclaimedState);
-            }
-            claimedState = 1;
-            unclaimedState = 0;
+            //claimedState = 0;
+            //unclaimedState = 1;
+            //var warmStartStage = new WarmStartStageFunction { Velocities = bodies.VelocityBundles };
+            //for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
+            //{
+            //    var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+            //    //Don't use the warm start to guess at the solve iteration work distribution.
+            //    var workerBatchStartCopy = batchStarts[batchIndex];
+            //    ExecuteStage(ref warmStartStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
+            //        ref workerBatchStartCopy, ref syncStage, claimedState, unclaimedState);
+            //}
+            //claimedState = 1;
+            //unclaimedState = 0;
 
-            var solveStage = new SolveStageFunction { Velocities = bodies.VelocityBundles };
-            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
-            {
-                for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
-                {
-                    var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
-                    ExecuteStage(ref solveStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
-                        ref batchStarts[batchIndex], ref syncStage, claimedState, unclaimedState);
-                }
-                claimedState ^= 1;
-                unclaimedState ^= 1;
-            }
+            //var solveStage = new SolveStageFunction { Velocities = bodies.VelocityBundles };
+            //for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
+            //{
+            //    for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
+            //    {
+            //        var batchStart = batchIndex > 0 ? context.BatchBoundaries[batchIndex - 1] : 0;
+            //        ExecuteStage(ref solveStage, ref bounds, ref boundsBackBuffer, workerIndex, batchStart, context.BatchBoundaries[batchIndex],
+            //            ref batchStarts[batchIndex], ref syncStage, claimedState, unclaimedState);
+            //    }
+            //    claimedState ^= 1;
+            //    unclaimedState ^= 1;
+            //}
         }
 
         [Conditional("DEBUG")]
