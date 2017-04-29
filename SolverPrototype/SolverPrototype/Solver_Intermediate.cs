@@ -23,7 +23,7 @@ namespace SolverPrototype
             }
 
             InterstageSync(ref syncStage);
-            
+
             for (int batchIndex = 0; batchIndex < Batches.Count; ++batchIndex)
             {
                 endIndex = context.BatchBoundaries[batchIndex];

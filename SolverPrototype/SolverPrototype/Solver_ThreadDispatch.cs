@@ -159,25 +159,81 @@ namespace SolverPrototype
             public int Max;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void Merge(ref WorkerBounds current, ref WorkerBounds mergeSource)
+            public static void MergeIfTouching(ref WorkerBounds current, ref WorkerBounds other, int blockCount)
             {
-                if (mergeSource.Min < current.Min)
-                    current.Min = mergeSource.Min;
-                if (mergeSource.Max > current.Max)
-                    current.Max = mergeSource.Max;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static bool BoundsTouch(ref WorkerBounds a, ref WorkerBounds b)
-            {
-                //Note that touching is sufficient reason to merge. They don't have to actually intersect.
-                return a.Min - b.Max <= 0 && b.Min - a.Max <= 0;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void MergeIfTouching(ref WorkerBounds current, ref WorkerBounds other)
-            {
-                //Could be a little more clever here if it matters.
-                if (BoundsTouch(ref current, ref other))
-                    Merge(ref current, ref other);
+                //Ignore invalid intervals.
+                if (current.Max == int.MinValue || current.Min == int.MaxValue || other.Max == int.MinValue || other.Min == int.MaxValue)
+                    return;
+                //Note that 'other' could become larger during execution. The result would be this function underestimating otherWidth
+                //and overestimating currentToOtherDistance. The result would be a false negative compared to an ideal always-latest atomic operation.
+                //But that's fine- a false negative won't break things, and it's unavoidable.
+                int currentWidth = current.Max - current.Min;
+                //Note that there is no such thing as a valid zero length claim. Min and Max being equal means it covers the whole region.
+                if (currentWidth <= 0)
+                    currentWidth += blockCount;
+                int otherWidth = other.Max - other.Min;
+                if (otherWidth <= 0)
+                    otherWidth += blockCount;
+                //Note that we consider an empty interval to be intersectable. That ensures a worker that hasn't claimed anything
+                //will still be able to find the next available slot to work on.
+                var currentToOtherDistance = other.Min - current.Min;
+                int otherToCurrentDistance;
+                if (currentToOtherDistance < 0)
+                {
+                    otherToCurrentDistance = -currentToOtherDistance;
+                    currentToOtherDistance += blockCount;
+                }
+                else
+                {
+                    otherToCurrentDistance = blockCount - currentToOtherDistance;
+                }
+                //Note that we merge intervals that do not overlap if they butt up against each other.
+
+                var otherMinTouched = currentToOtherDistance <= currentWidth;
+                var currentMinTouched = otherToCurrentDistance <= otherWidth;
+
+                if (otherMinTouched && currentMinTouched)
+                {
+                    //The only way for both mins to be contained is if the entire block space is covered.
+                    //(And the only way for the entire block space to be covered is if both mins are touched.)
+                    //Note that only setting the max is important: if you were to set both the min and max to some other value, like zero, another thread may see the half-written result
+                    //and get an invalid interval.
+                    current.Max = current.Min;
+                }
+                else if (otherMinTouched)
+                {
+                    //Expand to the other's max, if the other's max is further away.
+                    var candidateWidth = currentToOtherDistance + otherWidth;
+                    Debug.Assert(candidateWidth < blockCount, "A candidate width covering the entire region should result in both mins being touched, so this shouldn't execute.");
+                    if (candidateWidth > currentWidth)
+                    {
+                        var newMaxCandidate = current.Min + candidateWidth;
+                        //It's not possible for the new max to have gone beyond min + blockCount - 1, so one check is sufficient.
+                        if (newMaxCandidate >= blockCount)
+                            newMaxCandidate -= blockCount;
+                        Debug.Assert(newMaxCandidate < blockCount);
+                        current.Max = newMaxCandidate;
+                        //Need to update this value for use in the next test.
+                        currentWidth = current.Max - current.Min;
+                        if (currentWidth <= 0)
+                            currentWidth += blockCount;
+                    }
+                    //The current min is not included in the other interval, so there is no need to expand.
+                }
+                else if (currentMinTouched)
+                {
+                    //Expand to the other's min, if the other's min is further from the current max.
+                    //We know by the first condition that the other min is not contained in the current interval.
+                    //We also know that the merged interval does not cover all blocks.
+                    //That means the other min MUST be further away from the max than the current min.
+#if DEBUG
+                    var otherMinToCurrentMax = current.Max - other.Min;
+                    if (otherMinToCurrentMax <= 0)
+                        otherMinToCurrentMax += blockCount;
+                    Debug.Assert(otherMinToCurrentMax > currentWidth);
+#endif
+                    current.Min = other.Min;
+                }
 
             }
         }
@@ -203,11 +259,11 @@ namespace SolverPrototype
         {
             for (int i = 0; i < workerIndex; ++i)
             {
-                WorkerBounds.MergeIfTouching(ref bounds, ref allWorkerBounds[i]);
+                WorkerBounds.MergeIfTouching(ref bounds, ref allWorkerBounds[i], context.WorkBlocks.Count);
             }
             for (int i = workerIndex + 1; i < context.WorkerCount; ++i)
             {
-                WorkerBounds.MergeIfTouching(ref bounds, ref allWorkerBounds[i]);
+                WorkerBounds.MergeIfTouching(ref bounds, ref allWorkerBounds[i], context.WorkBlocks.Count);
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -237,40 +293,13 @@ namespace SolverPrototype
                     break;
                 }
             }
+            //Wrap.
+            if (bounds.Max == batchEnd)
+                bounds.Max = 0;
             MergeWorkerBounds(ref bounds, ref allWorkerBounds, workerIndex);
             return highestLocallyClaimedIndex;
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        int TraverseBackwardUntilBlocked<TStageFunction>(ref TStageFunction stageFunction, int blockIndex, ref WorkerBounds bounds, ref Buffer<WorkerBounds> allWorkerBounds, int workerIndex,
-            int batchStart, int claimedState, int unclaimedState)
-            where TStageFunction : IStageFunction
-        {
-            //If no claim is made, this defaults to an invalid interval endpoint.
-            int lowestLocallyClaimedIndex = context.WorkBlocks.Count;
-            while (true)
-            {
-                if (Interlocked.CompareExchange(ref context.BlockClaims[blockIndex], claimedState, unclaimedState) == unclaimedState)
-                {
-                    lowestLocallyClaimedIndex = blockIndex;
-                    bounds.Min = blockIndex;
-                    Debug.Assert(blockIndex >= batchStart);
-                    ref var block = ref context.WorkBlocks[blockIndex];
-                    stageFunction.Execute(Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex], block.StartBundle, block.End);
-                    //Decrement or exit.
-                    if (blockIndex == batchStart)
-                        break;
-                    --blockIndex;
-                }
-                else
-                {
-                    //Already claimed.
-                    bounds.Min = blockIndex;
-                    break;
-                }
-            }
-            MergeWorkerBounds(ref bounds, ref allWorkerBounds, workerIndex);
-            return lowestLocallyClaimedIndex;
-        }
+
         interface IStageFunction
         {
             void Execute(TypeBatch typeBatch, int start, int end);
@@ -365,37 +394,29 @@ namespace SolverPrototype
                 //Just assume the min will be claimed. There's a chance the thread will get preempted or the value will be read before it's actually claimed, but 
                 //that's a very small risk and doesn't affect long-term correctness. (It would just somewhat reduce workstealing effectiveness, and so performance.)
                 bounds.Min = blockIndex;
+                bounds.Max = blockIndex == batchEnd - 1 ? 0 : blockIndex + 1;
 
                 //Note that initialization guarantees a start index in the batch; no test required.
                 //Note that we track the largest contiguous region over the course of the stage execution. The batch start of this worker will be set to the 
                 //minimum slot of the largest contiguous region so that following iterations will tend to have a better initial work distribution with less work stealing.
                 Debug.Assert(batchStart <= blockIndex && batchEnd > blockIndex);
-                var highestLocalClaim = TraverseForwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
+                var originalHighest = TraverseForwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
 
-                //By now, we've reached the end of the contiguous region in the forward direction. Try walking the other way.
-                blockIndex = workerStart - 1;
-                //Note that there is no guarantee that the block will be in the batch- this could be the leftmost worker.
-                int lowestLocalClaim;
-                if (blockIndex >= batchStart)
-                {
-                    lowestLocalClaim = TraverseBackwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
-                }
-                else
-                {
-                    lowestLocalClaim = batchStart;
-                }
                 //These are actually two inclusive bounds, so this is count - 1, but as long as we're consistent it's fine.
                 //For this first region, we need to check that it's actually a valid region- if the claims were blocked, it might not be.
-                var largestContiguousRegionSize = highestLocalClaim - lowestLocalClaim;
-                if (largestContiguousRegionSize >= 0)
-                    workerStart = lowestLocalClaim;
-                else
+                int originalLowest = blockIndex;
+                var largestContiguousRegionSize = originalHighest - originalLowest;
+                if (largestContiguousRegionSize < 0)
                     largestContiguousRegionSize = 0; //It was an invalid region, but later invalid regions should be rejected by size. Setting to zero guarantees that later regions have to have at least one open slot.
 
 
-                //All contiguous slots have been claimed. Now just traverse to the end along the right direction.
-                while (bounds.Max < batchEnd)
+                //All contiguous slots have been claimed. Now just traverse forward until we meet our own butt.
+                int lowestLocalClaim = int.MaxValue;
+                int highestLocalClaim = int.MinValue;
+                while (true)
                 {
+                    if (bounds.Min == bounds.Max)
+                        break;
                     //Each of these iterations may find a contiguous region larger than our previous attempt.
                     lowestLocalClaim = bounds.Max;
                     highestLocalClaim = TraverseForwardUntilBlocked(ref stageFunction, bounds.Max, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
@@ -407,24 +428,13 @@ namespace SolverPrototype
                         largestContiguousRegionSize = regionSize;
                     }
                 }
-
-                //Traverse backwards.
-                while (bounds.Min > batchStart)
+                //If the last contiguous region touched the original one, we should merge them together.
+                if (lowestLocalClaim != int.MaxValue && highestLocalClaim == originalLowest - 1 && originalHighest - lowestLocalClaim > largestContiguousRegionSize)
                 {
-                    //Note bounds.Min - 1; Min is inclusive, so in order to access a new location, it must be pushed out.
-                    //Note that the above condition uses a > to handle this.
-                    highestLocalClaim = bounds.Min - 1;
-                    lowestLocalClaim = TraverseBackwardUntilBlocked(ref stageFunction, highestLocalClaim, ref bounds, ref allWorkerBounds, workerIndex, batchStart, claimedState, unclaimedState);
-                    //If the claim at highestLocalClaim was blocked, lowestLocalClaim will be workblocks.Count, so the size will be negative.
-                    var regionSize = highestLocalClaim - lowestLocalClaim; //again, actually count - 1
-                    if (regionSize > largestContiguousRegionSize)
-                    {
-                        workerStart = lowestLocalClaim;
-                        largestContiguousRegionSize = regionSize;
-                    }
+                    workerStart = lowestLocalClaim;
                 }
 
-                Debug.Assert(bounds.Min == batchStart && bounds.Max == batchEnd);
+                Debug.Assert(bounds.Min == bounds.Max, "If the workstealing has terminated, then the current worker's bounds should encompass the entire block set.");
 
                 //Clear the previous bounds array before the sync so the next stage has fresh data.
                 previousWorkerBounds[workerIndex].Min = int.MaxValue;
@@ -583,6 +593,11 @@ namespace SolverPrototype
             context.BlockClaims.Clear(0, context.WorkBlocks.Count);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsA);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsB);
+            for (int i = 0; i < workerCount; ++i)
+            {
+                //Initialize the first set of bounds to the 'invalid endpoint' state.
+                context.WorkerBoundsA[i] = new WorkerBounds { Min = int.MaxValue, Max = int.MinValue };
+            }
 
             var start = Stopwatch.GetTimestamp();
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
