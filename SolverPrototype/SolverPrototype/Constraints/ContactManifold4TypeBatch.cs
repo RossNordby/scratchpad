@@ -15,15 +15,24 @@ namespace SolverPrototype.Constraints
     {
         //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.
         //If you modify this layout, be sure to update the associated ContactManifold4Constraint.
-        //In a convex manifold, all contacts share the same normal.
+        //Note that this layout is defined by the execution order in the prestep. The function accesses it sequentially to ensure the prefetcher can do its job.
+        public Vector3Wide OffsetA0;
+        public Vector3Wide OffsetA1;
+        public Vector3Wide OffsetA2;
+        public Vector3Wide OffsetA3;
+        public Vector3Wide OffsetB0;
+        public Vector3Wide OffsetB1;
+        public Vector3Wide OffsetB2;
+        public Vector3Wide OffsetB3;
+        public Vector<float> FrictionCoefficient;        
+        //In a convex manifold, all contacts share the same normal and tangents.
         public QuaternionWide SurfaceBasis;
-        public ManifoldContactData Contact0;
-        public ManifoldContactData Contact1;
-        public ManifoldContactData Contact2;
-        public ManifoldContactData Contact3;
         //All contacts also share the spring settings.
         public SpringSettings SpringSettings;
-        public Vector<float> FrictionCoefficient;
+        public Vector<float> PenetrationDepth0;
+        public Vector<float> PenetrationDepth1;
+        public Vector<float> PenetrationDepth2;
+        public Vector<float> PenetrationDepth3;
     }
 
     public struct ContactManifold4AccumulatedImpulses
@@ -86,13 +95,16 @@ namespace SolverPrototype.Constraints
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
 
                 GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
-                Vector3Wide.Add(ref prestep.Contact0.OffsetA, ref prestep.Contact1.OffsetA, out var a01);
-                Vector3Wide.Add(ref prestep.Contact2.OffsetA, ref prestep.Contact3.OffsetA, out var a23);
+                //Be careful about the execution order here. It should be aligned with the prestep data layout to ensure prefetching works well.
+                //(Note that the Vector3Wide operations cause some degree of non-sequential access. We COULD fix that, but it would get gross; we'd have to store OffsetAX0, OffsetAX1...
+                //Probably another 1-3% prestep performance on the table there. Blegh.)
+                Vector3Wide.Add(ref prestep.OffsetA0, ref prestep.OffsetA1, out var a01);
+                Vector3Wide.Add(ref prestep.OffsetA2, ref prestep.OffsetA3, out var a23);
                 Vector3Wide.Add(ref a01, ref a23, out var offsetToManifoldCenterA);
                 var scale = new Vector<float>(0.25f);
                 Vector3Wide.Scale(ref offsetToManifoldCenterA, ref scale, out offsetToManifoldCenterA);
-                Vector3Wide.Add(ref prestep.Contact0.OffsetB, ref prestep.Contact1.OffsetB, out var b01);
-                Vector3Wide.Add(ref prestep.Contact2.OffsetB, ref prestep.Contact3.OffsetB, out var b23);
+                Vector3Wide.Add(ref prestep.OffsetB0, ref prestep.OffsetB1, out var b01);
+                Vector3Wide.Add(ref prestep.OffsetB2, ref prestep.OffsetB3, out var b23);
                 Vector3Wide.Add(ref b01, ref b23, out var offsetToManifoldCenterB);
                 Vector3Wide.Scale(ref offsetToManifoldCenterB, ref scale, out offsetToManifoldCenterB);
                 projection.PremultipliedFrictionCoefficient = scale * prestep.FrictionCoefficient;
@@ -101,10 +113,10 @@ namespace SolverPrototype.Constraints
                 TangentFriction.Prestep(ref surfaceBasis.X, ref surfaceBasis.Z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
                 ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, inverseDt, out projection.Penetration);
                 //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
-                Vector3Wide.Distance(ref prestep.Contact0.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm0);
-                Vector3Wide.Distance(ref prestep.Contact1.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm1);
-                Vector3Wide.Distance(ref prestep.Contact2.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm2);
-                Vector3Wide.Distance(ref prestep.Contact3.OffsetA, ref offsetToManifoldCenterA, out projection.LeverArm3);
+                Vector3Wide.Distance(ref prestep.OffsetA0, ref offsetToManifoldCenterA, out projection.LeverArm0);
+                Vector3Wide.Distance(ref prestep.OffsetA1, ref offsetToManifoldCenterA, out projection.LeverArm1);
+                Vector3Wide.Distance(ref prestep.OffsetA2, ref offsetToManifoldCenterA, out projection.LeverArm2);
+                Vector3Wide.Distance(ref prestep.OffsetA3, ref offsetToManifoldCenterA, out projection.LeverArm3);
                 TwistFriction.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, out projection.Twist);
             }
         }

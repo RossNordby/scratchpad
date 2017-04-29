@@ -36,7 +36,7 @@ namespace SolverPrototype.Constraints
     /// </summary>
     public static class ContactPenetrationLimit4
     {
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold4PrestepData prestep, float dt, float inverseDt,
             out ContactPenetrationLimit4Projection projection)
         {
@@ -69,14 +69,14 @@ namespace SolverPrototype.Constraints
             //linearB: -N
             //angularB: N x offsetB
             //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact0.OffsetA, ref normal, out projection.Penetration0.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.Contact0.OffsetB, out projection.Penetration0.AngularB);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact1.OffsetA, ref normal, out projection.Penetration1.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.Contact1.OffsetB, out projection.Penetration1.AngularB);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact2.OffsetA, ref normal, out projection.Penetration2.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.Contact2.OffsetB, out projection.Penetration2.AngularB);
-            Vector3Wide.CrossWithoutOverlap(ref prestep.Contact3.OffsetA, ref normal, out projection.Penetration3.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.Contact3.OffsetB, out projection.Penetration3.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA0, ref normal, out projection.Penetration0.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB0, out projection.Penetration0.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA1, ref normal, out projection.Penetration1.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB1, out projection.Penetration1.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA2, ref normal, out projection.Penetration2.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB2, out projection.Penetration2.AngularB);
+            Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA3, ref normal, out projection.Penetration3.AngularA);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB3, out projection.Penetration3.AngularB);
 
             //effective mass
             Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration0.AngularA, ref inertiaA.InverseInertiaTensor, out var intermediateA0);
@@ -110,10 +110,10 @@ namespace SolverPrototype.Constraints
             projection.Penetration2.EffectiveMass = effectiveMassCFMScale / (linear + angularA2 + angularB2);
             projection.Penetration3.EffectiveMass = effectiveMassCFMScale / (linear + angularA3 + angularB3);            
 
-            projection.Penetration0.BiasVelocity = Vector.Min(prestep.Contact0.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            projection.Penetration1.BiasVelocity = Vector.Min(prestep.Contact1.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            projection.Penetration2.BiasVelocity = Vector.Min(prestep.Contact2.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            projection.Penetration3.BiasVelocity = Vector.Min(prestep.Contact3.PenetrationDepth * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            projection.Penetration0.BiasVelocity = Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            projection.Penetration1.BiasVelocity = Vector.Min(prestep.PenetrationDepth1 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            projection.Penetration2.BiasVelocity = Vector.Min(prestep.PenetrationDepth2 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            projection.Penetration3.BiasVelocity = Vector.Min(prestep.PenetrationDepth3 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
         }
 
 

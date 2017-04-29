@@ -64,7 +64,7 @@ namespace SolverPrototype.Constraints
             Vector3Wide.CrossWithoutOverlap(ref jacobians.LinearA.Y, ref offsetB, out jacobians.AngularB.Y);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref Vector3Wide tangentX, ref Vector3Wide tangentY, ref Vector3Wide offsetA, ref Vector3Wide offsetB,
             ref BodyInertias inertiaA, ref BodyInertias inertiaB,
             out TangentFrictionProjection projection)

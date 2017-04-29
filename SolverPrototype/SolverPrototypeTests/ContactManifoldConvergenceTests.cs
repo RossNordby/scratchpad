@@ -118,11 +118,11 @@ namespace SolverPrototypeTests
                     var velocityA = GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Y, innerIndexA);
                     var velocityB = GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Y, innerIndexB);
                     var penetrationChange = dt * (velocityA - velocityB);
-                    ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact0.PenetrationDepth, innerIndex);
+                    ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth0, innerIndex);
                     penetrationDepth += penetrationChange;
-                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact1.PenetrationDepth, innerIndex) += penetrationChange;
-                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact2.PenetrationDepth, innerIndex) += penetrationChange;
-                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].Contact3.PenetrationDepth, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth1, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth2, innerIndex) += penetrationChange;
+                    GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth3, innerIndex) += penetrationChange;
 
                     if (i == 0)
                         //if (penetrationDepth > 0.2)

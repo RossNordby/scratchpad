@@ -17,7 +17,7 @@ namespace SolverPrototype.Constraints
     /// </summary>
     public static class TwistFriction
     {
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide angularJacobianA,
             out TwistFrictionProjection projection)
         {

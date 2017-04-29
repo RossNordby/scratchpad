@@ -10,6 +10,7 @@ namespace SolverPrototype
 {
     public struct SpringSettings
     {
+        //Be careful when fiddling with the memory layout. It's aligned with execution order.
         public Vector<float> NaturalFrequency;
         public Vector<float> DampingRatio;
         public Vector<float> MaximumRecoveryVelocity;
