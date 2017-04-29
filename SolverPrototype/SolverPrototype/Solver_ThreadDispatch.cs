@@ -583,6 +583,11 @@ namespace SolverPrototype
             context.BlockClaims.Clear(0, context.WorkBlocks.Count);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsA);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsB);
+            //The worker bounds for A should be initialized to avoid trash interval data from messing up the workstealing.
+            for (int i =0; i < workerCount; ++i)
+            {
+                context.WorkerBoundsA[i] = new WorkerBounds { Min = int.MaxValue, Max = int.MinValue };
+            }
 
             var start = Stopwatch.GetTimestamp();
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.

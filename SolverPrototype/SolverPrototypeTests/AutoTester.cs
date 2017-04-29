@@ -77,11 +77,11 @@ namespace SolverPrototypeTests
         }
         static void Subtest(int width, int height, int length, int frameCount, StreamWriter writer)
         {
-            const int testsPerVariant = 8;
+            const int testsPerVariant = 3;
             WriteLine(writer, $"{width}x{height}x{length} lattice, {frameCount} frames:");
             var timings = new TestTimings[Environment.ProcessorCount];
             //for (int threadCount = 1; threadCount <= 1; ++threadCount)
-            for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
+            for (int threadCount = 8; threadCount <= Environment.ProcessorCount; ++threadCount)
             {
                 ref var timingsForThreadCount = ref timings[threadCount - 1];
                 timingsForThreadCount = new TestTimings { Total = double.MaxValue };
@@ -107,12 +107,12 @@ namespace SolverPrototypeTests
         {
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
-            Subtest(32, 32, 32, 8, writer);
-            Subtest(26, 26, 26, 12, writer);
-            Subtest(20, 20, 20, 20, writer);
-            Subtest(16, 16, 16, 30, writer);
-            Subtest(13, 13, 13, 45, writer);
-            Subtest(10, 10, 10, 70, writer);
+            //Subtest(32, 32, 32, 8, writer);
+            //Subtest(26, 26, 26, 12, writer);
+            //Subtest(20, 20, 20, 20, writer);
+            //Subtest(16, 16, 16, 30, writer);
+            //Subtest(13, 13, 13, 45, writer);
+            Subtest(10, 10, 10, 2000, writer);
             writer.Flush();
             var path = "log.txt";
             using (var stream = File.OpenWrite(path))
