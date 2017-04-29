@@ -7,7 +7,6 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             AutoTester.Test();
-            //ContactManifoldConvergenceTests.Test();
         }
     }
 }

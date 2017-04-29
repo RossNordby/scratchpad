@@ -85,7 +85,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
-            const int frameCount = 128;
+            const int frameCount = 64;
             simulation.Solver.IterationCount = iterationCount;
 
 
@@ -151,8 +151,8 @@ namespace SolverPrototypeTests
                 //GC.Collect(3, GCCollectionMode.Forced, true);
                 timer.Start();
                 //simulation.Solver.Update(dt, inverseDt);
-                //solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
