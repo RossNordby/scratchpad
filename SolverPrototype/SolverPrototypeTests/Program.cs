@@ -6,7 +6,8 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
-            AutoTester.Test();
+            LocalsinitCodegen.Test();
+            //AutoTester.Test();
         }
     }
 }

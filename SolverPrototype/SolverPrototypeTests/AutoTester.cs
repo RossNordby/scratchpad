@@ -81,7 +81,7 @@ namespace SolverPrototypeTests
             WriteLine(writer, $"{width}x{height}x{length} lattice, {frameCount} frames:");
             var timings = new TestTimings[Environment.ProcessorCount];
             //for (int threadCount = 1; threadCount <= 1; ++threadCount)
-            for (int threadCount = 8; threadCount <= Environment.ProcessorCount; ++threadCount)
+            for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
             {
                 ref var timingsForThreadCount = ref timings[threadCount - 1];
                 timingsForThreadCount = new TestTimings { Total = double.MaxValue };
@@ -112,7 +112,7 @@ namespace SolverPrototypeTests
             //Subtest(20, 20, 20, 20, writer);
             //Subtest(16, 16, 16, 30, writer);
             //Subtest(13, 13, 13, 45, writer);
-            Subtest(10, 10, 10, 2000, writer);
+            Subtest(10, 10, 10, 70, writer);
             writer.Flush();
             var path = "log.txt";
             using (var stream = File.OpenWrite(path))
