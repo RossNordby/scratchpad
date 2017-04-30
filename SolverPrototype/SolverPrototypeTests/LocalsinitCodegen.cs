@@ -71,12 +71,14 @@ namespace SolverPrototypeTests
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void MicroTest2(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
+            //no locals initialization
             Vector3Wide.Add(ref angularA, ref wsvA.LinearVelocity, out var temp);
             wsvB.AngularVelocity = temp;
         }
         [MethodImpl(MethodImplOptions.NoInlining)]
         public static void MicroTest3(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
+            //no locals initialization
             Vector3Wide.Add(ref angularA, ref wsvA.LinearVelocity, out wsvB.AngularVelocity);
         }
 
@@ -141,6 +143,13 @@ namespace SolverPrototypeTests
         {
             public Vector<float> X;
             public Vector<float> Y;
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Scale(ref InnerStruct v, ref Vector<float> s, out InnerStruct result)
+            {
+                result.X = v.X * s;
+                result.Y = v.Y * s;
+            }
         }
         public struct OuterStruct
         {
@@ -155,6 +164,12 @@ namespace SolverPrototypeTests
                 result.Y.X = m.Y.X * s;
                 result.Y.Y = m.Y.Y * s;
             }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void ScaleSubcalls(ref OuterStruct m, ref Vector<float> s, out OuterStruct result)
+            {
+                InnerStruct.Scale(ref m.X, ref s, out result.X);
+                InnerStruct.Scale(ref m.Y, ref s, out result.Y);
+            }
         }
 
         public struct FlattenedStruct
@@ -164,6 +179,19 @@ namespace SolverPrototypeTests
             public Vector<float> YX;
             public Vector<float> YY;
 
+            //public ref InnerStruct X { get { return ref Unsafe.As<Vector<float>, InnerStruct>(ref XX); } }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static ref InnerStruct GetX(ref FlattenedStruct m)
+            {
+                return ref Unsafe.As<Vector<float>, InnerStruct>(ref m.XX);
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static ref InnerStruct GetY(ref FlattenedStruct m)
+            {
+                return ref Unsafe.As<Vector<float>, InnerStruct>(ref m.YX);
+            }
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static void Scale(ref FlattenedStruct m, ref Vector<float> s, out FlattenedStruct result)
             {
@@ -171,6 +199,16 @@ namespace SolverPrototypeTests
                 result.XY = m.XY * s;
                 result.YX = m.YX * s;
                 result.YY = m.YY * s;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void ScaleRenested(ref FlattenedStruct m, ref Vector<float> s, out FlattenedStruct result)
+            {
+                ref var x = ref GetX(ref m);
+                result.XX = x.X * s;
+                result.XY = x.Y * s;
+                ref var y = ref GetY(ref m);
+                result.YX = y.X * s;
+                result.YY = y.Y * s;
             }
         }
 
@@ -182,11 +220,25 @@ namespace SolverPrototypeTests
             OuterStruct.Scale(ref intermediate, ref s, out result);
         }
         [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void SubcallsNestedStructTest(ref OuterStruct m, ref Vector<float> s, out OuterStruct result)
+        {
+            //rep stos, ecx 10h (64 bytes), with or without inlining on the interior subcall
+            OuterStruct.ScaleSubcalls(ref m, ref s, out var intermediate);
+            OuterStruct.ScaleSubcalls(ref intermediate, ref s, out result);
+        }
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void FlattenedStructTest(ref FlattenedStruct m, ref Vector<float> s, out FlattenedStruct result)
         {
             //no locals initialization
             FlattenedStruct.Scale(ref m, ref s, out var intermediate);
             FlattenedStruct.Scale(ref intermediate, ref s, out result);
+        }
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void RenestedStructTest(ref FlattenedStruct m, ref Vector<float> s, out FlattenedStruct result)
+        {
+            //rep stos, ecx 8 (32 bytes)
+            FlattenedStruct.ScaleRenested(ref m, ref s, out var intermediate);
+            FlattenedStruct.ScaleRenested(ref intermediate, ref s, out result);
         }
 
 
@@ -307,9 +359,11 @@ namespace SolverPrototypeTests
                 var m = new OuterStruct();
                 var s = new Vector<float>();
                 NestedStructTest(ref m, ref s, out var result);
+                SubcallsNestedStructTest(ref m, ref s, out result);
 
                 var m2 = new FlattenedStruct();
                 FlattenedStructTest(ref m2, ref s, out var result2);
+                RenestedStructTest(ref m2, ref s, out result2);
 
                 var m3 = new DummyOuterStruct();
                 DummyNestedStructTest(ref m3, ref s, out var result3);
@@ -321,7 +375,7 @@ namespace SolverPrototypeTests
 
                 var m2 = new ScalarFlattenedStruct();
                 ScalarFlattenedStructTest(ref m2, s, out var result2);
-                
+
             }
         }
 
