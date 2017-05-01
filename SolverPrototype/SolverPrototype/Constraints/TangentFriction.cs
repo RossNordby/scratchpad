@@ -29,7 +29,7 @@ namespace SolverPrototype.Constraints
             public Matrix2x3Wide AngularB;
         }
         //Since this is an unshared specialized implementation, the jacobian calculation is kept in here rather than in the batch.
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void ComputeJacobians(ref Vector3Wide tangentX, ref Vector3Wide tangentY, ref Vector3Wide offsetA, ref Vector3Wide offsetB,
             out Jacobians jacobians)
         {
@@ -56,12 +56,12 @@ namespace SolverPrototype.Constraints
             //           [ -tangentY ]
             //jAngularB = [ -offsetB x tangentX ] = [ tangentX x offsetB ]
             //            [ -offsetB x tangentY ]   [ tangentY x offsetB ]
-            jacobians.LinearA.X = tangentX;
-            jacobians.LinearA.Y = tangentY;
-            Vector3Wide.CrossWithoutOverlap(ref offsetA, ref tangentX, out jacobians.AngularA.X);
-            Vector3Wide.CrossWithoutOverlap(ref offsetA, ref jacobians.LinearA.Y, out jacobians.AngularA.Y);
-            Vector3Wide.CrossWithoutOverlap(ref tangentX, ref offsetB, out jacobians.AngularB.X);
-            Vector3Wide.CrossWithoutOverlap(ref jacobians.LinearA.Y, ref offsetB, out jacobians.AngularB.Y);
+            Matrix2x3Wide.GetX(ref jacobians.LinearA) = tangentX;
+            Matrix2x3Wide.GetY(ref jacobians.LinearA) = tangentY;
+            Vector3Wide.CrossWithoutOverlap(ref offsetA, ref tangentX, out Matrix2x3Wide.GetX(ref jacobians.AngularA));
+            Vector3Wide.CrossWithoutOverlap(ref offsetA, ref tangentY, out Matrix2x3Wide.GetY(ref jacobians.AngularA));
+            Vector3Wide.CrossWithoutOverlap(ref tangentX, ref offsetB, out Matrix2x3Wide.GetX(ref jacobians.AngularB));
+            Vector3Wide.CrossWithoutOverlap(ref tangentY, ref offsetB, out Matrix2x3Wide.GetY(ref jacobians.AngularB));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

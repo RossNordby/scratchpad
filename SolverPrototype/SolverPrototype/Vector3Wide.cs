@@ -29,7 +29,7 @@ namespace SolverPrototype
             length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void Add(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
         {
             result.X = a.X + b.X;
@@ -51,7 +51,7 @@ namespace SolverPrototype
             result = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void Scale(ref Vector3Wide vector, ref Vector<float> scalar, out Vector3Wide result)
         {
             result.X = vector.X * scalar;

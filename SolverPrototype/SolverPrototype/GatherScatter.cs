@@ -278,8 +278,8 @@ namespace SolverPrototype
 
             inertiaA = new BodyInertias();
             inertiaB = new BodyInertias();
-            ref var targetBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.X.X);
-            ref var targetBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.X.X);
+            ref var targetBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
+            ref var targetBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.M11);
 
             //Grab the base references for the body indices. Note that we make use of the references memory layout again.
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
@@ -290,7 +290,7 @@ namespace SolverPrototype
                 {
                     var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
 
-                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexA].InverseInertiaTensor.X.X, innerIndexA);
+                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexA].InverseInertiaTensor.M11, innerIndexA);
                     ref var targetSlot = ref Unsafe.Add(ref targetBaseA, i);
                     targetSlot = bundleSlot;
                     Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
@@ -308,7 +308,7 @@ namespace SolverPrototype
                     var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
                     var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
 
-                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexB].InverseInertiaTensor.X.X, innerIndexB);
+                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexB].InverseInertiaTensor.M11, innerIndexB);
                     ref var targetSlot = ref Unsafe.Add(ref targetBaseB, i);
                     targetSlot = bundleSlot;
                     Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
@@ -326,7 +326,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
         {
-            ref var targetLane = ref Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
+            ref var targetLane = ref Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
 
             targetLane = inertia.InverseInertiaTensor.X.X;
             Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.X.Y;
@@ -367,7 +367,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
         {
-            ref var sourceLane = ref Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
+            ref var sourceLane = ref Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
 
             inertia.InverseInertiaTensor.X = new Vector3(
                 sourceLane,

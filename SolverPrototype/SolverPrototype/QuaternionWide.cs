@@ -22,10 +22,10 @@ namespace SolverPrototype
             //Since we can't branch, we're going to end up calculating the possible states of all branches.
             //This requires doing more ALU work than the branching implementation, but there are a lot of common terms across the branches, and (random-ish) branches aren't free.
             //Overall, this turns out to be about 2x-2.5x more expensive per call than the scalar version, but it handles multiple lanes, so it's a net win.
-            var oneAddX = Vector<float>.One + r.X.X;
-            var oneSubX = Vector<float>.One - r.X.X;
-            var yAddZ = r.Y.Y + r.Z.Z;
-            var ySubZ = r.Y.Y - r.Z.Z;
+            var oneAddX = Vector<float>.One + r.M11;
+            var oneSubX = Vector<float>.One - r.M11;
+            var yAddZ = r.M22 + r.M33;
+            var ySubZ = r.M22 - r.M33;
             var tX = oneAddX - yAddZ;
             var tY = oneSubX + ySubZ;
             var tZ = oneSubX - ySubZ;
@@ -33,24 +33,24 @@ namespace SolverPrototype
 
             //There are two layers of conditions- inner, and outer. We have to first select each of the two inner halves- upper, and lower-
             //and then we will select which of the two inners to use for the outer.
-            var useUpper = Vector.LessThan(r.Z.Z, Vector<float>.Zero);
-            var useUpperUpper = Vector.GreaterThan(r.X.X, r.Y.Y);
-            var useLowerUpper = Vector.LessThan(r.X.X, -r.Y.Y);
+            var useUpper = Vector.LessThan(r.M33, Vector<float>.Zero);
+            var useUpperUpper = Vector.GreaterThan(r.M11, r.M22);
+            var useLowerUpper = Vector.LessThan(r.M11, -r.M22);
             var t = Vector.ConditionalSelect(useUpper,
                     Vector.ConditionalSelect(useUpperUpper, tX, tY),
                     Vector.ConditionalSelect(useLowerUpper, tZ, tW));
-            var xyAddYx = r.X.Y + r.Y.X;
-            var yzSubZy = r.Y.Z - r.Z.Y;
-            var zxAddXz = r.Z.X + r.X.Z;
+            var xyAddYx = r.M12 + r.M21;
+            var yzSubZy = r.M23 - r.M32;
+            var zxAddXz = r.M31 + r.M13;
             q.X = Vector.ConditionalSelect(useUpper,
                     Vector.ConditionalSelect(useUpperUpper, tX, xyAddYx),
                     Vector.ConditionalSelect(useLowerUpper, zxAddXz, yzSubZy));
-            var yzAddZy = r.Y.Z + r.Z.Y;
-            var zxSubXz = r.Z.X - r.X.Z;
+            var yzAddZy = r.M23 + r.M32;
+            var zxSubXz = r.M31 - r.M13;
             q.Y = Vector.ConditionalSelect(useUpper,
                     Vector.ConditionalSelect(useUpperUpper, xyAddYx, tY),
                     Vector.ConditionalSelect(useLowerUpper, yzAddZy, zxSubXz));
-            var xySubYx = r.X.Y - r.Y.X;
+            var xySubYx = r.M12 - r.M21;
             q.Z = Vector.ConditionalSelect(useUpper,
                     Vector.ConditionalSelect(useUpperUpper, zxAddXz, yzAddZy),
                     Vector.ConditionalSelect(useLowerUpper, tZ, xySubYx));

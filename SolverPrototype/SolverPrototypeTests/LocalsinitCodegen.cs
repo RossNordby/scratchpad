@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -139,6 +140,7 @@ namespace SolverPrototypeTests
             //Note that friction constraints have no bias velocity. They target zero velocity.
         }
 
+
         public struct InnerStruct
         {
             public Vector<float> X;
@@ -178,8 +180,6 @@ namespace SolverPrototypeTests
             public Vector<float> XY;
             public Vector<float> YX;
             public Vector<float> YY;
-
-            //public ref InnerStruct X { get { return ref Unsafe.As<Vector<float>, InnerStruct>(ref XX); } }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static ref InnerStruct GetX(ref FlattenedStruct m)
@@ -271,23 +271,56 @@ namespace SolverPrototypeTests
         }
 
 
-        public struct ScalarInnerStruct
+        public struct ScalarOuterStruct8
         {
-            public float X;
-            public float Y;
-        }
-        public struct ScalarOuterStruct
-        {
+            public struct ScalarInnerStruct
+            {
+                public float X;
+            }
             public ScalarInnerStruct X;
             public ScalarInnerStruct Y;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void Scale(ref ScalarOuterStruct m, float s, out ScalarOuterStruct result)
+            static void Scale(ref ScalarOuterStruct8 m, float s, out ScalarOuterStruct8 result)
+            {
+                result.X.X = m.X.X * s;
+                result.Y.X = m.Y.X * s;
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref ScalarOuterStruct8 m, float s, out ScalarOuterStruct8 result)
+            {
+                //8 byte mov clear
+                Scale(ref m, s, out var intermediate);
+                Scale(ref intermediate, s, out result);
+            }
+        }
+
+        public struct ScalarOuterStruct16
+        {
+            public struct ScalarInnerStruct
+            {
+                public float X;
+                public float Y;
+            }
+            public ScalarInnerStruct X;
+            public ScalarInnerStruct Y;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static void Scale(ref ScalarOuterStruct16 m, float s, out ScalarOuterStruct16 result)
             {
                 result.X.X = m.X.X * s;
                 result.X.Y = m.X.Y * s;
                 result.Y.X = m.Y.X * s;
                 result.Y.Y = m.Y.Y * s;
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref ScalarOuterStruct16 m, float s, out ScalarOuterStruct16 result)
+            {
+                //rep stos, ecx 4 (16 bytes)
+                Scale(ref m, s, out var intermediate);
+                Scale(ref intermediate, s, out result);
             }
         }
 
@@ -306,24 +339,166 @@ namespace SolverPrototypeTests
                 result.YX = m.YX * s;
                 result.YY = m.YY * s;
             }
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref ScalarFlattenedStruct m, float s, out ScalarFlattenedStruct result)
+            {
+                //no locals initialization
+                Scale(ref m, s, out var intermediate);
+                Scale(ref intermediate, s, out result);
+            }
         }
 
+
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void ScalarNestedStructTest(ref ScalarOuterStruct m, float s, out ScalarOuterStruct result)
+        public static void Matrix2x3WideTest(ref Matrix2x3Wide m, ref Vector<float> s, out Matrix2x3Wide result)
         {
-            //rep stos, ecx 4 (16 bytes)
-            ScalarOuterStruct.Scale(ref m, s, out var intermediate);
-            ScalarOuterStruct.Scale(ref intermediate, s, out result);
+            //rep stos, ecx 18h (96 bytes)
+            Matrix2x3Wide.Scale(ref m, ref s, out var temp);
+            Matrix2x3Wide.Scale(ref temp, ref s, out result);
         }
+
+
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void ScalarFlattenedStructTest(ref ScalarFlattenedStruct m, float s, out ScalarFlattenedStruct result)
+        public static void Matrix2x2WideTest(ref Matrix2x2Wide m, ref Vector<float> s, out Matrix2x2Wide result)
         {
             //no locals initialization
-            ScalarFlattenedStruct.Scale(ref m, s, out var intermediate);
-            ScalarFlattenedStruct.Scale(ref intermediate, s, out result);
+            Matrix2x2Wide.Scale(ref m, ref s, out var temp);
+            Matrix2x2Wide.Scale(ref temp, ref s, out result);
+        }
+
+        public struct Scale80
+        {
+            public Vector<float> A;
+            public Vector<float> B;
+            public Vector<float> C;
+            public Vector<float> D;
+            public Vector<float> E;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Scale(ref Scale80 m, ref Vector<float> s, out Scale80 result)
+            {
+                result.A = m.A * s;
+                result.B = m.B * s;
+                result.C = m.C * s;
+                result.D = m.D * s;
+
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref Scale80 m, ref Vector<float> s, out Scale80 result)
+            {
+                //rep stos, ecx 14h (80 bytes)
+                Scale(ref m, ref s, out var temp);
+                Scale(ref temp, ref s, out result);
+            }
+        }
+        public struct Scale64
+        {
+            public Vector<float> A;
+            public Vector<float> B;
+            public Vector<float> C;
+            public Vector<float> D;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Scale(ref Scale64 m, ref Vector<float> s, out Scale64 result)
+            {
+                result.A = m.A * s;
+                result.B = m.B * s;
+                result.C = m.C * s;
+                result.D = m.D * s;
+
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref Scale64 m, ref Vector<float> s, out Scale64 result)
+            {
+                //no locals initialized
+                Scale(ref m, ref s, out var temp);
+                Scale(ref temp, ref s, out result);
+            }
         }
 
 
+
+        [StructLayout(LayoutKind.Sequential, Size = 16)]
+        struct DummyStruct16
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 32)]
+        struct DummyStruct32
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 48)]
+        struct DummyStruct48
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 64)]
+        struct DummyStruct64
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 80)]
+        struct DummyStruct80
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 96)]
+        struct DummyStruct96
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 112)]
+        struct DummyStruct112
+        {
+        }
+        [StructLayout(LayoutKind.Sequential, Size = 128)]
+        struct DummyStruct128
+        {
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void InnerDoDummies<T>(ref T a, out T result)
+        {
+            result = a;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void DoDummies<T>(ref T a, out T result)
+        {
+            //init across size equal to T size. (for 16 byte case, uses two movs)
+            InnerDoDummies(ref a, out var temp);
+            InnerDoDummies(ref temp, out result);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Vector3WideScaleTest(ref Vector3Wide v, ref Vector<float> s, out Vector3Wide result)
+        {
+            //no locals initialization
+            Vector3Wide.Scale(ref v, ref s, out var temp0);
+            Vector3Wide.Scale(ref v, ref s, out var temp1);
+            Vector3Wide.Scale(ref v, ref s, out var temp2);
+            Vector3Wide.Add(ref temp0, ref temp1, out temp0);
+            Vector3Wide.Add(ref temp0, ref temp2, out result);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Matrix2x2WideScaleTest(ref Matrix2x2Wide m, ref Vector<float> s, out Matrix2x2Wide result)
+        {
+            //rep stos, ecx 48h (288 bytes)
+            Matrix2x2Wide.Scale(ref m, ref s, out var temp0);
+            Matrix2x2Wide.Scale(ref m, ref s, out var temp1);
+            Matrix2x2Wide.Scale(ref m, ref s, out var temp2);
+            Matrix2x2Wide.Add(ref temp0, ref temp1, out temp0);
+            Matrix2x2Wide.Add(ref temp0, ref temp2, out result);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Matrix2x3WideScaleTest(ref Matrix2x3Wide m, ref Vector<float> s, out Matrix2x3Wide result)
+        {
+            //rep stos, ecx 48h (288 bytes)
+            Matrix2x3Wide.Scale(ref m, ref s, out var temp0);
+            Matrix2x3Wide.Scale(ref m, ref s, out var temp1);
+            Matrix2x3Wide.Scale(ref m, ref s, out var temp2);
+            Matrix2x3Wide.Add(ref temp0, ref temp1, out temp0);
+            Matrix2x3Wide.Add(ref temp0, ref temp2, out result);
+        }
 
         public static void Test()
         {
@@ -369,13 +544,58 @@ namespace SolverPrototypeTests
                 DummyNestedStructTest(ref m3, ref s, out var result3);
             }
             {
-                var m = new ScalarOuterStruct();
+                var s8 = new ScalarOuterStruct8();
+                var s16 = new ScalarOuterStruct16();
                 var s = 0f;
-                ScalarNestedStructTest(ref m, s, out var result);
+                ScalarOuterStruct8.Test(ref s8, s, out var result8);
+                ScalarOuterStruct16.Test(ref s16, s, out var result16);
 
                 var m2 = new ScalarFlattenedStruct();
-                ScalarFlattenedStructTest(ref m2, s, out var result2);
+                ScalarFlattenedStruct.Test(ref m2, s, out var result2);
 
+            }
+            {
+                var m2x3 = new Matrix2x3Wide();
+                var m2x2 = new Matrix2x2Wide();
+                var s = new Vector<float>();
+                Matrix2x3WideTest(ref m2x3, ref s, out var result2x3);
+                Matrix2x2WideTest(ref m2x2, ref s, out var result2x2);
+            }
+
+            {
+                var s16 = new DummyStruct16();
+                var s32 = new DummyStruct32();
+                var s48 = new DummyStruct48();
+                var s64 = new DummyStruct64();
+                var s80 = new DummyStruct80();
+                var s96 = new DummyStruct96();
+                var s112 = new DummyStruct112();
+                var s128 = new DummyStruct128();
+                DoDummies(ref s16, out var result16);
+                DoDummies(ref s32, out var result32);
+                DoDummies(ref s48, out var result48);
+                DoDummies(ref s64, out var result64);
+                DoDummies(ref s80, out var result80);
+                DoDummies(ref s96, out var result96);
+                DoDummies(ref s112, out var result112);
+                DoDummies(ref s128, out var result128);
+            }
+            {
+
+                var v = new Vector3Wide();
+                var m2x2 = new Matrix2x2Wide();
+                var m2x3 = new Matrix2x3Wide();
+                var s = new Vector<float>();
+                Vector3WideScaleTest(ref v, ref s, out var vResult);
+                Matrix2x2WideScaleTest(ref m2x2, ref s, out var m2x2Result);
+                Matrix2x3WideScaleTest(ref m2x3, ref s, out var m2x3Result);
+            }
+            {
+                var s64 = new Scale64();
+                var s80 = new Scale80();
+                var s = new Vector<float>();
+                Scale64.Test(ref s64, ref s, out var s64Result);
+                Scale80.Test(ref s80, ref s, out var s80Result);
             }
         }
 
