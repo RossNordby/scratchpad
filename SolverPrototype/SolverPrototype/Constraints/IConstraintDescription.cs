@@ -22,8 +22,7 @@ namespace SolverPrototype.Constraints
         /// <param name="batch">Batch to modify.</param>
         /// <param name="bundleIndex">Index of the target constraint's bundle.</param>
         /// <param name="innerIndex">Index of the target constraint within its bundle.</param>
-        /// <param name="description">Description of the constraint to apply.</param>
-        void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex, ref TDescription description);
+        void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex);
 
 
         /// <summary>

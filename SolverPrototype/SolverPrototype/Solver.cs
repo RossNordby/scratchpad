@@ -154,7 +154,7 @@ namespace SolverPrototype
             where TDescription : IConstraintDescription<TDescription>
         {
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-            description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, ref description);
+            description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex);
         }
 
 
@@ -169,7 +169,7 @@ namespace SolverPrototype
         {
             GetConstraintReference(constraintHandle, out var constraintReference);
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-            description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex, ref description);
+            description.ApplyDescription(constraintReference.TypeBatch, bundleIndex, innerIndex);
         }
 
         /// <summary>

@@ -6,8 +6,9 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
-            LocalsinitCodegen.Test();
+            //LocalsinitCodegen.Test();
             //AutoTester.Test();
+            ContactManifoldConvergenceTests.Test();
         }
     }
 }
