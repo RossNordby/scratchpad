@@ -308,8 +308,6 @@ namespace SolverPrototype
 
         public void Update(float dt, float inverseDt)
         {
-            //TODO: Note that the prestep phase is completely parallel. When multithreading, there is no need to stop at the boundaries of bodybatches.
-            //You could technically build a separate list that ignores bodybatch boundaries. Value is unclear.
             for (int i = 0; i < Batches.Count; ++i)
             {
                 var batch = Batches[i];
@@ -318,6 +316,8 @@ namespace SolverPrototype
                     batch.TypeBatches[j].Prestep(bodies.LocalInertiaBundles, dt, inverseDt);
                 }
             }
+            //TODO: May want to consider executing warmstart immediately following the prestep. Multithreading can't do that, so there could be some bitwise differences introduced.
+            //On the upside, it would make use of cached data.
             for (int i = 0; i < Batches.Count; ++i)
             {
                 var batch = Batches[i];
