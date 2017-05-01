@@ -13,133 +13,30 @@ namespace SolverPrototypeTests
 {
     public static class LocalsinitCodegen
     {
+
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void ApplyImpulseBaseline(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
-            ref Vector<float> correctiveImpulse,
-            ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        public static void Matrix2x3WideTest(ref Matrix2x3Wide m, ref Vector<float> s, out Matrix2x3Wide result)
+        {
+            //rep stos, ecx 18h (96 bytes)
+            Matrix2x3Wide.Scale(ref m, ref s, out var temp);
+            Matrix2x3Wide.Scale(ref temp, ref s, out result);
+        }
+
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void Matrix2x2WideTest(ref Matrix2x2Wide m, ref Vector<float> s, out Matrix2x2Wide result)
         {
             //no locals initialization
-            var linearVelocityChangeA = correctiveImpulse * inertiaA.InverseMass;
-            Vector3Wide.Scale(ref normal, ref linearVelocityChangeA, out var correctiveVelocityALinearVelocity);
-            Vector3Wide.Scale(ref angularA, ref correctiveImpulse, out var correctiveAngularImpulseA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref correctiveAngularImpulseA, ref inertiaA.InverseInertiaTensor, out var correctiveVelocityAAngularVelocity);
-
-            var linearVelocityChangeB = correctiveImpulse * inertiaB.InverseMass;
-            Vector3Wide.Scale(ref normal, ref linearVelocityChangeB, out var correctiveVelocityBLinearVelocity);
-            Vector3Wide.Scale(ref angularB, ref correctiveImpulse, out var correctiveAngularImpulseB);
-            Matrix3x3Wide.TransformWithoutOverlap(ref correctiveAngularImpulseB, ref inertiaB.InverseInertiaTensor, out var correctiveVelocityBAngularVelocity);
-
-            Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityALinearVelocity, out wsvA.LinearVelocity);
-            Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityAAngularVelocity, out wsvA.AngularVelocity);
-            Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveVelocityBLinearVelocity, out wsvB.LinearVelocity); //Note subtract; normal = -jacobianLinearB
-            Vector3Wide.Add(ref wsvB.AngularVelocity, ref correctiveVelocityBAngularVelocity, out wsvB.AngularVelocity);
+            Matrix2x2Wide.Scale(ref m, ref s, out var temp);
+            Matrix2x2Wide.Scale(ref temp, ref s, out result);
         }
-
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void ApplyImpulseTest(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
-            ref Vector<float> correctiveImpulse,
-            ref BodyVelocities wsvA, ref BodyVelocities wsvB)
+        static void Vector3WideScaleTest(ref Vector3Wide v, ref Vector<float> s, out Vector3Wide result)
         {
             //no locals initialization
-            var linearVelocityChangeA = correctiveImpulse * inertiaA.InverseMass;
-            Vector3Wide.Scale(ref normal, ref linearVelocityChangeA, out var correctiveVelocityALinearVelocity);
-            Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityALinearVelocity, out wsvA.LinearVelocity);
-            Vector3Wide.Scale(ref angularA, ref correctiveImpulse, out var correctiveAngularImpulseA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref correctiveAngularImpulseA, ref inertiaA.InverseInertiaTensor, out var correctiveVelocityAAngularVelocity);
-            Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityAAngularVelocity, out wsvA.AngularVelocity);
-
-            var linearVelocityChangeB = correctiveImpulse * inertiaB.InverseMass;
-            Vector3Wide.Scale(ref normal, ref linearVelocityChangeB, out var correctiveVelocityBLinearVelocity);
-            Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveVelocityBLinearVelocity, out wsvB.LinearVelocity); //Note subtract; normal = -jacobianLinearB
-
-            Vector3Wide.Scale(ref angularB, ref correctiveImpulse, out var correctiveAngularImpulseB);
-            Matrix3x3Wide.TransformWithoutOverlap(ref correctiveAngularImpulseB, ref inertiaB.InverseInertiaTensor, out var correctiveVelocityBAngularVelocity);
-            Vector3Wide.Add(ref wsvB.AngularVelocity, ref correctiveVelocityBAngularVelocity, out wsvB.AngularVelocity);
+            Vector3Wide.Scale(ref v, ref s, out var temp0);
+            Vector3Wide.Add(ref temp0, ref v, out result);
         }
-
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void MicroTest(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
-        {
-            //no locals initialization
-            var tempX = angularA.X + wsvA.LinearVelocity.X;
-            var tempY = angularA.Y + wsvA.LinearVelocity.Y;
-            var tempZ = angularA.Z + wsvA.LinearVelocity.Z;
-            wsvB.AngularVelocity.X = tempX;
-            wsvB.AngularVelocity.Y = tempY;
-            wsvB.AngularVelocity.Z = tempZ;
-        }
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void MicroTest2(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
-        {
-            //no locals initialization
-            Vector3Wide.Add(ref angularA, ref wsvA.LinearVelocity, out var temp);
-            wsvB.AngularVelocity = temp;
-        }
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void MicroTest3(ref Vector3Wide angularA, ref Vector3Wide angularB, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
-        {
-            //no locals initialization
-            Vector3Wide.Add(ref angularA, ref wsvA.LinearVelocity, out wsvB.AngularVelocity);
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void TangentPrestepBaseline(ref Vector3Wide tangentX, ref Vector3Wide tangentY, ref Vector3Wide offsetA, ref Vector3Wide offsetB,
-            ref BodyInertias inertiaA, ref BodyInertias inertiaB,
-            out TangentFrictionProjection projection)
-        {
-            TangentFriction.ComputeJacobians(ref tangentX, ref tangentY, ref offsetA, ref offsetB, out var jacobians);
-            //Compute effective mass matrix contributions.
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearIntermediateA);
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaB.InverseMass, out var linearIntermediateB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref linearIntermediateA, ref jacobians.LinearA, out var linearContributionA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref linearIntermediateB, ref jacobians.LinearA, out var linearContributionB);
-
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out var angularIntermediateA);
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out var angularIntermediateB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref angularIntermediateA, ref jacobians.AngularA, out var angularContributionA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref angularIntermediateB, ref jacobians.AngularB, out var angularContributionB);
-
-            //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
-            Matrix2x2Wide.Add(ref linearContributionA, ref linearContributionB, out var linear);
-            Matrix2x2Wide.Subtract(ref angularContributionA, ref angularContributionB, out var angular);
-            Matrix2x2Wide.Add(ref linear, ref angular, out var inverseEffectiveMass);
-            Matrix2x2Wide.InvertWithoutOverlap(ref inverseEffectiveMass, out projection.EffectiveMass);
-            projection.OffsetA = offsetA;
-            projection.OffsetB = offsetB;
-
-            //Note that friction constraints have no bias velocity. They target zero velocity.
-        }
-
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void TangentPrestepTest(ref Vector3Wide tangentX, ref Vector3Wide tangentY, ref Vector3Wide offsetA, ref Vector3Wide offsetB,
-            ref BodyInertias inertiaA, ref BodyInertias inertiaB,
-            out TangentFrictionProjection projection)
-        {
-            TangentFriction.ComputeJacobians(ref tangentX, ref tangentY, ref offsetA, ref offsetB, out var jacobians);
-            //Compute effective mass matrix contributions.
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearIntermediateA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref linearIntermediateA, ref jacobians.LinearA, out var linearContributionA);
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaB.InverseMass, out var linearIntermediateB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref linearIntermediateB, ref jacobians.LinearA, out var linearContributionB);
-            //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
-            Matrix2x2Wide.Add(ref linearContributionA, ref linearContributionB, out var linear);
-
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out var angularIntermediateA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref angularIntermediateA, ref jacobians.AngularA, out var angularContributionA);
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out var angularIntermediateB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref angularIntermediateB, ref jacobians.AngularB, out var angularContributionB);
-            Matrix2x2Wide.Subtract(ref angularContributionA, ref angularContributionB, out var angular);
-
-            Matrix2x2Wide.Add(ref linear, ref angular, out var inverseEffectiveMass);
-            Matrix2x2Wide.InvertWithoutOverlap(ref inverseEffectiveMass, out projection.EffectiveMass);
-            projection.OffsetA = offsetA;
-            projection.OffsetB = offsetB;
-
-            //Note that friction constraints have no bias velocity. They target zero velocity.
-        }
-
 
         public struct InnerStruct
         {
@@ -349,45 +246,25 @@ namespace SolverPrototypeTests
         }
 
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void Matrix2x3WideTest(ref Matrix2x3Wide m, ref Vector<float> s, out Matrix2x3Wide result)
-        {
-            //rep stos, ecx 18h (96 bytes)
-            Matrix2x3Wide.Scale(ref m, ref s, out var temp);
-            Matrix2x3Wide.Scale(ref temp, ref s, out result);
-        }
-
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void Matrix2x2WideTest(ref Matrix2x2Wide m, ref Vector<float> s, out Matrix2x2Wide result)
-        {
-            //no locals initialization
-            Matrix2x2Wide.Scale(ref m, ref s, out var temp);
-            Matrix2x2Wide.Scale(ref temp, ref s, out result);
-        }
-
-        public struct Scale80
+        public struct Scale48
         {
             public Vector<float> A;
             public Vector<float> B;
             public Vector<float> C;
-            public Vector<float> D;
-            public Vector<float> E;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void Scale(ref Scale80 m, ref Vector<float> s, out Scale80 result)
+            public static void Scale(ref Scale48 m, ref Vector<float> s, out Scale48 result)
             {
                 result.A = m.A * s;
                 result.B = m.B * s;
                 result.C = m.C * s;
-                result.D = m.D * s;
 
             }
 
             [MethodImpl(MethodImplOptions.NoInlining)]
-            public static void Test(ref Scale80 m, ref Vector<float> s, out Scale80 result)
+            public static void Test(ref Scale48 m, ref Vector<float> s, out Scale48 result)
             {
-                //rep stos, ecx 14h (80 bytes)
+                //no locals initialized
                 Scale(ref m, ref s, out var temp);
                 Scale(ref temp, ref s, out result);
             }
@@ -418,6 +295,96 @@ namespace SolverPrototypeTests
             }
         }
 
+        public struct Scale80
+        {
+            public Vector<float> A;
+            public Vector<float> B;
+            public Vector<float> C;
+            public Vector<float> D;
+            public Vector<float> E;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Scale(ref Scale80 m, ref Vector<float> s, out Scale80 result)
+            {
+                result.A = m.A * s;
+                result.B = m.B * s;
+                result.C = m.C * s;
+                result.D = m.D * s;
+                result.E = m.E * s;
+
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref Scale80 m, ref Vector<float> s, out Scale80 result)
+            {
+                //rep stos, ecx 14h (80 bytes)
+                Scale(ref m, ref s, out var temp);
+                Scale(ref temp, ref s, out result);
+            }
+        }
+        public struct Scale96
+        {
+            public Vector<float> A;
+            public Vector<float> B;
+            public Vector<float> C;
+            public Vector<float> D;
+            public Vector<float> E;
+            public Vector<float> F;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Scale(ref Scale96 m, ref Vector<float> s, out Scale96 result)
+            {
+                result.A = m.A * s;
+                result.B = m.B * s;
+                result.C = m.C * s;
+                result.D = m.D * s;
+                result.E = m.C * s;
+                result.F = m.D * s;
+
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref Scale96 m, ref Vector<float> s, out Scale96 result)
+            {
+                //rep stos, ecx 18h (96 bytes)
+                Scale(ref m, ref s, out var temp);
+                Scale(ref temp, ref s, out result);
+            }
+        }
+
+        public struct Scale128
+        {
+            public Vector<float> A;
+            public Vector<float> B;
+            public Vector<float> C;
+            public Vector<float> D;
+            public Vector<float> E;
+            public Vector<float> F;
+            public Vector<float> G;
+            public Vector<float> H;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Scale(ref Scale128 m, ref Vector<float> s, out Scale128 result)
+            {
+                result.A = m.A * s;
+                result.B = m.B * s;
+                result.C = m.C * s;
+                result.D = m.D * s;
+                result.E = m.E * s;
+                result.F = m.F * s;
+                result.G = m.G * s;
+                result.H = m.H * s;
+
+            }
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            public static void Test(ref Scale128 m, ref Vector<float> s, out Scale128 result)
+            {
+                //rep stos, ecx 20h (128 bytes)
+                Scale(ref m, ref s, out var temp);
+                Scale(ref temp, ref s, out result);
+            }
+        }
 
 
         [StructLayout(LayoutKind.Sequential, Size = 16)]
@@ -453,7 +420,7 @@ namespace SolverPrototypeTests
         {
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void InnerDoDummies<T>(ref T a, out T result)
         {
             result = a;
@@ -467,69 +434,9 @@ namespace SolverPrototypeTests
             InnerDoDummies(ref temp, out result);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Vector3WideScaleTest(ref Vector3Wide v, ref Vector<float> s, out Vector3Wide result)
-        {
-            //no locals initialization
-            Vector3Wide.Scale(ref v, ref s, out var temp0);
-            Vector3Wide.Scale(ref v, ref s, out var temp1);
-            Vector3Wide.Scale(ref v, ref s, out var temp2);
-            Vector3Wide.Add(ref temp0, ref temp1, out temp0);
-            Vector3Wide.Add(ref temp0, ref temp2, out result);
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Matrix2x2WideScaleTest(ref Matrix2x2Wide m, ref Vector<float> s, out Matrix2x2Wide result)
-        {
-            //rep stos, ecx 48h (288 bytes)
-            Matrix2x2Wide.Scale(ref m, ref s, out var temp0);
-            Matrix2x2Wide.Scale(ref m, ref s, out var temp1);
-            Matrix2x2Wide.Scale(ref m, ref s, out var temp2);
-            Matrix2x2Wide.Add(ref temp0, ref temp1, out temp0);
-            Matrix2x2Wide.Add(ref temp0, ref temp2, out result);
-        }
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        static void Matrix2x3WideScaleTest(ref Matrix2x3Wide m, ref Vector<float> s, out Matrix2x3Wide result)
-        {
-            //rep stos, ecx 48h (288 bytes)
-            Matrix2x3Wide.Scale(ref m, ref s, out var temp0);
-            Matrix2x3Wide.Scale(ref m, ref s, out var temp1);
-            Matrix2x3Wide.Scale(ref m, ref s, out var temp2);
-            Matrix2x3Wide.Add(ref temp0, ref temp1, out temp0);
-            Matrix2x3Wide.Add(ref temp0, ref temp2, out result);
-        }
 
         public static void Test()
         {
-            var angularA = new Vector3Wide();
-            var angularB = new Vector3Wide();
-            var bodyInertiasA = new BodyInertias();
-            var bodyInertiasB = new BodyInertias();
-            var normal = new Vector3Wide();
-            var correctiveImpulse = new Vector<float>();
-            var wsvA = new BodyVelocities();
-            var wsvB = new BodyVelocities();
-
-            ApplyImpulseBaseline(ref angularA, ref angularB, ref bodyInertiasA, ref bodyInertiasB, ref normal, ref correctiveImpulse, ref wsvA, ref wsvB);
-            ApplyImpulseTest(ref angularA, ref angularB, ref bodyInertiasA, ref bodyInertiasB, ref normal, ref correctiveImpulse, ref wsvA, ref wsvB);
-
-            MicroTest(ref angularA, ref angularB, ref wsvA, ref wsvB);
-            MicroTest2(ref angularA, ref angularB, ref wsvA, ref wsvB);
-            MicroTest3(ref angularA, ref angularB, ref wsvA, ref wsvB);
-            {
-                var tangentX = new Vector3Wide();
-                var tangentY = new Vector3Wide();
-                var offsetA = new Vector3Wide();
-                var offsetB = new Vector3Wide();
-                Console.WriteLine($"Vector3Wide: {Unsafe.SizeOf<Vector3Wide>()}");
-                Console.WriteLine($"Matrix2x2Wide: {Unsafe.SizeOf<Matrix2x2Wide>()}");
-                Console.WriteLine($"Matrix2x3Wide: {Unsafe.SizeOf<Matrix2x3Wide>()}");
-                Console.WriteLine($"Vector3Wide: {Unsafe.SizeOf<Vector3Wide>()}");
-                Console.WriteLine($"Tangent Jacobians: {Unsafe.SizeOf<TangentFriction.Jacobians>()}");
-                TangentPrestepBaseline(ref tangentX, ref tangentY, ref offsetA, ref offsetB, ref bodyInertiasA, ref bodyInertiasB, out var projection);
-                TangentPrestepTest(ref tangentX, ref tangentY, ref offsetA, ref offsetB, ref bodyInertiasA, ref bodyInertiasB, out projection);
-            }
             {
                 var m = new OuterStruct();
                 var s = new Vector<float>();
@@ -555,13 +462,14 @@ namespace SolverPrototypeTests
 
             }
             {
+                var v = new Vector3Wide();
                 var m2x3 = new Matrix2x3Wide();
                 var m2x2 = new Matrix2x2Wide();
                 var s = new Vector<float>();
+                Vector3WideScaleTest(ref v, ref s, out var vResult);
                 Matrix2x3WideTest(ref m2x3, ref s, out var result2x3);
                 Matrix2x2WideTest(ref m2x2, ref s, out var result2x2);
             }
-
             {
                 var s16 = new DummyStruct16();
                 var s32 = new DummyStruct32();
@@ -581,21 +489,17 @@ namespace SolverPrototypeTests
                 DoDummies(ref s128, out var result128);
             }
             {
-
-                var v = new Vector3Wide();
-                var m2x2 = new Matrix2x2Wide();
-                var m2x3 = new Matrix2x3Wide();
-                var s = new Vector<float>();
-                Vector3WideScaleTest(ref v, ref s, out var vResult);
-                Matrix2x2WideScaleTest(ref m2x2, ref s, out var m2x2Result);
-                Matrix2x3WideScaleTest(ref m2x3, ref s, out var m2x3Result);
-            }
-            {
+                var s48 = new Scale48();
                 var s64 = new Scale64();
                 var s80 = new Scale80();
+                var s96 = new Scale96();
+                var s128 = new Scale128();
                 var s = new Vector<float>();
+                Scale48.Test(ref s48, ref s, out var s48Result);
                 Scale64.Test(ref s64, ref s, out var s64Result);
                 Scale80.Test(ref s80, ref s, out var s80Result);
+                Scale96.Test(ref s96, ref s, out var s96Result);
+                Scale128.Test(ref s128, ref s, out var s128Result);
             }
         }
 
