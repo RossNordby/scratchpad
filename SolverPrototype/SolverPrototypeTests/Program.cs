@@ -7,8 +7,10 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             //LocalsinitCodegen.Test();
-            AutoTester.Test();
+            //AutoTester.Test();
             //ContactManifoldConvergenceTests.Test();
+            //SortTest.Test();
+            SpanCodegenTests.Test();
         }
     }
 }

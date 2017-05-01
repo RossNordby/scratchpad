@@ -42,13 +42,12 @@ namespace SolverPrototypeTests
                 CacheBlaster.Blast();
                 var frameStartTime = Stopwatch.GetTimestamp();
                 //simulation.Solver.Update(dt, inverseDt);
-                simulation.Solver.SingleThreadedSplitUpdate(16 * 8, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 var frameEndTime = Stopwatch.GetTimestamp();
                 var frameTime = (frameEndTime - frameStartTime) / (double)Stopwatch.Frequency;
                 if (frameTime < testTimings.Min)
@@ -80,8 +79,8 @@ namespace SolverPrototypeTests
             const int testsPerVariant = 8;
             WriteLine(writer, $"{width}x{height}x{length} lattice, {frameCount} frames:");
             var timings = new TestTimings[Environment.ProcessorCount];
-            for (int threadCount = 1; threadCount <= 1; ++threadCount)
-            //for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
+            //for (int threadCount = 1; threadCount <= 1; ++threadCount)
+            for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
             {
                 ref var timingsForThreadCount = ref timings[threadCount - 1];
                 timingsForThreadCount = new TestTimings { Total = double.MaxValue };

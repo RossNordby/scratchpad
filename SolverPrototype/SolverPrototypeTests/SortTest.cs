@@ -27,7 +27,7 @@ namespace SolverPrototypeTests
                     Debug.Assert(keys[i] >= keys[i - 1]);
                 }
             }
-            const int elementCount = 1024;
+            const int elementCount = 262144;
             const int elementExclusiveUpperBound = 1 << 30;
             for (int iteration = 0; iteration < 16; ++iteration)
             {

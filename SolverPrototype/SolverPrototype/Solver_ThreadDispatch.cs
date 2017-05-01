@@ -604,34 +604,5 @@ namespace SolverPrototype
         }
 
 
-        public void SingleThreadedSplitUpdate(int blockCount, BufferPool bufferPool, float dt, float inverseDt)
-        {
-            const int minimumBlockSizeInBundles = 4;            
-            BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, blockCount);
-            ValidateWorkBlocks();
-
-            for (int i =0; i < context.WorkBlocks.Count; ++i)
-            {
-                ref var block = ref context.WorkBlocks[i];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies.LocalInertiaBundles, context.Dt, context.InverseDt, block.StartBundle, block.End);
-            }
-            for (int i = 0; i < context.WorkBlocks.Count; ++i)
-            {
-                ref var block = ref context.WorkBlocks[i];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.VelocityBundles, block.StartBundle, block.End);
-            }
-            for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
-            {
-                for (int i = 0; i < context.WorkBlocks.Count; ++i)
-                {
-                    ref var block = ref context.WorkBlocks[i];
-                    Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].SolveIteration(bodies.VelocityBundles, block.StartBundle, block.End);
-                }
-            }
-
-            context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
-        }
-
-
     }
 }
