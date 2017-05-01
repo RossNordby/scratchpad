@@ -6,92 +6,33 @@ namespace SolverPrototype
 {
     public struct Matrix3x3Wide
     {
-        //TODO: While it would be a little more convenient to store these rows as Vector3Wides, there is a codegen issue with nested structs as of Microsoft.NETCore.App 2.0.0-preview2-002093-00.
-        //The jit emits zeroing for temporaries for nested structs, but not flattened ones.
-
         /// <summary>
-        /// Value at row 1, column 1 of the matrix.
+        /// First row of the matrix.
         /// </summary>
-        public Vector<float> M11;
+        public Vector3Wide X;
         /// <summary>
-        /// Value at row 1, column 2 of the matrix.
+        /// Second row of the matrix.
         /// </summary>
-        public Vector<float> M12;
+        public Vector3Wide Y;
         /// <summary>
-        /// Value at row 1, column 3 of the matrix.
+        /// Third row of the matrix.
         /// </summary>
-        public Vector<float> M13;
-        /// <summary>
-        /// Value at row 2, column 1 of the matrix.
-        /// </summary>
-        public Vector<float> M21;
-        /// <summary>
-        /// Value at row 2, column 2 of the matrix.
-        /// </summary>
-        public Vector<float> M22;
-        /// <summary>
-        /// Value at row 2, column 3 of the matrix.
-        /// </summary>
-        public Vector<float> M23;
-        /// <summary>
-        /// Value at row 3, column 1 of the matrix.
-        /// </summary>
-        public Vector<float> M31;
-        /// <summary>
-        /// Value at row 3, column 2 of the matrix.
-        /// </summary>
-        public Vector<float> M32;
-        /// <summary>
-        /// Value at row 3, column 3 of the matrix.
-        /// </summary>
-        public Vector<float> M33;
-
-        //These helpers attempt to make up for the convenience lost from the row flattening.
-        /// <summary>
-        /// Gets a reference to the first row of the matrix.
-        /// </summary>
-        /// <param name="m">Matrix to get the row from.</param>
-        /// <returns>Reference to the first row of the matrix.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Vector3Wide GetX(ref Matrix3x3Wide m)
-        {
-            return ref Unsafe.As<Vector<float>, Vector3Wide>(ref m.M11);
-        }
-        /// <summary>
-        /// Gets a reference to the second row of the matrix.
-        /// </summary>
-        /// <param name="m">Matrix to get the row from.</param>
-        /// <returns>Reference to the second row of the matrix.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Vector3Wide GetY(ref Matrix3x3Wide m)
-        {
-            return ref Unsafe.As<Vector<float>, Vector3Wide>(ref m.M21);
-        }
-        /// <summary>
-        /// Gets a reference to the third row of the matrix.
-        /// </summary>
-        /// <param name="m">Matrix to get the row from.</param>
-        /// <returns>Reference to the third row of the matrix.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Vector3Wide GetZ(ref Matrix3x3Wide m)
-        {
-            return ref Unsafe.As<Vector<float>, Vector3Wide>(ref m.M31);
-        }
+        public Vector3Wide Z;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MultiplyWithoutOverlap(ref Matrix3x3Wide a, ref Matrix3x3Wide b, out Matrix3x3Wide result)
         {
-            result.M11 = a.M11 * b.M11 + a.M12 * b.M21 + a.M13 * b.M31;
-            result.M12 = a.M11 * b.M12 + a.M12 * b.M22 + a.M13 * b.M32;
-            result.M13 = a.M11 * b.M13 + a.M12 * b.M23 + a.M13 * b.M33;
+            result.X.X = a.X.X * b.X.X + a.X.Y * b.Y.X + a.X.Z * b.Z.X;
+            result.X.Y = a.X.X * b.X.Y + a.X.Y * b.Y.Y + a.X.Z * b.Z.Y;
+            result.X.Z = a.X.X * b.X.Z + a.X.Y * b.Y.Z + a.X.Z * b.Z.Z;
 
-            result.M21 = a.M21 * b.M11 + a.M22 * b.M21 + a.M23 * b.M31;
-            result.M22 = a.M21 * b.M12 + a.M22 * b.M22 + a.M23 * b.M32;
-            result.M23 = a.M21 * b.M13 + a.M22 * b.M23 + a.M23 * b.M33;
+            result.Y.X = a.Y.X * b.X.X + a.Y.Y * b.Y.X + a.Y.Z * b.Z.X;
+            result.Y.Y = a.Y.X * b.X.Y + a.Y.Y * b.Y.Y + a.Y.Z * b.Z.Y;
+            result.Y.Z = a.Y.X * b.X.Z + a.Y.Y * b.Y.Z + a.Y.Z * b.Z.Z;
 
-            result.M31 = a.M31 * b.M11 + a.M32 * b.M21 + a.M33 * b.M31;
-            result.M32 = a.M31 * b.M12 + a.M32 * b.M22 + a.M33 * b.M32;
-            result.M33 = a.M31 * b.M13 + a.M32 * b.M23 + a.M33 * b.M33;
+            result.Z.X = a.Z.X * b.X.X + a.Z.Y * b.Y.X + a.Z.Z * b.Z.X;
+            result.Z.Y = a.Z.X * b.X.Y + a.Z.Y * b.Y.Y + a.Z.Z * b.Z.Y;
+            result.Z.Z = a.Z.X * b.X.Z + a.Z.Y * b.Y.Z + a.Z.Z * b.Z.Z;
         }
 
         /// <summary>
@@ -103,26 +44,26 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MultiplyByTransposeWithoutOverlap(ref Matrix3x3Wide a, ref Matrix3x3Wide b, out Matrix3x3Wide result)
         {
-            result.M11 = a.M11 * b.M11 + a.M12 * b.M12 + a.M13 * b.M13;
-            result.M12 = a.M11 * b.M21 + a.M12 * b.M22 + a.M13 * b.M23;
-            result.M13 = a.M11 * b.M31 + a.M12 * b.M32 + a.M13 * b.M33;
+            result.X.X = a.X.X * b.X.X + a.X.Y * b.X.Y + a.X.Z * b.X.Z;
+            result.X.Y = a.X.X * b.Y.X + a.X.Y * b.Y.Y + a.X.Z * b.Y.Z;
+            result.X.Z = a.X.X * b.Z.X + a.X.Y * b.Z.Y + a.X.Z * b.Z.Z;
 
-            result.M21 = a.M21 * b.M11 + a.M22 * b.M12 + a.M23 * b.M13;
-            result.M22 = a.M21 * b.M21 + a.M22 * b.M22 + a.M23 * b.M23;
-            result.M23 = a.M21 * b.M31 + a.M22 * b.M32 + a.M23 * b.M33;
+            result.Y.X = a.Y.X * b.X.X + a.Y.Y * b.X.Y + a.Y.Z * b.X.Z;
+            result.Y.Y = a.Y.X * b.Y.X + a.Y.Y * b.Y.Y + a.Y.Z * b.Y.Z;
+            result.Y.Z = a.Y.X * b.Z.X + a.Y.Y * b.Z.Y + a.Y.Z * b.Z.Z;
 
-            result.M31 = a.M31 * b.M11 + a.M32 * b.M12 + a.M33 * b.M13;
-            result.M32 = a.M31 * b.M21 + a.M32 * b.M22 + a.M33 * b.M23;
-            result.M33 = a.M31 * b.M31 + a.M32 * b.M32 + a.M33 * b.M33;
+            result.Z.X = a.Z.X * b.X.X + a.Z.Y * b.X.Y + a.Z.Z * b.X.Z;
+            result.Z.Y = a.Z.X * b.Y.X + a.Z.Y * b.Y.Y + a.Z.Z * b.Y.Z;
+            result.Z.Z = a.Z.X * b.Z.X + a.Z.Y * b.Z.Y + a.Z.Z * b.Z.Z;
         }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void TransformWithoutOverlap(ref Vector3Wide v, ref Matrix3x3Wide m, out Vector3Wide result)
         {
-            result.X = v.X * m.M11 + v.Y * m.M21 + v.Z * m.M31;
-            result.Y = v.X * m.M12 + v.Y * m.M22 + v.Z * m.M32;
-            result.Z = v.X * m.M13 + v.Y * m.M23 + v.Z * m.M33;
+            result.X = v.X * m.X.X + v.Y * m.Y.X + v.Z * m.Z.X;
+            result.Y = v.X * m.X.Y + v.Y * m.Y.Y + v.Z * m.Z.Y;
+            result.Z = v.X * m.X.Z + v.Y * m.Y.Z + v.Z * m.Z.Z;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -141,15 +82,15 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Scale(ref Matrix3x3Wide m, ref Vector<float> scale, out Matrix3x3Wide result)
         {
-            result.M11 = m.M11 * scale;
-            result.M12 = m.M12 * scale;
-            result.M13 = m.M13 * scale;
-            result.M21 = m.M21 * scale;
-            result.M22 = m.M22 * scale;
-            result.M23 = m.M23 * scale;
-            result.M31 = m.M31 * scale;
-            result.M32 = m.M32 * scale;
-            result.M33 = m.M33 * scale;
+            result.X.X = m.X.X * scale;
+            result.X.Y = m.X.Y * scale;
+            result.X.Z = m.X.Z * scale;
+            result.Y.X = m.Y.X * scale;
+            result.Y.Y = m.Y.Y * scale;
+            result.Y.Z = m.Y.Z * scale;
+            result.Z.X = m.Z.X * scale;
+            result.Z.Y = m.Z.Y * scale;
+            result.Z.Z = m.Z.Z * scale;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -161,24 +102,24 @@ namespace SolverPrototype
 
             var YY = qY2 * quaternion.Y;
             var ZZ = qZ2 * quaternion.Z;
-            result.M11 = Vector<float>.One - YY - ZZ;
+            result.X.X = Vector<float>.One - YY - ZZ;
             var XY = qX2 * quaternion.Y;
             var ZW = qZ2 * quaternion.W;
-            result.M12 = XY + ZW;
+            result.X.Y = XY + ZW;
             var XZ = qX2 * quaternion.Z;
             var YW = qY2 * quaternion.W;
-            result.M13 = XZ - YW;
+            result.X.Z = XZ - YW;
 
             var XX = qX2 * quaternion.X;
-            result.M21 = XY - ZW;
-            result.M22 = Vector<float>.One - XX - ZZ;
+            result.Y.X = XY - ZW;
+            result.Y.Y = Vector<float>.One - XX - ZZ;
             var XW = qX2 * quaternion.W;
             var YZ = qY2 * quaternion.Z;
-            result.M23 = YZ + XW;
+            result.Y.Z = YZ + XW;
 
-            result.M31 = XZ + YW;
-            result.M32 = YZ - XW;
-            result.M33 = Vector<float>.One - XX - YY;
+            result.Z.X = XZ + YW;
+            result.Z.Y = YZ - XW;
+            result.Z.Z = Vector<float>.One - XX - YY;
         }
 
     }

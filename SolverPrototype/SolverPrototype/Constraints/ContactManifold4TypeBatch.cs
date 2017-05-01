@@ -24,7 +24,7 @@ namespace SolverPrototype.Constraints
         public Vector3Wide OffsetB1;
         public Vector3Wide OffsetB2;
         public Vector3Wide OffsetB3;
-        public Vector<float> FrictionCoefficient;        
+        public Vector<float> FrictionCoefficient;
         //In a convex manifold, all contacts share the same normal and tangents.
         public QuaternionWide SurfaceBasis;
         //All contacts also share the spring settings.
@@ -108,14 +108,14 @@ namespace SolverPrototype.Constraints
                 projection.PremultipliedFrictionCoefficient = scale * prestep.FrictionCoefficient;
                 projection.SurfaceBasis = prestep.SurfaceBasis;
                 Matrix3x3Wide.CreateFromQuaternion(ref prestep.SurfaceBasis, out var surfaceBasis);
-                TangentFriction.Prestep(ref Matrix3x3Wide.GetX(ref surfaceBasis), ref Matrix3x3Wide.GetZ(ref surfaceBasis), ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
-                ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref Matrix3x3Wide.GetY(ref surfaceBasis), ref prestep, dt, inverseDt, out projection.Penetration);
+                TangentFriction.Prestep(ref surfaceBasis.X, ref surfaceBasis.Z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
+                ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, inverseDt, out projection.Penetration);
                 //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
                 Vector3Wide.Distance(ref prestep.OffsetA0, ref offsetToManifoldCenterA, out projection.LeverArm0);
                 Vector3Wide.Distance(ref prestep.OffsetA1, ref offsetToManifoldCenterA, out projection.LeverArm1);
                 Vector3Wide.Distance(ref prestep.OffsetA2, ref offsetToManifoldCenterA, out projection.LeverArm2);
                 Vector3Wide.Distance(ref prestep.OffsetA3, ref offsetToManifoldCenterA, out projection.LeverArm3);
-                TwistFriction.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref Matrix3x3Wide.GetY(ref surfaceBasis), out projection.Twist);
+                TwistFriction.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, out projection.Twist);
             }
         }
         public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
@@ -130,14 +130,14 @@ namespace SolverPrototype.Constraints
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 Matrix3x3Wide.CreateFromQuaternion(ref projection.SurfaceBasis, out var surfaceBasis);
-                TangentFriction.WarmStart(ref Matrix3x3Wide.GetX(ref surfaceBasis), ref Matrix3x3Wide.GetZ(ref surfaceBasis), ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TangentFriction.WarmStart(ref surfaceBasis.X, ref surfaceBasis.Z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 ContactPenetrationLimit4.WarmStart(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB,
-                    ref Matrix3x3Wide.GetY(ref surfaceBasis),
+                    ref surfaceBasis.Y,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
                     ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
-                TwistFriction.WarmStart(ref Matrix3x3Wide.GetY(ref surfaceBasis), ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TwistFriction.WarmStart(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
@@ -157,11 +157,11 @@ namespace SolverPrototype.Constraints
                 Matrix3x3Wide.CreateFromQuaternion(ref projection.SurfaceBasis, out var surfaceBasis);
                 var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
-                TangentFriction.Solve(ref Matrix3x3Wide.GetX(ref surfaceBasis), ref Matrix3x3Wide.GetZ(ref surfaceBasis), ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref maximumTangentImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
+                TangentFriction.Solve(ref surfaceBasis.X, ref surfaceBasis.Z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref maximumTangentImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
-                ContactPenetrationLimit4.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref Matrix3x3Wide.GetY(ref surfaceBasis),
+                ContactPenetrationLimit4.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
@@ -172,7 +172,7 @@ namespace SolverPrototype.Constraints
                     accumulatedImpulses.Penetration1 * projection.LeverArm1 +
                     accumulatedImpulses.Penetration2 * projection.LeverArm2 +
                     accumulatedImpulses.Penetration3 * projection.LeverArm3);
-                TwistFriction.Solve(ref Matrix3x3Wide.GetY(ref surfaceBasis), ref projection.InertiaA, ref projection.InertiaB, ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
+                TwistFriction.Solve(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }

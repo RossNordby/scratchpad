@@ -7,47 +7,14 @@ namespace SolverPrototype
 
     public struct Matrix2x2Wide
     {
-        //TODO: While it would be a little more convenient to store these rows as Vector2Wides, there is a codegen issue with nested structs as of Microsoft.NETCore.App 2.0.0-preview2-002093-00.
-        //The jit emits zeroing for temporaries for nested structs, but not flattened ones.
-
         /// <summary>
-        /// Value at row 1, column 1 of the matrix.
+        /// First row of the matrix.
         /// </summary>
-        public Vector<float> M11;
+        public Vector2Wide X;
         /// <summary>
-        /// Value at row 1, column 2 of the matrix.
+        /// Second row of the matrix.
         /// </summary>
-        public Vector<float> M12;
-        /// <summary>
-        /// Value at row 2, column 1 of the matrix.
-        /// </summary>
-        public Vector<float> M21;
-        /// <summary>
-        /// Value at row 2, column 2 of the matrix.
-        /// </summary>
-        public Vector<float> M22;
-
-        //These helpers attempt to make up for the convenience lost from the row flattening.
-        /// <summary>
-        /// Gets a reference to the first row of the matrix.
-        /// </summary>
-        /// <param name="m">Matrix to get the row from.</param>
-        /// <returns>Reference to the first row of the matrix.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Vector2Wide GetX(ref Matrix2x2Wide m)
-        {
-            return ref Unsafe.As<Vector<float>, Vector2Wide>(ref m.M11);
-        }
-        /// <summary>
-        /// Gets a reference to the second row of the matrix.
-        /// </summary>
-        /// <param name="m">Matrix to get the row from.</param>
-        /// <returns>Reference to the second row of the matrix.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref Vector2Wide GetY(ref Matrix2x2Wide m)
-        {
-            return ref Unsafe.As<Vector<float>, Vector2Wide>(ref m.M21);
-        }
+        public Vector2Wide Y;
 
 
         /// <summary>
@@ -59,18 +26,18 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void MultiplyByTransposeWithoutOverlap(ref Matrix2x2Wide a, ref Matrix2x2Wide b, out Matrix2x2Wide result)
         {
-            result.M11 = a.M11 * b.M11 + a.M12 * b.M12;
-            result.M12 = a.M11 * b.M21 + a.M12 * b.M22;
-            result.M21 = a.M21 * b.M11 + a.M22 * b.M12;
-            result.M22 = a.M21 * b.M21 + a.M22 * b.M22;
+            result.X.X = a.X.X * b.X.X + a.X.Y * b.X.Y;
+            result.X.Y = a.X.X * b.Y.X + a.X.Y * b.Y.Y;
+            result.Y.X = a.Y.X * b.X.X + a.Y.Y * b.X.Y;
+            result.Y.Y = a.Y.X * b.Y.X + a.Y.Y * b.Y.Y;
         }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void TransformWithoutOverlap(ref Vector2Wide v, ref Matrix2x2Wide m, out Vector2Wide result)
         {
-            result.X = v.X * m.M11 + v.Y * m.M21;
-            result.Y = v.X * m.M12 + v.Y * m.M22;
+            result.X = v.X * m.X.X + v.Y * m.Y.X;
+            result.Y = v.X * m.X.Y + v.Y * m.Y.Y;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -90,10 +57,10 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Scale(ref Matrix2x2Wide m, ref Vector<float> scale, out Matrix2x2Wide result)
         {
-            result.M11 = m.M11 * scale;
-            result.M12 = m.M12 * scale;
-            result.M21 = m.M21 * scale;
-            result.M22 = m.M22 * scale;
+            result.X.X = m.X.X * scale;
+            result.X.Y = m.X.Y * scale;
+            result.Y.X = m.Y.X * scale;
+            result.Y.Y = m.Y.Y * scale;
         }
 
         /// <summary>
@@ -105,10 +72,8 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Add(ref Matrix2x2Wide a, ref Matrix2x2Wide b, out Matrix2x2Wide result)
         {
-            result.M11 = a.M11 + b.M11;
-            result.M12 = a.M12 + b.M12;
-            result.M21 = a.M21 + b.M21;
-            result.M22 = a.M22 + b.M22;
+            Vector2Wide.Add(ref a.X, ref b.X, out result.X);
+            Vector2Wide.Add(ref a.Y, ref b.Y, out result.Y);
         }
 
         /// <summary>
@@ -120,10 +85,8 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Subtract(ref Matrix2x2Wide a, ref Matrix2x2Wide b, out Matrix2x2Wide result)
         {
-            result.M11 = a.M11 - b.M11;
-            result.M12 = a.M12 - b.M12;
-            result.M21 = a.M21 - b.M21;
-            result.M22 = a.M22 - b.M22;
+            Vector2Wide.Subtract(ref a.X, ref b.X, out result.X);
+            Vector2Wide.Subtract(ref a.Y, ref b.Y, out result.Y);
         }
 
 
@@ -136,12 +99,12 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void InvertWithoutOverlap(ref Matrix2x2Wide m, out Matrix2x2Wide inverse)
         {
-            var determinantInverse = Vector<float>.One / (m.M11 * m.M22 - m.M12 * m.M21);
-            inverse.M11 = m.M22 * determinantInverse;
-            inverse.M12 = -m.M12 * determinantInverse;
+            var determinantInverse = Vector<float>.One / (m.X.X * m.Y.Y - m.X.Y * m.Y.X);
+            inverse.X.X = m.Y.Y * determinantInverse;
+            inverse.X.Y = -m.X.Y * determinantInverse;
 
-            inverse.M21 = -m.M21 * determinantInverse;
-            inverse.M22 = m.M11 * determinantInverse;
+            inverse.Y.X = -m.Y.X * determinantInverse;
+            inverse.Y.Y = m.X.X * determinantInverse;
 
         }
     }
