@@ -61,7 +61,7 @@ namespace SolverPrototype.Constraints
                 Unsafe.Add(ref targetB, 3) = Unsafe.Add(ref sourceB, 3) >> BundleIndexing.VectorShift;
 
             }
-            
+
             var mask = new Vector<int>(BundleIndexing.VectorMask);
             unpacked.InnerIndexA = Vector.BitwiseAnd(mask, IndexA);
             unpacked.InnerIndexB = Vector.BitwiseAnd(mask, IndexB);
@@ -132,7 +132,7 @@ namespace SolverPrototype.Constraints
             //Sort based on the smaller body index in a constraint. Note that it is impossible for there to be two references to the same body within a constraint batch, 
             //so there's no need to worry about the case where the comparison is equal.
             ref var indexA = ref GatherScatter.Get(ref bundleReferences.IndexA, innerIndex);
-            ref var indexB = ref Unsafe.Add(ref indexA, innerIndex);
+            ref var indexB = ref Unsafe.Add(ref indexA, Vector<int>.Count);
             return indexA < indexB ? indexA : indexB;
         }
         struct IntComparer : IComparerRef<int>
@@ -179,6 +179,9 @@ namespace SolverPrototype.Constraints
             QuickSort.Sort(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
 
             //Push the cached data into its proper sorted position.
+#if DEBUG
+            var previousKey = -1;
+#endif
             for (int i = 0; i < constraintCount; ++i)
             {
                 var sourceIndex = sourceIndices[i];
@@ -188,11 +191,17 @@ namespace SolverPrototype.Constraints
                 //Also, its maximum benefit is quite small.
                 BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
                 BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-
+                
                 Move(ref referencesCache[sourceBundle], ref prestepCache[sourceBundle], ref accumulatedImpulseCache[sourceBundle],
                     sourceInner, handlesCache[sourceIndex],
                     targetBundle, targetInner, targetIndex, handlesToConstraints);
 
+#if DEBUG
+                var key = GetSortKey(baseIndex + i);
+                Debug.Assert(key > previousKey, "After the sort and swap completes, all constraints should be in order.");
+                Debug.Assert(key == sortKeys[i], "After the swap goes through, the rederived sort keys should match the previously sorted ones.");
+                previousKey = key;
+#endif
             }
 
             rawPool.SpecializeFor<int>().Return(ref sourceIndices);
