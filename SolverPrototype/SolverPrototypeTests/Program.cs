@@ -6,11 +6,12 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
             //AutoTester.Test();
             //ContactManifoldConvergenceTests.Test();
             //SortTest.Test();
-            SpanCodegenTests.Test();
+            //SpanCodegenTests.Test();
         }
     }
 }

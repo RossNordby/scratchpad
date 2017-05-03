@@ -20,7 +20,8 @@ namespace SolverPrototypeTests
             SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.ScrambleBodies(simulation);
-            //SimulationSetup.ScrambleConstraints(simulation.Solver);         
+            //SimulationSetup.ScrambleConstraints(simulation.Solver);   
+            SimulationSetup.AddRemoveChurn(simulation, 162, bodyHandles, constraintHandles);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
@@ -40,7 +41,7 @@ namespace SolverPrototypeTests
             GC.Collect(3, GCCollectionMode.Forced, true);
 
             //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 16;
+            int bodyOptimizationIterations = bodyHandles.Length * 128;
             //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
             //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
             var timer = Stopwatch.StartNew();
@@ -84,7 +85,7 @@ namespace SolverPrototypeTests
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 8;
+            const int iterationCount = 32;
             const int frameCount = 64;
             simulation.Solver.IterationCount = iterationCount;
 
@@ -146,17 +147,29 @@ namespace SolverPrototypeTests
                 {
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
                     simulation.Bodies.VelocityBundles[i].LinearVelocity.Y += simulation.Bodies.LocalInertiaBundles[i].InverseMass * impulse;
+                    //if (Vector.LessThanAny(new Vector<float>(.1f), Vector.Abs(simulation.Bodies.VelocityBundles[i].LinearVelocity.Y)))
+                    //    Console.WriteLine($"Bundle {i}, Y velocities {simulation.Bodies.VelocityBundles[i].LinearVelocity.Y}");
+                    ref var bundleLinearVelocity = ref simulation.Bodies.VelocityBundles[i].LinearVelocity;
+                    Vector3Wide.Length(ref bundleLinearVelocity, out var length);
+                    if (Vector.LessThanAny(new Vector<float>(2f), length))
+                    {
+                        Console.WriteLine($"Bundle {i}, speeds {length}");
+                        Console.WriteLine($"X {bundleLinearVelocity.X}");
+                        Console.WriteLine($"Y {bundleLinearVelocity.Y}");
+                        Console.WriteLine($"Z {bundleLinearVelocity.Z}");
+
+                    }
                 }
                 //CacheBlaster.Blast();
                 //GC.Collect(3, GCCollectionMode.Forced, true);
                 timer.Start();
                 //simulation.Solver.Update(dt, inverseDt);
-                solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //solveTime += simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();

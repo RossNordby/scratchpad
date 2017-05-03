@@ -51,7 +51,7 @@ namespace SolverPrototype
             Bodies = new Bodies(initialBodyCapacity);
             Solver = new Solver(Bodies, BufferPool, initialCapacity: initialConstraintCapacity, minimumCapacityPerTypeBatch: minimumCapacityPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialBodyCapacity, initialConstraintCountPerBodyEstimate);
-            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver);
+            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
         }

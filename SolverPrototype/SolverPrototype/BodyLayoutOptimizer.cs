@@ -15,20 +15,20 @@ namespace SolverPrototype
         Bodies bodies;
         ConstraintConnectivityGraph graph;
         Solver solver;
-        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver)
+        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool)
         {
             this.bodies = bodies;
             this.graph = graph;
             this.solver = solver;
 
-            partialIslandDFSEnumerator = new PartialIslandDFSEnumerator
+            islandEnumerator = new PartialIslandDFSEnumerator
             {
-                traversalStack = new QuickList<int, Array<int>>(),
-                pool = new PassthroughArrayPool<int>(),
                 bodies = bodies,
                 graph = graph,
                 solver = solver,
+                pool = pool.SpecializeFor<int>()
             };
+            QuickList<int, Buffer<int>>.Create(islandEnumerator.pool, 32, out islandEnumerator.traversalStack);
         }
 
         //TODO: Note that there are a few ways we can do multithreading. The naive way is to just apply locks on all the nodes affected by an optimization candidate.
@@ -97,6 +97,8 @@ namespace SolverPrototype
                     //so we don't have to worry about having the rug pulled by this list swap.
                     //(Also, !(x > x) for many values of x.)
                     SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
+
+                    //slotIndex = int.MaxValue;
                 }
             }
         }
@@ -124,8 +126,57 @@ namespace SolverPrototype
             enumerator.slotIndex = dumbBodyIndex + 1;
             graph.EnumerateConnectedBodies(dumbBodyIndex, ref enumerator);
 
-            //TODO: Should probably try skipping to the end of the blob we optimized in the enumeration.
             ++dumbBodyIndex;
+
+        }
+
+        int minimumBodyIndex = 0;
+
+        struct MinimumIncrementalEnumerator : IForEach<int>
+        {
+            public int targetIndex;
+            public int minimumIndex;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void LoopBody(int connectedBodyIndex)
+            {
+                //Only pull bodies over that are to the right. This helps limit pointless fighting.
+                //With this condition, objects within an island will tend to move towards the position of the leftmost body.
+                //Without it, any progress towards island-level convergence could be undone by the next iteration.
+                if (connectedBodyIndex > targetIndex && connectedBodyIndex < minimumIndex)
+                {
+                    minimumIndex = connectedBodyIndex;
+                }
+            }
+        }
+        public void MinimumIncrementalOptimize()
+        {
+            //All this does is look for any bodies which are to the right of a given body. If it finds one, it pulls it to be adjacent.
+            //This converges at the island level- that is, running this on a static topology of simulation islands will eventually result in 
+            //the islands being contiguous in memory, and at least some connected bodies being adjacent to each other.
+            //However, within the islands, it may continue to unnecessarily swap objects around as bodies 'fight' for ownership.
+            //One body doesn't know that another body has already claimed a body as a child, so this can't produce a coherent unique traversal order.
+            //(In fact, it won't generally converge even with a single one dimensional chain of bodies.)
+
+            //This optimization routine requires much less overhead than other options, like full island traversals. We only request the connections of a single body,
+            //and the swap count is limited to the number of connected bodies.
+
+            //Note that this first implementation really does not care about performance. Just looking for the performance impact on the solver at this point.
+
+            if (minimumBodyIndex >= bodies.BodyCount - 1)
+                minimumBodyIndex = 0;
+
+            var enumerator = new MinimumIncrementalEnumerator();
+            enumerator.targetIndex = minimumBodyIndex + 1;
+            enumerator.minimumIndex = int.MaxValue;
+
+            graph.EnumerateConnectedBodies(minimumBodyIndex, ref enumerator);
+
+            if (enumerator.minimumIndex < int.MaxValue)
+            {
+                SwapBodyLocation(bodies, graph, solver, enumerator.minimumIndex, minimumBodyIndex + 1);
+                //Console.WriteLine($"Swapping {enumerator.minimumIndex} with {minimumBodyIndex + 1}");
+            }
+            ++minimumBodyIndex;
         }
 
         struct PartialIslandDFSEnumerator : IForEach<int>
@@ -134,8 +185,8 @@ namespace SolverPrototype
             public ConstraintConnectivityGraph graph;
             public Solver solver;
             //We effectively do a full traversal over multiple frames. We have to store the stack for this to work.
-            public QuickList<int, Array<int>> traversalStack;
-            public PassthroughArrayPool<int> pool;
+            public QuickList<int, Buffer<int>> traversalStack;
+            public BufferPool<int> pool;
             //The target index is just the last recorded exclusive endpoint of the island. In other words, it's the place where the next island body will be put.
             public int targetIndex;
             public int currentBodyIndex;
@@ -163,7 +214,7 @@ namespace SolverPrototype
                 }
             }
         }
-        PartialIslandDFSEnumerator partialIslandDFSEnumerator;
+        PartialIslandDFSEnumerator islandEnumerator;
 
         public void PartialIslandOptimizeDFS(int maximumBodiesToVisit = 32)
         {
@@ -176,56 +227,32 @@ namespace SolverPrototype
             //Further, no swaps will occur with any body to the left of the target index.
             //Any body before the target index has already been swapped into position by an earlier traversal (heuristically speaking).
             //3) Swaps are performed inline, eliminating the need for any temporary body storage (or long-term locks in the multithreaded implementation).
-            partialIslandDFSEnumerator.visitedBodyCount = 0;
-            partialIslandDFSEnumerator.maximumBodiesToVisit = maximumBodiesToVisit;
+            islandEnumerator.visitedBodyCount = 0;
+            islandEnumerator.maximumBodiesToVisit = maximumBodiesToVisit;
             //First, attempt to continue any previous traversals.
             do
             {
-                if (partialIslandDFSEnumerator.targetIndex >= bodies.BodyCount)
+                if (islandEnumerator.targetIndex >= bodies.BodyCount)
                 {
                     //The target index has walked outside the bounds of the body set. While we could wrap around and continue, that would a different heuristic
                     //for swapping and visitation- currently we use 'to the right' which isn't well defined on a ring.
                     //Instead, for simplicity's sake, the target simply resets to the first index, and the traversal stack gets cleared.
-                    partialIslandDFSEnumerator.targetIndex = 0;
-                    partialIslandDFSEnumerator.traversalStack.Count = 0;
+                    islandEnumerator.targetIndex = 0;
+                    islandEnumerator.traversalStack.Count = 0;
                 }
-                if (partialIslandDFSEnumerator.traversalStack.Count == 0)
+                if (islandEnumerator.traversalStack.Count == 0)
                 {
                     //There is no active traversal. Start one.
-                    partialIslandDFSEnumerator.traversalStack.Add(partialIslandDFSEnumerator.targetIndex++, partialIslandDFSEnumerator.pool);
+                    islandEnumerator.traversalStack.Add(islandEnumerator.targetIndex++, islandEnumerator.pool);
                 }
-                partialIslandDFSEnumerator.traversalStack.Pop(out partialIslandDFSEnumerator.currentBodyIndex);
+                islandEnumerator.traversalStack.Pop(out islandEnumerator.currentBodyIndex);
                 //It's possible for the target index to fall behind if no swaps are needed. 
-                partialIslandDFSEnumerator.targetIndex = Math.Max(partialIslandDFSEnumerator.targetIndex, partialIslandDFSEnumerator.currentBodyIndex + 1);
-                graph.EnumerateConnectedBodies(partialIslandDFSEnumerator.currentBodyIndex, ref partialIslandDFSEnumerator);
-                ++partialIslandDFSEnumerator.visitedBodyCount;
-            } while (partialIslandDFSEnumerator.visitedBodyCount < partialIslandDFSEnumerator.maximumBodiesToVisit);
+                islandEnumerator.targetIndex = Math.Max(islandEnumerator.targetIndex, islandEnumerator.currentBodyIndex + 1);
+                graph.EnumerateConnectedBodies(islandEnumerator.currentBodyIndex, ref islandEnumerator);
+                ++islandEnumerator.visitedBodyCount;
+            } while (islandEnumerator.visitedBodyCount < islandEnumerator.maximumBodiesToVisit);
         }
 
-        public void IslandOptimizeDFS()
-        {
-            //Simply grab an entire island by walking through the connection graph.
-            //This trivially guarantees island locality and a stable depth first traversal order.
-            //Beating this in terms of cache quality would likely require some pretty complex heuristics (root choice, branching choice...),
-            //but the traversal and swap time is an issue. Very large islands are not rare. 
-            //This is doubly true because multithreading this would be a pain (likely with little gain).
-
-            //On the upside, with a good choice of bodies, this will converge pretty quickly.
-
-
-        }
-
-        public void IslandOptimizeBFS()
-        {
-            //Same idea as the DFS version. This is just a sanity test; it should be significantly worse.
-            //1) While BFS can guarantee the contiguity of all children (and all bodies at that traversal distance), the solver operates on batches that
-            //do not include the same body twice. In other words, while BFS produces a decent result if the child-parent pairs were iterated in order,
-            //the solver is explicitly not doing that.
-            //2) Apart from the root and its first child, we never guarantee that any direct connections will be adjacent in memory. In fact, we make it harder by putting a bunch
-            //of other nodes in between them. While this doesn't guarantee that there won't be ANY adjacency, it doesn't do any better than randomly shuffling the island.
-
-
-        }
 
         //Note that external systems which have to respond to body movements will generally be okay without their own synchronization in multithreaded cache optimization.
         //For example, the constraint handle, type batch index, index in type batch, and body index in constraint do not change. If we properly synchronize
