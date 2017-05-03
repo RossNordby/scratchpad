@@ -130,41 +130,18 @@ namespace SolverPrototype.Constraints
                 ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 Matrix3x3Wide.CreateFromQuaternion(ref projection.SurfaceBasis, out var surfaceBasis);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
                 TangentFriction.WarmStart(ref surfaceBasis.X, ref surfaceBasis.Z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
                 ContactPenetrationLimit4.WarmStart(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB,
                     ref surfaceBasis.Y,
                     ref accumulatedImpulses.Penetration0,
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
                     ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
                 TwistFriction.WarmStart(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
             }
         }
-        static void Check(ref BodyVelocities wsvA, ref BodyVelocities wsvB, int bodyCount)
-        {
-            for (int i =0; i < bodyCount; ++i)
-            {
-                if (GatherScatter.Get(ref wsvA.LinearVelocity.X, i) != 0 ||
-                    GatherScatter.Get(ref wsvA.LinearVelocity.Z, i) != 0 ||
-                    GatherScatter.Get(ref wsvA.AngularVelocity.X, i) != 0 ||
-                    GatherScatter.Get(ref wsvA.AngularVelocity.Y, i) != 0 ||
-                    GatherScatter.Get(ref wsvA.AngularVelocity.Z, i) != 0 || 
-                    GatherScatter.Get(ref wsvB.LinearVelocity.X, i) != 0 ||
-                    GatherScatter.Get(ref wsvB.LinearVelocity.Z, i) != 0 ||
-                    GatherScatter.Get(ref wsvB.AngularVelocity.X, i) != 0 ||
-                    GatherScatter.Get(ref wsvB.AngularVelocity.Y, i) != 0 ||
-                    GatherScatter.Get(ref wsvB.AngularVelocity.Z, i) != 0)
-                {
-                    Debug.WriteLine("ODd");
-                }
-            }
-        }
+
         public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
             ref var projectionBase = ref Projection[0];
@@ -181,9 +158,7 @@ namespace SolverPrototype.Constraints
                 Matrix3x3Wide.CreateFromQuaternion(ref projection.SurfaceBasis, out var surfaceBasis);
                 var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
                     (accumulatedImpulses.Penetration0 + accumulatedImpulses.Penetration1 + accumulatedImpulses.Penetration2 + accumulatedImpulses.Penetration3);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
                 TangentFriction.Solve(ref surfaceBasis.X, ref surfaceBasis.Z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref maximumTangentImpulse, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
                 //Note that we solve the penetration constraints after the friction constraints. 
                 //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
                 //It's a pretty minor effect either way.
@@ -192,7 +167,6 @@ namespace SolverPrototype.Constraints
                     ref accumulatedImpulses.Penetration1,
                     ref accumulatedImpulses.Penetration2,
                     ref accumulatedImpulses.Penetration3, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
 
                 var maximumTwistImpulse = projection.PremultipliedFrictionCoefficient * (
                     accumulatedImpulses.Penetration0 * projection.LeverArm0 +
@@ -200,10 +174,8 @@ namespace SolverPrototype.Constraints
                     accumulatedImpulses.Penetration2 * projection.LeverArm2 +
                     accumulatedImpulses.Penetration3 * projection.LeverArm3);
                 TwistFriction.Solve(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
-
+            
                 GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
-                Check(ref wsvA, ref wsvB, bodyReferences.Count);
             }
         }
 

@@ -23,7 +23,7 @@ namespace SolverPrototypeTests
 
             //SimulationSetup.ScrambleBodies(simulation);
             //SimulationSetup.ScrambleConstraints(simulation.Solver);   
-            SimulationSetup.AddRemoveChurn(simulation, 162, bodyHandles, constraintHandles);
+            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
@@ -88,7 +88,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 32;
-            const int frameCount = 64;
+            const int frameCount = 128;
             simulation.Solver.IterationCount = iterationCount;
 
 
@@ -135,7 +135,7 @@ namespace SolverPrototypeTests
                         GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.W, innerIndex));
                     Matrix3x3.CreateFromQuaternion(ref surfaceBasis, out var surfaceBasisMatrix);
                     var normal = surfaceBasisMatrix.Y;
-                    var penetrationChange = dt * Vector3.Dot(relativeVelocity, normal);
+                    var penetrationChange = -dt * Vector3.Dot(relativeVelocity, normal);
                     ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth0, innerIndex);
                     penetrationDepth += penetrationChange;
                     GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth1, innerIndex) += penetrationChange;
