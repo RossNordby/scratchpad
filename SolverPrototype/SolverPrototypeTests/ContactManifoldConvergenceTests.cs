@@ -21,9 +21,10 @@ namespace SolverPrototypeTests
 
             SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            //SimulationSetup.ScrambleBodies(simulation);
-            //SimulationSetup.ScrambleConstraints(simulation.Solver);   
-            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            SimulationSetup.ScrambleBodies(simulation);
+            SimulationSetup.ScrambleConstraints(simulation.Solver);
+            SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
@@ -43,14 +44,14 @@ namespace SolverPrototypeTests
             GC.Collect(3, GCCollectionMode.Forced, true);
 
             //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 128;
+            int bodyOptimizationIterations = bodyHandles.Length * 16;
             //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
             //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
                 //bodyOptimizer.PartialIslandOptimizeDFS(64);
-                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
+                simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
@@ -78,7 +79,7 @@ namespace SolverPrototypeTests
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool);
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +

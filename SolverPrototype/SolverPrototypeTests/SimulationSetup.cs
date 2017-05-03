@@ -84,6 +84,24 @@ namespace SolverPrototypeTests
                 }
             }
         }
+        public static void ScrambleBodyConstraintLists(Simulation simulation)
+        {
+            Random random = new Random(5);
+            //Body lists are isolated enough that we don't have to worry about a bunch of internal bookkeeping. Just pull the list and mess with it.
+            //Note that we cannot change the order of bodies within constraints! That would change behavior.
+            for (int bodyIndex = 0; bodyIndex < simulation.Bodies.BodyCount; ++bodyIndex)
+            {
+                ref var list = ref simulation.ConstraintGraph.GetConstraintList(bodyIndex);
+                for (int i = 0; i < list.Count - 1; ++i)
+                {
+                    ref var currentSlot = ref list[i];
+                    ref var otherSlot = ref list[random.Next(i + 1, list.Count)];
+                    var currentTemp = currentSlot;
+                    currentSlot = otherSlot;
+                    otherSlot = currentTemp;
+                }
+            }
+        }
 
         public static void BuildStackOfBodiesOnGround(int bodyCount,
             out Simulation simulation, out int[] bodyHandles, out int[] constraintHandles)
@@ -522,7 +540,7 @@ namespace SolverPrototypeTests
                 ChurnAddConstraint(simulation, bodyHandles, constraintHandles, constraintHandlesToIdentity, constraintDescriptions, removedConstraints, removedBodies, random);
             }
 
-            for (int i =0; i < constraintHandles.Length; ++i)
+            for (int i = 0; i < constraintHandles.Length; ++i)
             {
                 simulation.Solver.GetDescription(constraintHandles[i], out ContactManifold4Constraint description);
                 Debug.Assert(description.Equals(constraintDescriptions[i].Description), "Moving constraints around should not affect their descriptions.");

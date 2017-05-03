@@ -421,10 +421,11 @@ namespace BEPUutilities2.Collections
                 firstGreaterValueSlot = pivotValue;
                 j = i - 1; //Sort's parameters take an inclusive bound, so push j back.
                 i = i + 1; //The pivot takes i's spot, and the pivot should not be included in sorting, so push i up.
-                Debug.Assert(i <= r);
-                Debug.Assert(j >= l);
-                Sort(ref keys, ref values, l, j, ref comparer);
-                Sort(ref keys, ref values, i, r, ref comparer);
+                //Only bother sorting if there is anything to sort.
+                if (j > l)
+                    Sort(ref keys, ref values, l, j, ref comparer);
+                if (r > i)
+                    Sort(ref keys, ref values, i, r, ref comparer);
             }
         }
 

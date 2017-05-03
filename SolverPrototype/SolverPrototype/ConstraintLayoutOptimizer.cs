@@ -158,7 +158,7 @@ namespace SolverPrototype
                 ref var target = ref targets[i];
                 var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
                 //TODO: Note that we currently use the main bufferpool. That's not thread safe.
-                //When using multiple threads to sort, we should provide the function a 'parallel context' that includes both the workers dispatch interface and the memory resources.
+                //When using multiple threads to sort, we should provide the function a worker context that includes both the workers dispatch interface and the memory resources.
                 typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount, rawPool);
             }
 
