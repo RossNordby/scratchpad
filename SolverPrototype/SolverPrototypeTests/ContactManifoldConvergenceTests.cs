@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.Memory;
+﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Constraints;
 using System;
@@ -7,6 +8,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using static SolverPrototype.Solver;
+using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
@@ -116,9 +118,24 @@ namespace SolverPrototypeTests
                     var bodyBundleIndexB = GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex);
                     var innerIndexA = GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex);
                     var innerIndexB = GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex);
-                    var velocityA = GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Y, innerIndexA);
-                    var velocityB = GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Y, innerIndexB);
-                    var penetrationChange = dt * (velocityA - velocityB);
+
+                    var velocityA = new Vector3(
+                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.X, innerIndexA),
+                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Y, innerIndexA),
+                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Z, innerIndexA));
+                    var velocityB = new Vector3(
+                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.X, innerIndexB),
+                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Y, innerIndexB),
+                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Z, innerIndexB));
+                    var relativeVelocity = (velocityA - velocityB);
+                    var surfaceBasis = new Quaternion(
+                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.X, innerIndex),
+                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.Y, innerIndex),
+                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.Z, innerIndex),
+                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.W, innerIndex));
+                    Matrix3x3.CreateFromQuaternion(ref surfaceBasis, out var surfaceBasisMatrix);
+                    var normal = surfaceBasisMatrix.Y;
+                    var penetrationChange = dt * Vector3.Dot(relativeVelocity, normal);
                     ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth0, innerIndex);
                     penetrationDepth += penetrationChange;
                     GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth1, innerIndex) += penetrationChange;
@@ -145,20 +162,8 @@ namespace SolverPrototypeTests
                 var impulse = new Vector<float>(-10 * dt);
                 for (int i = 0; i < bodyBundleCount; ++i)
                 {
-                    //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematic.)
+                    //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematics.)
                     simulation.Bodies.VelocityBundles[i].LinearVelocity.Y += simulation.Bodies.LocalInertiaBundles[i].InverseMass * impulse;
-                    //if (Vector.LessThanAny(new Vector<float>(.1f), Vector.Abs(simulation.Bodies.VelocityBundles[i].LinearVelocity.Y)))
-                    //    Console.WriteLine($"Bundle {i}, Y velocities {simulation.Bodies.VelocityBundles[i].LinearVelocity.Y}");
-                    ref var bundleLinearVelocity = ref simulation.Bodies.VelocityBundles[i].LinearVelocity;
-                    Vector3Wide.Length(ref bundleLinearVelocity, out var length);
-                    if (Vector.LessThanAny(new Vector<float>(2f), length))
-                    {
-                        Console.WriteLine($"Bundle {i}, speeds {length}");
-                        Console.WriteLine($"X {bundleLinearVelocity.X}");
-                        Console.WriteLine($"Y {bundleLinearVelocity.Y}");
-                        Console.WriteLine($"Z {bundleLinearVelocity.Z}");
-
-                    }
                 }
                 //CacheBlaster.Blast();
                 //GC.Collect(3, GCCollectionMode.Forced, true);

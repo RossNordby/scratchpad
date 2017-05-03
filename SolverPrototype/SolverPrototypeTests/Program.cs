@@ -9,7 +9,7 @@ namespace SolverPrototypeTests
             ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
             //AutoTester.Test();
-            //ContactManifoldConvergenceTests.Test();
+            ContactManifoldConvergenceTests.Test();
             //SortTest.Test();
             //SpanCodegenTests.Test();
         }

@@ -522,6 +522,12 @@ namespace SolverPrototypeTests
                 ChurnAddConstraint(simulation, bodyHandles, constraintHandles, constraintHandlesToIdentity, constraintDescriptions, removedConstraints, removedBodies, random);
             }
 
+            for (int i =0; i < constraintHandles.Length; ++i)
+            {
+                simulation.Solver.GetDescription(constraintHandles[i], out ContactManifold4Constraint description);
+                Debug.Assert(description.Equals(constraintDescriptions[i].Description), "Moving constraints around should not affect their descriptions.");
+            }
+
             var newConstraintCount = 0;
             foreach (var batch in simulation.Solver.Batches)
             {

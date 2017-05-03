@@ -49,7 +49,7 @@ namespace SolverPrototypeTests
 
                 ref var source = ref sources[constraintTestIndex];
                 FillWithRandomBytes(ref source, random);
-                simulation.Solver.Add(ref constraintBodyHandles[0], constraintTypeBodyCount, ref source, out constraintHandles[constraintTestIndex]);
+                constraintHandles[constraintTestIndex] = simulation.Add(ref constraintBodyHandles[0], constraintTypeBodyCount, ref source);
 
             }
             for (int constraintTestIndex = 0; constraintTestIndex < constraintTestCount; ++constraintTestIndex)
@@ -59,6 +59,7 @@ namespace SolverPrototypeTests
                 var bValue = (ValueType)sources[constraintTestIndex];
                 if (!Equals(typeof(T).Name, typeof(T), aValue, bValue))
                     break;
+                simulation.RemoveConstraint(constraintHandles[constraintTestIndex]);
             }
         }
 
