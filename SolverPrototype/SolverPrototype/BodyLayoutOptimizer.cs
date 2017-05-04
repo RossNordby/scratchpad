@@ -130,25 +130,26 @@ namespace SolverPrototype
 
         }
 
-        int minimumBodyIndex = 0;
+        int sortingBodyIndex = 0;
 
-        struct MinimumIncrementalEnumerator : IForEach<int>
+        struct CollectingEnumerator : IForEach<int>
         {
-            public int targetIndex;
             public int minimumIndex;
+            public QuickList<int, Buffer<int>> bodyIndices;
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
                 //Only pull bodies over that are to the right. This helps limit pointless fighting.
                 //With this condition, objects within an island will tend to move towards the position of the leftmost body.
                 //Without it, any progress towards island-level convergence could be undone by the next iteration.
-                if (connectedBodyIndex > targetIndex && connectedBodyIndex < minimumIndex)
+                if (connectedBodyIndex > minimumIndex)
                 {
-                    minimumIndex = connectedBodyIndex;
+                    bodyIndices.AddUnsafely(connectedBodyIndex);
                 }
             }
         }
-        public void MinimumIncrementalOptimize()
+        public void SortingIncrementalOptimize(BufferPool rawPool)
         {
             //All this does is look for any bodies which are to the right of a given body. If it finds one, it pulls it to be adjacent.
             //This converges at the island level- that is, running this on a static topology of simulation islands will eventually result in 
@@ -162,21 +163,32 @@ namespace SolverPrototype
 
             //Note that this first implementation really does not care about performance. Just looking for the performance impact on the solver at this point.
 
-            if (minimumBodyIndex >= bodies.BodyCount - 1)
-                minimumBodyIndex = 0;
+            if (sortingBodyIndex >= bodies.BodyCount - 1)
+                sortingBodyIndex = 0;
 
-            var enumerator = new MinimumIncrementalEnumerator();
-            enumerator.targetIndex = minimumBodyIndex + 1;
-            enumerator.minimumIndex = int.MaxValue;
+            var enumerator = new CollectingEnumerator();
+            enumerator.minimumIndex = sortingBodyIndex;
+            var pool = rawPool.SpecializeFor<int>();
+            QuickList<int, Buffer<int>>.Create(pool, graph.GetConstraintList(sortingBodyIndex).Count, out enumerator.bodyIndices);
 
-            graph.EnumerateConnectedBodies(minimumBodyIndex, ref enumerator);
-
-            if (enumerator.minimumIndex < int.MaxValue)
+            graph.EnumerateConnectedBodies(sortingBodyIndex, ref enumerator);
+            if (enumerator.bodyIndices.Count > 0)
             {
-                SwapBodyLocation(bodies, graph, solver, enumerator.minimumIndex, minimumBodyIndex + 1);
-                //Console.WriteLine($"Swapping {enumerator.minimumIndex} with {minimumBodyIndex + 1}");
+                pool.Take(enumerator.bodyIndices.Count, out var sourceIndices);
+                var comparer = new PrimitiveComparer<int>();
+                InsertionSort.Sort(ref enumerator.bodyIndices[0], ref sourceIndices[0], 0, enumerator.bodyIndices.Count - 1, ref comparer);
+                int targetIndex = sortingBodyIndex;
+                for (int i = 0; i < enumerator.bodyIndices.Count; ++i)
+                {
+                    ++targetIndex;
+                    //Because the list is sorted, it's not possible for the swap target location to be greater than the swap source location.
+                    Debug.Assert(targetIndex <= enumerator.bodyIndices[i]);
+                    SwapBodyLocation(bodies, graph, solver, enumerator.bodyIndices[i], ++targetIndex);
+                }
+                pool.Return(ref sourceIndices);
             }
-            ++minimumBodyIndex;
+            enumerator.bodyIndices.Dispose(pool);
+            ++sortingBodyIndex;
         }
 
         struct PartialIslandDFSEnumerator : IForEach<int>
