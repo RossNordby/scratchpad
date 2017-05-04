@@ -29,7 +29,7 @@ namespace SolverPrototype
         }
 
         Optimization nextTargetWithoutOffset;
-        Optimization nextTargetWithOffset;
+        Optimization previousStartWithoutOffset;
 
         //Note that this is stored on the heap just to make it easier to pass to the multithreaded workers later. It doesn't truly exist outside of the scope of an update call.
         QuickList<Optimization, Buffer<Optimization>> targets;
@@ -43,86 +43,81 @@ namespace SolverPrototype
         {
             this.bodies = bodies;
             this.solver = solver;
-            //Trigger an offset initialization.
-            nextTargetWithOffset.BatchIndex = int.MaxValue;
         }
 
-        int GetStartBundleIndex(int batchIndex, int typeBatchIndex, int maximumRegionSizeInBundles)
-        {
-            return shouldOffset ? Math.Min(maximumRegionSizeInBundles / 2,
-                Math.Max(0, solver.Batches[batchIndex].TypeBatches[typeBatchIndex].BundleCount - maximumRegionSizeInBundles)) : 0;
-        }
-        bool WrapBatch(ref Optimization o, int maximumRegionSizeInBundles)
+        bool WrapBatch(ref Optimization o)
         {
             Debug.Assert(solver.Batches.Count >= 0);
             if (o.BatchIndex >= solver.Batches.Count)
             {
                 //Wrap around.
                 o = new Optimization();
-                o.BundleIndex = GetStartBundleIndex(0, 0, maximumRegionSizeInBundles);
                 return true;
             }
             return false;
         }
-        bool WrapTypeBatch(ref Optimization o, int maximumRegionSizeInBundles)
+        bool WrapTypeBatch(ref Optimization o)
         {
             Debug.Assert(o.BatchIndex <= solver.Batches.Count, "Should only attempt to wrap type batch indices if the batch index is known to be valid.");
             if (o.TypeBatchIndex >= solver.Batches[o.BatchIndex].TypeBatches.Count)
             {
                 ++o.BatchIndex;
-                if (!WrapBatch(ref o, maximumRegionSizeInBundles))
+                if (!WrapBatch(ref o))
                 {
                     o.TypeBatchIndex = 0;
-                    o.BundleIndex = GetStartBundleIndex(o.BatchIndex, 0, maximumRegionSizeInBundles);
+                    o.BundleIndex = 0;
                 }
                 return true;
             }
             return false;
         }
 
-        void WrapBundle(ref Optimization o, int maximumRegionSizeInBundles)
+        bool WrapBundle(ref Optimization o)
         {
             Debug.Assert(o.BatchIndex <= solver.Batches.Count && o.TypeBatchIndex <= solver.Batches[o.BatchIndex].TypeBatches.Count,
                 "Should only attempt to wrap constraint index if the type batch and batch indices are known to be valid.");
             if (o.BundleIndex >= solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].BundleCount)
             {
                 ++o.TypeBatchIndex;
-                if (!WrapTypeBatch(ref o, maximumRegionSizeInBundles))
+                if (!WrapTypeBatch(ref o))
                 {
-                    o.BundleIndex = GetStartBundleIndex(o.BatchIndex, o.TypeBatchIndex, maximumRegionSizeInBundles);
+                    o.BundleIndex = 0;
                 }
+                return true;
             }
+            return false;
         }
-        void BoundsCheckOldTarget(ref Optimization o, int maximumRegionSizeInBundles)
+        void BoundsCheckOldTarget(ref Optimization o)
         {
-            if (!WrapBatch(ref o, maximumRegionSizeInBundles))
+            if (!WrapBatch(ref o))
             {
-                if (!WrapTypeBatch(ref o, maximumRegionSizeInBundles))
+                if (!WrapTypeBatch(ref o))
                 {
-                    WrapBundle(ref o, maximumRegionSizeInBundles);
+                    WrapBundle(ref o);
                 }
             }
         }
-        void FindOffsetFrameStart(ref Optimization o, int maximumRegionSizeInBundles)
+        Optimization FindOffsetFrameStart(Optimization o, int maximumRegionSizeInBundles)
         {
-            BoundsCheckOldTarget(ref o, maximumRegionSizeInBundles);
+            BoundsCheckOldTarget(ref o);
 
-            int constraintCount = 0;
+            int bundleCount = 0;
             for (int i = 0; i < solver.Batches.Count; ++i)
             {
                 var batch = solver.Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
                     var typeBatch = batch.TypeBatches[j];
-                    constraintCount += typeBatch.BundleCount;
+                    bundleCount += typeBatch.BundleCount;
                 }
             }
 
-            var remainingDistance = constraintCount / 2;
-            while (remainingDistance > 0)
+            var remainingDistance = bundleCount / 2;
+            while (true)
             {
-                var spaceRemaining = solver.Batches[o.BundleIndex].TypeBatches[o.TypeBatchIndex].BundleCount - o.BundleIndex;
-                if(spaceRemaining > remainingDistance)
+                var typeBatch = solver.Batches[o.BundleIndex].TypeBatches[o.TypeBatchIndex];
+                var spaceRemaining = typeBatch.BundleCount - o.BundleIndex;
+                if (spaceRemaining > remainingDistance)
                 {
                     o.BundleIndex += remainingDistance;
                     //Move to the next position >= (x + 0.5) * regionSize, where x is some whole number.
@@ -133,21 +128,16 @@ namespace SolverPrototype
                         ++halfRegionCount;
                     //In order to be on an offset start, the number of half regions must be odd.
                     halfRegionCount |= 1;
-                    o.BundleIndex = halfRegionCount * halfRegionSize;
-                    WrapBundle(ref o, maximumRegionSizeInBundles);
-                    break;
+                    var targetBundleIndex = halfRegionCount * halfRegionSize;
+                    //Put the bundle index at the target, or as close to it as you can get while staying within the current batch.
+                    //If it bumps up against the end, just pull it forward. You don't lose any convergence power here- the region covers all the bundles that
+                    //would have been covered by starting at the target, and then some.
+                    o.BundleIndex = Math.Max(0, Math.Min(targetBundleIndex, typeBatch.BundleCount - maximumRegionSizeInBundles));
+                    return o;
                 }
                 remainingDistance -= spaceRemaining;
-                //Note that we don't use the usual wrap- this shouldn't use the wrap half offset support, since we handle it explicitly above.
-                ++o.TypeBatchIndex;
-                if (o.TypeBatchIndex >= solver.Batches[o.BatchIndex].TypeBatches.Count)
-                {
-                    o.TypeBatchIndex = 0;
-                    o.BundleIndex = 0;
-                    ++o.BatchIndex;
-                    if (o.BatchIndex >= solver.Batches.Count)
-                        o.BatchIndex = 0;
-                }
+                o.BundleIndex += spaceRemaining;
+                WrapBundle(ref o);
             }
         }
 
@@ -161,13 +151,20 @@ namespace SolverPrototype
             if (solver.Batches.Count == 0)
                 return;
 
-            var nextTarget = shouldOffset ? nextTargetWithOffset : nextTargetWithoutOffset;
+            Optimization nextTarget;
+            if (shouldOffset)
+            {
+                //Use the previous frame's start to create the new target.
+                nextTarget = FindOffsetFrameStart(previousStartWithoutOffset, maximumRegionSizeInBundles);
+            }
+            else
+            {
+                //Since the constraint set could have changed arbitrarily since the previous execution, validate from batch down.
+                nextTarget = nextTargetWithoutOffset;
+                BoundsCheckOldTarget(ref nextTarget);
+                previousStartWithoutOffset = nextTargetWithoutOffset;
+            }
 
-            FindOffsetFrameStart(ref previousStart, maximumRegionSizeInBundles);
-
-
-            //Since the constraint set could have changed arbitrarily since the previous execution, validate from batch down.
-            BoundsCheckOldTarget(ref nextTarget, maximumRegionSizeInBundles);
 
             //Note that we can know exactly how many targets will exist thanks to the region count, so we can perform unsafe adds.
             var pool = rawPool.SpecializeFor<Optimization>();
@@ -179,7 +176,7 @@ namespace SolverPrototype
                 //Add the initial target for optimization. It's already been validated- either by the initial test, or by the previous wrap.
                 targets.AddUnsafely(ref nextTarget);
                 nextTarget.BundleIndex += maximumRegionSizeInBundles;
-                WrapBundle(ref nextTarget, maximumRegionSizeInBundles);
+                WrapBundle(ref nextTarget);
 
                 //If the next target overlaps with the first target, the collection has wrapped around all constraints. Apparently more regions were requested
                 //than are available. Stop collection.
@@ -194,13 +191,8 @@ namespace SolverPrototype
             while (targets.Count < regionCount);
 
             //Note that we have two separate parallel optimizations over multiple frames. Alternating between them on a per frame basis is a fairly simple way to guarantee
-            //eventual convergence in the sort.
-            //If conditionally assignable ref locals existed, this reassignment could go away. You might be able to do some hack to get around it, but it's superdupernotworthit.
-            if (shouldOffset)
-            {
-                nextTargetWithOffset = nextTarget;
-            }
-            else
+            //eventual convergence in the sort. We only ever push forward the non-offset version; the offset position is based on the nonoffset version's last start position.
+            if (!shouldOffset)
             {
                 nextTargetWithoutOffset = nextTarget;
             }
