@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using BEPUutilities2.Memory;
 using BEPUutilities2.Collections;
+using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
@@ -274,5 +275,120 @@ namespace SolverPrototype
         //a single threaded implementation running at the same time as some other compatible stage just vastly outperforms it. It is very likely that the multithreaded version
         //will be 2-6 times slower than the single threaded version per thread.
 
+
+        struct MultithreadedDumbIncrementalEnumerator : IForEach<int>
+        {
+            public Bodies bodies;
+            public ConstraintConnectivityGraph graph;
+            public Solver solver;
+            public int slotIndex;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void LoopBody(int connectedBodyIndex)
+            {
+                //Only pull bodies over that are to the right. This helps limit pointless fighting.
+                //With this condition, objects within an island will tend to move towards the position of the leftmost body.
+                //Without it, any progress towards island-level convergence could be undone by the next iteration.
+                if (connectedBodyIndex > slotIndex)
+                {
+                    //Note that we update the memory location immediately. This could affect the next loop iteration.
+                    //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
+
+                    //TODO: If we end up choosing to go with the dumb optimizer, you can almost certainly improve this implementation-
+                    //this version goes through all the effort of diving into the type batches for references, then does it all again to move stuff around.
+                    //A hardcoded swapping operation could do both at once, saving a few indirections.
+                    //It won't be THAT much faster- every single indirection is already cached- but it's probably still worth it.
+                    //(It's not like this implementation with all of its nested enumerators is particularly simple or clean.)
+                    var newLocation = slotIndex++;
+                    //Note that graph.EnumerateConnectedBodies explicitly excludes the body whose constraints we are enumerating, 
+                    //so we don't have to worry about having the rug pulled by this list swap.
+                    //(Also, !(x > x) for many values of x.)
+                    SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
+
+                    //slotIndex = int.MaxValue;
+                }
+            }
+        }
+        //Avoid a little pointless false sharing with padding.
+        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        struct Worker
+        {
+            [FieldOffset(0)]
+            public int Index;
+        }
+        int remainingOptimizationCount;
+        Buffer<Worker> workers;
+
+        void MultithreadedDumbIncrementalOptimize(int workerIndex)
+        {
+            var enumerator = new MultithreadedDumbIncrementalEnumerator();
+            enumerator.bodies = bodies;
+            enumerator.graph = graph;
+            enumerator.solver = solver;
+            enumerator.slotIndex = dumbBodyIndex + 1;
+            graph.EnumerateConnectedBodies(dumbBodyIndex, ref enumerator);
+
+            ++dumbBodyIndex;
+
+        }
+
+        //This claims set is a part of the optimizer for now, but if there is ever a time where you might want a per body claims set for some other multithreaded purpose,
+        //move it into the Bodies class instead. It tends to resize with the body count, so it makes sense to bundle it if there is any sharing at all.
+        //Note that claims are peristent because clearing a few kilobytes every frame isn't free. (It's not expensive, either, but it's not free.)
+        Buffer<int> claims;
+        public void DumbOptimizeMultithreaded(int optimizationCount, IThreadPool threadPool, BufferPool rawPool)
+        {
+            if (SpanHelper.GetContainingPowerOf2(bodies.BodyCount) > claims.Length || claims.Length > bodies.BodyCount * 2)
+            {
+                //We need a new claims buffer. Get rid of the old one.
+                Dispose(rawPool);
+                rawPool.SpecializeFor<int>().Take(bodies.BodyCount, out claims);
+                //Claims need to be zeroed so that workers can claim by identity.
+                //Go ahead and clear the full buffer so we don't have to worry about later body additions resulting in accesses to uncleared memory.
+                //Easier to clear upfront than track every single add.
+                claims.Clear(0, claims.Length);
+            }
+            rawPool.SpecializeFor<Worker>().Take(threadPool.ThreadCount, out workers);
+
+            if (dumbBodyIndex > bodies.BodyCount)
+                dumbBodyIndex = 0;
+            //Each worker is assigned a start location evenly spaced from other workers. The less interference, the better.
+            var spacingBetweenWorkers = bodies.BodyCount / threadPool.ThreadCount;
+            var spacingRemainder = spacingBetweenWorkers - spacingBetweenWorkers * threadPool.ThreadCount;
+            var optimizationsPerWorker = optimizationCount / threadPool.ThreadCount;
+            var optimizationsRemainder = optimizationCount - optimizationsPerWorker * threadPool.ThreadCount;
+            int nextStartIndex = dumbBodyIndex;
+            for (int i = 0; i < threadPool.ThreadCount; ++i)
+            {
+                workers[i].Index = nextStartIndex;
+                nextStartIndex += spacingBetweenWorkers;
+                if (--spacingRemainder >= 0)
+                    ++nextStartIndex;
+                //Note that we just wrap to zero rather than taking into acount the amount of spill. 
+                //No real downside, and ensures that the potentially longest distance pulls get done.
+                if (nextStartIndex >= bodies.BodyCount)
+                    nextStartIndex = 0;
+            }
+            //Every worker moves forward from its start location by decrementing the optimization count to claim an optimization job.
+            remainingOptimizationCount = Math.Min(bodies.BodyCount, optimizationCount);
+
+            threadPool.ForLoop(0, threadPool.ThreadCount, MultithreadedDumbIncrementalOptimize);
+
+            rawPool.SpecializeFor<Worker>().Return(ref workers);
+        }
+
+        /// <summary>
+        /// Returns the multithreaded claims array to the provided pool.
+        /// </summary>
+        /// <remarks>Apart from its use in the optimization function itself, this only needs to be called when the simulation is being torn down 
+        /// and outstanding pinned resources need to be reclaimed (with the assumption that the underlying bufferpool will be reused).</remarks>
+        /// <param name="rawPool">Pool to return the claims array to.</param>
+        public void Dispose(BufferPool rawPool)
+        {
+            if (claims.Length > 0)
+            {
+                rawPool.SpecializeFor<int>().Return(ref claims);
+                claims = new Buffer<int>();
+            }
+        }
     }
 }

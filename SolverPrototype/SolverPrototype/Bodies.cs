@@ -45,6 +45,13 @@ namespace SolverPrototype
     /// </summary>
     public class Bodies
     {
+        //TODO: there is a somewhat weak argument suggesting we should use bufferpooled memory always.
+        //That would mean tearing down a simulation would result in only a few objects being thrown away- constraint batches, the individual class stages, and so on.
+        //In other words, the amount of garbage generated would be miniscule.
+        //A slightly stronger argument is that array resizing can create fairly significant garbage blobs in the current setup.
+        //If we kept that memory around, we could use it for other stuff. But it's questionable how often you'd actually have use for a megabyte long ephemeral array...
+        //Maybe in the constraint batches or something. As long as you're able to compact the BufferPool, there's not much of an issue.
+
         /// <summary>
         /// Remaps a body handle to the actual array index of the body.
         /// The backing array index may change in response to cache optimization.
