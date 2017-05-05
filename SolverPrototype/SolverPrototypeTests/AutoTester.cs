@@ -25,7 +25,7 @@ namespace SolverPrototypeTests
 
             SimulationSetup.ScrambleBodies(simulation);
             SimulationSetup.ScrambleConstraints(simulation.Solver);
-            //SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            SimulationSetup.ScrambleBodyConstraintLists(simulation);
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             //Attempt cache optimization.
@@ -35,8 +35,8 @@ namespace SolverPrototypeTests
             //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS(simulation.Bodies.BodyCount);
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
-                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
-                simulation.BodyLayoutOptimizer.SortingIncrementalOptimize(simulation.BufferPool);
+                simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
+                //simulation.BodyLayoutOptimizer.SortingIncrementalOptimize(simulation.BufferPool);
                 //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS();
             }
             //timer.Stop();

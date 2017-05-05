@@ -115,7 +115,7 @@ namespace SolverPrototype
             var remainingDistance = bundleCount / 2;
             while (true)
             {
-                var typeBatch = solver.Batches[o.BundleIndex].TypeBatches[o.TypeBatchIndex];
+                var typeBatch = solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex];
                 var spaceRemaining = typeBatch.BundleCount - o.BundleIndex;
                 if (spaceRemaining > remainingDistance)
                 {
