@@ -5,6 +5,7 @@ using System.Diagnostics;
 using BEPUutilities2.Memory;
 using BEPUutilities2.Collections;
 using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace SolverPrototype
 {
@@ -276,12 +277,73 @@ namespace SolverPrototype
         //will be 2-6 times slower than the single threaded version per thread.
 
 
+
+        struct ClaimConnectedBodiesEnumerator : IForEach<int>
+        {
+            public Bodies Bodies;
+            public ConstraintConnectivityGraph Graph;
+            public Solver Solver;
+            /// <summary>
+            /// The claim states for every body in the simulation.
+            /// </summary>
+            public Buffer<int> ClaimStates;
+            /// <summary>
+            /// The set of claims owned by the current worker.
+            /// </summary>
+            public QuickList<int, Buffer<int>> WorkerClaims;
+            public int ClaimIdentity;
+            public bool AllClaimsSucceeded;
+
+            public bool TryClaim(int index)
+            {
+                var preclaimValue = Interlocked.CompareExchange(ref ClaimStates[index], ClaimIdentity, 0);
+                if (preclaimValue == 0)
+                {
+                    Debug.Assert(WorkerClaims.Count < WorkerClaims.Span.Length,
+                        "The claim enumerator should never be invoked if the worker claims buffer is too small to hold all the bodies.");
+                    WorkerClaims.AddUnsafely(index);
+                }
+                else if (preclaimValue != ClaimIdentity)
+                {
+                    //Note that it only fails when it's both nonzero AND not equal to the claim identity. It means it's claimed by a different worker.
+                    return false;
+                }
+                return true;
+            }
+            /// <summary>
+            /// Because new claims are appended, and a failed claim always results in the removal of a contiguous set of trailing indices, it acts like a stack.
+            /// This pops off a number of the most recent claim indices.
+            /// </summary>
+            /// <param name="workerClaimsToPop">Number of claims to remove from the end of the worker claims list.</param>
+            public void Unclaim(int workerClaimsToPop)
+            {
+                Debug.Assert(workerClaimsToPop <= WorkerClaims.Count, "The pop request should never exceed the accumulated claims.");
+                for (int i = 0; i < workerClaimsToPop; ++i)
+                {
+                    WorkerClaims.Pop(out var poppedIndex);
+                    //We don't need to do anything special here, provided a reasonably strong memory model. Just release the slot.
+                    ClaimStates[poppedIndex] = 0;
+                }
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void LoopBody(int connectedBodyIndex)
+            {
+                //TODO: If you end up going with this approach, you should probably use a IBreakableForEach instead to avoid unnecessary traversals.
+                if (AllClaimsSucceeded)
+                {
+                    if (!TryClaim(connectedBodyIndex))
+                        AllClaimsSucceeded = false;
+                }
+            }
+
+        }
+
         struct MultithreadedDumbIncrementalEnumerator : IForEach<int>
         {
-            public Bodies bodies;
-            public ConstraintConnectivityGraph graph;
-            public Solver solver;
+            public ClaimConnectedBodiesEnumerator ClaimEnumerator;
             public int slotIndex;
+            public int TotalNeededClaimCount;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
@@ -290,44 +352,106 @@ namespace SolverPrototype
                 //Without it, any progress towards island-level convergence could be undone by the next iteration.
                 if (connectedBodyIndex > slotIndex)
                 {
+                    var newLocation = slotIndex++;
+                    //We must claim both the swap source, target, AND all of the bodies connected to them.
+                    //(If we didn't claim the conected bodies, the changes to the constraint body indices could break the traversal.)
+                    //(We don't do a constraint claims array directly because there is no single contiguous and easily indexable set of constraints.)
+                    var previousClaimCount = ClaimEnumerator.WorkerClaims.Count;
+                    var neededSize = previousClaimCount + 2 +
+                        ClaimEnumerator.Graph.GetConstraintList(connectedBodyIndex).Count +
+                        ClaimEnumerator.Graph.GetConstraintList(connectedBodyIndex).Count;
+                    //We accumulate the number of claims needed so that later updates can expand the claim array if necessary.
+                    //(This should be exceptionally rare so long as a decent initial size is chosen- unless you happen to attach 5000 constraints
+                    //to a single object. Which is a really bad idea.)
+                    TotalNeededClaimCount += neededSize;
+                    if (neededSize > ClaimEnumerator.WorkerClaims.Span.Length)
+                    {
+                        //This body can't be claimed; we don't have enough space left.
+                        return;
+                    }
+                    if (!ClaimEnumerator.TryClaim(connectedBodyIndex))
+                        return;
+                    if (!ClaimEnumerator.TryClaim(newLocation))
+                    {
+                        //If this claim failed but the previous succeeded, we should unclaim the remote location.
+                        ClaimEnumerator.Unclaim(1);
+                        return;
+                    }
+                    ClaimEnumerator.Graph.EnumerateConnectedBodies(connectedBodyIndex, ref ClaimEnumerator);
+                    if (!ClaimEnumerator.AllClaimsSucceeded)
+                    {
+                        ClaimEnumerator.Unclaim(ClaimEnumerator.WorkerClaims.Count - previousClaimCount);
+                        return;
+                    }
+                    ClaimEnumerator.Graph.EnumerateConnectedBodies(newLocation, ref ClaimEnumerator);
+                    if (!ClaimEnumerator.AllClaimsSucceeded)
+                    {
+                        ClaimEnumerator.Unclaim(ClaimEnumerator.WorkerClaims.Count - previousClaimCount);
+                        return;
+                    }
+
+                    //At this point, we have claimed both swap targets and all their satellites. Can actually do the swap.
+
                     //Note that we update the memory location immediately. This could affect the next loop iteration.
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
+                    SwapBodyLocation(ClaimEnumerator.Bodies, ClaimEnumerator.Graph, ClaimEnumerator.Solver, connectedBodyIndex, newLocation);
 
-                    //TODO: If we end up choosing to go with the dumb optimizer, you can almost certainly improve this implementation-
-                    //this version goes through all the effort of diving into the type batches for references, then does it all again to move stuff around.
-                    //A hardcoded swapping operation could do both at once, saving a few indirections.
-                    //It won't be THAT much faster- every single indirection is already cached- but it's probably still worth it.
-                    //(It's not like this implementation with all of its nested enumerators is particularly simple or clean.)
-                    var newLocation = slotIndex++;
-                    //Note that graph.EnumerateConnectedBodies explicitly excludes the body whose constraints we are enumerating, 
-                    //so we don't have to worry about having the rug pulled by this list swap.
-                    //(Also, !(x > x) for many values of x.)
-                    SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
-
-                    //slotIndex = int.MaxValue;
                 }
             }
         }
         //Avoid a little pointless false sharing with padding.
-        [StructLayout(LayoutKind.Explicit, Size = 64)]
+        [StructLayout(LayoutKind.Explicit, Size = 128)]
         struct Worker
         {
             [FieldOffset(0)]
             public int Index;
+            [FieldOffset(4)]
+            public int LargestNeededClaimCount;
+            [FieldOffset(8)]
+            public int CompletedJobs;
+            [FieldOffset(16)]
+            public QuickList<int, Buffer<int>> WorkerClaims;
         }
-        int remainingOptimizationCount;
+        int remainingOptimizationAttemptCount;
         Buffer<Worker> workers;
 
         void MultithreadedDumbIncrementalOptimize(int workerIndex)
         {
             var enumerator = new MultithreadedDumbIncrementalEnumerator();
-            enumerator.bodies = bodies;
-            enumerator.graph = graph;
-            enumerator.solver = solver;
-            enumerator.slotIndex = dumbBodyIndex + 1;
-            graph.EnumerateConnectedBodies(dumbBodyIndex, ref enumerator);
+            ref var worker = ref workers[workerIndex];
+            enumerator.ClaimEnumerator = new ClaimConnectedBodiesEnumerator
+            {
+                Bodies = bodies,
+                Graph = graph,
+                Solver = solver,
+                ClaimStates = claims,
+                WorkerClaims = worker.WorkerClaims,
+                ClaimIdentity = workerIndex + 1,
+            };
+            //Note that these are optimization *attempts*. If we fail due to contention, that's totally fine. We'll get around to it later.
+            //Remember, this is strictly a performance oriented heuristic. Even if all bodies are completely scrambled, it will still produce perfectly correct results.
+            while (Interlocked.Decrement(ref remainingOptimizationAttemptCount) >= 0)
+            {
+                enumerator.TotalNeededClaimCount = 0;
+                Debug.Assert(worker.Index < bodies.BodyCount - 2, "The scheduler shouldn't produce optimizations targeting the last two slots- no swaps are possible.");
+                var optimizationTarget = worker.Index++;
+                //There's no reason to target the last two slots. No swaps are possible.
+                if (worker.Index >= bodies.BodyCount - 2)
+                    worker.Index = 0;
+                enumerator.slotIndex = optimizationTarget + 1;
+                //We don't want to let other threads yank the claim origin away from us while we're enumerating over its connections. That would be complicated to deal with.
+                if (!enumerator.ClaimEnumerator.TryClaim(optimizationTarget))
+                    continue; //Couldn't grab the origin; just move on.
+                graph.EnumerateConnectedBodies(optimizationTarget, ref enumerator);
 
-            ++dumbBodyIndex;
+                //The optimization for this object is complete. We should relinquish all existing claims.
+                Debug.Assert(enumerator.ClaimEnumerator.WorkerClaims.Count == 1 && enumerator.ClaimEnumerator.WorkerClaims[0] == optimizationTarget,
+                    "The only remaining claim should be the optimization target; all others should have been relinquished within the inner enumerator.");
+                enumerator.ClaimEnumerator.Unclaim(1);
+
+                if (enumerator.TotalNeededClaimCount > worker.LargestNeededClaimCount)
+                    worker.LargestNeededClaimCount = enumerator.TotalNeededClaimCount;
+            }
 
         }
 
@@ -335,6 +459,8 @@ namespace SolverPrototype
         //move it into the Bodies class instead. It tends to resize with the body count, so it makes sense to bundle it if there is any sharing at all.
         //Note that claims are peristent because clearing a few kilobytes every frame isn't free. (It's not expensive, either, but it's not free.)
         Buffer<int> claims;
+        //We pick an extremely generous value to begin with because there's not much reason not to. This avoids problems in most reasonable simulations.
+        int workerClaimsBufferSize = 1; //TODO: Just set it to 512 or something once it's confirmed to be working.
         public void DumbOptimizeMultithreaded(int optimizationCount, IThreadPool threadPool, BufferPool rawPool)
         {
             if (SpanHelper.GetContainingPowerOf2(bodies.BodyCount) > claims.Length || claims.Length > bodies.BodyCount * 2)
@@ -349,7 +475,8 @@ namespace SolverPrototype
             }
             rawPool.SpecializeFor<Worker>().Take(threadPool.ThreadCount, out workers);
 
-            if (dumbBodyIndex > bodies.BodyCount)
+            //Note that we ignore the last two slots as optimization targets- no swaps are possible.
+            if (dumbBodyIndex >= bodies.BodyCount - 2)
                 dumbBodyIndex = 0;
             //Each worker is assigned a start location evenly spaced from other workers. The less interference, the better.
             var spacingBetweenWorkers = bodies.BodyCount / threadPool.ThreadCount;
@@ -359,21 +486,47 @@ namespace SolverPrototype
             int nextStartIndex = dumbBodyIndex;
             for (int i = 0; i < threadPool.ThreadCount; ++i)
             {
-                workers[i].Index = nextStartIndex;
+                ref var worker = ref workers[i];
+                worker.Index = nextStartIndex;
+                worker.LargestNeededClaimCount = 0;
+                worker.CompletedJobs = 0;
+                QuickList<int, Buffer<int>>.Create(rawPool.SpecializeFor<int>(), workerClaimsBufferSize, out worker.WorkerClaims);
+
                 nextStartIndex += spacingBetweenWorkers;
                 if (--spacingRemainder >= 0)
                     ++nextStartIndex;
                 //Note that we just wrap to zero rather than taking into acount the amount of spill. 
                 //No real downside, and ensures that the potentially longest distance pulls get done.
-                if (nextStartIndex >= bodies.BodyCount)
+                //Also note that we ignore the last two slots as optimization targets- no swaps are possible.
+                if (nextStartIndex >= bodies.BodyCount - 2)
                     nextStartIndex = 0;
             }
             //Every worker moves forward from its start location by decrementing the optimization count to claim an optimization job.
-            remainingOptimizationCount = Math.Min(bodies.BodyCount, optimizationCount);
+            remainingOptimizationAttemptCount = Math.Min(bodies.BodyCount, optimizationCount);
 
             threadPool.ForLoop(0, threadPool.ThreadCount, MultithreadedDumbIncrementalOptimize);
 
+            int lowestWorkerJobsCompleted = int.MaxValue;
+            for (int i = 0; i < threadPool.ThreadCount; ++i)
+            {
+                ref var worker = ref workers[i];
+                //Update the initial buffer size if it was too small this frame.
+                if (worker.LargestNeededClaimCount > workerClaimsBufferSize)
+                    workerClaimsBufferSize = worker.LargestNeededClaimCount;
+                if (worker.CompletedJobs < lowestWorkerJobsCompleted)
+                    lowestWorkerJobsCompleted = worker.CompletedJobs;
+
+                Debug.Assert(worker.WorkerClaims.Count == 0, "After execution, all worker claims should be relinquished.");
+                worker.WorkerClaims.Dispose(rawPool.SpecializeFor<int>());
+            }
+
             rawPool.SpecializeFor<Worker>().Return(ref workers);
+
+            //Push all workers forward by the amount the slowest one got done- or a fixed minimum to avoid stalls.
+            //The goal is to ensure each worker gets to keep working on a contiguous blob as much as possible for higher cache coherence.
+            //This isn't a hard guarantee- contested claims and thread scheduling can easily result in gaps in the optimization, but that's fine.
+            //No harm to correctness; we'll eventually optimize it during a later frame.
+            dumbBodyIndex += Math.Max(lowestWorkerJobsCompleted, Math.Max(1, optimizationCount / (threadPool.ThreadCount * 4)));
         }
 
         /// <summary>

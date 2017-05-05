@@ -26,6 +26,9 @@ namespace SolverPrototypeTests
             SimulationSetup.ScrambleBodyConstraintLists(simulation);
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
+            //var threadPool = new TPLPool(8);
+            var threadPool = new SimpleThreadPool(1);
+
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
             const int internalCompressionIterations = 1;
@@ -44,14 +47,15 @@ namespace SolverPrototypeTests
             GC.Collect(3, GCCollectionMode.Forced, true);
 
             //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 16;
+            int bodyOptimizationIterations = bodyHandles.Length * 1;
             //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
             //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
                 //bodyOptimizer.PartialIslandOptimizeDFS(64);
-                simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
+                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
+                simulation.BodyLayoutOptimizer.DumbOptimizeMultithreaded(128, threadPool, simulation.BufferPool);
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
@@ -97,8 +101,6 @@ namespace SolverPrototypeTests
             simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
-            //var threadPool = new TPLPool(8);
-            var threadPool = new SimpleThreadPool(1);
 
             //var threadPool = new NotQuiteAThreadPool();
             Console.WriteLine($"Using {threadPool.ThreadCount} workers.");

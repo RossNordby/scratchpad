@@ -28,16 +28,21 @@ namespace SolverPrototypeTests
             SimulationSetup.ScrambleBodyConstraintLists(simulation);
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
+            //var threadPool = new TPLPool(8);
+            var threadPool = new SimpleThreadPool(threadCount);
+            //var threadPool = new NotQuiteAThreadPool();
+
             //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 64;
+            int bodyOptimizationIterations = bodyHandles.Length * 1;
             //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
             //var timer = Stopwatch.StartNew();
             //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS(simulation.Bodies.BodyCount);
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
-                simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
+                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
                 //simulation.BodyLayoutOptimizer.SortingIncrementalOptimize(simulation.BufferPool);
                 //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS();
+                simulation.BodyLayoutOptimizer.DumbOptimizeMultithreaded(128, threadPool, simulation.BufferPool);
             }
             //timer.Stop();
             //var optimizationTime = timer.Elapsed.TotalSeconds;
@@ -76,9 +81,6 @@ namespace SolverPrototypeTests
             simulation.Solver.IterationCount = iterationCount;
 
 
-            //var threadPool = new TPLPool(8);
-            var threadPool = new SimpleThreadPool(threadCount);
-            //var threadPool = new NotQuiteAThreadPool();
             double totalTime = 0;
             double sumOfSquares = 0.0;
             TestTimings testTimings;
