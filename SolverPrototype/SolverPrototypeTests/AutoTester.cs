@@ -40,7 +40,7 @@ namespace SolverPrototypeTests
                 //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
                 //simulation.BodyLayoutOptimizer.SortingIncrementalOptimize(simulation.BufferPool);
                 //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS();
-                simulation.BodyLayoutOptimizer.DumbOptimizeMultithreaded(32, initializationThreadPool, simulation.BufferPool);
+                simulation.BodyLayoutOptimizer.IncrementalOptimize(32, initializationThreadPool, simulation.BufferPool);
             }
             //int bodyOptimizationIterations = 32;
             //for (int i = 0; i < bodyOptimizationIterations; ++i)

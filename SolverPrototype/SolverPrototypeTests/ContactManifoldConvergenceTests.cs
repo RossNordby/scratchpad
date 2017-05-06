@@ -55,7 +55,7 @@ namespace SolverPrototypeTests
             {
                 //bodyOptimizer.PartialIslandOptimizeDFS(64);
                 //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
-                simulation.BodyLayoutOptimizer.DumbOptimizeMultithreaded(128, threadPool, simulation.BufferPool);
+                simulation.BodyLayoutOptimizer.IncrementalOptimize(128, threadPool, simulation.BufferPool);
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
