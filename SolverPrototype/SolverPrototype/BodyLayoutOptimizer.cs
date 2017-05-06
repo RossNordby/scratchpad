@@ -276,7 +276,21 @@ namespace SolverPrototype
         //a single threaded implementation running at the same time as some other compatible stage just vastly outperforms it. It is very likely that the multithreaded version
         //will be 2-6 times slower than the single threaded version per thread.
 
-
+        //Avoid a little pointless false sharing with padding.
+        [StructLayout(LayoutKind.Explicit, Size = 128)]
+        struct Worker
+        {
+            [FieldOffset(0)]
+            public int Index;
+            [FieldOffset(4)]
+            public int HighestNeededClaimCount;
+            [FieldOffset(8)]
+            public int CompletedJobs;
+            [FieldOffset(16)]
+            public QuickList<int, Buffer<int>> WorkerClaims;
+        }
+        int remainingOptimizationAttemptCount;
+        Buffer<Worker> workers;
 
         struct ClaimConnectedBodiesEnumerator : IForEach<int>
         {
@@ -292,7 +306,7 @@ namespace SolverPrototype
             /// </summary>
             public QuickList<int, Buffer<int>> WorkerClaims;
             public int ClaimIdentity;
-            public bool AllClaimsSucceeded;
+            public bool AllClaimsSucceededSoFar;
 
             public bool TryClaim(int index)
             {
@@ -330,10 +344,10 @@ namespace SolverPrototype
             public void LoopBody(int connectedBodyIndex)
             {
                 //TODO: If you end up going with this approach, you should probably use a IBreakableForEach instead to avoid unnecessary traversals.
-                if (AllClaimsSucceeded)
+                if (AllClaimsSucceededSoFar)
                 {
                     if (!TryClaim(connectedBodyIndex))
-                        AllClaimsSucceeded = false;
+                        AllClaimsSucceededSoFar = false;
                 }
             }
 
@@ -343,7 +357,7 @@ namespace SolverPrototype
         {
             public ClaimConnectedBodiesEnumerator ClaimEnumerator;
             public int slotIndex;
-            public int TotalNeededClaimCount;
+            public int HighestNeededClaimCount;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void LoopBody(int connectedBodyIndex)
             {
@@ -359,11 +373,12 @@ namespace SolverPrototype
                     var previousClaimCount = ClaimEnumerator.WorkerClaims.Count;
                     var neededSize = previousClaimCount + 2 +
                         ClaimEnumerator.Graph.GetConstraintList(connectedBodyIndex).Count +
-                        ClaimEnumerator.Graph.GetConstraintList(connectedBodyIndex).Count;
+                        ClaimEnumerator.Graph.GetConstraintList(newLocation).Count;
                     //We accumulate the number of claims needed so that later updates can expand the claim array if necessary.
                     //(This should be exceptionally rare so long as a decent initial size is chosen- unless you happen to attach 5000 constraints
                     //to a single object. Which is a really bad idea.)
-                    TotalNeededClaimCount += neededSize;
+                    if (neededSize > HighestNeededClaimCount)
+                        HighestNeededClaimCount = neededSize;
                     if (neededSize > ClaimEnumerator.WorkerClaims.Span.Length)
                     {
                         //This body can't be claimed; we don't have enough space left.
@@ -377,14 +392,15 @@ namespace SolverPrototype
                         ClaimEnumerator.Unclaim(1);
                         return;
                     }
+                    ClaimEnumerator.AllClaimsSucceededSoFar = true;
                     ClaimEnumerator.Graph.EnumerateConnectedBodies(connectedBodyIndex, ref ClaimEnumerator);
-                    if (!ClaimEnumerator.AllClaimsSucceeded)
+                    if (!ClaimEnumerator.AllClaimsSucceededSoFar)
                     {
                         ClaimEnumerator.Unclaim(ClaimEnumerator.WorkerClaims.Count - previousClaimCount);
                         return;
                     }
                     ClaimEnumerator.Graph.EnumerateConnectedBodies(newLocation, ref ClaimEnumerator);
-                    if (!ClaimEnumerator.AllClaimsSucceeded)
+                    if (!ClaimEnumerator.AllClaimsSucceededSoFar)
                     {
                         ClaimEnumerator.Unclaim(ClaimEnumerator.WorkerClaims.Count - previousClaimCount);
                         return;
@@ -396,24 +412,13 @@ namespace SolverPrototype
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
                     SwapBodyLocation(ClaimEnumerator.Bodies, ClaimEnumerator.Graph, ClaimEnumerator.Solver, connectedBodyIndex, newLocation);
 
+                    //Unclaim all the bodies associated with this swap pair. Don't relinquish the claim origin.
+                    ClaimEnumerator.Unclaim(ClaimEnumerator.WorkerClaims.Count - previousClaimCount);
+
                 }
             }
         }
-        //Avoid a little pointless false sharing with padding.
-        [StructLayout(LayoutKind.Explicit, Size = 128)]
-        struct Worker
-        {
-            [FieldOffset(0)]
-            public int Index;
-            [FieldOffset(4)]
-            public int LargestNeededClaimCount;
-            [FieldOffset(8)]
-            public int CompletedJobs;
-            [FieldOffset(16)]
-            public QuickList<int, Buffer<int>> WorkerClaims;
-        }
-        int remainingOptimizationAttemptCount;
-        Buffer<Worker> workers;
+       
 
         void MultithreadedDumbIncrementalOptimize(int workerIndex)
         {
@@ -430,9 +435,10 @@ namespace SolverPrototype
             };
             //Note that these are optimization *attempts*. If we fail due to contention, that's totally fine. We'll get around to it later.
             //Remember, this is strictly a performance oriented heuristic. Even if all bodies are completely scrambled, it will still produce perfectly correct results.
+            worker.HighestNeededClaimCount = 0;
             while (Interlocked.Decrement(ref remainingOptimizationAttemptCount) >= 0)
             {
-                enumerator.TotalNeededClaimCount = 0;
+                enumerator.HighestNeededClaimCount = 0;
                 Debug.Assert(worker.Index < bodies.BodyCount - 2, "The scheduler shouldn't produce optimizations targeting the last two slots- no swaps are possible.");
                 var optimizationTarget = worker.Index++;
                 //There's no reason to target the last two slots. No swaps are possible.
@@ -448,9 +454,7 @@ namespace SolverPrototype
                 Debug.Assert(enumerator.ClaimEnumerator.WorkerClaims.Count == 1 && enumerator.ClaimEnumerator.WorkerClaims[0] == optimizationTarget,
                     "The only remaining claim should be the optimization target; all others should have been relinquished within the inner enumerator.");
                 enumerator.ClaimEnumerator.Unclaim(1);
-
-                if (enumerator.TotalNeededClaimCount > worker.LargestNeededClaimCount)
-                    worker.LargestNeededClaimCount = enumerator.TotalNeededClaimCount;
+                worker.HighestNeededClaimCount = enumerator.HighestNeededClaimCount;
             }
 
         }
@@ -488,7 +492,6 @@ namespace SolverPrototype
             {
                 ref var worker = ref workers[i];
                 worker.Index = nextStartIndex;
-                worker.LargestNeededClaimCount = 0;
                 worker.CompletedJobs = 0;
                 QuickList<int, Buffer<int>>.Create(rawPool.SpecializeFor<int>(), workerClaimsBufferSize, out worker.WorkerClaims);
 
@@ -511,8 +514,8 @@ namespace SolverPrototype
             {
                 ref var worker = ref workers[i];
                 //Update the initial buffer size if it was too small this frame.
-                if (worker.LargestNeededClaimCount > workerClaimsBufferSize)
-                    workerClaimsBufferSize = worker.LargestNeededClaimCount;
+                if (worker.HighestNeededClaimCount > workerClaimsBufferSize)
+                    workerClaimsBufferSize = worker.HighestNeededClaimCount;
                 if (worker.CompletedJobs < lowestWorkerJobsCompleted)
                     lowestWorkerJobsCompleted = worker.CompletedJobs;
 

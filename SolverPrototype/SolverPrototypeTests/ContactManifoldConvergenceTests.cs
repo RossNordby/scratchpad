@@ -27,7 +27,7 @@ namespace SolverPrototypeTests
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             //var threadPool = new TPLPool(8);
-            var threadPool = new SimpleThreadPool(1);
+            var threadPool = new SimpleThreadPool(8);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
