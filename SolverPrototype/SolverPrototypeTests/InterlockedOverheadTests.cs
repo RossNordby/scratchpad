@@ -24,10 +24,10 @@ namespace SolverPrototypeTests
                 Console.WriteLine($"Uncontested 1T increment (ns): {1e9 * (end - start) / (iterations * Stopwatch.Frequency)}");
             }
 
-            var threadPool = new SimpleThreadPool(Environment.ProcessorCount);
+            var threadPool = new SimpleThreadDispatcher(Environment.ProcessorCount);
             {
                 var start = Stopwatch.GetTimestamp();
-                threadPool.ForLoop(0, threadPool.ThreadCount, workerIndex =>
+                threadPool.DispatchWorkers(workerIndex =>
                 {
                     while (true)
                     {
@@ -42,7 +42,7 @@ namespace SolverPrototypeTests
             {
                 uncontestedAccumulators = new int[Environment.ProcessorCount * 32];
                 var start = Stopwatch.GetTimestamp();
-                threadPool.ForLoop(0, threadPool.ThreadCount, workerIndex =>
+                threadPool.DispatchWorkers(workerIndex =>
                 {
                     var offset = workerIndex * 32;
                     var exit = iterations / threadPool.ThreadCount;

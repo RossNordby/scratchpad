@@ -54,7 +54,7 @@ namespace SolverPrototype
 
 
 
-        public double IntermediateMultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
+        public double IntermediateMultithreadedUpdate(IThreadDispatcher threadPool, BufferPool bufferPool, float dt, float inverseDt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
             context.WorkerCompletedCount = 0;
@@ -86,7 +86,7 @@ namespace SolverPrototype
             }
 
             var start = Stopwatch.GetTimestamp();
-            threadPool.ForLoop(0, threadPool.ThreadCount, IntermediateWork);
+            threadPool.DispatchWorkers(IntermediateWork);
             var end = Stopwatch.GetTimestamp();
 
             bufferPool.SpecializeFor<int>().Return(ref StageIndices);

@@ -9,7 +9,6 @@ namespace SolverPrototypeTests
 {
     class GatherScatterTests
     {
-
         struct Context
         {
             public BodyVelocities[] BodyVelocities;

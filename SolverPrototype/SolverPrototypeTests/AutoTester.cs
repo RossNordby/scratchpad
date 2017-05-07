@@ -17,7 +17,7 @@ namespace SolverPrototypeTests
             public double Average;
             public double StdDev;
         }
-        public static TestTimings Solve(int width, int height, int length, int frameCount, int threadCount, IThreadPool initializationThreadPool, IThreadPool threadPool)
+        public static TestTimings Solve(int width, int height, int length, int frameCount, int threadCount, IThreadDispatcher initializationThreadPool, IThreadDispatcher threadPool)
         {
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
@@ -61,8 +61,8 @@ namespace SolverPrototypeTests
             }
             const int bundlesPerOptimizationRegion = 93248 / 4;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
-            const int regionsPerConstraintOptimizationIteration = 1;
-            int constraintOptimizationIterations = 64;
+            const int regionsPerConstraintOptimizationIteration = 16;
+            int constraintOptimizationIterations = 8;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
@@ -72,7 +72,7 @@ namespace SolverPrototypeTests
             //timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, initializationThreadPool);
             }
             //timer.Stop();
             //Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
@@ -124,7 +124,7 @@ namespace SolverPrototypeTests
             writer.WriteLine(text);
             Console.WriteLine(text);
         }
-        static void Subtest(int width, int height, int length, int frameCount, IThreadPool initializationThreadPool, StreamWriter writer)
+        static void Subtest(int width, int height, int length, int frameCount, IThreadDispatcher initializationThreadPool, StreamWriter writer)
         {
             const int testsPerVariant = 8;
             WriteLine(writer, $"{width}x{height}x{length} lattice, {frameCount} frames:");
@@ -134,7 +134,7 @@ namespace SolverPrototypeTests
             //for (int threadCount = 1; threadCount <= 1; ++threadCount)
             for (int threadCount = 1; threadCount <= Environment.ProcessorCount; ++threadCount)
             {
-                var threadPool = new SimpleThreadPool(threadCount);
+                var threadPool = new SimpleThreadDispatcher(threadCount);
                 ref var timingsForThreadCount = ref timings[threadCount - 1];
                 timingsForThreadCount = new TestTimings { Total = double.MaxValue };
                 for (int i = 0; i < testsPerVariant; ++i)
@@ -160,7 +160,7 @@ namespace SolverPrototypeTests
         {
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
-            var initializationThreadPool = new SimpleThreadPool(Environment.ProcessorCount);
+            var initializationThreadPool = new SimpleThreadDispatcher(Environment.ProcessorCount);
             Subtest(32, 32, 32, 8, initializationThreadPool, writer);
             Subtest(26, 26, 26, 12, initializationThreadPool, writer);
             Subtest(20, 20, 20, 20, initializationThreadPool, writer);

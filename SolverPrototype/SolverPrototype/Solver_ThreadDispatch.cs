@@ -560,7 +560,7 @@ namespace SolverPrototype
 
         }
 
-        public double MultithreadedUpdate(IThreadPool threadPool, BufferPool bufferPool, float dt, float inverseDt)
+        public double MultithreadedUpdate(IThreadDispatcher threadPool, BufferPool bufferPool, float dt, float inverseDt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
             context.WorkerCompletedCount = 0;
@@ -592,7 +592,7 @@ namespace SolverPrototype
             var start = Stopwatch.GetTimestamp();
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
             if (Batches.Count > 0)
-                threadPool.ForLoop(0, threadPool.ThreadCount, Work);
+                threadPool.DispatchWorkers(Work);
             var end = Stopwatch.GetTimestamp();
 
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());

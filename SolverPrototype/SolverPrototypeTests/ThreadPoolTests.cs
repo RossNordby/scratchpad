@@ -1,28 +1,30 @@
 ﻿using SolverPrototype;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+using BEPUutilities2.Memory;
 
 namespace SolverPrototypeTests
 {
-   
-
-    public class NotQuiteAThreadPool : IThreadPool
+    public class NotQuiteAThreadDispatcher : IThreadDispatcher
     {
         public int ThreadCount => 1;
 
-        public void ForLoop(int startIndex, int exclusiveEndIndex, Action<int> loopBody)
+        BufferPool bufferPool = new BufferPool();
+
+        public void DispatchWorkers(Action<int> workerBody)
         {
-            for (int i = startIndex; i < exclusiveEndIndex; ++i)
-                loopBody(i);
+            workerBody(0);
+        }
+
+        public BufferPool GetThreadMemoryPool(int workerIndex)
+        {
+            Debug.Assert(workerIndex == 0);
+            return bufferPool;
         }
     }
 
-    public class SimpleThreadPool : IThreadPool, IDisposable
+    public class SimpleThreadDispatcher : IThreadDispatcher, IDisposable
     {
         int threadCount;
         public int ThreadCount => threadCount;
@@ -35,7 +37,9 @@ namespace SolverPrototypeTests
         Worker[] workers;
         AutoResetEvent finished;
 
-        public SimpleThreadPool(int threadCount)
+        BufferPool[] bufferPools;
+
+        public SimpleThreadDispatcher(int threadCount)
         {
             this.threadCount = threadCount;
             workers = new Worker[threadCount - 1];
@@ -46,28 +50,27 @@ namespace SolverPrototypeTests
                 workers[i].Thread.Start(workers[i].Signal);
             }
             finished = new AutoResetEvent(false);
+            bufferPools = new BufferPool[threadCount];
+            for (int i = 0; i < bufferPools.Length; ++i)
+            {
+                bufferPools[i] = new BufferPool();
+            }
         }
 
-        int jobIndexCounter;
-        int completedWorkerCounter;
-        volatile Action<int> loopBody;
-        volatile int exclusiveJobEndIndex;
-
-        void ConsumeJobs()
+        void DispatchThread(int workerIndex)
         {
-            Debug.Assert(this.loopBody != null);
-            var loopBody = this.loopBody;
-            int jobIndex;
-            var exclusiveEnd = exclusiveJobEndIndex;
-            while ((jobIndex = Interlocked.Increment(ref jobIndexCounter) - 1) < exclusiveEnd)
-            {
-                loopBody(jobIndex);
-            }
+            Debug.Assert(workerBody != null);
+            workerBody(workerIndex);
+
             if (Interlocked.Increment(ref completedWorkerCounter) == threadCount)
             {
                 finished.Set();
             }
         }
+
+        volatile Action<int> workerBody;
+        int workerIndex;
+        int completedWorkerCounter;
 
         void WorkerLoop(object untypedSignal)
         {
@@ -77,7 +80,7 @@ namespace SolverPrototypeTests
                 signal.WaitOne();
                 if (disposed)
                     return;
-                ConsumeJobs();
+                DispatchThread(Interlocked.Increment(ref workerIndex) - 1);
             }
         }
 
@@ -89,18 +92,17 @@ namespace SolverPrototypeTests
             }
         }
 
-        public void ForLoop(int startIndex, int exclusiveEndIndex, Action<int> loopBody)
+        public void DispatchWorkers(Action<int> workerBody)
         {
-            Debug.Assert(this.loopBody == null);
-            jobIndexCounter = startIndex;
+            Debug.Assert(this.workerBody == null);
+            workerIndex = 1; //Just make the inline thread worker 0. While the other threads might start executing first, the user should never rely on the dispatch order.
             completedWorkerCounter = 0;
-            exclusiveJobEndIndex = exclusiveEndIndex;
-            this.loopBody = loopBody;
+            this.workerBody = workerBody;
             SignalThreads();
             //Calling thread does work. No reason to spin up another worker and block this one!
-            ConsumeJobs();
+            DispatchThread(0);
             finished.WaitOne();
-            this.loopBody = null;
+            this.workerBody= null;
         }
 
         volatile bool disposed;
@@ -116,6 +118,11 @@ namespace SolverPrototypeTests
                     worker.Signal.Dispose();
                 }
             }
+        }
+
+        public BufferPool GetThreadMemoryPool(int workerIndex)
+        {
+            return bufferPools[workerIndex];
         }
     }
 

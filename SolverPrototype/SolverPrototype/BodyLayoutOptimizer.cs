@@ -325,7 +325,7 @@ namespace SolverPrototype
         Buffer<int> claims;
         //We pick an extremely generous value to begin with because there's not much reason not to. This avoids problems in most reasonable simulations.
         int workerClaimsBufferSize = 512;
-        public void IncrementalOptimize(int optimizationCount, IThreadPool threadPool, BufferPool rawPool)
+        public void IncrementalOptimize(int optimizationCount, IThreadDispatcher threadPool, BufferPool rawPool)
         {
             if (SpanHelper.GetContainingPowerOf2(bodies.BodyCount) > claims.Length || claims.Length > bodies.BodyCount * 2)
             {
@@ -367,7 +367,7 @@ namespace SolverPrototype
             //Every worker moves forward from its start location by decrementing the optimization count to claim an optimization job.
             remainingOptimizationAttemptCount = Math.Min(bodies.BodyCount, optimizationCount);
 
-            threadPool.ForLoop(0, threadPool.ThreadCount, IncrementalOptimizeWork);
+            threadPool.DispatchWorkers(IncrementalOptimizeWork);
 
             int lowestWorkerJobsCompleted = int.MaxValue;
             for (int i = 0; i < threadPool.ThreadCount; ++i)

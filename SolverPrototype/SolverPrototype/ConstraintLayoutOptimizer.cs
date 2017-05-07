@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 
 namespace SolverPrototype
 {
@@ -30,9 +31,6 @@ namespace SolverPrototype
 
         Optimization nextTargetWithoutOffset;
         Optimization previousStartWithoutOffset;
-
-        //Note that this is stored on the heap just to make it easier to pass to the multithreaded workers later. It doesn't truly exist outside of the scope of an update call.
-        QuickList<Optimization, Buffer<Optimization>> targets;
 
         /// <summary>
         /// If true, regions are offset by a half region width. Toggled each frame. Offsets allow the sorted regions to intermix, eventually converging to a full sort.
@@ -142,7 +140,7 @@ namespace SolverPrototype
         }
 
 
-        public void Update(int maximumRegionSizeInBundles, int regionCount, BufferPool rawPool)
+        public void Update(int maximumRegionSizeInBundles, int regionCount, BufferPool rawPool, IThreadDispatcher threadDispatcher = null)
         {
             //Note that we require that all regions are bundle aligned. This is important for the typebatch sorting process, which tends to use bulk copies from bundle arrays to cache.
             //If not bundle aligned, those bulk copies would become complex due to the constraint AOSOA layout.
@@ -202,17 +200,48 @@ namespace SolverPrototype
             var maximumRegionSizeInConstraints = maximumRegionSizeInBundles * Vector<int>.Count;
             //Now that we have a set of scheduled optimizations, execute them. 
             //Note that having the set of optimizations computed up front makes multithreading the loop trivial.
-            for (int i = 0; i < targets.Count; ++i)
+            if (threadDispatcher != null)
             {
-                ref var target = ref targets[i];
-                var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
-                //TODO: Note that we currently use the main bufferpool. That's not thread safe.
-                //When using multiple threads to sort, we should provide the function a worker context that includes both the workers dispatch interface and the memory resources.
-                typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount, rawPool);
+                this.threadContexts = threadDispatcher;
+                this.maximumRegionSizeInConstraints = maximumRegionSizeInConstraints;
+                targetIndex = 0;
+                threadDispatcher.DispatchWorkers(HandleWorker);
+                this.threadContexts = null;
             }
-
+            else
+            {
+                for (int i = 0; i < targets.Count; ++i)
+                {
+                    SortRegion(ref targets[i], rawPool, maximumRegionSizeInConstraints);
+                }
+            }
             //Give the targets back to the pool.
             targets.Dispose(pool);
+        }
+
+        void SortRegion(ref Optimization target, BufferPool pool, int maximumRegionSizeInConstraints)
+        {
+            var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
+            //TODO: Note that we currently use the main bufferpool. That's not thread safe.
+            //When using multiple threads to sort, we should provide the function a worker context that includes both the workers dispatch interface and the memory resources.
+            typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount, pool);
+
+        }
+
+
+        //Note that this is stored on the heap just to make it easier to pass to the multithreaded workers later. It doesn't truly exist outside of the scope of an update call.
+        //This is basically a poor man's closure.
+        QuickList<Optimization, Buffer<Optimization>> targets;
+        IThreadDispatcher threadContexts;
+        int targetIndex;
+        int maximumRegionSizeInConstraints;
+        void HandleWorker(int workerIndex)
+        {
+            int incrementedTargetIndex;
+            while ((incrementedTargetIndex = Interlocked.Increment(ref targetIndex)) <= targets.Count)
+            {
+                SortRegion(ref targets[incrementedTargetIndex - 1], threadContexts.GetThreadMemoryPool(workerIndex), maximumRegionSizeInConstraints);
+            }
         }
     }
 }
