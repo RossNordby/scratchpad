@@ -123,7 +123,7 @@ namespace SolverPrototype.Constraints
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        int GetSortKey(int constraintIndex)
+        public int GetSortKey(int constraintIndex)
         {
             BundleIndexing.GetBundleIndices(constraintIndex, out var bundleIndex, out var innerIndex);
             ref var bundleReferences = ref BodyReferences[bundleIndex];
@@ -134,6 +134,23 @@ namespace SolverPrototype.Constraints
             ref var indexA = ref GatherScatter.Get(ref bundleReferences.IndexA, innerIndex);
             ref var indexB = ref Unsafe.Add(ref indexA, Vector<int>.Count);
             return indexA < indexB ? indexA : indexB;
+            //TODO: It is conceivable that another sorting key heuristic would beat this one. This completely ignores the second connection and makes it very unlikely
+            //that it could converge to whatever globally optimal layout exists. It's a little tricky to come up with good heuristics, though- many will end up 
+            //batching constraints which relate to wildly different bodies. Sorting by the minimum at least guarantees that two adjacent constraints will be as close as they can be
+            //in one way. 
+
+            //In practice, we approach within about 5-10% of the optimum using the above sorting heuristic and the current incremental body optimizer.
+
+            //It's not immediately clear that ANY local comparison based sort will be able to do as well as some form of global optimizer that maximizes
+            //the 'closeness', which drops to zero once accesses would leave the cache line. This is made more complicated by the AOSOA layout- most likely
+            //such a heuristic would need to score based on whether the bodies are in the same bundle. So, for example, two constraints get one 'close' point for each 
+            //shared body bundle.
+            //(Since you would only be optimizing within type batches, the fact that different types have different body counts wouldn't be an issue. They would
+            //only ever be compared against other constraints of the same type.)
+            //Even if you can't guarantee the next constraint is going to have bodies that are in cache, if you can generally lift the number of constraints
+            //that end up used quite a few times in L1/L2, there is probably a nice benefit to be had. That would suggest 'wider' optimizations rather than bundle-specific ones.
+            //All of these global techniques get into some nasty O complexities, but there may be heuristics which can approach them- sort of like BVH SAH sweep builders.
+            //Especially incremental ones, like the refinement we use in the dynamic BVH broadphase.
         }
         struct IntComparer : IComparerRef<int>
         {
@@ -172,9 +189,25 @@ namespace SolverPrototype.Constraints
                 sortKeys[i] = GetSortKey(baseIndex + i);
             }
 
+            //On most platforms, this stage is going to be heavily memory bound. On a 3770K with 4x1600, it can only scale up to about 2.5x as fast.
+            //This is mostly caused by the memory copying into and out of the local cache. Because of this, any reduction in the amount of copying required
+            //would enable significantly better performance. We don't have a lot of options here in terms of microoptimizations- 
+            //not making use of a temp cache would require vastly greater numbers of swaps which are much slower.
+
             //TODO: You may want to actually change the way the optimizer handles sorting. Rather than doing a bunch of independent sorts, it could do a cooperative sort.
-            //It would be slower in terms of raw coverage, but it would converge faster. The key there would be an efficient and parallel merge operation.
+            //It would be slower in terms of raw coverage, but it would converge faster. Remember: a sort region that is twice as large converges four times as fast.
+            //Even with biting the bullet on worse multicore scaling, the fact that we could pretty easily sort a reason that's three times larger on a quad core
+            //would make it much faster overall in terms of progress towards cache quality per frame. Also, the reduction in copies per sort would help.
+            //The key there would be an efficient and parallel merge operation.
             //Subarrays could be sorted by any available means.
+
+            //There may also be other more interesting non-sort based approaches available. For example, in the body layout optimizer, we pull connected bodies by
+            //traversing the constraint graph. Similarly, we could pull constraints by traversing the constraint graph. Any constraint which is connected to a body
+            //that another constraint shares is a good candidate for being adjacent. This could conceivably do better than the sort, since it is directly operating on
+            //adjacency information. Multithreading it would be a little tricky, just as it was in the body layout optimizer- lots and lots of locks in the naive approach.
+            //But hey, it works, and if it turns out much cheaper, then it's much cheaper. It WOULD be nice to figure out a way to do it that doesn't require tons of 
+            //locking, though. Maybe doing the super naive thing and multithreading across batch-typebatch is the right choice. That would require zero locking and would
+            //likely scale extremely well, so long as the simulation was complicated enough to support it.
             var comparer = default(IntComparer);
             QuickSort.Sort(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
 
@@ -191,7 +224,7 @@ namespace SolverPrototype.Constraints
                 //Also, its maximum benefit is quite small.
                 BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
                 BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-                
+
                 Move(ref referencesCache[sourceBundle], ref prestepCache[sourceBundle], ref accumulatedImpulseCache[sourceBundle],
                     sourceInner, handlesCache[sourceIndex],
                     targetBundle, targetInner, targetIndex, handlesToConstraints);

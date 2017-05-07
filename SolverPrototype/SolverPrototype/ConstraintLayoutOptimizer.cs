@@ -154,6 +154,8 @@ namespace SolverPrototype
             {
                 //Use the previous frame's start to create the new target.
                 nextTarget = FindOffsetFrameStart(previousStartWithoutOffset, maximumRegionSizeInBundles);
+                Debug.Assert(solver.Batches[nextTarget.BatchIndex].TypeBatches[nextTarget.TypeBatchIndex].BundleCount <= maximumRegionSizeInBundles || nextTarget.BundleIndex != 0,
+                    "On offset frames, the only time a target bundle can be 0 is if the batch is too small for it to be anything else.");
             }
             else
             {
@@ -175,6 +177,15 @@ namespace SolverPrototype
                 targets.AddUnsafely(ref nextTarget);
                 nextTarget.BundleIndex += maximumRegionSizeInBundles;
                 WrapBundle(ref nextTarget);
+                //If this is an offset frame, then every target capable of being offset should be. This is required for convergence.
+                if (shouldOffset && nextTarget.BundleIndex == 0)
+                {
+                    nextTarget.BundleIndex = Math.Max(0, Math.Min(
+                        nextTarget.BundleIndex + maximumRegionSizeInBundles / 2,
+                        solver.Batches[nextTarget.BatchIndex].TypeBatches[nextTarget.TypeBatchIndex].BundleCount - maximumRegionSizeInBundles));
+                }
+                Debug.Assert(!shouldOffset || solver.Batches[nextTarget.BatchIndex].TypeBatches[nextTarget.TypeBatchIndex].BundleCount <= maximumRegionSizeInBundles || nextTarget.BundleIndex != 0,
+                    "On offset frames, the only time a target bundle can be 0 is if the batch is too small for it to be anything else.");
 
                 //If the next target overlaps with the first target, the collection has wrapped around all constraints. Apparently more regions were requested
                 //than are available. Stop collection.
@@ -222,12 +233,9 @@ namespace SolverPrototype
         void SortRegion(ref Optimization target, BufferPool pool, int maximumRegionSizeInConstraints)
         {
             var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
-            //TODO: Note that we currently use the main bufferpool. That's not thread safe.
-            //When using multiple threads to sort, we should provide the function a worker context that includes both the workers dispatch interface and the memory resources.
             typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints), solver.HandlesToConstraints, bodies.BodyCount, pool);
 
         }
-
 
         //Note that this is stored on the heap just to make it easier to pass to the multithreaded workers later. It doesn't truly exist outside of the scope of an update call.
         //This is basically a poor man's closure.

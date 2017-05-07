@@ -21,9 +21,9 @@ namespace SolverPrototypeTests
 
             SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            //SimulationSetup.ScrambleBodies(simulation);
-            //SimulationSetup.ScrambleConstraints(simulation.Solver);
-            //SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            SimulationSetup.ScrambleBodies(simulation);
+            SimulationSetup.ScrambleConstraints(simulation.Solver);
+            SimulationSetup.ScrambleBodyConstraintLists(simulation);
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             //var threadPool = new TPLPool(8);
@@ -73,12 +73,12 @@ namespace SolverPrototypeTests
             const int bundlesPerOptimizationRegion = 256;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 8;
-            int constraintOptimizationIterations = 32768;
+            int constraintOptimizationIterations = 1426;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            //simulation.ConstraintLayoutOptimizer.Update(2, 1, simulation.BufferPool); //prejit
+            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
@@ -88,8 +88,30 @@ namespace SolverPrototypeTests
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
-            return;
 
+            //for (int batchIndex= 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
+            //{
+            //    var batch = simulation.Solver.Batches[batchIndex];
+            //    for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
+            //    {
+            //        var typeBatch = (ContactManifold4TypeBatch)batch.TypeBatches[typeBatchIndex];
+            //        int[] sortKeys = new int[typeBatch.ConstraintCount];
+            //        int previous = -1;
+            //        Console.WriteLine($"Batch {batchIndex}, type batch {typeBatchIndex}: ");
+            //        for (int i = 0; i < sortKeys.Length; ++i)
+            //        {
+            //            sortKeys[i] = typeBatch.GetSortKey(i);
+            //            if(sortKeys[i] <= previous)
+            //            {
+            //                Console.WriteLine("Not sorted!");
+            //            }
+            //            previous = sortKeys[i];
+            //            Console.Write($"{sortKeys[i]}, ");
+            //        }
+            //        Console.WriteLine();
+            //    }
+            //}
+            
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
