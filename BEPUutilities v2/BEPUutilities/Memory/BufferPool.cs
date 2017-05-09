@@ -413,6 +413,7 @@ namespace BEPUutilities2.Memory
         public void TakeForPower(int power, out Buffer<T> span)
         {
             //Note that we can't directly use TakeForPower from the underlying pool- the actual power needed at the byte level differs!
+            Debug.Assert(power >= 0 && power < 31, "Power must be positive and 2^power must fit within a signed integer.");
             Raw.Take((1 << power) * Unsafe.SizeOf<T>(), out var rawBuffer);
             span = rawBuffer.As<T>();
         }

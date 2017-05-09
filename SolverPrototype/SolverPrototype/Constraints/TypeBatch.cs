@@ -17,6 +17,7 @@ namespace SolverPrototype.Constraints
         public int ConstraintCount => constraintCount;
 
         public abstract int BodiesPerConstraint { get; }
+        public int TypeId { get { return typeId; } }
 
         /// <summary>
         /// The handles for the constraints in this type batch.
@@ -45,6 +46,13 @@ namespace SolverPrototype.Constraints
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
+        /// <summary>
+        /// Swaps two constraints in the type batch by index.
+        /// </summary>
+        /// <param name="indexA">Index of the first constraint to swap.</param>
+        /// <param name="indexB">Index of the second constraint to swap.</param>
+        /// <param name="handlesToConstraints">The owning solver's handle to constraint mapping.</param>
+        public abstract void SwapConstraints(int a, int b, ConstraintLocation[] handlesToConstraints);
 
         public abstract void Scramble(Random random, ConstraintLocation[] handlesToConstraints);
 
@@ -237,6 +245,31 @@ namespace SolverPrototype.Constraints
             BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
             Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, IndexToHandle[sourceIndex],
                 targetBundle, targetInner, targetIndex, handlesToConstraints);
+        }
+
+        /// <summary>
+        /// Swaps two constraints in the type batch by index.
+        /// </summary>
+        /// <param name="a">Index of the first constraint to swap.</param>
+        /// <param name="b">Index of the second constraint to swap.</param>
+        /// <param name="handlesToConstraints">The owning solver's handle to constraint mapping.</param>
+        public override sealed void SwapConstraints(int a, int b, ConstraintLocation[] handlesToConstraints)
+        {
+            //TODO: It would probably be a good idea to preallocate a memory blob for use as a cache rather than initializes a bunch of new locals.
+            //Maybe newer JITs won't require init, but it doesn't require that much effort to preallocate a blob of sufficient size.
+            TPrestepData aPrestep = default(TPrestepData);
+            TAccumulatedImpulse aAccumulated = default(TAccumulatedImpulse);
+            TBodyReferences aBodyReferences = default(TBodyReferences);
+
+            BundleIndexing.GetBundleIndices(a, out var aBundle, out var aInner);
+            GatherScatter.CopyLane(ref BodyReferences[aBundle], aInner, ref aBodyReferences, 0);
+            GatherScatter.CopyLane(ref PrestepData[aBundle], aInner, ref aPrestep, 0);
+            GatherScatter.CopyLane(ref AccumulatedImpulses[aBundle], aInner, ref aAccumulated, 0);
+            var aHandle = IndexToHandle[a];
+
+            BundleIndexing.GetBundleIndices(b, out var bBundle, out var bInner);
+            Move(bBundle, bInner, b, aBundle, aInner, a, handlesToConstraints);
+            Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, aHandle, bBundle, bInner, b, handlesToConstraints);
         }
 
 

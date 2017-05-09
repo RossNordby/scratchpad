@@ -208,6 +208,11 @@ namespace SolverPrototype.Constraints
             //But hey, it works, and if it turns out much cheaper, then it's much cheaper. It WOULD be nice to figure out a way to do it that doesn't require tons of 
             //locking, though. Maybe doing the super naive thing and multithreading across batch-typebatch is the right choice. That would require zero locking and would
             //likely scale extremely well, so long as the simulation was complicated enough to support it.
+
+            //Notably, if you used the similar approach to the incremental body layout optimizer, you would only need to claim the 'claim origin' and then each individual 
+            //swap pair thereafter. That's about an order of magnitude fewer interlocked operations required per swap, so it would probably scale reasonably well.
+            //You could also avoid some clearing overhead by only allocating a claims buffer of min(1024, typeBatch.ConstraintCount), and computing the claims index
+            //by modulo. That's not ideal since you'll get false contention, especially if your threads happen to be put at 1024 increments, but it would be easy and cheap.
             var comparer = default(IntComparer);
             QuickSort.Sort(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
 
