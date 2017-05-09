@@ -183,6 +183,7 @@ namespace SolverPrototype
                     //Note that, when multithreading, we do not need any form of extra lock for thes olver.HandlesToConstraints, even though this swap will mutate them.
                     //That's because we will have already claimed the constraints, and the only handle-constraint mappings that will change are those which have been claimed.
                     //No race conditions are possible.
+                    //Console.WriteLine($"Swap in ({handleToConstraint.BatchIndex}, {handleToConstraint.TypeId}): {handleToConstraint.IndexInTypeBatch} and {moveSlotIndex}");
                     typeBatch.SwapConstraints(handleToConstraint.IndexInTypeBatch, moveSlotIndex++, solver.HandlesToConstraints);
                 }
                 //Note that we use the handleToConstraint here. It must be a ref local, because any constraint swap triggered above could change the index.
@@ -194,7 +195,7 @@ namespace SolverPrototype
             Debug.Assert(worker.TraversalStack.Count == 0 && worker.AlreadyTraversedConstraintHandles.Count == 0, "The original worker reference counts should be zero and unchanged.");
         }
 
-        public void Update(int constraintsToOptimize, BufferPool rawPool)
+        public void Update(int constraintsToOptimize, int maximumTraversalCount, BufferPool rawPool)
         {
             //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
             if (solver.Batches.Count == 0)
@@ -204,10 +205,9 @@ namespace SolverPrototype
             BoundsCheckOldTarget(ref nextTarget);
 
             Worker worker;
-            const int traversalCapacity = 64;
-            QuickList<int, Buffer<int>>.Create(rawPool.SpecializeFor<int>(), 64, out worker.TraversalStack);
+            QuickList<int, Buffer<int>>.Create(rawPool.SpecializeFor<int>(), maximumTraversalCount, out worker.TraversalStack);
             QuickSet<int, Buffer<int>, Buffer<int>, PrimitiveComparer<int>>.Create(rawPool.SpecializeFor<int>(), rawPool.SpecializeFor<int>(),
-                SpanHelper.GetContainingPowerOf2(traversalCapacity), 3, out worker.AlreadyTraversedConstraintHandles);
+                SpanHelper.GetContainingPowerOf2(maximumTraversalCount), 3, out worker.AlreadyTraversedConstraintHandles);
 
             for (int i = 0; i < constraintsToOptimize; ++i)
             {

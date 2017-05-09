@@ -62,7 +62,7 @@ namespace SolverPrototypeTests
             const int bundlesPerOptimizationRegion = 256;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 8;
-            int constraintOptimizationIterations = 512;
+            int constraintOptimizationIterations = 8;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
@@ -73,7 +73,7 @@ namespace SolverPrototypeTests
             var testOptimizer = new ConstraintLayoutOptimizer2(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver);
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                testOptimizer.Update(constraintsPerOptimizationRegion, simulation.BufferPool);
+                testOptimizer.Update(1, 93248, simulation.BufferPool);
                 //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, initializationThreadPool);
             }
             //timer.Stop();

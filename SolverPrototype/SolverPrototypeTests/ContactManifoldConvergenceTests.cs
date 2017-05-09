@@ -81,16 +81,18 @@ namespace SolverPrototypeTests
             var testOptimizer = new ConstraintLayoutOptimizer2(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver);
             //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
-            testOptimizer.Update(1, simulation.BufferPool);
+            //testOptimizer.Update(1, 1, simulation.BufferPool);
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                testOptimizer.Update(32, simulation.BufferPool);
+                testOptimizer.Update(1, 4096, simulation.BufferPool);
                 //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);
+
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
+            return;
 
             //for (int batchIndex= 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
             //{
@@ -114,7 +116,7 @@ namespace SolverPrototypeTests
             //        Console.WriteLine();
             //    }
             //}
-            
+
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
