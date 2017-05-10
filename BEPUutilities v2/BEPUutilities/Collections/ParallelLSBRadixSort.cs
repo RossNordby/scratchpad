@@ -15,12 +15,12 @@ namespace BEPUutilities2.Collections
     {
         //TODO: If the jit ever managed to handle ISpan indexers optimally, we could use a much more natural ISpan-based implementation.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void ReorderForByte<T>(ref uint sourceKeys, ref uint targetKeys, ref T sourceValues, ref T targetValues, int keyCount, ref int indices, int shift)
+        static void ReorderForByte<T>(ref uint sourceKeys, ref uint targetKeys, ref T sourceValues, ref T targetValues, int keyCount, ref int bucketStartIndices, int shift)
         {
             for (int i = 0; i < keyCount; ++i)
             {
                 var key = Unsafe.Add(ref sourceKeys, i);
-                ref var bucketStartIndex = ref Unsafe.Add(ref indices, (int)(key >> shift) & 0xFF);
+                ref var bucketStartIndex = ref Unsafe.Add(ref bucketStartIndices, (int)(key >> shift) & 0xFF);
                 Unsafe.Add(ref targetKeys, bucketStartIndex) = key;
                 Unsafe.Add(ref targetValues, bucketStartIndex) = Unsafe.Add(ref sourceValues, i);
                 //Bump the index up to compensate for the new element.
@@ -110,19 +110,23 @@ namespace BEPUutilities2.Collections
             Unsafe.InitBlock(worker.Buckets0.Memory, 0, bucketSize);
             Unsafe.InitBlock(worker.Buckets8.Memory, 0, bucketSize);
 
+
             ref var firstKey = ref keys[0];
             while (true)
             {
                 var workBlockIndex = Interlocked.Increment(ref nextWorkBlockIndex) - 1;
                 var index = workBlockIndex * workBlockSize;
+                if (index >= keyCount)
+                    break;
+                var end = Math.Min(keyCount, index + workBlockSize);
                 while (true)
                 {
-                    if (index >= keyCount)
-                        return;
-
                     var key = Unsafe.Add(ref firstKey, index);
                     ++worker.Buckets0[(int)(key & 0xFF)];
                     ++worker.Buckets8[(int)((key >> 8) & 0xFF)];
+                    ++index;
+                    if (index >= end)
+                        break;
                 }
             }
         }
@@ -178,12 +182,15 @@ namespace BEPUutilities2.Collections
             bufferPool.SpecializeFor<Worker>().Take(threadDispatcher.ThreadCount, out workers);
             const int bucketCount = 256;
             intPool.Take(bucketCount, out bucketStarts0);
+            if (bucketSetCount >= 2) intPool.Take(bucketCount, out bucketStarts8);
+            if (bucketSetCount >= 3) intPool.Take(bucketCount, out bucketStarts16);
+            if (bucketSetCount >= 4) intPool.Take(bucketCount, out bucketStarts24);
             for (int workerIndex = 0; workerIndex < threadDispatcher.ThreadCount; ++workerIndex)
             {
                 intPool.Take(bucketCount, out workers[workerIndex].Buckets0);
                 if (bucketSetCount >= 2) intPool.Take(bucketCount, out workers[workerIndex].Buckets8);
                 if (bucketSetCount >= 3) intPool.Take(bucketCount, out workers[workerIndex].Buckets16);
-                if (bucketSetCount == 4) intPool.Take(bucketCount, out workers[workerIndex].Buckets24);
+                if (bucketSetCount >= 4) intPool.Take(bucketCount, out workers[workerIndex].Buckets24);
             }
             nextWorkBlockIndex = 0;
             workBlockSize = Math.Min(Math.Max(count / threadDispatcher.ThreadCount, 1), 64);
@@ -196,7 +203,6 @@ namespace BEPUutilities2.Collections
                         threadDispatcher.DispatchWorkers(Fill1Bucket);
                         //Compute the start indices for each bucket.
                         ref var start0 = ref bucketStarts0[0];
-                        start0 = 0;
                         int previousSum0 = 0;
                         for (int bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
                         {
@@ -211,15 +217,13 @@ namespace BEPUutilities2.Collections
                         sortedKeys = keysScratch;
                         sortedValues = valuesScratch;
                     }
-                    return;
+                    break;
                 case 2:
                     {
                         threadDispatcher.DispatchWorkers(Fill2Buckets);
                         //Compute the start indices for each bucket.
                         ref var start0 = ref bucketStarts0[0];
                         ref var start8 = ref bucketStarts8[0];
-                        start0 = 0;
-                        start8 = 0;
                         int previousSum0 = 0;
                         int previousSum8 = 0;
                         for (int bucketIndex = 0; bucketIndex < bucketCount; ++bucketIndex)
@@ -234,11 +238,11 @@ namespace BEPUutilities2.Collections
                             }
                         }
                         ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts0[0], 0);
-                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts8[0], 0);
+                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts8[0], 8);
                         sortedKeys = keys;
                         sortedValues = values;
                     }
-                    return;
+                    break;
                 case 3:
                     {
                         threadDispatcher.DispatchWorkers(Fill3Buckets);
@@ -246,9 +250,6 @@ namespace BEPUutilities2.Collections
                         ref var start0 = ref bucketStarts0[0];
                         ref var start8 = ref bucketStarts8[0];
                         ref var start16 = ref bucketStarts16[0];
-                        start0 = 0;
-                        start8 = 0;
-                        start16 = 0;
                         int previousSum0 = 0;
                         int previousSum8 = 0;
                         int previousSum16 = 0;
@@ -266,12 +267,12 @@ namespace BEPUutilities2.Collections
                             }
                         }
                         ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts0[0], 0);
-                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts8[0], 0);
-                        ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts16[0], 0);
+                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts8[0], 8);
+                        ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts16[0], 16);
                         sortedKeys = keysScratch;
                         sortedValues = valuesScratch;
                     }
-                    return;
+                    break;
                 case 4:
                     {
                         threadDispatcher.DispatchWorkers(Fill4Buckets);
@@ -280,10 +281,6 @@ namespace BEPUutilities2.Collections
                         ref var start8 = ref bucketStarts8[0];
                         ref var start16 = ref bucketStarts16[0];
                         ref var start24 = ref bucketStarts24[0];
-                        start0 = 0;
-                        start8 = 0;
-                        start16 = 0;
-                        start24 = 0;
                         int previousSum0 = 0;
                         int previousSum8 = 0;
                         int previousSum16 = 0;
@@ -304,19 +301,34 @@ namespace BEPUutilities2.Collections
                             }
                         }
                         ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts0[0], 0);
-                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts8[0], 0);
-                        ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts16[0], 0);
-                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts24[0], 0);
+                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts8[0], 8);
+                        ReorderForByte(ref keys[0], ref keysScratch[0], ref values[0], ref valuesScratch[0], keyCount, ref bucketStarts16[0], 16);
+                        ReorderForByte(ref keysScratch[0], ref keys[0], ref valuesScratch[0], ref values[0], keyCount, ref bucketStarts24[0], 24);
                         sortedKeys = keys;
                         sortedValues = values;
                     }
-                    return;
+                    break;
+                default:
+                    Debug.Fail("This should be impossible- the switch cases should cover all possible values of bucket levels.");
+                    sortedKeys = new Buffer<uint>();
+                    sortedValues = new Buffer<TValue>();
+                    break;
+
             }
-            Debug.Fail("This should be impossible- the switch cases should cover all possible values of bucket levels.");
-            sortedKeys = new Buffer<uint>();
-            sortedValues = new Buffer<TValue>();
+            for (int workerIndex = 0; workerIndex < threadDispatcher.ThreadCount; ++workerIndex)
+            {
+                intPool.Return(ref workers[workerIndex].Buckets0);
+                if (bucketSetCount >= 2) intPool.Return(ref workers[workerIndex].Buckets8);
+                if (bucketSetCount >= 3) intPool.Return(ref workers[workerIndex].Buckets16);
+                if (bucketSetCount >= 4) intPool.Return(ref workers[workerIndex].Buckets24);
+            }
+            intPool.Return(ref bucketStarts0);
+            if (bucketSetCount >= 2) intPool.Return(ref bucketStarts8);
+            if (bucketSetCount >= 3) intPool.Return(ref bucketStarts16);
+            if (bucketSetCount >= 4) intPool.Return(ref bucketStarts24);
+            bufferPool.SpecializeFor<Worker>().Return(ref workers);
 
         }
-        
+
     }
 }

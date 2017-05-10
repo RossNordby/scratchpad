@@ -29,6 +29,9 @@ namespace SolverPrototypeTests
             }
             const int elementCount = 4096;
             const int elementExclusiveUpperBound = 32768;// 1 << 5;
+
+            var bufferPool = new BufferPool();
+            var threadDispatcher = new SimpleThreadDispatcher(8);
             for (int iteration = 0; iteration < 4; ++iteration)
             {
                 GC.Collect(3, GCCollectionMode.Forced, true);
@@ -91,13 +94,13 @@ namespace SolverPrototypeTests
                     //VerifySort(keys2);
                     //Console.WriteLine($"Array.Sort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
-                    //keys.CopyTo(0, ref keys3, 0, elementCount);
-                    //timer.Restart();
-                    //Array.Clear(bucketCounts, 0, bucketCounts.Length);
-                    //LSBRadixSort.SortU16(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount);
-                    //timer.Stop();
-                    //VerifySort(keys3);
-                    //Console.WriteLine($"{t} LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+                    keys.CopyTo(0, ref keys3, 0, elementCount);
+                    timer.Restart();
+                    Array.Clear(bucketCounts, 0, bucketCounts.Length);
+                    LSBRadixSort.SortU16(ref keys3[0], ref indexMap3[0], ref keysScratch[0], ref valuesScratch[0], ref bucketCounts[0], elementCount);
+                    timer.Stop();
+                    VerifySort(keys3);
+                    Console.WriteLine($"{t} LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
                     //keys.CopyTo(0, ref keys4, 0, elementCount);
                     //var originalIndices = new int[256];
@@ -119,17 +122,17 @@ namespace SolverPrototypeTests
                         fixed (int* valuesScratchPointer = valuesScratch)
                         {
                             var keys3Buffer = new Buffer<uint>(keys3Pointer, keys3.Length);
-                            var indexMap3Buffer = new Buffer<int>(keys3Pointer, keys3.Length);
-                            var keysScratchBuffer = new Buffer<uint>(keys3Pointer, keys3.Length);
-                            var valuesScratchBuffer = new Buffer<int>(keys3Pointer, keys3.Length);
-                            sorter.Sort(ref keys3, ref indexMap3, ref keysScratch, 0, keys3.Length, elementExclusiveUpperBound, ref valuesScratch, 
+                            var indexMap3Buffer = new Buffer<int>(indexMap3Pointer, keys3.Length);
+                            var keysScratchBuffer = new Buffer<uint>(keysScratchPointer, keys3.Length);
+                            var valuesScratchBuffer = new Buffer<int>(valuesScratchPointer, keys3.Length);
+                            sorter.Sort(ref keys3Buffer, ref indexMap3Buffer, 0, keys3.Length, elementExclusiveUpperBound, ref keysScratchBuffer, ref valuesScratchBuffer, 
                                 bufferPool, threadDispatcher, out var sortedKeys, out var sortedValues);
 
-                            VerifySort(sortedKeys);
+                            VerifySort(Unsafe.As<Buffer<uint>, Buffer<int>>(ref sortedKeys));
                         }
                     }
                     timer.Stop();
-                    Console.WriteLine($"{t} LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
+                    Console.WriteLine($"{t} Parallel LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
                 }
             }
 
