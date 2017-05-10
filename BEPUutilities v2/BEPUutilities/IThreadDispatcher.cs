@@ -1,7 +1,7 @@
 ﻿using BEPUutilities2.Memory;
 using System;
 
-namespace SolverPrototype
+namespace BEPUutilities2
 {
     /// <summary>
     /// Provides multithreading dispatch primitives, a thread count, and per thread resource pools for the simulation to use.

@@ -16,11 +16,11 @@ namespace BEPUutilities2.Collections
             for (int i = 0; i < keyCount; ++i)
             {
                 var key = Unsafe.Add(ref sourceKeys, i);
-                ref var index = ref Unsafe.Add(ref indices, (key >> shift) & 0xFF);
-                Unsafe.Add(ref targetKeys, index) = key;
-                Unsafe.Add(ref targetValues, index) = Unsafe.Add(ref sourceValues, i);
+                ref var bucketStartIndex = ref Unsafe.Add(ref indices, (key >> shift) & 0xFF);
+                Unsafe.Add(ref targetKeys, bucketStartIndex) = key;
+                Unsafe.Add(ref targetValues, bucketStartIndex) = Unsafe.Add(ref sourceValues, i);
                 //Bump the index up to compensate for the new element.
-                ++index;
+                ++bucketStartIndex;
             }
         }
 

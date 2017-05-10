@@ -144,34 +144,10 @@ namespace BEPUutilities2.Collections
 
         public unsafe static void SortU32<T>(ref int keys, ref T values, int keyCount, int shift)
         {
-            if (keyCount < 32)
+            if (keyCount < 256)
             {
-                //There aren't many keys remaining. Use insertion sort.
-                for (int i = 1; i < keyCount; ++i)
-                {
-                    var originalKey = Unsafe.Add(ref keys, i);
-                    var originalValue = Unsafe.Add(ref values, i);
-                    int compareIndex;
-                    for (compareIndex = i - 1; compareIndex >= 0; --compareIndex)
-                    {
-                        if (originalKey < Unsafe.Add(ref keys, compareIndex))
-                        {
-                            //Move the element up one slot.
-                            var upperSlotIndex = compareIndex + 1;
-                            Unsafe.Add(ref keys, upperSlotIndex) = Unsafe.Add(ref keys, compareIndex);
-                            Unsafe.Add(ref values, upperSlotIndex) = Unsafe.Add(ref values, compareIndex);
-                        }
-                        else
-                            break;
-                    }
-                    var targetIndex = compareIndex + 1;
-                    if (targetIndex != i)
-                    {
-                        //Move the original index down.
-                        Unsafe.Add(ref keys, targetIndex) = originalKey;
-                        Unsafe.Add(ref values, targetIndex) = originalValue;
-                    }
-                }
+                var comparer = default(PrimitiveComparer<int>);
+                QuickSort.Sort(ref keys, ref values, 0, keyCount - 1, ref comparer);
                 return;
             }
             const int bucketCountPower = 7;

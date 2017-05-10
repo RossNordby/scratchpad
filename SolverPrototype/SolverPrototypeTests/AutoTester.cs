@@ -1,4 +1,5 @@
-﻿using SolverPrototype;
+﻿using BEPUutilities2;
+using SolverPrototype;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -62,7 +63,7 @@ namespace SolverPrototypeTests
             const int bundlesPerOptimizationRegion = 256;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 8;
-            int constraintOptimizationIterations = 8;
+            int constraintOptimizationIterations = 361;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
@@ -70,11 +71,9 @@ namespace SolverPrototypeTests
             //simulation.ConstraintLayoutOptimizer.Update(2, 1, simulation.BufferPool); //prejit
             //var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             //timer.Restart();
-            var testOptimizer = new ConstraintLayoutOptimizer2(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver);
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                testOptimizer.Update(1, 93248, simulation.BufferPool);
-                //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, initializationThreadPool);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, initializationThreadPool);
             }
             //timer.Stop();
             //Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +

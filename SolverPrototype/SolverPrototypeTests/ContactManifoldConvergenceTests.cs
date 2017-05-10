@@ -78,15 +78,13 @@ namespace SolverPrototypeTests
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            var testOptimizer = new ConstraintLayoutOptimizer2(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver);
-            //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
+            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             //testOptimizer.Update(1, 1, simulation.BufferPool);
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                testOptimizer.Update(1, 4096, simulation.BufferPool);
-                //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);
 
             }
             timer.Stop();

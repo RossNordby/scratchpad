@@ -9,9 +9,9 @@ namespace SolverPrototypeTests
             //InterlockedOverheadTests.Test();
             ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
-            AutoTester.Test();
+            //AutoTester.Test();
             //ContactManifoldConvergenceTests.Test();
-            //SortTest.Test();
+            SortTest.Test();
             //SpanCodegenTests.Test();
 
         }

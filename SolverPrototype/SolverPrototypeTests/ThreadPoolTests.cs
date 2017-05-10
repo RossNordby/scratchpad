@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using BEPUutilities2.Memory;
+using BEPUutilities2;
 
 namespace SolverPrototypeTests
 {

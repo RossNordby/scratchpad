@@ -6,6 +6,7 @@ using BEPUutilities2.Memory;
 using BEPUutilities2.Collections;
 using System.Runtime.InteropServices;
 using System.Threading;
+using BEPUutilities2;
 
 namespace SolverPrototype
 {
