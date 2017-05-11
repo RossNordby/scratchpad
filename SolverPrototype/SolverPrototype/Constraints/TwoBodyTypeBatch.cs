@@ -165,7 +165,6 @@ namespace SolverPrototype.Constraints
             intPool.Take(constraintCount, out var sortKeys);
             intPool.Take(constraintCount, out var scratchValues);
             intPool.Take(constraintCount, out var scratchKeys);
-            intPool.Take(constraintCount, out var scatterIndices);
 
             //First we'll compute the proper order of the constraints in this region by sorting their keys.
             //This minimizes the number of swaps that must be applied to the actual bundle data.
@@ -185,19 +184,16 @@ namespace SolverPrototype.Constraints
             LSBRadixSort.Sort<int, Buffer<int>, Buffer<int>>(ref sortKeys, ref inputSourceIndices, ref scratchKeys, ref scratchValues, 0, constraintCount, bodyCount - 1, rawPool,
                 out var sortedKeys, out var sortedSourceIndices);
 
-            //We do this transformation from gather indices to scatter indices on a single thread since the whole thing will likely take less time than a multithread dispatch.
-            //Also, it's likely that all the values being gathered are still in L1 cache. If we farmed it out to other threads, that wouldn't be the case.
-            for (int i = 0; i < constraintCount; ++i)
-            {
-                scatterIndices[sortedSourceIndices[i]] = baseIndex + i;
-            }
+            ref var sourceIndices = ref sortedSourceIndices[0];
 
             //Now that we have scatter indices, copy each constraint property into cache and then into final sorted position in sequence.
             //First, scatter body references into position- we already cached them.
-            for (int sourceIndex = 0; sourceIndex < constraintCount; ++sourceIndex)
+            for (int targetOffset = 0; targetOffset < constraintCount; ++targetOffset)
             {
+                var sourceIndex = Unsafe.Add(ref sourceIndices, targetOffset);
+                var targetIndex = targetOffset + baseIndex;                
                 BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
-                BundleIndexing.GetBundleIndices(scatterIndices[sourceIndex], out var targetBundle, out var targetInner);
+                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
                 GatherScatter.CopyLane(ref referencesCache[sourceBundle], sourceInner, ref BodyReferences[targetBundle], targetInner);
             }
             rawPool.SpecializeFor<TwoBodyReferences>().Return(ref referencesCache);
@@ -212,19 +208,17 @@ namespace SolverPrototype.Constraints
                 previousKey = key;
             }
 #endif
-            //Technically these could be returned more aggressively, but we keep them down here for the sake of debugging simplicity.
-            intPool.Return(ref inputSourceIndices);
-            intPool.Return(ref sortKeys);
-            intPool.Return(ref scratchKeys);
-            intPool.Return(ref scratchValues);
+
 
             //Now cache and scatter the prestep data.
             rawPool.SpecializeFor<TPrestepData>().Take(bundleCount, out var prestepCache);
             PrestepData.CopyTo(bundleStartIndex, ref prestepCache, 0, bundleCount);
-            for (int sourceIndex = 0; sourceIndex < constraintCount; ++sourceIndex) //TODO: Try reverse.
+            for (int targetOffset = 0; targetOffset < constraintCount; ++targetOffset)
             {
+                var sourceIndex = Unsafe.Add(ref sourceIndices, targetOffset);
+                var targetIndex = targetOffset + baseIndex;
                 BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
-                BundleIndexing.GetBundleIndices(scatterIndices[sourceIndex], out var targetBundle, out var targetInner);
+                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
                 GatherScatter.CopyLane(ref prestepCache[sourceBundle], sourceInner, ref PrestepData[targetBundle], targetInner);
             }
             rawPool.SpecializeFor<TPrestepData>().Return(ref prestepCache);
@@ -232,10 +226,12 @@ namespace SolverPrototype.Constraints
             //Now cache and scatter the accumulated impulse data.
             rawPool.SpecializeFor<TAccumulatedImpulse>().Take(bundleCount, out var accumulatedImpulseCache);
             AccumulatedImpulses.CopyTo(bundleStartIndex, ref accumulatedImpulseCache, 0, bundleCount);
-            for (int sourceIndex = 0; sourceIndex < constraintCount; ++sourceIndex) //TODO: Try reverse.
+            for (int targetOffset = 0; targetOffset < constraintCount; ++targetOffset)
             {
+                var sourceIndex = Unsafe.Add(ref sourceIndices, targetOffset);
+                var targetIndex = targetOffset + baseIndex;
                 BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
-                BundleIndexing.GetBundleIndices(scatterIndices[sourceIndex], out var targetBundle, out var targetInner);
+                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
                 GatherScatter.CopyLane(ref accumulatedImpulseCache[sourceBundle], sourceInner, ref AccumulatedImpulses[targetBundle], targetInner);
             }
             rawPool.SpecializeFor<TAccumulatedImpulse>().Return(ref accumulatedImpulseCache);
@@ -243,16 +239,21 @@ namespace SolverPrototype.Constraints
             //Now cache and scatter the index to constraint index to handle mapping.
             intPool.Take(constraintCount, out var handlesCache);
             IndexToHandle.CopyTo(bundleStartIndex * Vector<int>.Count, ref handlesCache, 0, constraintCount);
-            for (int sourceIndex = 0; sourceIndex < constraintCount; ++sourceIndex) //TODO: Try reverse.
+            for (int targetOffset = 0; targetOffset < constraintCount; ++targetOffset)
             {
-                var targetIndex = scatterIndices[sourceIndex];
+                var sourceIndex = Unsafe.Add(ref sourceIndices, targetOffset);
+                var targetIndex = targetOffset + baseIndex;
                 var handle = handlesCache[sourceIndex];
                 IndexToHandle[targetIndex] = handle;
                 //Note that this overwrites some other constraint's entry, but that other constraint will also be overwriting their new spot too.
                 handlesToConstraints[handle].IndexInTypeBatch = targetIndex;
             }
-            intPool.Return(ref handlesCache);
-            intPool.Return(ref scatterIndices);
+            intPool.Return(ref handlesCache);          
+            //Technically some of these could be returned more aggressively, but we keep them down here for the sake of debugging simplicity.
+            intPool.Return(ref inputSourceIndices);
+            intPool.Return(ref sortKeys);
+            intPool.Return(ref scratchKeys);
+            intPool.Return(ref scratchValues);
         }
 
         //        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool rawPool)
