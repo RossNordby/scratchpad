@@ -111,28 +111,7 @@ namespace SolverPrototypeTests
                     //VerifySort(keys4);
                     //Console.WriteLine($"{t} MSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
 
-                    keys.CopyTo(0, ref keys3, 0, elementCount);
-                    timer.Restart();
-                    var sorter = new ParallelLSBRadixSort();
-                    unsafe
-                    {
-                        fixed (int* keys3Pointer = keys3.Memory)
-                        fixed (int* indexMap3Pointer = indexMap3.Memory)
-                        fixed (int* keysScratchPointer = keysScratch)
-                        fixed (int* valuesScratchPointer = valuesScratch)
-                        {
-                            var keys3Buffer = new Buffer<uint>(keys3Pointer, keys3.Length);
-                            var indexMap3Buffer = new Buffer<int>(indexMap3Pointer, keys3.Length);
-                            var keysScratchBuffer = new Buffer<uint>(keysScratchPointer, keys3.Length);
-                            var valuesScratchBuffer = new Buffer<int>(valuesScratchPointer, keys3.Length);
-                            sorter.Sort(ref keys3Buffer, ref indexMap3Buffer, 0, keys3.Length, elementExclusiveUpperBound, ref keysScratchBuffer, ref valuesScratchBuffer, 
-                                bufferPool, threadDispatcher, out var sortedKeys, out var sortedValues);
 
-                            VerifySort(Unsafe.As<Buffer<uint>, Buffer<int>>(ref sortedKeys));
-                        }
-                    }
-                    timer.Stop();
-                    Console.WriteLine($"{t} Parallel LSBRadixSort time (ms): {timer.Elapsed.TotalSeconds * 1e3}");
                 }
             }
 

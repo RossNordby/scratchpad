@@ -152,23 +152,19 @@ namespace SolverPrototype.Constraints
             //All of these global techniques get into some nasty O complexities, but there may be heuristics which can approach them- sort of like BVH SAH sweep builders.
             //Especially incremental ones, like the refinement we use in the dynamic BVH broadphase.
         }
-        struct IntComparer : IComparerRef<int>
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int Compare(ref int a, ref int b)
-            {
-                return a > b ? 1 : a < b ? -1 : 0;
-            }
-        }
+
         public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool rawPool)
         {
             int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
             if ((constraintCount & BundleIndexing.VectorMask) != 0)
                 ++bundleCount;
 
-            rawPool.SpecializeFor<int>().Take(constraintCount, out var sourceIndices);
-            rawPool.SpecializeFor<int>().Take(constraintCount, out var sortKeys);
-            rawPool.SpecializeFor<int>().Take(constraintCount, out var handlesCache);
+            var intPool = rawPool.SpecializeFor<int>();
+            intPool.Take(constraintCount, out var inputSourceIndices);
+            intPool.Take(constraintCount, out var sortKeys);
+            intPool.Take(constraintCount, out var scratchValues);
+            intPool.Take(constraintCount, out var scratchKeys);
+            intPool.Take(constraintCount, out var handlesCache);
             rawPool.SpecializeFor<TwoBodyReferences>().Take(bundleCount, out var referencesCache);
             rawPool.SpecializeFor<TPrestepData>().Take(bundleCount, out var prestepCache);
             rawPool.SpecializeFor<TAccumulatedImpulse>().Take(bundleCount, out var accumulatedImpulseCache);
@@ -185,36 +181,14 @@ namespace SolverPrototype.Constraints
             var baseIndex = bundleStartIndex * Vector<int>.Count;
             for (int i = 0; i < constraintCount; ++i)
             {
-                sourceIndices[i] = i;
+                inputSourceIndices[i] = i;
                 sortKeys[i] = GetSortKey(baseIndex + i);
             }
-
-            //On most platforms, this stage is going to be heavily memory bound. On a 3770K with 4x1600, it can only scale up to about 2.5x as fast.
-            //This is mostly caused by the memory copying into and out of the local cache. Because of this, any reduction in the amount of copying required
-            //would enable significantly better performance. We don't have a lot of options here in terms of microoptimizations- 
-            //not making use of a temp cache would require vastly greater numbers of swaps which are much slower.
-
-            //TODO: You may want to actually change the way the optimizer handles sorting. Rather than doing a bunch of independent sorts, it could do a cooperative sort.
-            //It would be slower in terms of raw coverage, but it would converge faster. Remember: a sort region that is twice as large converges four times as fast.
-            //Even with biting the bullet on worse multicore scaling, the fact that we could pretty easily sort a reason that's three times larger on a quad core
-            //would make it much faster overall in terms of progress towards cache quality per frame. Also, the reduction in copies per sort would help.
-            //The key there would be an efficient and parallel merge operation.
-            //Subarrays could be sorted by any available means.
-
-            //There may also be other more interesting non-sort based approaches available. For example, in the body layout optimizer, we pull connected bodies by
-            //traversing the constraint graph. Similarly, we could pull constraints by traversing the constraint graph. Any constraint which is connected to a body
-            //that another constraint shares is a good candidate for being adjacent. This could conceivably do better than the sort, since it is directly operating on
-            //adjacency information. Multithreading it would be a little tricky, just as it was in the body layout optimizer- lots and lots of locks in the naive approach.
-            //But hey, it works, and if it turns out much cheaper, then it's much cheaper. It WOULD be nice to figure out a way to do it that doesn't require tons of 
-            //locking, though. Maybe doing the super naive thing and multithreading across batch-typebatch is the right choice. That would require zero locking and would
-            //likely scale extremely well, so long as the simulation was complicated enough to support it.
-
-            //Notably, if you used the similar approach to the incremental body layout optimizer, you would only need to claim the 'claim origin' and then each individual 
-            //swap pair thereafter. That's about an order of magnitude fewer interlocked operations required per swap, so it would probably scale reasonably well.
-            //You could also avoid some clearing overhead by only allocating a claims buffer of min(1024, typeBatch.ConstraintCount), and computing the claims index
-            //by modulo. That's not ideal since you'll get false contention, especially if your threads happen to be put at 1024 increments, but it would be easy and cheap.
-            var comparer = default(IntComparer);
-            QuickSort.Sort(ref sortKeys[0], ref sourceIndices[0], 0, constraintCount - 1, ref comparer);
+            
+            //We don't bother using multiple threads on the sort. Sorting 4096 elements takes 20 microseconds on a single 4.5ghz 3770K thread.
+            //TODO: You could run this alongside parts of the copy operations to hide it, but that's nontrivial complexity for hiding 20us.
+            LSBRadixSort.Sort<int, Buffer<int>, Buffer<int>>(ref sortKeys, ref inputSourceIndices, ref scratchKeys, ref scratchValues, 0, constraintCount, bodyCount - 1, rawPool,
+                out var sortedKeys, out var sortedSourceIndices);
 
             //Push the cached data into its proper sorted position.
 #if DEBUG
@@ -222,7 +196,7 @@ namespace SolverPrototype.Constraints
 #endif
             for (int i = 0; i < constraintCount; ++i)
             {
-                var sourceIndex = sourceIndices[i];
+                var sourceIndex = sortedSourceIndices[i];
                 var targetIndex = baseIndex + i;
                 //Note that we do not bother checking whether the source and target are the same.
                 //The cost of the branch is large enough in comparison to the frequency of its usefulness that it only helps in practically static situations.
@@ -242,9 +216,11 @@ namespace SolverPrototype.Constraints
 #endif
             }
 
-            rawPool.SpecializeFor<int>().Return(ref sourceIndices);
-            rawPool.SpecializeFor<int>().Return(ref sortKeys);
-            rawPool.SpecializeFor<int>().Return(ref handlesCache);
+            intPool.Return(ref inputSourceIndices);
+            intPool.Return(ref sortKeys);
+            intPool.Return(ref scratchKeys);
+            intPool.Return(ref scratchValues);
+            intPool.Return(ref handlesCache);
             rawPool.SpecializeFor<TwoBodyReferences>().Return(ref referencesCache);
             rawPool.SpecializeFor<TPrestepData>().Return(ref prestepCache);
             rawPool.SpecializeFor<TAccumulatedImpulse>().Return(ref accumulatedImpulseCache);

@@ -73,7 +73,7 @@ namespace SolverPrototypeTests
             const int bundlesPerOptimizationRegion = 256;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 8;
-            int constraintOptimizationIterations = 32768;
+            int constraintOptimizationIterations = 8192;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
