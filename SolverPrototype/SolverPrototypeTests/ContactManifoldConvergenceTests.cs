@@ -19,7 +19,7 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(10, 10, 10, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             SimulationSetup.ScrambleBodies(simulation);
             SimulationSetup.ScrambleConstraints(simulation.Solver);
@@ -27,7 +27,8 @@ namespace SolverPrototypeTests
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             //var threadPool = new TPLPool(8);
-            var threadPool = new SimpleThreadDispatcher(1);
+            var threadPool = new SimpleThreadDispatcher(8);
+            //var threadPool = new NotQuiteAThreadDispatcher(8);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
@@ -70,15 +71,15 @@ namespace SolverPrototypeTests
                     constraintCount += simulation.Solver.Batches[i].TypeBatches[j].ConstraintCount;
                 }
             }
-            const int bundlesPerOptimizationRegion = 4;
+            const int bundlesPerOptimizationRegion = 1024;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
             const int regionsPerConstraintOptimizationIteration = 1;
-            int constraintOptimizationIterations = 16384;
+            int constraintOptimizationIterations = 183;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            //simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
+            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             //testOptimizer.Update(1, 1, simulation.BufferPool);
             timer.Restart();

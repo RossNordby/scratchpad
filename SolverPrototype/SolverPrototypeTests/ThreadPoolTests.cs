@@ -9,18 +9,23 @@ namespace SolverPrototypeTests
 {
     public class NotQuiteAThreadDispatcher : IThreadDispatcher
     {
-        public int ThreadCount => 1;
+        public int ThreadCount { get; private set; }
+
+        public NotQuiteAThreadDispatcher(int threadCount)
+        {
+            ThreadCount = threadCount;
+        }
 
         BufferPool bufferPool = new BufferPool();
 
         public void DispatchWorkers(Action<int> workerBody)
         {
-            workerBody(0);
+            for (int i = 0; i < ThreadCount; ++i)
+                workerBody(i);
         }
 
         public BufferPool GetThreadMemoryPool(int workerIndex)
         {
-            Debug.Assert(workerIndex == 0);
             return bufferPool;
         }
     }
@@ -103,7 +108,7 @@ namespace SolverPrototypeTests
             //Calling thread does work. No reason to spin up another worker and block this one!
             DispatchThread(0);
             finished.WaitOne();
-            this.workerBody= null;
+            this.workerBody = null;
         }
 
         volatile bool disposed;
