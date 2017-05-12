@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.Memory;
+﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -64,7 +65,7 @@ namespace SolverPrototype.Constraints
         /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that needs to be updated in response to swaps.</param>
         /// <param name="bodyCount">Number of bodies in the body set.</param>
         /// <param name="pool">Pool to pull cache spans from.</param>
-        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool pool);
+        public abstract void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool pool, IThreadDispatcher threadDispatcher);
 
         public abstract void Initialize(BufferPool rawPool, int initialCapacityInBundles, int typeId);
         public abstract void Reset(BufferPool rawPool);
@@ -204,7 +205,7 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void CopyConstraintData(
+        protected static void CopyConstraintData(
              ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle, int sourceInner,
              ref TBodyReferences targetReferencesBundle, ref TPrestepData targetPrestepBundle, ref TAccumulatedImpulse targetAccumulatedBundle, int targetInner)
         {
@@ -215,6 +216,22 @@ namespace SolverPrototype.Constraints
             GatherScatter.CopyLane(ref sourcePrestepBundle, sourceInner, ref targetPrestepBundle, targetInner);
             GatherScatter.CopyLane(ref sourceAccumulatedBundle, sourceInner, ref targetAccumulatedBundle, targetInner);
         }
+        /// <summary>
+        /// Overwrites all the data in the target constraint slot with source data.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        protected static void Move(
+            ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
+            ref Buffer<TBodyReferences> bodyReferences, ref Buffer<TPrestepData> prestepData, ref Buffer<TAccumulatedImpulse> accumulatedImpulses,
+            ref Buffer<int> indexToHandle,
+            int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ConstraintLocation[] handlesToConstraints)
+        {
+            CopyConstraintData(
+                ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, sourceInner,
+                ref bodyReferences[targetBundle], ref prestepData[targetBundle], ref accumulatedImpulses[targetBundle], targetInner);
+            indexToHandle[targetIndex] = sourceHandle;
+            handlesToConstraints[sourceHandle].IndexInTypeBatch = targetIndex;
+        }
 
         /// <summary>
         /// Overwrites all the data in the target constraint slot with source data.
@@ -224,11 +241,8 @@ namespace SolverPrototype.Constraints
             ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
             int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ConstraintLocation[] handlesToConstraints)
         {
-            CopyConstraintData(
-                ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, sourceInner,
-                ref BodyReferences[targetBundle], ref PrestepData[targetBundle], ref AccumulatedImpulses[targetBundle], targetInner);
-            IndexToHandle[targetIndex] = sourceHandle;
-            handlesToConstraints[sourceHandle].IndexInTypeBatch = targetIndex;
+            Move(ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, ref BodyReferences, ref PrestepData, ref AccumulatedImpulses, ref IndexToHandle,
+                sourceInner, sourceHandle, targetBundle, targetInner, targetIndex, handlesToConstraints);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Move(int sourceBundle, int sourceInner, int sourceIndex, int targetBundle, int targetInner, int targetIndex,

@@ -60,9 +60,9 @@ namespace SolverPrototypeTests
                     constraintCount += simulation.Solver.Batches[i].TypeBatches[j].ConstraintCount;
                 }
             }
-            const int bundlesPerOptimizationRegion = 256;
+            const int bundlesPerOptimizationRegion = 1024;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
-            const int regionsPerConstraintOptimizationIteration = 8;
+            const int regionsPerConstraintOptimizationIteration = 1;
             int constraintOptimizationIterations = 361;
             //int constraintOptimizationIterations = Math.Max(16,
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
