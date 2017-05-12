@@ -71,7 +71,7 @@ namespace BEPUutilities2.Memory
         }
 
         /// <summary>
-        /// Creates a typed region from the raw buffer with the largest capacity that can fit within the 
+        /// Creates a typed region from the raw buffer with the largest capacity that can fit within the allocated bytes.
         /// </summary>
         /// <typeparam name="T">Type of the buffer.</typeparam>
         /// <returns>Typed buffer of maximum extent within the current raw buffer.</returns>

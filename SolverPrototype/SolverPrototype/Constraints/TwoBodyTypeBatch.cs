@@ -153,211 +153,35 @@ namespace SolverPrototype.Constraints
             //Especially incremental ones, like the refinement we use in the dynamic BVH broadphase.
         }
 
-        struct Phase1
+
+        internal sealed override void GenerateSortKeysAndCopyReferences(
+            int bundleStart, int localBundleStart, int bundleCount,
+            int constraintStart, int localConstraintStart, int constraintCount,
+            ref int firstSortKey, ref int firstSourceIndex, ref RawBuffer bodyReferencesCache)
         {
-            public Buffer<int> SortKeys;
-            public Buffer<int> SourceIndices;
-            public Buffer<TwoBodyReferences> BodyReferences;
-            public Buffer<TwoBodyReferences> BodyReferencesCache;
-            public int SourceStartBundleIndex;
-            public int BundlesPerWorker;
-            public int BundlesPerWorkerRemainder;
-            public int TypeBatchConstraintCount;
-        }
-        Phase1 phase1;
-        void GenerateSortKeys(int workerIndex)
-        {
-            var localWorkerBundleStart = phase1.BundlesPerWorker * workerIndex + Math.Min(workerIndex, phase1.BundlesPerWorkerRemainder);
-            var workerBundleStart = phase1.SourceStartBundleIndex + localWorkerBundleStart;
-            var workerBundleCount = workerIndex < phase1.BundlesPerWorkerRemainder ? phase1.BundlesPerWorker + 1 : phase1.BundlesPerWorker;
-            var workerConstraintStart = workerBundleStart << BundleIndexing.VectorShift;
-            //Note that the number of constraints we can iterate over is clamped by the type batch's constraint count. The last bundle may not be full.
-            var workerConstraintCount = Math.Min(phase1.TypeBatchConstraintCount - workerConstraintStart, workerBundleCount << BundleIndexing.VectorShift);
-            if (workerConstraintCount <= 0)
-                return; //No work remains.
-            var localWorkerConstraintStart = localWorkerBundleStart << BundleIndexing.VectorShift;
-            ref var firstSortKey = ref phase1.SortKeys[localWorkerConstraintStart];
-            ref var firstSourceIndex = ref phase1.SourceIndices[localWorkerConstraintStart];
-            for (int i = 0; i < workerConstraintCount; ++i)
+            for (int i = 0; i < constraintStart; ++i)
             {
-                Unsafe.Add(ref firstSourceIndex, i) = localWorkerConstraintStart + i;
-                Unsafe.Add(ref firstSortKey, i) = GetSortKey(workerConstraintStart + i, ref phase1.BodyReferences);
+                Unsafe.Add(ref firstSourceIndex, i) = localConstraintStart + i;
+                Unsafe.Add(ref firstSortKey, i) = GetSortKey(constraintStart + i, ref BodyReferences);
             }
-            phase1.BodyReferences.CopyTo(workerBundleStart, ref phase1.BodyReferencesCache, localWorkerBundleStart, workerBundleCount);
-        }
-        struct Phase2
-        {
-            public Buffer<int> SortedKeys; //This is only really stored for debug use.
-            public Buffer<int> SortedSourceIndices;
-            public Buffer<int> ScratchKeys;
-            public Buffer<int> ScratchValues;
-            public Buffer<int> IndexToHandle;
-            public Buffer<TPrestepData> PrestepData;
-            public Buffer<TAccumulatedImpulse> AccumulatesImpulses;
-            public Buffer<int> IndexToHandleCache;
-            public Buffer<TPrestepData> PrestepDataCache;
-            public Buffer<TAccumulatedImpulse> AccumulatesImpulsesCache;
-            public int KeyUpperBound;
-            public int ConstraintsInSortRegionCount;
-            //Note that these differ from phase 1- one of the threads is dedicated to a sort. These regard the remaining threads.
-            public int BundlesPerWorker;
-            public int BundlesPerWorkerRemainder;
-        }
-        Phase2 phase2;
-        IThreadDispatcher threadDispatcher;
-        ConstraintLocation[] handlesToConstraints;
-        void CopyToCacheAndSort(int workerIndex)
-        {
-            //Sorting only requires that the sort keys and indices be ready. Caching doesn't need to be done yet. 
-            //Given that the sort is already very fast and trying to independently multithread it is a bad idea, we'll just bundle it alongside
-            //the remaining cache copies. This phase is extremely memory bound and the sort likely won't match the copy duration, but there is no
-            //room for complicated schemes at these timescales (<150us). We just try to get as much benefit as we can with a few simple tricks.
-            //Most likely we won't get more than about 2.5x speedup on a computer with bandwidth/compute ratios similar to a 3770K with 1600mhz memory.
-            if (workerIndex == threadDispatcher.ThreadCount - 1)
-            {
-                LSBRadixSort.Sort<int, Buffer<int>, Buffer<int>>(
-                    ref phase1.SortKeys, ref phase1.SourceIndices,
-                    ref phase2.ScratchKeys, ref phase2.ScratchValues, 0, phase2.ConstraintsInSortRegionCount,
-                    phase2.KeyUpperBound, threadDispatcher.GetThreadMemoryPool(workerIndex),
-                    out phase2.SortedKeys, out phase2.SortedSourceIndices);
-            }
-            //Note that worker 0 still copies if there's only one thread in the pool. Mainly for debugging purposes.
-            if (threadDispatcher.ThreadCount == 1 || workerIndex < threadDispatcher.ThreadCount - 1)
-            {
-                var localWorkerBundleStart = phase2.BundlesPerWorker * workerIndex + Math.Min(workerIndex, phase2.BundlesPerWorkerRemainder);
-                var workerBundleStart = phase1.SourceStartBundleIndex + localWorkerBundleStart;
-                var workerBundleCount = workerIndex < phase2.BundlesPerWorkerRemainder ? phase2.BundlesPerWorker + 1 : phase2.BundlesPerWorker;
-                var workerConstraintStart = workerBundleStart << BundleIndexing.VectorShift;
-                //Note that the number of constraints we can iterate over is clamped by the type batch's constraint count. The last bundle may not be full.
-                var workerConstraintCount = Math.Min(phase1.TypeBatchConstraintCount - workerConstraintStart, workerBundleCount << BundleIndexing.VectorShift);
-                if (workerConstraintCount <= 0)
-                    return; //No work remains.
-                var localWorkerConstraintStart = localWorkerBundleStart << BundleIndexing.VectorShift;
-                phase2.IndexToHandle.CopyTo(workerConstraintStart, ref phase2.IndexToHandleCache, 0, workerConstraintCount);
-                phase2.PrestepData.CopyTo(workerBundleStart, ref phase2.PrestepDataCache, 0, workerBundleCount);
-                phase2.AccumulatesImpulses.CopyTo(workerBundleStart, ref phase2.AccumulatesImpulsesCache, 0, workerBundleCount);
-            }
+            var typedBodyReferencesCache = bodyReferencesCache.As<TwoBodyReferences>();
+            BodyReferences.CopyTo(bundleStart, ref typedBodyReferencesCache, localBundleStart, bundleCount);
         }
 
-        void Regather(int workerIndex)
+        internal override sealed void VerifySortRegion(int bundleStartIndex, int constraintCount, ref Buffer<int> sortedKeys, ref Buffer<int> sortedSourceIndices)
         {
-            var localWorkerBundleStart = phase1.BundlesPerWorker * workerIndex + Math.Min(workerIndex, phase1.BundlesPerWorkerRemainder);
-            var workerBundleStart = phase1.SourceStartBundleIndex + localWorkerBundleStart;
-            var workerBundleCount = workerIndex < phase1.BundlesPerWorkerRemainder ? phase1.BundlesPerWorker + 1 : phase1.BundlesPerWorker;
-            var workerConstraintStart = workerBundleStart << BundleIndexing.VectorShift;
-            //Note that the number of constraints we can iterate over is clamped by the type batch's constraint count. The last bundle may not be full.
-            var workerConstraintCount = Math.Min(phase1.TypeBatchConstraintCount - workerConstraintStart, workerBundleCount << BundleIndexing.VectorShift);
-            if (workerConstraintCount <= 0)
-                return; //No work remains.
-            var localWorkerConstraintStart = localWorkerBundleStart << BundleIndexing.VectorShift;
-            ref var firstSourceIndex = ref phase2.SortedSourceIndices[localWorkerConstraintStart];
-#if DEBUG
-            var previousKey = workerIndex > 0 && (workerConstraintCount > 0 || phase1.BundlesPerWorkerRemainder > 0) ?
-                phase2.SortedKeys[localWorkerConstraintStart - 1] :
-                -1;
-#endif
-            for (int i = 0; i < workerConstraintCount; ++i)
-            {
-                var sourceIndex = Unsafe.Add(ref firstSourceIndex, i);
-                var targetIndex = workerConstraintStart + i;
-                //Note that we do not bother checking whether the source and target are the same.
-                //The cost of the branch is large enough in comparison to the frequency of its usefulness that it only helps in practically static situations.
-                //Also, its maximum benefit is quite small.
-                BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
-                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-
-                Move(ref phase1.BodyReferencesCache[sourceBundle], ref phase2.PrestepDataCache[sourceBundle], ref phase2.AccumulatesImpulsesCache[sourceBundle],
-                    ref phase1.BodyReferences, ref phase2.PrestepData, ref phase2.AccumulatesImpulses, ref phase2.IndexToHandle,
-                    sourceInner, phase2.IndexToHandleCache[sourceIndex],
-                    targetBundle, targetInner, targetIndex, handlesToConstraints);
-
-#if DEBUG
-                var key = GetSortKey(workerConstraintStart + i, ref phase1.BodyReferences);
-                Debug.Assert(key > previousKey, "After a move, it should be sorted.");
-                Debug.Assert(key == phase2.SortedKeys[localWorkerConstraintStart + i],
-                    "Post-swap body reference derived sort keys should match the post-sorted keys.");
-                previousKey = key;
-#endif
-            }
-        }
-
-
-
-        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount,
-            BufferPool rawPool, IThreadDispatcher threadDispatcher)
-        {
-            int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
-            if ((constraintCount & BundleIndexing.VectorMask) != 0)
-                ++bundleCount;
-
-            var intPool = rawPool.SpecializeFor<int>();
-            intPool.Take(constraintCount, out phase1.SourceIndices);
-            intPool.Take(constraintCount, out phase1.SortKeys);
-            intPool.Take(constraintCount, out phase2.ScratchKeys);
-            intPool.Take(constraintCount, out phase2.ScratchValues);
-            intPool.Take(constraintCount, out phase2.IndexToHandleCache);
-            rawPool.SpecializeFor<TwoBodyReferences>().Take(bundleCount, out phase1.BodyReferencesCache);
-            rawPool.SpecializeFor<TPrestepData>().Take(bundleCount, out phase2.PrestepDataCache);
-            rawPool.SpecializeFor<TAccumulatedImpulse>().Take(bundleCount, out phase2.AccumulatesImpulsesCache);
-
-            phase1.BodyReferences = BodyReferences;
-            phase2.AccumulatesImpulses = AccumulatedImpulses;
-            phase2.PrestepData = PrestepData;
-            phase2.IndexToHandle = IndexToHandle;
-
-            phase1.BundlesPerWorker = bundleCount / threadDispatcher.ThreadCount;
-            phase1.BundlesPerWorkerRemainder = bundleCount - phase1.BundlesPerWorker * threadDispatcher.ThreadCount;
-            phase1.TypeBatchConstraintCount = this.constraintCount;
-            phase1.SourceStartBundleIndex = bundleStartIndex;
-
-            //The second phase uses one worker to sort.
-            if (threadDispatcher.ThreadCount > 1)
-            {
-                phase2.BundlesPerWorker = bundleCount / (threadDispatcher.ThreadCount - 1);
-                phase2.BundlesPerWorkerRemainder = bundleCount - phase2.BundlesPerWorker * (threadDispatcher.ThreadCount - 1);
-            }
-            else
-            {
-                //We allow one-thread execution for ease of debugging.
-                phase2.BundlesPerWorker = bundleCount;
-                phase2.BundlesPerWorkerRemainder = 0;
-            }
-            phase2.ConstraintsInSortRegionCount = constraintCount;
-            phase2.KeyUpperBound = bodyCount - 1;
-
-            this.threadDispatcher = threadDispatcher;
-            this.handlesToConstraints = handlesToConstraints;
-
-            threadDispatcher.DispatchWorkers(GenerateSortKeys);
-            threadDispatcher.DispatchWorkers(CopyToCacheAndSort);
-            threadDispatcher.DispatchWorkers(Regather);
-
-            this.threadDispatcher = null;
-            this.handlesToConstraints = null;
-
-#if DEBUG
             var previousKey = -1;
-            var baseIndex = phase1.SourceStartBundleIndex << BundleIndexing.VectorShift;
+            var baseIndex = bundleStartIndex << BundleIndexing.VectorShift;
             for (int i = 0; i < constraintCount; ++i)
             {
-                var sourceIndex = phase2.SortedSourceIndices[i];
+                var sourceIndex = sortedSourceIndices[i];
                 var targetIndex = baseIndex + i;
                 var key = GetSortKey(baseIndex + i, ref BodyReferences);
                 Debug.Assert(key > previousKey, "After the sort and swap completes, all constraints should be in order.");
-                Debug.Assert(key == phase2.SortedKeys[i], "After the swap goes through, the rederived sort keys should match the previously sorted ones.");
+                Debug.Assert(key == sortedKeys[i], "After the swap goes through, the rederived sort keys should match the previously sorted ones.");
                 previousKey = key;
 
             }
-#endif
-
-            intPool.Return(ref phase1.SourceIndices);
-            intPool.Return(ref phase1.SortKeys);
-            intPool.Return(ref phase2.ScratchKeys);
-            intPool.Return(ref phase2.ScratchValues);
-            intPool.Return(ref phase2.IndexToHandleCache);
-            rawPool.SpecializeFor<TwoBodyReferences>().Return(ref phase1.BodyReferencesCache);
-            rawPool.SpecializeFor<TPrestepData>().Return(ref phase2.PrestepDataCache);
-            rawPool.SpecializeFor<TAccumulatedImpulse>().Return(ref phase2.AccumulatesImpulsesCache);
         }
 
         //        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool rawPool)
