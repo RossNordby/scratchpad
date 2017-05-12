@@ -174,11 +174,11 @@ namespace SolverPrototype.Constraints
             int constraintStart, int localConstraintStart, int constraintCount,
             ref Buffer<int> indexToHandleCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache)
         {
-            IndexToHandle.CopyTo(constraintStart, ref indexToHandleCache, 0, constraintCount);
+            IndexToHandle.CopyTo(constraintStart, ref indexToHandleCache, localConstraintStart, constraintCount);
             var typedPrestepCache = prestepCache.As<TPrestepData>();
             var typedAccumulatedImpulsesCache = accumulatedImpulsesCache.As<TAccumulatedImpulse>();
-            PrestepData.CopyTo(bundleStart, ref typedPrestepCache, 0, bundleCount);
-            AccumulatedImpulses.CopyTo(bundleStart, ref typedAccumulatedImpulsesCache, 0, bundleCount);
+            PrestepData.CopyTo(bundleStart, ref typedPrestepCache, localBundleStart, bundleCount);
+            AccumulatedImpulses.CopyTo(bundleStart, ref typedAccumulatedImpulsesCache, localBundleStart, bundleCount);
         }
 
 
@@ -221,77 +221,6 @@ namespace SolverPrototype.Constraints
 
             }
         }
-
-        //        public override sealed void SortByBodyLocation(int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount, BufferPool rawPool)
-        //        {
-        //            int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
-        //            if ((constraintCount & BundleIndexing.VectorMask) != 0)
-        //                ++bundleCount;
-
-        //            var intPool = rawPool.SpecializeFor<int>();
-        //            intPool.Take(constraintCount, out var inputSourceIndices);
-        //            intPool.Take(constraintCount, out var sortKeys);
-        //            intPool.Take(constraintCount, out var scratchValues);
-        //            intPool.Take(constraintCount, out var scratchKeys);
-        //            intPool.Take(constraintCount, out var handlesCache);
-        //            rawPool.SpecializeFor<TwoBodyReferences>().Take(bundleCount, out var referencesCache);
-        //            rawPool.SpecializeFor<TPrestepData>().Take(bundleCount, out var prestepCache);
-        //            rawPool.SpecializeFor<TAccumulatedImpulse>().Take(bundleCount, out var accumulatedImpulseCache);
-
-        //            //Cache the unsorted data.
-        //            BodyReferences.CopyTo(bundleStartIndex, ref referencesCache, 0, bundleCount);
-        //            PrestepData.CopyTo(bundleStartIndex, ref prestepCache, 0, bundleCount);
-        //            AccumulatedImpulses.CopyTo(bundleStartIndex, ref accumulatedImpulseCache, 0, bundleCount);
-        //            IndexToHandle.CopyTo(bundleStartIndex * Vector<int>.Count, ref handlesCache, 0, constraintCount);
-
-        //            //First, compute the proper order of the constraints in this region by sorting their keys.
-        //            //This minimizes the number of swaps that must be applied to the actual bundle data.
-        //            //Avoiding swaps of actual data is very valuable- a single constraint can be hundreds of bytes, and the accesses to a slot tend to require some complex addressing.
-        //            var baseIndex = bundleStartIndex * Vector<int>.Count;
-        //            for (int i = 0; i < constraintCount; ++i)
-        //            {
-        //                inputSourceIndices[i] = i;
-        //                sortKeys[i] = GetSortKey(baseIndex + i, ref BodyReferences);
-        //            }
-
-        //            LSBRadixSort.Sort<int, Buffer<int>, Buffer<int>>(ref sortKeys, ref inputSourceIndices, ref scratchKeys, ref scratchValues, 0, constraintCount, bodyCount - 1, rawPool,
-        //                out var sortedKeys, out var sortedSourceIndices);
-
-        //            //Push the cached data into its proper sorted position.
-        //#if DEBUG
-        //            var previousKey = -1;
-        //#endif
-        //            for (int i = 0; i < constraintCount; ++i)
-        //            {
-        //                var sourceIndex = sortedSourceIndices[i];
-        //                var targetIndex = baseIndex + i;
-        //                //Note that we do not bother checking whether the source and target are the same.
-        //                //The cost of the branch is large enough in comparison to the frequency of its usefulness that it only helps in practically static situations.
-        //                //Also, its maximum benefit is quite small.
-        //                BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
-        //                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
-
-        //                Move(ref referencesCache[sourceBundle], ref prestepCache[sourceBundle], ref accumulatedImpulseCache[sourceBundle],
-        //                    sourceInner, handlesCache[sourceIndex],
-        //                    targetBundle, targetInner, targetIndex, handlesToConstraints);
-
-        //#if DEBUG
-        //                var key = GetSortKey(baseIndex + i);
-        //                Debug.Assert(key > previousKey, "After the sort and swap completes, all constraints should be in order.");
-        //                Debug.Assert(key == sortedKeys[i], "After the swap goes through, the rederived sort keys should match the previously sorted ones.");
-        //                previousKey = key;
-        //#endif
-        //            }
-
-        //            intPool.Return(ref inputSourceIndices);
-        //            intPool.Return(ref sortKeys);
-        //            intPool.Return(ref scratchKeys);
-        //            intPool.Return(ref scratchValues);
-        //            intPool.Return(ref handlesCache);
-        //            rawPool.SpecializeFor<TwoBodyReferences>().Return(ref referencesCache);
-        //            rawPool.SpecializeFor<TPrestepData>().Return(ref prestepCache);
-        //            rawPool.SpecializeFor<TAccumulatedImpulse>().Return(ref accumulatedImpulseCache);
-        //        }
 
     }
 }

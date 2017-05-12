@@ -26,9 +26,8 @@ namespace SolverPrototypeTests
             SimulationSetup.ScrambleBodyConstraintLists(simulation);
             //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
-            //var threadPool = new TPLPool(8);
-            var threadPool = new SimpleThreadDispatcher(8);
-            //var threadPool = new NotQuiteAThreadDispatcher(8);
+            var threadDispatcher = new SimpleThreadDispatcher(8);
+            //var threadDispatcher = new NotQuiteAThreadDispatcher(8);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 1;
@@ -79,43 +78,18 @@ namespace SolverPrototypeTests
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);//prejit
+            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadDispatcher);//prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             //testOptimizer.Update(1, 1, simulation.BufferPool);
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadPool);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadDispatcher);
 
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
-     
-
-            for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
-            {
-                var batch = simulation.Solver.Batches[batchIndex];
-                for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
-                {
-                    var typeBatch = (ContactManifold4TypeBatch)batch.TypeBatches[typeBatchIndex];
-                    int[] sortKeys = new int[typeBatch.ConstraintCount];
-                    int previous = -1;
-                    Console.WriteLine($"Batch {batchIndex}, type batch {typeBatchIndex}: ");
-                    for (int i = 0; i < sortKeys.Length; ++i)
-                    {
-                        sortKeys[i] = ContactManifold4TypeBatch.GetSortKey(i, ref typeBatch.BodyReferences);
-                        if (sortKeys[i] <= previous)
-                        {
-                            Console.WriteLine("Not sorted!");
-                        }
-                        previous = sortKeys[i];
-                        //Console.Write($"{sortKeys[i]}, ");
-                    }
-                    Console.WriteLine();
-                }
-            }
-            return;
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
@@ -130,7 +104,7 @@ namespace SolverPrototypeTests
             timer.Reset();
 
             //var threadPool = new NotQuiteAThreadPool();
-            Console.WriteLine($"Using {threadPool.ThreadCount} workers.");
+            Console.WriteLine($"Using {threadDispatcher.ThreadCount} workers.");
             double solveTime = 0;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
@@ -204,7 +178,7 @@ namespace SolverPrototypeTests
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
@@ -216,6 +190,7 @@ namespace SolverPrototypeTests
             Console.WriteLine($"Solve time (ms): {1e3 * solveTime}");
 
 
+            threadDispatcher.Dispose();
             simulation.BufferPool.Clear();
 
         }
