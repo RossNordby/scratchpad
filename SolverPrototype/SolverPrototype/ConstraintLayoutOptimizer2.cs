@@ -100,15 +100,18 @@ namespace SolverPrototype
         Optimization FindOffsetFrameStart(Optimization o, int maximumRegionSizeInBundles)
         {
             BoundsCheckOldTarget(ref o);
-
-            var typeBatch = solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex];
-            var spaceRemaining = typeBatch.BundleCount - o.BundleIndex;
+            
+            var spaceRemaining = solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].BundleCount - o.BundleIndex;
             if (spaceRemaining <= maximumRegionSizeInBundles)
             {
                 ++o.TypeBatchIndex;
                 WrapTypeBatch(ref o);
             }
-            o.BundleIndex = Math.Max(0, Math.Min(o.BundleIndex + maximumRegionSizeInBundles / 2, typeBatch.BundleCount - maximumRegionSizeInBundles));
+            //Note that the bundle count is not cached; the above type batch may differ.
+            o.BundleIndex = Math.Max(0, 
+                Math.Min(
+                    o.BundleIndex + maximumRegionSizeInBundles / 2, 
+                    solver.Batches[o.BatchIndex].TypeBatches[o.TypeBatchIndex].BundleCount - maximumRegionSizeInBundles));
 
             return o;
         }
@@ -149,7 +152,7 @@ namespace SolverPrototype
             var maximumRegionSizeInConstraints = maximumRegionSizeInBundles * Vector<int>.Count;
 
             var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
-            typeBatch.SortByBodyLocation(target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints),
+            SortByBodyLocation(typeBatch, target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints),
                 solver.HandlesToConstraints, bodies.BodyCount, rawPool, threadDispatcher);
 
         }
@@ -229,9 +232,11 @@ namespace SolverPrototype
                 if (workerConstraintCount <= 0)
                     return; //No work remains.
                 var localWorkerConstraintStart = localWorkerBundleStart << BundleIndexing.VectorShift;
-                phase2.IndexToHandle.CopyTo(workerConstraintStart, ref phase2.IndexToHandleCache, 0, workerConstraintCount);
-                phase2.PrestepData.CopyTo(workerBundleStart, ref phase2.PrestepDataCache, 0, workerBundleCount);
-                phase2.AccumulatesImpulses.CopyTo(workerBundleStart, ref phase2.AccumulatesImpulsesCache, 0, workerBundleCount);
+
+                typeBatch.CopyToCache(
+                    workerBundleStart, localWorkerBundleStart, workerBundleCount,
+                    workerConstraintStart, localWorkerConstraintStart, workerConstraintCount,
+                    ref phase2.IndexToHandleCache, ref phase2.PrestepDataCache, ref phase2.AccumulatesImpulsesCache);
             }
         }
 
@@ -247,37 +252,13 @@ namespace SolverPrototype
                 return; //No work remains.
             var localWorkerConstraintStart = localWorkerBundleStart << BundleIndexing.VectorShift;
             ref var firstSourceIndex = ref phase2.SortedSourceIndices[localWorkerConstraintStart];
-#if DEBUG
-            var previousKey = workerIndex > 0 && (workerConstraintCount > 0 || phase1.BundlesPerWorkerRemainder > 0) ?
-                phase2.SortedKeys[localWorkerConstraintStart - 1] :
-                -1;
-#endif
-            for (int i = 0; i < workerConstraintCount; ++i)
-            {
-                var sourceIndex = Unsafe.Add(ref firstSourceIndex, i);
-                var targetIndex = workerConstraintStart + i;
-                //Note that we do not bother checking whether the source and target are the same.
-                //The cost of the branch is large enough in comparison to the frequency of its usefulness that it only helps in practically static situations.
-                //Also, its maximum benefit is quite small.
-                BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
-                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
 
-                Move(ref phase1.BodyReferencesCache[sourceBundle], ref phase2.PrestepDataCache[sourceBundle], ref phase2.AccumulatesImpulsesCache[sourceBundle],
-                    ref phase1.BodyReferences, ref phase2.PrestepData, ref phase2.AccumulatesImpulses, ref phase2.IndexToHandle,
-                    sourceInner, phase2.IndexToHandleCache[sourceIndex],
-                    targetBundle, targetInner, targetIndex, handlesToConstraints);
+            typeBatch.Regather(workerConstraintStart, workerConstraintCount, ref firstSourceIndex, 
+                ref phase2.IndexToHandleCache, ref phase1.BodyReferencesCache, ref phase2.PrestepDataCache, ref phase2.AccumulatesImpulsesCache, handlesToConstraints);
 
-#if DEBUG
-                var key = GetSortKey(workerConstraintStart + i, ref phase1.BodyReferences);
-                Debug.Assert(key > previousKey, "After a move, it should be sorted.");
-                Debug.Assert(key == phase2.SortedKeys[localWorkerConstraintStart + i],
-                    "Post-swap body reference derived sort keys should match the post-sorted keys.");
-                previousKey = key;
-#endif
-            }
         }
 
-
+       
 
         void SortByBodyLocation(TypeBatch typeBatch, int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount,
             BufferPool rawPool, IThreadDispatcher threadDispatcher)
@@ -335,7 +316,6 @@ namespace SolverPrototype
 
             //This is a pure debug function.
             typeBatch.VerifySortRegion(bundleStartIndex, constraintCount, ref phase2.SortedKeys, ref phase2.SortedSourceIndices);
-
 
             intPool.Return(ref phase1.SourceIndices);
             intPool.Return(ref phase1.SortKeys);

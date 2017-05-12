@@ -57,12 +57,21 @@ namespace SolverPrototype.Constraints
 
         public abstract void Scramble(Random random, ConstraintLocation[] handlesToConstraints);
 
-        internal abstract GetBundleTypeSizes(out int bodyReferencesBundleSize, out int prestepBundleSize, out int accumulatedImpulseBundleSize);
+        internal abstract void GetBundleTypeSizes(out int bodyReferencesBundleSize, out int prestepBundleSize, out int accumulatedImpulseBundleSize);
 
         internal abstract void GenerateSortKeysAndCopyReferences(
             int bundleStart, int localBundleStart, int bundleCount,
             int constraintStart, int localConstraintStart, int constraintCount,
             ref int firstSortKey, ref int firstSourceIndex, ref RawBuffer bodyReferencesCache);
+
+        internal abstract void CopyToCache(
+            int bundleStart, int localBundleStart, int bundleCount,
+            int constraintStart, int localConstraintStart, int constraintCount,
+            ref Buffer<int> indexToHandleCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache);
+
+        internal abstract void Regather(int constraintStart, int constraintCount, ref int firstSourceIndex,
+           ref Buffer<int> indexToHandleCache, ref RawBuffer bodyReferencesCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache,
+            ConstraintLocation[] handlesToConstraints);
 
         [Conditional("DEBUG")]
         internal abstract void VerifySortRegion(int bundleStartIndex, int constraintCount, ref Buffer<int> sortedKeys, ref Buffer<int> sortedSourceIndices);
@@ -73,7 +82,7 @@ namespace SolverPrototype.Constraints
         public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle);
         public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle);
         public abstract void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle);
-                
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt)
         {
@@ -91,7 +100,7 @@ namespace SolverPrototype.Constraints
             SolveIteration(bodyVelocities, 0, bundleCount);
         }
 
-    
+
     }
     //You are allowed to squint at this triple-class separation.
     //This is only really here because there are cases (e.g. adding a constraint) where it is necessary to have knowledge of TBodyReferences so that the caller (the solver, generally)
@@ -422,7 +431,7 @@ namespace SolverPrototype.Constraints
             AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
             IndexToHandle = new Buffer<int>();
         }
-        
+
         internal sealed override void GetBundleTypeSizes(out int bodyReferencesBundleSize, out int prestepBundleSize, out int accumulatedImpulseBundleSize)
         {
             bodyReferencesBundleSize = Unsafe.SizeOf<TBodyReferences>();

@@ -159,13 +159,51 @@ namespace SolverPrototype.Constraints
             int constraintStart, int localConstraintStart, int constraintCount,
             ref int firstSortKey, ref int firstSourceIndex, ref RawBuffer bodyReferencesCache)
         {
-            for (int i = 0; i < constraintStart; ++i)
+            for (int i = 0; i < constraintCount; ++i)
             {
                 Unsafe.Add(ref firstSourceIndex, i) = localConstraintStart + i;
                 Unsafe.Add(ref firstSortKey, i) = GetSortKey(constraintStart + i, ref BodyReferences);
             }
             var typedBodyReferencesCache = bodyReferencesCache.As<TwoBodyReferences>();
             BodyReferences.CopyTo(bundleStart, ref typedBodyReferencesCache, localBundleStart, bundleCount);
+        }
+
+
+        internal sealed override void CopyToCache(
+            int bundleStart, int localBundleStart, int bundleCount,
+            int constraintStart, int localConstraintStart, int constraintCount,
+            ref Buffer<int> indexToHandleCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache)
+        {
+            IndexToHandle.CopyTo(constraintStart, ref indexToHandleCache, 0, constraintCount);
+            var typedPrestepCache = prestepCache.As<TPrestepData>();
+            var typedAccumulatedImpulsesCache = accumulatedImpulsesCache.As<TAccumulatedImpulse>();
+            PrestepData.CopyTo(bundleStart, ref typedPrestepCache, 0, bundleCount);
+            AccumulatedImpulses.CopyTo(bundleStart, ref typedAccumulatedImpulsesCache, 0, bundleCount);
+        }
+
+
+        internal sealed override void Regather(int constraintStart, int constraintCount, ref int firstSourceIndex,
+            ref Buffer<int> indexToHandleCache, ref RawBuffer bodyReferencesCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache,
+            ConstraintLocation[] handlesToConstraints)
+        {
+            var typedBodyReferencesCache = bodyReferencesCache.As<TwoBodyReferences>();
+            var typedPrestepCache = prestepCache.As<TPrestepData>();
+            var typedAccumulatedImpulsesCache = accumulatedImpulsesCache.As<TAccumulatedImpulse>();
+            for (int i = 0; i < constraintCount; ++i)
+            {
+                var sourceIndex = Unsafe.Add(ref firstSourceIndex, i);
+                var targetIndex = constraintStart + i;
+                //Note that we do not bother checking whether the source and target are the same.
+                //The cost of the branch is large enough in comparison to the frequency of its usefulness that it only helps in practically static situations.
+                //Also, its maximum benefit is quite small.
+                BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
+                BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
+
+                Move(ref typedBodyReferencesCache[sourceBundle], ref typedPrestepCache[sourceBundle], ref typedAccumulatedImpulsesCache[sourceBundle],
+                    sourceInner, indexToHandleCache[sourceIndex],
+                    targetBundle, targetInner, targetIndex, handlesToConstraints);
+
+            }
         }
 
         internal override sealed void VerifySortRegion(int bundleStartIndex, int constraintCount, ref Buffer<int> sortedKeys, ref Buffer<int> sortedSourceIndices)
