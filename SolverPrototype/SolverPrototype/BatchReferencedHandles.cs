@@ -70,7 +70,7 @@ namespace SolverPrototype
                 //and not trying to reuse them just saves some complexity.
                 //Also note that we go ahead and jump to the next higher power of 2 rather than exactly matching the handle index. Avoids pointless resizing.
                 //(Any waste is, again, basically ignorable.)
-                Array.Resize(ref packedHandles, 1 << SpanHelper.GetContainingPowerOf2(handleIndex));
+                Array.Resize(ref packedHandles, 1 << SpanHelper.GetContainingPowerOf2(bundleIndex + 1));
             }
             ref var bundle = ref packedHandles[bundleIndex];
             var slot = 1ul << (handleIndex & mask);

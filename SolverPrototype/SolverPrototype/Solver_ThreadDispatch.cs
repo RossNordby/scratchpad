@@ -238,7 +238,9 @@ namespace SolverPrototype
                     break;
                 }
             }
+            Debug.Assert(bounds.Max <= batchEnd);
             MergeWorkerBounds(ref bounds, ref allWorkerBounds, workerIndex);
+            Debug.Assert(bounds.Max <= batchEnd);
             return highestLocallyClaimedIndex;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -366,6 +368,7 @@ namespace SolverPrototype
                 //Just assume the min will be claimed. There's a chance the thread will get preempted or the value will be read before it's actually claimed, but 
                 //that's a very small risk and doesn't affect long-term correctness. (It would just somewhat reduce workstealing effectiveness, and so performance.)
                 bounds.Min = blockIndex;
+                Debug.Assert(bounds.Max <= batchEnd);
 
                 //Note that initialization guarantees a start index in the batch; no test required.
                 //Note that we track the largest contiguous region over the course of the stage execution. The batch start of this worker will be set to the 
@@ -373,6 +376,7 @@ namespace SolverPrototype
                 Debug.Assert(batchStart <= blockIndex && batchEnd > blockIndex);
                 var highestLocalClaim = TraverseForwardUntilBlocked(ref stageFunction, blockIndex, ref bounds, ref allWorkerBounds, workerIndex, batchEnd, claimedState, unclaimedState);
 
+                Debug.Assert(bounds.Max <= batchEnd);
                 //By now, we've reached the end of the contiguous region in the forward direction. Try walking the other way.
                 blockIndex = workerStart - 1;
                 //Note that there is no guarantee that the block will be in the batch- this could be the leftmost worker.
@@ -385,6 +389,7 @@ namespace SolverPrototype
                 {
                     lowestLocalClaim = batchStart;
                 }
+                Debug.Assert(bounds.Max <= batchEnd);
                 //These are actually two inclusive bounds, so this is count - 1, but as long as we're consistent it's fine.
                 //For this first region, we need to check that it's actually a valid region- if the claims were blocked, it might not be.
                 var largestContiguousRegionSize = highestLocalClaim - lowestLocalClaim;
@@ -407,6 +412,7 @@ namespace SolverPrototype
                         workerStart = lowestLocalClaim;
                         largestContiguousRegionSize = regionSize;
                     }
+                    Debug.Assert(bounds.Max <= batchEnd);
                 }
 
                 //Traverse backwards.
@@ -423,14 +429,17 @@ namespace SolverPrototype
                         workerStart = lowestLocalClaim;
                         largestContiguousRegionSize = regionSize;
                     }
+                    Debug.Assert(bounds.Max <= batchEnd);
                 }
 
                 Debug.Assert(bounds.Min == batchStart && bounds.Max == batchEnd);
 
-                //Clear the previous bounds array before the sync so the next stage has fresh data.
-                previousWorkerBounds[workerIndex].Min = int.MaxValue;
-                previousWorkerBounds[workerIndex].Max = int.MinValue;
             }
+            //Clear the previous bounds array before the sync so the next stage has fresh data.
+            //Note that this clear is unconditional- the previous worker data must be cleared out or trash data may find its way into the next stage.
+            previousWorkerBounds[workerIndex].Min = int.MaxValue;
+            previousWorkerBounds[workerIndex].Max = int.MinValue;
+
             InterstageSync(ref syncStage);
             //Swap the bounds buffers being used before proceeding.
             var tempWorkerBounds = allWorkerBounds;
@@ -584,8 +593,9 @@ namespace SolverPrototype
             context.BlockClaims.Clear(0, context.WorkBlocks.Count);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsA);
             bufferPool.SpecializeFor<WorkerBounds>().Take(workerCount, out context.WorkerBoundsB);
-            //The worker bounds for A should be initialized to avoid trash interval data from messing up the workstealing.
-            for (int i =0; i < workerCount; ++i)
+            //The worker bounds front buffer should be initialized to avoid trash interval data from messing up the workstealing.
+            //The worker bounds back buffer will be cleared by the worker before moving on to the next stage.
+            for (int i = 0; i < workerCount; ++i)
             {
                 context.WorkerBoundsA[i] = new WorkerBounds { Min = int.MaxValue, Max = int.MinValue };
             }

@@ -62,8 +62,13 @@ namespace SolverPrototype
         }
 
         //Note that these lists do not contain any valid information between frames- they only exist for the duration of the optimization.
-        Buffer<Compression> compressions;
-        QuickList<AnalysisRegion, Buffer<AnalysisRegion>> workerRegions;
+        struct WorkerContext
+        {
+            public QuickList<Compression, Buffer<Compression>> Compressions;
+            public AnalysisRegion Region;
+        }
+        //Note that we allocate all of the contexts and their compressions on demand. It's all pointer backed, so there's no worries about GC reference tracing.
+        Buffer<WorkerContext> workerContexts;
         /// <summary>
         /// Gets or sets the maximum number of constraint moves that can occur in a single execution of Compress.
         /// </summary>
@@ -115,14 +120,14 @@ namespace SolverPrototype
         int compressionsCount;
         unsafe void AnalysisWorker(int workerId)
         {
-            ref var region = ref workerRegions[workerId];
+            ref var context = ref workerContexts[workerId];
             var batch = Solver.Batches[nextBatchIndex];
-            var typeBatchIndex = region.Start.TypeBatchIndex;
+            var typeBatchIndex = context.Region.Start.TypeBatchIndex;
             var typeBatch = batch.TypeBatches[typeBatchIndex];
-            var indexInTypeBatch = region.Start.StartIndexInTypeBatch;
+            var indexInTypeBatch = context.Region.Start.StartIndexInTypeBatch;
 
             //This region may cover multiple type batches. Each iteration goes up to either the constraint count, or the end of the current type batch.
-            var remainder = region.ConstraintCount;
+            var remainder = context.Region.ConstraintCount;
             while (remainder > 0)
             {
                 var availableConstraints = Math.Min(remainder, typeBatch.ConstraintCount - indexInTypeBatch);
@@ -152,11 +157,14 @@ namespace SolverPrototype
                             //Note that we don't add it if the new index would put the total number of compression targets above the maximum for this pass.
                             //We might have wasted some time getting to this point, but in practice, that doesn't really matter so long as compressions are rare relative
                             //to analysis.
-                            var newIndex = Interlocked.Increment(ref compressionsCount) - 1;
-                            if (newIndex >= MaximumCompressionCount)
+                            if (Interlocked.Increment(ref compressionsCount) > MaximumCompressionCount)
                                 return;
                             //Note that we build the compressions list with a maximum sized backing array. Don't have to worry about resizing.
-                            compressions[newIndex] = new Compression { IndexInTypeBatch = i, TargetBatch = batchIndex, TypeBatchIndex = typeBatchIndex };
+                            //IMPORTANT: The compression lists must be created per worker. The order of elements in the compressions lists are important.
+                            //The compression-application phase will iterate over the workers in order. Since the analysis regions were created in order,
+                            //and because the workers generate compressions in order, the application phase has a fully ordered list of compressions.
+                            //This is required to avoid early compressions invalidating later compression targets.
+                            context.Compressions.AddUnsafely(new Compression { IndexInTypeBatch = i, TargetBatch = batchIndex, TypeBatchIndex = typeBatchIndex });
                             break;
                         }
                     }
@@ -182,10 +190,11 @@ namespace SolverPrototype
         /// </summary>
         void ScheduleAnalysisRegions(int workerCount, BufferPool rawPool)
         {
-            QuickList<AnalysisRegion, Buffer<AnalysisRegion>>.Create(rawPool.SpecializeFor<AnalysisRegion>(), workerCount, out workerRegions);
-            rawPool.SpecializeFor<Compression>().Take(MaximumCompressionCount, out compressions);
-            compressionsCount = 0;
-            workerRegions.Count = workerCount;
+            rawPool.SpecializeFor<WorkerContext>().Take(workerCount, out workerContexts);
+            for (int i = 0; i < workerCount; ++i)
+            {
+                QuickList<Compression, Buffer<Compression>>.Create(rawPool.SpecializeFor<Compression>(), MaximumCompressionCount, out workerContexts[i].Compressions);
+            }
 
             //In any given compression attempt, we only optimize over one ConstraintBatch.
             //This provides a guarantee that every optimization that occurs over the course of the compression
@@ -254,10 +263,10 @@ namespace SolverPrototype
             //var DEBUGTotalConstraintsAnalyzed = 0;
             for (int i = 0; i < workerCount; ++i)
             {
-                ref var region = ref workerRegions[i];
-                region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
-                region.Start = nextTarget;
-                nextTarget.StartIndexInTypeBatch += region.ConstraintCount;
+                ref var context = ref workerContexts[i];
+                context.Region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
+                context.Region.Start = nextTarget;
+                nextTarget.StartIndexInTypeBatch += context.Region.ConstraintCount;
                 //DEBUGTotalConstraintsAnalyzed += region.ConstraintCount;
             }
 
@@ -272,24 +281,31 @@ namespace SolverPrototype
         /// <summary>
         /// Applies the set of compressions found in the previous call to FindCompressions.
         /// </summary>
-        void ApplyCompressions(BufferPool rawPool)
+        void ApplyCompressions(int workerCount, BufferPool rawPool)
         {
             //Walk the list of workers in reverse order. We assume here that each worker has generated its results in low to high order as well.
             //So, by walking backwards sequentially, we ensure that early removals will not interfere with later removals 
             //because removals take the last element and pull it into the removed slot, leaving the earlier section of the arrays untouched.
             var sourceBatch = Solver.Batches[nextBatchIndex];
-            for (int j = compressionsCount - 1; j >= 0; --j)
+            for (int i = workerCount - 1; i >= 0; --i)
             {
-                ref var compression = ref compressions[j];
-                //Note that we do not simply remove and re-add the constraint; while that would work, it would redo a lot of work that isn't necessary.
-                //Instead, since we already know exactly where the constraint is and what constraint batch it should go to, we can avoid a lot of abstractions
-                //and do more direct copies.
-                sourceBatch.TypeBatches[compression.TypeBatchIndex].TransferConstraint(
-                    nextBatchIndex, compression.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
+                ref var context = ref workerContexts[i];
+                for (int j = context.Compressions.Count - 1; j >= 0; --j)
+                {
+                    ref var compression = ref context.Compressions[j];
+                    //Note that we do not simply remove and re-add the constraint; while that would work, it would redo a lot of work that isn't necessary.
+                    //Instead, since we already know exactly where the constraint is and what constraint batch it should go to, we can avoid a lot of abstractions
+                    //and do more direct copies.
+                    sourceBatch.TypeBatches[compression.TypeBatchIndex].TransferConstraint(
+                        nextBatchIndex, compression.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
+                }
             }
 
-            rawPool.SpecializeFor<Compression>().Return(ref compressions);
-            workerRegions.Dispose(rawPool.SpecializeFor<AnalysisRegion>());
+            for (int i = 0; i < workerCount; ++i)
+            {
+                workerContexts[i].Compressions.Dispose(rawPool.SpecializeFor<Compression>());
+            }
+            rawPool.SpecializeFor<WorkerContext>().Return(ref workerContexts);
         }
 
         /// <summary>
@@ -298,21 +314,21 @@ namespace SolverPrototype
         /// </summary>
         public void Compress(BufferPool rawPool, IThreadDispatcher threadDispatcher = null)
         {
+            var workerCount = threadDispatcher != null ? threadDispatcher.ThreadCount : 1;
+            ScheduleAnalysisRegions(workerCount, rawPool);
             if (threadDispatcher != null)
             {
-                ScheduleAnalysisRegions(threadDispatcher.ThreadCount, rawPool);
                 threadDispatcher.DispatchWorkers(AnalysisWorker);
             }
             else
             {
-                ScheduleAnalysisRegions(1, rawPool);
                 AnalysisWorker(0);
             }
             //It's possible for multiple workers to hit the interlocked increment and bump it above the maximum. Clamp it.
             if (compressionsCount > MaximumCompressionCount)
                 compressionsCount = MaximumCompressionCount;
 
-            ApplyCompressions(rawPool);
+            ApplyCompressions(workerCount, rawPool);
         }
     }
 }

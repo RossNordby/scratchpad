@@ -289,7 +289,7 @@ namespace SolverPrototypeTests
             //Debug.WriteLine(message);
         }
 
-        [Conditional("DEBUG")]
+        [Conditional("dDEBUG")]
         static void Validate(Simulation simulation, List<int> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
         {
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)

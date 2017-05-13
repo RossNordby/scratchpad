@@ -27,7 +27,7 @@ namespace SolverPrototypeTests
             SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
-            //var threadDispatcher = new NotQuiteAThreadDispatcher(8);
+            //var threadDispatcher = new NotQuiteAThreadDispatcher(1);
 
             double compressionTimeAccumulator = 0;
             const int iterations = 100;

@@ -10,7 +10,9 @@ namespace SolverPrototypeTests
     public class NotQuiteAThreadDispatcher : IThreadDispatcher
     {
         public int ThreadCount { get; private set; }
-
+        
+        //Note that some systems (the solver, for example) expect the ThreadCount to be the number of actual parallel threads. 
+        //If the threadcount doesn't represent independent threads, deadlocks may occur.
         public NotQuiteAThreadDispatcher(int threadCount)
         {
             ThreadCount = threadCount;

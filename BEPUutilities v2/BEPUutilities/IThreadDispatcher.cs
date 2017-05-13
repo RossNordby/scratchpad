@@ -19,6 +19,9 @@ namespace BEPUutilities2
         /// <summary>
         /// Gets the number of workers available in the thread dispatcher.
         /// </summary>
+        /// <remarks>Note that some systems (like the solver) expect the ThreadCount to be backed by truly independent threads capable of progression even when one is blocked.
+        /// If the ThreadCount doesn't represent independent threads, deadlocks will occur.
+        /// </remarks>
         int ThreadCount { get; }
 
         /// <summary>
