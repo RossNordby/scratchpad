@@ -10,8 +10,8 @@ namespace SolverPrototypeTests
             ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
             //AutoTester.Test();
-            //ContactManifoldConvergenceTests.Test();
-            ConstraintCacheOptimizationTests.Test();
+            ContactManifoldConvergenceTests.Test();
+            //ConstraintCacheOptimizationTests.Test();
             //SortTest.Test();
             //SpanCodegenTests.Test();
 

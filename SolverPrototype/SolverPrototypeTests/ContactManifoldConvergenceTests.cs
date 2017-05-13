@@ -24,25 +24,26 @@ namespace SolverPrototypeTests
             SimulationSetup.ScrambleBodies(simulation);
             SimulationSetup.ScrambleConstraints(simulation.Solver);
             SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(8);
 
             double compressionTimeAccumulator = 0;
-            const int iterations = 1;
-            const int internalCompressionIterations = 1;
-            //for (int i = 0; i < iterations; ++i)
-            //{
-            //    SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
-            //    GC.Collect(3, GCCollectionMode.Forced, true);
-            //    var start = Stopwatch.GetTimestamp();
-            //    for (int j = 0; j < internalCompressionIterations; ++j)
-            //    {
-            //        simulation.SolverBatchCompressor.Compress(simulation.BufferPool);
-            //    }
-            //    compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
-            //}
+            const int iterations = 100;
+            const int internalCompressionIterations = 100;
+            simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher); //prejit
+            for (int i = 0; i < iterations; ++i)
+            {
+                SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
+                GC.Collect(3, GCCollectionMode.Forced, true);
+                var start = Stopwatch.GetTimestamp();
+                for (int j = 0; j < internalCompressionIterations; ++j)
+                {
+                    simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher);
+                }
+                compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
+            }
             Console.WriteLine($"Time per compression: {1e6 * compressionTimeAccumulator / (iterations * internalCompressionIterations)} us");
             GC.Collect(3, GCCollectionMode.Forced, true);
 
@@ -55,7 +56,7 @@ namespace SolverPrototypeTests
             {
                 //bodyOptimizer.PartialIslandOptimizeDFS(64);
                 //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
-                //simulation.BodyLayoutOptimizer.IncrementalOptimize(1, threadPool, simulation.BufferPool);
+                simulation.BodyLayoutOptimizer.IncrementalOptimize(128, threadDispatcher, simulation.BufferPool);
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
@@ -78,13 +79,13 @@ namespace SolverPrototypeTests
             //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
             //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadDispatcher);//prejit
+            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);//prejit
             var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             //testOptimizer.Update(1, 1, simulation.BufferPool);
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadDispatcher);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);
 
             }
             timer.Stop();
@@ -94,7 +95,7 @@ namespace SolverPrototypeTests
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 32;
-            const int frameCount = 128;
+            const int frameCount = 256;
             simulation.Solver.IterationCount = iterationCount;
 
 

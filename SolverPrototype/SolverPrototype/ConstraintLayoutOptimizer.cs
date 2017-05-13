@@ -117,7 +117,7 @@ namespace SolverPrototype
         }
 
 
-        public void Update(int maximumRegionSizeInBundles, int throwaway, BufferPool rawPool, IThreadDispatcher threadDispatcher = null)
+        public void Update(int maximumRegionSizeInBundles, BufferPool rawPool, IThreadDispatcher threadDispatcher = null)
         {
             //Note that we require that all regions are bundle aligned. This is important for the typebatch sorting process, which tends to use bulk copies from bundle arrays to cache.
             //If not bundle aligned, those bulk copies would become complex due to the constraint AOSOA layout.

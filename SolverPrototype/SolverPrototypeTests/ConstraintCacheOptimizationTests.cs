@@ -31,17 +31,15 @@ namespace SolverPrototypeTests
 
             const int bundlesPerOptimizationRegion = 1024;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
-            const int regionsPerConstraintOptimizationIteration = 1;
             int constraintOptimizationIterations = 8192;
 
-            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadDispatcher);//prejit
-            var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
+            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);//prejit
+            var constraintsToOptimize = constraintsPerOptimizationRegion * constraintOptimizationIterations;
             //testOptimizer.Update(1, 1, simulation.BufferPool);
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, threadDispatcher);
-
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +

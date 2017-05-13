@@ -30,7 +30,13 @@ namespace SolverPrototypeTests
             SimulationSetup.ScrambleBodyConstraintLists(simulation);
             SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
-
+            const int batchCompressionIterations = 1000;
+            simulation.SolverBatchCompressor.TargetCandidateCount = constraintHandles.Length / 100;
+            for (int i = 0; i < batchCompressionIterations; ++i)
+            {
+                simulation.SolverBatchCompressor.Compress(simulation.BufferPool, initializationThreadPool);
+            }
+            
             //Attempt cache optimization.
             int bodyOptimizationIterations = bodyHandles.Length * 1;
             //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
@@ -43,37 +49,17 @@ namespace SolverPrototypeTests
                 //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS();
                 simulation.BodyLayoutOptimizer.IncrementalOptimize(32, initializationThreadPool, simulation.BufferPool);
             }
-            //int bodyOptimizationIterations = 32;
-            //for (int i = 0; i < bodyOptimizationIterations; ++i)
-            //{
-            //    simulation.BodyLayoutOptimizer.DumbOptimizeMultithreaded(bodyHandles.Length, threadPool, simulation.BufferPool);
-            //}
-            //timer.Stop();
-            //var optimizationTime = timer.Elapsed.TotalSeconds;
-            //Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
 
-            int constraintCount = 0;
-            for (int i = 0; i < simulation.Solver.Batches.Count; ++i)
-            {
-                for (int j = 0; j < simulation.Solver.Batches[i].TypeBatches.Count; ++j)
-                {
-                    constraintCount += simulation.Solver.Batches[i].TypeBatches[j].ConstraintCount;
-                }
-            }
             const int bundlesPerOptimizationRegion = 1024;
             int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
-            const int regionsPerConstraintOptimizationIteration = 1;
             int constraintOptimizationIterations = 361;
-            //int constraintOptimizationIterations = Math.Max(16,
-            //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
-            //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
-
+         
             //simulation.ConstraintLayoutOptimizer.Update(2, 1, simulation.BufferPool); //prejit
             //var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
             //timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, regionsPerConstraintOptimizationIteration, simulation.BufferPool, initializationThreadPool);
+                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, initializationThreadPool);
             }
             //timer.Stop();
             //Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
@@ -83,7 +69,7 @@ namespace SolverPrototypeTests
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
             simulation.Solver.IterationCount = iterationCount;
-            
+
             double totalTime = 0;
             double sumOfSquares = 0.0;
             TestTimings testTimings;
@@ -110,7 +96,7 @@ namespace SolverPrototypeTests
                 totalTime += frameTime;
                 sumOfSquares += frameTime * frameTime;
             }
-            
+
             simulation.BufferPool.Clear();
 
             testTimings.Average = totalTime / frameCount;
