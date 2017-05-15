@@ -44,11 +44,32 @@ namespace SolverPrototype
 
         public Solver Solver { get; private set; }
         public Bodies Bodies { get; private set; }
+        float targetCandidateFraction;
+        float maximumCompressionFraction;
         /// <summary>
-        /// Gets or sets the desired number of candidates to analyze.
+        /// Gets or sets the desired number of candidates to analyze as a fraction of the total number of constraints.
         /// </summary>
-        public int TargetCandidateCount;
-
+        public float TargetCandidateFraction
+        {
+            get { return targetCandidateFraction; }
+            set
+            {
+                if (value < 0 || value > 1) throw new ArgumentException("Fraction must be from 0 to 1.");
+                targetCandidateFraction = value;
+            }
+        }
+        /// <summary>
+        /// Gets or sets the maximum number of constraint moves that can occur in a single execution of Compress as a fraction of the total number of constraints.
+        /// </summary>       
+        public float MaximumCompressionFraction
+        {
+            get { return maximumCompressionFraction; }
+            set
+            {
+                if (value < 0 || value > 1) throw new ArgumentException("Fraction must be from 0 to 1.");
+                maximumCompressionFraction = value;
+            }
+        }
         struct Compression
         {
             //Since we have an ordered list of compression targets all in the same batch, and because we're going to do the compressions sequentially from high to low,
@@ -69,18 +90,15 @@ namespace SolverPrototype
         }
         //Note that we allocate all of the contexts and their compressions on demand. It's all pointer backed, so there's no worries about GC reference tracing.
         Buffer<WorkerContext> workerContexts;
-        /// <summary>
-        /// Gets or sets the maximum number of constraint moves that can occur in a single execution of Compress.
-        /// </summary>
-        int MaximumCompressionCount;
 
 
-        public BatchCompressor(Solver solver, Bodies bodies, int targetCandidateCount = 1024, int maximumCompressionCount = 128)
+
+        public BatchCompressor(Solver solver, Bodies bodies, float targetCandidateFraction = 0.01f, float maximumCompressionFraction = 0.0005f)
         {
             this.Solver = solver;
             this.Bodies = bodies;
-            TargetCandidateCount = targetCandidateCount;
-            this.MaximumCompressionCount = maximumCompressionCount;
+            TargetCandidateFraction = targetCandidateFraction;
+            this.MaximumCompressionFraction = maximumCompressionFraction;
         }
         struct AnalysisStart
         {
@@ -157,7 +175,7 @@ namespace SolverPrototype
                             //Note that we don't add it if the new index would put the total number of compression targets above the maximum for this pass.
                             //We might have wasted some time getting to this point, but in practice, that doesn't really matter so long as compressions are rare relative
                             //to analysis.
-                            if (Interlocked.Increment(ref compressionsCount) > MaximumCompressionCount)
+                            if (Interlocked.Increment(ref compressionsCount) > maximumCompressionCount)
                                 return;
                             //Note that we build the compressions list with a maximum sized backing array. Don't have to worry about resizing.
                             //IMPORTANT: The compression lists must be created per worker. The order of elements in the compressions lists are important.
@@ -193,7 +211,7 @@ namespace SolverPrototype
             rawPool.SpecializeFor<WorkerContext>().Take(workerCount, out workerContexts);
             for (int i = 0; i < workerCount; ++i)
             {
-                QuickList<Compression, Buffer<Compression>>.Create(rawPool.SpecializeFor<Compression>(), MaximumCompressionCount, out workerContexts[i].Compressions);
+                QuickList<Compression, Buffer<Compression>>.Create(rawPool.SpecializeFor<Compression>(), maximumCompressionCount, out workerContexts[i].Compressions);
             }
 
             //In any given compression attempt, we only optimize over one ConstraintBatch.
@@ -252,9 +270,9 @@ namespace SolverPrototype
             for (int i = nextTarget.TypeBatchIndex; i < batch.TypeBatches.Count; ++i)
             {
                 remainingConstraintCount += batch.TypeBatches[i].ConstraintCount;
-                if (remainingConstraintCount > TargetCandidateCount)
+                if (remainingConstraintCount > targetCandidateCount)
                 {
-                    remainingConstraintCount = TargetCandidateCount;
+                    remainingConstraintCount = targetCandidateCount;
                     break;
                 }
             }
@@ -308,6 +326,8 @@ namespace SolverPrototype
             rawPool.SpecializeFor<WorkerContext>().Return(ref workerContexts);
         }
 
+        int maximumCompressionCount;
+        int targetCandidateCount;
         /// <summary>
         /// Incrementally finds and applies a set of compressions to apply to the constraints in the solver's batches.
         /// Constraints in higher index batches try to move to lower index batches whenever possible.
@@ -315,6 +335,9 @@ namespace SolverPrototype
         public void Compress(BufferPool rawPool, IThreadDispatcher threadDispatcher = null)
         {
             var workerCount = threadDispatcher != null ? threadDispatcher.ThreadCount : 1;
+            var constraintCount = Solver.ConstraintCount;
+            maximumCompressionCount = (int)Math.Max(1, Math.Round(MaximumCompressionFraction * constraintCount));
+            targetCandidateCount = (int)Math.Max(1, Math.Round(TargetCandidateFraction * constraintCount));
             ScheduleAnalysisRegions(workerCount, rawPool);
             if (threadDispatcher != null)
             {
@@ -325,8 +348,8 @@ namespace SolverPrototype
                 AnalysisWorker(0);
             }
             //It's possible for multiple workers to hit the interlocked increment and bump it above the maximum. Clamp it.
-            if (compressionsCount > MaximumCompressionCount)
-                compressionsCount = MaximumCompressionCount;
+            if (compressionsCount > maximumCompressionCount)
+                compressionsCount = maximumCompressionCount;
 
             ApplyCompressions(workerCount, rawPool);
         }

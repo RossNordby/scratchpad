@@ -29,23 +29,19 @@ namespace SolverPrototypeTests
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(8);
 
-            const int bundlesPerOptimizationRegion = 1024;
-            int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
+            simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.01f;
             int constraintOptimizationIterations = 8192;
 
-            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);//prejit
-            var constraintsToOptimize = constraintsPerOptimizationRegion * constraintOptimizationIterations;
-            //testOptimizer.Update(1, 1, simulation.BufferPool);
+            simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);//prejit
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);
+                simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);
             }
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
-
-
+            
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
             {
                 var batch = simulation.Solver.Batches[batchIndex];

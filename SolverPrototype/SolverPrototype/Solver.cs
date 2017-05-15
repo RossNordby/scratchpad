@@ -58,6 +58,45 @@ namespace SolverPrototype
 
         public TypeBatchAllocation TypeBatchAllocation { get; private set; }
 
+        /// <summary>
+        /// Gets the total number of constraints across all types and batches.
+        /// </summary>
+        public int ConstraintCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < Batches.Count; ++i)
+                {
+                    var batch = Batches[i];
+                    for (int j = 0; j < batch.TypeBatches.Count; ++j)
+                    {
+                        count += batch.TypeBatches[j].ConstraintCount;
+                    }
+                }
+                return count;
+            }
+        }
+        /// <summary>
+        /// Gets the total number of bundles across all types and batches.
+        /// </summary>
+        public int BundleCount
+        {
+            get
+            {
+                int count = 0;
+                for (int i = 0; i < Batches.Count; ++i)
+                {
+                    var batch = Batches[i];
+                    for (int j = 0; j < batch.TypeBatches.Count; ++j)
+                    {
+                        count += batch.TypeBatches[j].BundleCount;
+                    }
+                }
+                return count;
+            }
+        }
+
         public Solver(Bodies bodies, BufferPool bufferPool, int iterationCount = 5, int initialCapacity = 1024, int minimumCapacityPerTypeBatch = 64, int initialTypeCountEstimate = 32)
         {
             this.iterationCount = iterationCount;

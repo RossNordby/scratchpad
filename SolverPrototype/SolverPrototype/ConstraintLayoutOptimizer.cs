@@ -39,10 +39,23 @@ namespace SolverPrototype
         /// </summary>
         bool shouldOffset;
 
-        public ConstraintLayoutOptimizer(Bodies bodies, Solver solver)
+        float optimizationFraction;
+        public float OptimizationFraction
+        {
+            get { return optimizationFraction; }
+            set
+            {
+                if (value < 0 || value > 1)
+                    throw new ArgumentException("Optimization fraction must be from 0 to 1.");
+                optimizationFraction = value;
+            }
+        }
+
+        public ConstraintLayoutOptimizer(Bodies bodies, Solver solver, float optimizationFraction = 0.044f)
         {
             this.bodies = bodies;
             this.solver = solver;
+            OptimizationFraction = optimizationFraction;
         }
 
         bool WrapBatch(ref Optimization o)
@@ -115,13 +128,17 @@ namespace SolverPrototype
 
             return o;
         }
-
-
-        public void Update(int maximumRegionSizeInBundles, BufferPool rawPool, IThreadDispatcher threadDispatcher = null)
+        
+      
+        public void Update(BufferPool bufferPool, IThreadDispatcher threadDispatcher = null)
         {
+            var regionSizeInBundles = (int)Math.Max(2, Math.Round(solver.BundleCount * optimizationFraction));
+            //The region size in bundles should be divisible by two so that it can be offset by half.
+            if ((regionSizeInBundles & 1) == 1)
+                ++regionSizeInBundles;
             //Note that we require that all regions are bundle aligned. This is important for the typebatch sorting process, which tends to use bulk copies from bundle arrays to cache.
             //If not bundle aligned, those bulk copies would become complex due to the constraint AOSOA layout.
-            Debug.Assert((maximumRegionSizeInBundles & 1) == 0, "Region size in bundles should be divisible by two to allow offsets.");
+            Debug.Assert((regionSizeInBundles & 1) == 0, "Region size in bundles should be divisible by two to allow offsets.");
             //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
             if (solver.Batches.Count == 0)
                 return;
@@ -130,8 +147,8 @@ namespace SolverPrototype
             if (shouldOffset)
             {
                 //Use the previous frame's start to create the new target.
-                target = FindOffsetFrameStart(nextTarget, maximumRegionSizeInBundles);
-                Debug.Assert(solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex].BundleCount <= maximumRegionSizeInBundles || target.BundleIndex != 0,
+                target = FindOffsetFrameStart(nextTarget, regionSizeInBundles);
+                Debug.Assert(solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex].BundleCount <= regionSizeInBundles || target.BundleIndex != 0,
                     "On offset frames, the only time a target bundle can be 0 is if the batch is too small for it to be anything else.");
                 //Console.WriteLine($"Offset frame targeting {target.BatchIndex}.{target.TypeBatchIndex}:{target.BundleIndex}");
             }
@@ -141,7 +158,7 @@ namespace SolverPrototype
                 target = nextTarget;
                 BoundsCheckOldTarget(ref target);
                 nextTarget = target;
-                nextTarget.BundleIndex += maximumRegionSizeInBundles;
+                nextTarget.BundleIndex += regionSizeInBundles;
                 //Console.WriteLine($"Normal frame targeting {target.BatchIndex}.{target.TypeBatchIndex}:{target.BundleIndex}");
             }
             //Note that we have two separate parallel optimizations over multiple frames. Alternating between them on a per frame basis is a fairly simple way to guarantee
@@ -149,11 +166,11 @@ namespace SolverPrototype
             shouldOffset = !shouldOffset;
 
 
-            var maximumRegionSizeInConstraints = maximumRegionSizeInBundles * Vector<int>.Count;
+            var maximumRegionSizeInConstraints = regionSizeInBundles * Vector<int>.Count;
 
             var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
             SortByBodyLocation(typeBatch, target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints),
-                solver.HandlesToConstraints, bodies.BodyCount, rawPool, threadDispatcher);
+                solver.HandlesToConstraints, bodies.BodyCount, bufferPool, threadDispatcher);
 
         }
 

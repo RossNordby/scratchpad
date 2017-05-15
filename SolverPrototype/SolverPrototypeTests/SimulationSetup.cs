@@ -108,10 +108,13 @@ namespace SolverPrototypeTests
         {
             simulation = new Simulation(
                 new BufferPool(),
-                initialBodyCapacity: bodyCount,
-                initialConstraintCapacity: bodyCount - 1,
-                minimumCapacityPerTypeBatch: bodyCount / 2,
-                initialConstraintCountPerBodyEstimate: 2);
+                new SimulationAllocationSizes
+                {
+                    Bodies = bodyCount,
+                    Constraints = bodyCount - 1,
+                    ConstraintsPerTypeBatch = bodyCount / 2,
+                    ConstraintCountPerBodyEstimate = 2
+                });
             bodyHandles = new int[bodyCount];
             //Body 0 is a stationary kinematic acting as the ground.
             {
@@ -161,10 +164,13 @@ namespace SolverPrototypeTests
             var bodyCount = width * height * length;
             simulation = new Simulation(
                 new BufferPool(),
-                initialBodyCapacity: (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
-                initialConstraintCapacity: bodyCount * 3,
-                minimumCapacityPerTypeBatch: (bodyCount * 3) / 6,
-                initialConstraintCountPerBodyEstimate: 6);
+                new SimulationAllocationSizes
+                {
+                    Bodies = (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
+                    Constraints = bodyCount * 3,
+                    ConstraintsPerTypeBatch = (bodyCount * 3) / 6,
+                    ConstraintCountPerBodyEstimate = 6
+                });
             bodyHandles = new int[bodyCount];
             int ToId(int columnIndex, int rowIndex, int sliceIndex)
             {
@@ -289,7 +295,7 @@ namespace SolverPrototypeTests
             //Debug.WriteLine(message);
         }
 
-        [Conditional("dDEBUG")]
+        [Conditional("DEBUG")]
         static void Validate(Simulation simulation, List<int> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
         {
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)

@@ -25,45 +25,37 @@ namespace SolverPrototypeTests
             GC.Collect(3, GCCollectionMode.Forced, true);
             SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.ScrambleBodies(simulation);
-            SimulationSetup.ScrambleConstraints(simulation.Solver);
-            SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            //SimulationSetup.ScrambleBodies(simulation);
+            //SimulationSetup.ScrambleConstraints(simulation.Solver);
+            //SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             const int batchCompressionIterations = 1000;
-            simulation.SolverBatchCompressor.TargetCandidateCount = constraintHandles.Length / 100;
+            simulation.SolverBatchCompressor.TargetCandidateFraction = .005f;
+            simulation.SolverBatchCompressor.MaximumCompressionFraction = 0.0005f;
             for (int i = 0; i < batchCompressionIterations; ++i)
             {
                 simulation.SolverBatchCompressor.Compress(simulation.BufferPool, initializationThreadPool);
             }
-            
+
             //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 1;
-            //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
-            //var timer = Stopwatch.StartNew();
-            //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS(simulation.Bodies.BodyCount);
+            int bodyOptimizationIterations = bodyHandles.Length / 15;
+            simulation.BodyLayoutOptimizer.OptimizationFraction = 0.005f;
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
-                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
-                //simulation.BodyLayoutOptimizer.SortingIncrementalOptimize(simulation.BufferPool);
-                //simulation.BodyLayoutOptimizer.PartialIslandOptimizeDFS();
-                simulation.BodyLayoutOptimizer.IncrementalOptimize(32, initializationThreadPool, simulation.BufferPool);
+                //simulation.BodyLayoutOptimizer.IncrementalOptimize();// simulation.BufferPool, initializationThreadPool);
+                simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, initializationThreadPool);
             }
 
-            const int bundlesPerOptimizationRegion = 1024;
-            int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
-            int constraintOptimizationIterations = 361;
-         
-            //simulation.ConstraintLayoutOptimizer.Update(2, 1, simulation.BufferPool); //prejit
-            //var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
-            //timer.Restart();
+            simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.044f;
+            int constraintOptimizationIterations = 361;         
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, initializationThreadPool);
+                simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, initializationThreadPool);
             }
-            //timer.Stop();
-            //Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
-            //    $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
+
+            //If we don't initialize the inertias in a per-frame update, we must do so explicitly.
+            simulation.Bodies.LocalInertias.CopyTo(simulation.Bodies.Inertias, 0);
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;

@@ -36,27 +36,25 @@ namespace SolverPrototype
         /// <summary>
         /// Constructs a full featured simulation supporting dynamic movement and constraints.
         /// </summary>
+        /// <param name="initialAllocationSizes">Allocation sizes to initialize the simulation with.</param>
         /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
-        /// <param name="initialBodyCapacity">Expected number of bodies. If the simulation exceeds this number, a resize of relevant resources will be performed.</param>
-        /// <param name="initialConstraintCapacity">Expected number of constraints across all types. If the simulation exceeds this number, a resize of relevant resources will be performed.</param>
-        /// <param name="minimumCapacityPerTypeBatch">Minimum number of constraints of one type in a constraint batch.
-        /// This can vary greatly across types- there are usually far more contacts than ragdoll constraints.
-        /// Per type estimates can be assigned within the Solver.TypeBatchAllocation.</param>
-        /// <param name="initialConstraintCountPerBodyEstimate">Expected number of constraints connected to any one body. If this number is exceeded for a body, a resize of the body's list will be performed, but all affected resources are pooled.</param>
-        public Simulation(
-            BufferPool bufferPool,
-            int initialBodyCapacity = 4096,
-            int initialConstraintCapacity = 4096,
-            int minimumCapacityPerTypeBatch = 64,
-            int initialConstraintCountPerBodyEstimate = 8)
+        public Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
             BufferPool = bufferPool;
-            Bodies = new Bodies(initialBodyCapacity);
-            Solver = new Solver(Bodies, BufferPool, initialCapacity: initialConstraintCapacity, minimumCapacityPerTypeBatch: minimumCapacityPerTypeBatch);
-            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialBodyCapacity, initialConstraintCountPerBodyEstimate);
+            Bodies = new Bodies(initialAllocationSizes.Bodies);
+            Solver = new Solver(Bodies, BufferPool, initialCapacity: initialAllocationSizes.Constraints, minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
+            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
+        }
+        /// <summary>
+        /// Constructs a full featured simulation supporting dynamic movement and constraints. Uses a default preallocation size.
+        /// </summary>
+        /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
+        public Simulation(BufferPool bufferPool)
+            : this(bufferPool, new SimulationAllocationSizes { Bodies = 4096, ConstraintCountPerBodyEstimate = 8, Constraints = 16384, ConstraintsPerTypeBatch = 256 })
+        {
         }
 
         public int Add(ref BodyDescription bodyDescription)
@@ -151,6 +149,7 @@ namespace SolverPrototype
         {
             if (threadDispatcher != null)
             {
+                //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
                 BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
                 ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
                 SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
@@ -180,10 +179,10 @@ namespace SolverPrototype
         /// Increases the allocation size of any buffers too small to hold the allocation target.
         /// </summary>
         /// <remarks>
-        /// The final size of the allocated buffers are constrained by the allocator. The resulting buffer sizes will be the smallest power of 2 bytes containing the target.
+        /// The final size of the allocated buffers are constrained by the allocator. It is not guaranteed to be exactly equal to the target, but it is guaranteed to be at least as large.
         /// </remarks>
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
-        public void EnsureCapacity(ref SimulationAllocation allocationTarget)
+        public void EnsureCapacity(ref SimulationAllocationSizes allocationTarget)
         {
 
         }
@@ -191,26 +190,21 @@ namespace SolverPrototype
         /// Decreases the size of buffers to the smallest value that still contains the allocation target and any existing objects.
         /// </summary>
         /// <remarks>
-        /// The final size of the allocated buffers are constrained by the allocator. The resulting buffer sizes will be the smallest power of 2 bytes containing the target.
+        /// The final size of the allocated buffers are constrained by the allocator. It is not guaranteed to be exactly equal to the target, but it is guaranteed to be at least as large.
         /// </remarks>
         /// <param name="allocationTarget">Target size to compact to. Buffers may be larger to guarantee sufficient room for existing simulation objects.</param>
-        public void Compact(ref SimulationAllocation allocationTarget)
+        public void Compact(ref SimulationAllocationSizes allocationTarget)
         {
 
         }
         /// <summary>
-        /// Increases the allocation size of any buffers too small to hold the allocation target.
+        /// Increases the allocation size of any buffers too small to hold the allocation target, and decreases the allocation size of any buffers that are unnecessarily large.
         /// </summary>
         /// <remarks>
-        /// The final size of the allocated buffers are constrained by the allocator. The resulting buffer sizes will be the smallest power of 2 bytes containing the target.
+        /// The final size of the allocated buffers are constrained by the allocator. It is not guaranteed to be exactly equal to the target, but it is guaranteed to be at least as large.
         /// </remarks>
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
-        public void Resize(ref SimulationAllocation allocationTarget)
-        {
-
-        }
-
-        public void GetAllocation(out SimulationAllocation allocation)
+        public void Resize(ref SimulationAllocationSizes allocationTarget)
         {
 
         }
@@ -227,8 +221,27 @@ namespace SolverPrototype
     /// <summary>
     /// The common set of allocation sizes for a simulation.
     /// </summary>
-    public struct SimulationAllocation
+    public struct SimulationAllocationSizes
     {
-
+        /// <summary>
+        /// The number of bodies to allocate space for.
+        /// </summary>
+        public int Bodies;
+        /// <summary>
+        /// The number of constraints to allocate bookkeeping space for. This does not affect actual type batch allocation sizes, only the solver-level constraint handle storage.
+        /// </summary>
+        public int Constraints;
+        /// <summary>
+        /// The minimum number of constraints to allocate space for in each individual type batch.
+        /// New type batches will be given enough memory for this number of constraints, and any compaction will not reduce the allocations below it.
+        /// The number of constraints can vary greatly across types- there are usually far more contacts than ragdoll constraints.
+        /// Per type estimates can be assigned within the Solver.TypeBatchAllocation if necessary. This value acts as a lower bound for all types.
+        /// </summary>
+        public int ConstraintsPerTypeBatch;
+        /// <summary>
+        /// The minimum number of constraints to allocate space for in each body's constraint list.
+        /// New bodies will be given enough memory for this number of constraints, and any compaction will not reduce the allocations below it.
+        /// </summary>
+        public int ConstraintCountPerBodyEstimate;
     }
 }

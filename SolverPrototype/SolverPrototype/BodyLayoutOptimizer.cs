@@ -18,11 +18,31 @@ namespace SolverPrototype
         Bodies bodies;
         ConstraintConnectivityGraph graph;
         Solver solver;
-        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool)
+
+        float optimizationFraction;
+        /// <summary>
+        /// Gets or sets the fraction of all bodies to update each frame.
+        /// </summary>
+        public float OptimizationFraction
+        {
+            get
+            {
+                return optimizationFraction;
+            }
+            set
+            {
+                if (value > 1 || value < 0)
+                    throw new ArgumentException("Optimization fraction must be a value from 0 to 1.");
+                optimizationFraction = value;
+            }
+        }
+
+        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
         {
             this.bodies = bodies;
             this.graph = graph;
             this.solver = solver;
+            OptimizationFraction = optimizationFraction;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -83,7 +103,7 @@ namespace SolverPrototype
                 }
             }
         }
-        public void IncrementalOptimize(int optimizationCount)
+        public void IncrementalOptimize()
         {
             //All this does is look for any bodies which are to the right of a given body. If it finds one, it pulls it to be adjacent.
             //This converges at the island level- that is, running this on a static topology of simulation islands will eventually result in 
@@ -94,7 +114,7 @@ namespace SolverPrototype
 
             //This optimization routine requires much less overhead than other options, like full island traversals. We only request the connections of a single body,
             //and the swap count is limited to the number of connected bodies.
-
+            int optimizationCount = (int)Math.Max(1, Math.Round(bodies.BodyCount * optimizationFraction));
             for (int i = 0; i < optimizationCount; ++i)
             {
                 //No point trying to optimize the last two bodies. No optimizations are possible.
@@ -316,6 +336,7 @@ namespace SolverPrototype
                     "The only remaining claim should be the optimization target; all others should have been relinquished within the inner enumerator.");
                 enumerator.ClaimEnumerator.Unclaim(1);
                 worker.HighestNeededClaimCount = enumerator.HighestNeededClaimCount;
+                ++worker.CompletedJobs;
             }
 
         }
@@ -326,7 +347,7 @@ namespace SolverPrototype
         Buffer<int> claims;
         //We pick an extremely generous value to begin with because there's not much reason not to. This avoids problems in most reasonable simulations.
         int workerClaimsBufferSize = 512;
-        public void IncrementalOptimize(int optimizationCount, BufferPool rawPool, IThreadDispatcher threadPool)
+        public void IncrementalOptimize(BufferPool rawPool, IThreadDispatcher threadPool)
         {
             if (SpanHelper.GetContainingPowerOf2(bodies.BodyCount) > claims.Length || claims.Length > bodies.BodyCount * 2)
             {
@@ -346,6 +367,7 @@ namespace SolverPrototype
             //Each worker is assigned a start location evenly spaced from other workers. The less interference, the better.
             var spacingBetweenWorkers = bodies.BodyCount / threadPool.ThreadCount;
             var spacingRemainder = spacingBetweenWorkers - spacingBetweenWorkers * threadPool.ThreadCount;
+            int optimizationCount = (int)Math.Max(1, Math.Round(bodies.BodyCount * optimizationFraction));
             var optimizationsPerWorker = optimizationCount / threadPool.ThreadCount;
             var optimizationsRemainder = optimizationCount - optimizationsPerWorker * threadPool.ThreadCount;
             int nextStartIndex = nextBodyIndex;
@@ -383,7 +405,6 @@ namespace SolverPrototype
                 Debug.Assert(worker.WorkerClaims.Count == 0, "After execution, all worker claims should be relinquished.");
                 worker.WorkerClaims.Dispose(rawPool.SpecializeFor<int>());
             }
-
             rawPool.SpecializeFor<Worker>().Return(ref workers);
 
             //Push all workers forward by the amount the slowest one got done- or a fixed minimum to avoid stalls.

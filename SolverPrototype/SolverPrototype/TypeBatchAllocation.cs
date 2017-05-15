@@ -39,7 +39,7 @@ namespace SolverPrototype
         }
 
         //TODO: There is really no good reason why you couldn't have all the types defined up front. It would avoid all the last-second resizing. Not exactly a big issue,
-        //but something to think about if this every gets to be any more cumbersome.
+        //but something to think about if this ever gets to be any more cumbersome.
         void Validate(int typeId)
         {
             Debug.Assert(typeId >= 0, "Type ids are nonnegative!");

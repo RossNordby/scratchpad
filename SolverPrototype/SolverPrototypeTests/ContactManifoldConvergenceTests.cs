@@ -49,43 +49,26 @@ namespace SolverPrototypeTests
 
             //Attempt cache optimization.
             int bodyOptimizationIterations = bodyHandles.Length * 1;
-            //bodyOptimizer.PartialIslandOptimizeDFS(bodyHandles.Length); //prejit
-            //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize(); //prejit
+            simulation.BodyLayoutOptimizer.OptimizationFraction = 0.004f;
+            simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, threadDispatcher);//prejit
             var timer = Stopwatch.StartNew();
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
-                //bodyOptimizer.PartialIslandOptimizeDFS(64);
-                //simulation.BodyLayoutOptimizer.DumbIncrementalOptimize();
-                simulation.BodyLayoutOptimizer.IncrementalOptimize(128, threadDispatcher, simulation.BufferPool);
+                simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, threadDispatcher);
             }
             timer.Stop();
             var optimizationTime = timer.Elapsed.TotalSeconds;
             Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
 
             //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
-            int constraintCount = 0;
-            for (int i = 0; i < simulation.Solver.Batches.Count; ++i)
-            {
-                for (int j = 0; j < simulation.Solver.Batches[i].TypeBatches.Count; ++j)
-                {
-                    constraintCount += simulation.Solver.Batches[i].TypeBatches[j].ConstraintCount;
-                }
-            }
-            const int bundlesPerOptimizationRegion = 1024;
-            int constraintsPerOptimizationRegion = bundlesPerOptimizationRegion * Vector<int>.Count;
-            const int regionsPerConstraintOptimizationIteration = 1;
+            simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.044f;
             int constraintOptimizationIterations = 8192;
-            //int constraintOptimizationIterations = Math.Max(16,
-            //    (int)(1 * 2 * ((long)constraintCount * constraintCount /
-            //    ((double)constraintsPerOptimizationRegion * constraintsPerOptimizationRegion)) / regionsPerConstraintOptimizationIteration));
 
-            simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);//prejit
-            var constraintsToOptimize = constraintsPerOptimizationRegion * regionsPerConstraintOptimizationIteration * constraintOptimizationIterations;
-            //testOptimizer.Update(1, 1, simulation.BufferPool);
+            simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);//prejit
             timer.Restart();
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
-                simulation.ConstraintLayoutOptimizer.Update(bundlesPerOptimizationRegion, simulation.BufferPool, threadDispatcher);
+                simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);
 
             }
             timer.Stop();
@@ -98,6 +81,8 @@ namespace SolverPrototypeTests
             const int frameCount = 256;
             simulation.Solver.IterationCount = iterationCount;
 
+            //If we don't initialize the inertias in a per-frame update, we must do so explicitly.
+            simulation.Bodies.LocalInertias.CopyTo(simulation.Bodies.Inertias, 0);
 
             //prejit
             simulation.Solver.Update(dt, inverseDt);
