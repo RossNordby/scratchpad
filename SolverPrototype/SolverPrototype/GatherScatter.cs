@@ -31,7 +31,7 @@ namespace SolverPrototype
         //MULTIBODY CONSTRAINTS AND MANUAL INLINING
         //Unfortunately, as of this writing, there still seems to be a very small value in manually inlining all involved bodies.
         //This is going to get pretty annoying if there are a variety of different constraint body counts. For runtime-defined N-body constraints,
-        //we will likely end up just having a per-body gather, and that will be fine. I'm not gonna make 128 variants of this function!
+        //we will likely end up just having a per-body gather, and that will be fine. I'm not gonna make 128 variants of these functions!
 
         /// <summary>
         /// Gets a reference to an element from a vector without using pointers, bypassing direct vector access for codegen reasons.
@@ -323,24 +323,6 @@ namespace SolverPrototype
                 }
             }
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
-        {
-            ref var targetLane = ref Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
-
-            targetLane = inertia.InverseInertiaTensor.X.X;
-            Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.X.Y;
-            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inertia.InverseInertiaTensor.X.Z;
-            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.X;
-            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Y;
-            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Z;
-            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.X;
-            Unsafe.Add(ref targetLane, 7 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Y;
-            Unsafe.Add(ref targetLane, 8 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Z;
-            Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inertia.InverseMass;
-
-        }
-
         /// <summary>
         /// Sets a lane of a container of vectors, assuming that the vectors are contiguous.
         /// </summary>
@@ -363,54 +345,7 @@ namespace SolverPrototype
             }
         }
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
-        {
-            ref var sourceLane = ref Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
-
-            inertia.InverseInertiaTensor.X = new Vector3(
-                sourceLane,
-                Unsafe.Add(ref sourceLane, Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
-            inertia.InverseInertiaTensor.Y = new Vector3(
-                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
-            inertia.InverseInertiaTensor.Z = new Vector3(
-                Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 7 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 8 * Vector<float>.Count));
-            inertia.InverseMass =
-                Unsafe.Add(ref sourceLane, 9 * Vector<float>.Count);
-
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void SetLane(ref BodyVelocities targetBundle, int innerIndex, ref BodyVelocity velocity)
-        {
-            ref var targetLane = ref Get(ref targetBundle.LinearVelocity.X, innerIndex);
-
-            targetLane = velocity.Linear.X;
-            Unsafe.Add(ref targetLane, Vector<float>.Count) = velocity.Linear.Y;
-            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = velocity.Linear.Z;
-            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = velocity.Angular.X;
-            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = velocity.Angular.Y;
-            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = velocity.Angular.Z;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GetLane(ref BodyVelocities targetBundle, int innerIndex, out BodyVelocity velocity)
-        {
-            ref var sourceLane = ref Get(ref targetBundle.LinearVelocity.X, innerIndex);
-
-            velocity.Linear = new Vector3(
-                sourceLane,
-                Unsafe.Add(ref sourceLane, Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
-            velocity.Angular = new Vector3(
-                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
-        }
+        
     }
 }
 

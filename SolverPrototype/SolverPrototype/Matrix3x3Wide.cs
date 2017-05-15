@@ -34,6 +34,27 @@ namespace SolverPrototype
             result.Z.Y = a.Z.X * b.X.Y + a.Z.Y * b.Y.Y + a.Z.Z * b.Z.Y;
             result.Z.Z = a.Z.X * b.X.Z + a.Z.Y * b.Y.Z + a.Z.Z * b.Z.Z;
         }
+        /// <summary>
+        /// Multiplies a matrix by another matrix, where the first matrix is sampled as if it were transposed: result = transpose(a) * b.
+        /// </summary>
+        /// <param name="a">Matrix to be sampled as if it were transposed when multiplied with the second matrix.</param>
+        /// <param name="b">Second matrix in the pair.</param>
+        /// <param name="result">Result of the multiplication transpose(a) * b.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void MultiplyTransposedWithoutOverlap(ref Matrix3x3Wide a, ref Matrix3x3Wide b, out Matrix3x3Wide result)
+        {
+            result.X.X = a.X.X * b.X.X + a.Y.X * b.Y.X + a.Z.X * b.Z.X;
+            result.X.Y = a.X.X * b.X.Y + a.Y.X * b.Y.Y + a.Z.X * b.Z.Y;
+            result.X.Z = a.X.X * b.X.Z + a.Y.X * b.Y.Z + a.Z.X * b.Z.Z;
+
+            result.Y.X = a.X.Y * b.X.X + a.Y.Y * b.Y.X + a.Z.Y * b.Z.X;
+            result.Y.Y = a.X.Y * b.X.Y + a.Y.Y * b.Y.Y + a.Z.Y * b.Z.Y;
+            result.Y.Z = a.X.Y * b.X.Z + a.Y.Y * b.Y.Z + a.Z.Y * b.Z.Z;
+
+            result.Z.X = a.X.Z * b.X.X + a.Y.Z * b.Y.X + a.Z.Z * b.Z.X;
+            result.Z.Y = a.X.Z * b.X.Y + a.Y.Z * b.Y.Y + a.Z.Z * b.Z.Y;
+            result.Z.Z = a.X.Z * b.X.Z + a.Y.Z * b.Y.Z + a.Z.Z * b.Z.Z;
+        }
 
         /// <summary>
         /// Multiplies a matrix by another matrix, where the second matrix is sampled as if it were transposed: result = a * transpose(b).

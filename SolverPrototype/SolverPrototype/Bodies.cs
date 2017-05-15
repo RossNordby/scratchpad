@@ -26,23 +26,33 @@ namespace SolverPrototype
     public struct BodyInertias
     {
         public Matrix3x3Wide InverseInertiaTensor;
+        //Note that the inverse mass is included in the BodyInertias bundle. InverseMass is rotationally invariant, so it doesn't need to be updated...
+        //But it's included alongside the rotated inertia tensor because to split it out would require that constraint presteps suffer another cache miss when they
+        //gather the inverse mass in isolation. (From the solver's perspective, inertia/mass gathering is incoherent.)
         public Vector<float> InverseMass;
     }
-    
-    public struct BodyDescription
+
+    public struct BodyPose
     {
-        public BodyInertia LocalInertia;
-        public BodyVelocity Velocity;
+        public Vector3 Position;
+        public BEPUutilities2.Quaternion Orientation;
+    }
+
+    public struct BodyVelocity
+    {
+        public Vector3 Linear;
+        public Vector3 Angular;
     }
     public struct BodyInertia
     {
         public Matrix3x3 InverseInertiaTensor;
         public float InverseMass;
     }
-    public struct BodyVelocity
+    public struct BodyDescription
     {
-        public Vector3 Linear;
-        public Vector3 Angular;
+        public BodyPose Pose;
+        public BodyInertia LocalInertia;
+        public BodyVelocity Velocity;
     }
     /// <summary>
     /// Collection of allocated bodies.
@@ -69,13 +79,11 @@ namespace SolverPrototype
         public BodyPoses[] Poses;
         public BodyVelocities[] Velocities;
         public BodyInertias[] LocalInertias;
+        /// <summary>
+        /// The world transformed inertias of bodies as of the last update. Note that direct modifications to the orientation do not automatically update the world inertia tensor;
+        /// this is only updated once during the frame. It should be treated as ephemeral information.
+        /// </summary>
         public BodyInertias[] Inertias;
-        //TODO: While our current tests do not actually integrate orientation, when we do, we'll need to also update the world inertia.
-        //The constraints will need to gather from the transformed inertia rather than from the local variants.
-        //Note that the inverse mass is included in the BodyInertias bundle. InverseMass is rotationally invariant, so it doesn't need to be updated...
-        //But it's included alongside the rotated inertia tensor because to split it out would require that constraint presteps suffer another cache miss when they
-        //gather the inverse mass in isolation. (From the solver's perspective, inertia/mass gathering is incoherent.)
-        //public BodyInertias[] InertiaBundles;
         public IdPool IdPool;
         public int BodyCount;
         /// <summary>
@@ -95,8 +103,10 @@ namespace SolverPrototype
         public unsafe Bodies(int initialCapacity = 4096)
         {
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
+            Poses = new BodyPoses[initialCapacityInBundles];
             Velocities = new BodyVelocities[initialCapacityInBundles];
             LocalInertias = new BodyInertias[initialCapacityInBundles];
+            Inertias = new BodyInertias[initialCapacityInBundles];
 
             IdPool = new IdPool(initialCapacity);
             HandleToIndex = new int[initialCapacity];
@@ -120,8 +130,10 @@ namespace SolverPrototype
             {
                 //Out of room; need to resize.
                 var newSize = HandleToIndex.Length << 1;
+                Array.Resize(ref Poses, newSize);
                 Array.Resize(ref Velocities, newSize);
                 Array.Resize(ref LocalInertias, newSize);
+                Array.Resize(ref Inertias, newSize);
                 Array.Resize(ref IndexToHandle, newSize);
                 Array.Resize(ref HandleToIndex, newSize);
 
@@ -134,8 +146,10 @@ namespace SolverPrototype
             IndexToHandle[index] = handle;
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
-            GatherScatter.SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
-            GatherScatter.SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
+            Bodies.SetLane(ref Poses[bundleIndex], indexInBundle, ref bodyDescription.Pose);
+            Bodies.SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
+            Bodies.SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
+            //TODO: Should the world inertias be updated on add? That would suggest a convention of also updating world inertias on any orientation change, which might not be wise given the API.
 
             return handle;
         }
@@ -164,6 +178,7 @@ namespace SolverPrototype
                 //Copy the memory state of the last element down.
                 BundleIndexing.GetBundleIndices(removedIndex, out var targetBundle, out var targetInner);
                 BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
+                GatherScatter.CopyLane(ref Poses[sourceBundle], sourceInner, ref Poses[targetBundle], targetInner);
                 GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
                 GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
                 //Point the body handles at the new location.
@@ -209,50 +224,157 @@ namespace SolverPrototype
             var index = HandleToIndex[handle];
             BundleIndexing.GetBundleIndices(index, out bundleIndex, out innerIndex);
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
+        {
+            ref var targetLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
+
+            targetLane = inertia.InverseInertiaTensor.X.X;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.X.Y;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inertia.InverseInertiaTensor.X.Z;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.X;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Y;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Z;
+            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.X;
+            Unsafe.Add(ref targetLane, 7 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Y;
+            Unsafe.Add(ref targetLane, 8 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Z;
+            Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inertia.InverseMass;
+
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
+        {
+            ref var sourceLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
+
+            inertia.InverseInertiaTensor.X = new Vector3(
+                sourceLane,
+                Unsafe.Add(ref sourceLane, Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
+            inertia.InverseInertiaTensor.Y = new Vector3(
+                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
+            inertia.InverseInertiaTensor.Z = new Vector3(
+                Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 7 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 8 * Vector<float>.Count));
+            inertia.InverseMass =
+                Unsafe.Add(ref sourceLane, 9 * Vector<float>.Count);
+
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void SetLane(ref BodyVelocities targetBundle, int innerIndex, ref BodyVelocity velocity)
+        {
+            ref var targetLane = ref GatherScatter.Get(ref targetBundle.LinearVelocity.X, innerIndex);
+
+            targetLane = velocity.Linear.X;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = velocity.Linear.Y;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = velocity.Linear.Z;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = velocity.Angular.X;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = velocity.Angular.Y;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = velocity.Angular.Z;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void GetLane(ref BodyVelocities targetBundle, int innerIndex, out BodyVelocity velocity)
+        {
+            ref var sourceLane = ref GatherScatter.Get(ref targetBundle.LinearVelocity.X, innerIndex);
+
+            velocity.Linear = new Vector3(
+                sourceLane,
+                Unsafe.Add(ref sourceLane, Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
+            velocity.Angular = new Vector3(
+                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void SetLane(ref BodyPoses targetBundle, int innerIndex, ref BodyPose pose)
+        {
+            ref var targetLane = ref GatherScatter.Get(ref targetBundle.Position.X, innerIndex);
+
+            targetLane = pose.Position.X;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = pose.Position.Y;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = pose.Position.Z;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = pose.Orientation.X;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = pose.Orientation.Y;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = pose.Orientation.Z;
+            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = pose.Orientation.W;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void GetLane(ref BodyPoses targetBundle, int innerIndex, out BodyPose pose)
+        {
+            ref var sourceLane = ref GatherScatter.Get(ref targetBundle.Position.X, innerIndex);
+
+            pose.Position = new Vector3(
+                sourceLane,
+                Unsafe.Add(ref sourceLane, Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
+            pose.Orientation = new BEPUutilities2.Quaternion(
+                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count),
+                Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count));
+        }
+
+        public void SetPose(int handle, ref BodyPose pose)
+        {
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
+            SetLane(ref Poses[bundleIndex], innerIndex, ref pose);
+        }
+        public void GetPose(int handle, out BodyPose pose)
+        {
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
+            GetLane(ref Poses[bundleIndex], innerIndex, out pose);
+        }
         public void SetVelocity(int handle, ref BodyVelocity velocity)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetLane(ref Velocities[bundleIndex], innerIndex, ref velocity);
+            SetLane(ref Velocities[bundleIndex], innerIndex, ref velocity);
         }
         public void GetVelocity(int handle, out BodyVelocity velocity)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.GetLane(ref Velocities[bundleIndex], innerIndex, out velocity);
+            GetLane(ref Velocities[bundleIndex], innerIndex, out velocity);
         }
         public void SetLocalInertia(int handle, ref BodyInertia inertia)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetLane(ref LocalInertias[bundleIndex], innerIndex, ref inertia);
+            SetLane(ref LocalInertias[bundleIndex], innerIndex, ref inertia);
         }
         public void GetLocalInertia(int handle, out BodyInertia inertia)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
+            GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
 
+        /// <summary>
+        /// Gets a value roughly representing the amount of energy in the simulation. This is occasionally handy for debug purposes.
+        /// </summary>
         public float GetBodyEnergyHeuristic()
         {
-            float accumulated = 0;
             var lastBundleIndex = (BodyCount - 1) >> BundleIndexing.VectorShift;
             //Mask away the unused lanes. We're modifying the actual velocities; that's valid because they're unused.
             var lastBundleCount = BodyCount - (lastBundleIndex << BundleIndexing.VectorShift);
             var zeroVelocity = new BodyVelocity();
             for (int i = lastBundleCount; i < Vector<float>.Count; ++i)
             {
-                GatherScatter.SetLane(ref Velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
+                SetLane(ref Velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
             }
+            Vector<float> accumulated = Vector<float>.Zero;
             for (int bundleIndex = 0; bundleIndex <= lastBundleIndex; ++bundleIndex)
             {
                 Vector3Wide.Dot(ref Velocities[bundleIndex].LinearVelocity, ref Velocities[bundleIndex].LinearVelocity, out var linearDot);
                 Vector3Wide.Dot(ref Velocities[bundleIndex].AngularVelocity, ref Velocities[bundleIndex].AngularVelocity, out var angularDot);
-
-                accumulated += Vector.Dot(linearDot, Vector<float>.One) + Vector.Dot(angularDot, Vector<float>.One);
+                accumulated += linearDot + angularDot;
             }
-            return accumulated;
+            return Vector.Dot(accumulated, Vector<float>.One);
         }
 
 
@@ -271,6 +393,7 @@ namespace SolverPrototype
             IndexToHandle[slotB] = oldHandleA;
             BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
             BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
+            GatherScatter.SwapLanes(ref Poses[bundleA], innerA, ref Poses[bundleB], innerB);
             GatherScatter.SwapLanes(ref Velocities[bundleA], innerA, ref Velocities[bundleB], innerB);
             GatherScatter.SwapLanes(ref LocalInertias[bundleA], innerA, ref LocalInertias[bundleB], innerB);
         }

@@ -74,8 +74,8 @@ namespace SolverPrototype.Constraints
             var zeroVelocity = new BodyVelocity();
             for (int i = lastBundleCount; i < Vector<float>.Count; ++i)
             {
-                GatherScatter.SetLane(ref velocityChangesVectorizedA[lastBundleIndex], i, ref zeroVelocity);
-                GatherScatter.SetLane(ref velocityChangesVectorizedB[lastBundleIndex], i, ref zeroVelocity);
+                Bodies.SetLane(ref velocityChangesVectorizedA[lastBundleIndex], i, ref zeroVelocity);
+                Bodies.SetLane(ref velocityChangesVectorizedB[lastBundleIndex], i, ref zeroVelocity);
             }
 
 

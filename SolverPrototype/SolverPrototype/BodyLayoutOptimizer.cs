@@ -326,7 +326,7 @@ namespace SolverPrototype
         Buffer<int> claims;
         //We pick an extremely generous value to begin with because there's not much reason not to. This avoids problems in most reasonable simulations.
         int workerClaimsBufferSize = 512;
-        public void IncrementalOptimize(int optimizationCount, IThreadDispatcher threadPool, BufferPool rawPool)
+        public void IncrementalOptimize(int optimizationCount, BufferPool rawPool, IThreadDispatcher threadPool)
         {
             if (SpanHelper.GetContainingPowerOf2(bodies.BodyCount) > claims.Length || claims.Length > bodies.BodyCount * 2)
             {

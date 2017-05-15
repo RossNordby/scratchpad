@@ -313,7 +313,7 @@ namespace SolverPrototype
                 var batch = Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches[j].Prestep(bodies.LocalInertias, dt, inverseDt);
+                    batch.TypeBatches[j].Prestep(bodies.Inertias, dt, inverseDt);
                 }
             }
             //TODO: May want to consider executing warmstart immediately following the prestep. Multithreading can't do that, so there could be some bitwise differences introduced.

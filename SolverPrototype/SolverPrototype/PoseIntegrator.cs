@@ -95,7 +95,7 @@ namespace SolverPrototype
                 //TODO: If the pose integrator is positioned at the end of an update, the first frame after any out-of-timestep orientation change or local inertia change
                 //has to get is inertia tensors calculated elsewhere. Either they would need to be computed on addition or something- which is a bit gross, but doable-
                 //or we would need to move this calculation to the beginning of the frame to guarantee that all inertias are up to date. 
-                //This would require a scan through all pose memory to support, so it would be a little unfortunate given how little associated ALU there is.     
+                //This would require a scan through all pose memory to support, but if you do it at the same time as AABB update, that's fine- that stage uses the pose too.
                 ref var localInertias = ref Unsafe.Add(ref baseLocalInertias, i);
                 ref var inertias = ref Unsafe.Add(ref baseInertias, i);
                 Matrix3x3Wide.CreateFromQuaternion(ref pose.Orientation, out var orientationMatrix);
