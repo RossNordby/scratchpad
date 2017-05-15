@@ -20,7 +20,7 @@ namespace SolverPrototype
             while ((blockIndex = Interlocked.Increment(ref StageIndices[syncStage])) <= endIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies.LocalInertiaBundles, context.Dt, context.InverseDt, block.StartBundle, block.End);
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies.LocalInertias, context.Dt, context.InverseDt, block.StartBundle, block.End);
             }
 
             InterstageSync(ref syncStage);
@@ -31,7 +31,7 @@ namespace SolverPrototype
                 while ((blockIndex = Interlocked.Increment(ref StageIndices[syncStage])) <= endIndex)
                 {
                     ref var block = ref context.WorkBlocks[blockIndex - 1];
-                    Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.VelocityBundles, block.StartBundle, block.End);
+                    Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.Velocities, block.StartBundle, block.End);
                 }
                 InterstageSync(ref syncStage);
             }
@@ -44,7 +44,7 @@ namespace SolverPrototype
                     while ((blockIndex = Interlocked.Increment(ref StageIndices[syncStage])) <= endIndex)
                     {
                         ref var block = ref context.WorkBlocks[blockIndex - 1];
-                        Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].SolveIteration(bodies.VelocityBundles, block.StartBundle, block.End);
+                        Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].SolveIteration(bodies.Velocities, block.StartBundle, block.End);
                     }
                     InterstageSync(ref syncStage);
                 }

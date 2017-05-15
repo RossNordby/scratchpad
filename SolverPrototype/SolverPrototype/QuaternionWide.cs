@@ -62,6 +62,21 @@ namespace SolverPrototype
             Scale(ref q, ref scale, out q);
         }
 
+        /// <summary>
+        /// Adds the components of two quaternions together.
+        /// </summary>
+        /// <param name="a">First quaternion to add.</param>
+        /// <param name="b">Second quaternion to add.</param>
+        /// <param name="result">Sum of the two input quaternions.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Add(ref QuaternionWide a, ref QuaternionWide b, out QuaternionWide result)
+        {
+            result.X = a.X + b.X;
+            result.Y = a.Y + b.Y;
+            result.Z = a.Z + b.Z;
+            result.W = a.W + b.W;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Scale(ref QuaternionWide q, ref Vector<float> scale, out QuaternionWide result)
         {
@@ -131,6 +146,7 @@ namespace SolverPrototype
 
             Normalize(ref q, out q);
         }
+
 
         /// <summary>
         /// Transforms the vector using a quaternion. Assumes that the memory backing the input and output do not overlap.

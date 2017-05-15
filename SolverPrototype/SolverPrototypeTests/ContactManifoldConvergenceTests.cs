@@ -125,13 +125,13 @@ namespace SolverPrototypeTests
                     var innerIndexB = GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex);
 
                     var velocityA = new Vector3(
-                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.X, innerIndexA),
-                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Y, innerIndexA),
-                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexA].LinearVelocity.Z, innerIndexA));
+                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexA].LinearVelocity.X, innerIndexA),
+                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexA].LinearVelocity.Y, innerIndexA),
+                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexA].LinearVelocity.Z, innerIndexA));
                     var velocityB = new Vector3(
-                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.X, innerIndexB),
-                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Y, innerIndexB),
-                        GatherScatter.Get(ref simulation.Bodies.VelocityBundles[bodyBundleIndexB].LinearVelocity.Z, innerIndexB));
+                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.X, innerIndexB),
+                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.Y, innerIndexB),
+                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.Z, innerIndexB));
                     var relativeVelocity = (velocityA - velocityB);
                     var surfaceBasis = new Quaternion(
                         GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.X, innerIndex),
@@ -168,7 +168,7 @@ namespace SolverPrototypeTests
                 for (int i = 0; i < bodyBundleCount; ++i)
                 {
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematics.)
-                    simulation.Bodies.VelocityBundles[i].LinearVelocity.Y += simulation.Bodies.LocalInertiaBundles[i].InverseMass * impulse;
+                    simulation.Bodies.Velocities[i].LinearVelocity.Y += simulation.Bodies.LocalInertias[i].InverseMass * impulse;
                 }
                 //CacheBlaster.Blast();
                 //GC.Collect(3, GCCollectionMode.Forced, true);

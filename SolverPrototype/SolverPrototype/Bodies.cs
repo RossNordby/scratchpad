@@ -7,17 +7,21 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
-    /// <summary>
-    /// Body data is stored in AOSOA for the integration step.
-    /// From the solver's perspective, some form of gather is required for velocities regardless of the layout, so it might as well be optimal for some other stage.
-    /// We also reuse this layout for storing constraint space velocities.
-    /// </summary>
+    public struct BodyPoses
+    {
+        public Vector3Wide Position;
+        //Note that we store a quaternion rather than a matrix3x3. While this often requires some overhead when performing vector transforms or extracting basis vectors, 
+        //systems needing to interact directly with this representation are often terrifically memory bound. Spending the extra ALU time to convert to a basis can actually be faster
+        //than loading the extra 5 elements needed to express the full 3x3 rotation matrix. Also, it's marginally easier to keep the rotation normalized over time.
+        //There may be an argument for the matrix variant to ALSO be stored for some bandwidth-unconstrained stages, but don't worry about that until there's a reason to worry about it.
+        public QuaternionWide Orientation;
+    }
+    
     public struct BodyVelocities
     {
         public Vector3Wide LinearVelocity;
         public Vector3Wide AngularVelocity;
     }
-
 
     public struct BodyInertias
     {
@@ -41,7 +45,7 @@ namespace SolverPrototype
         public Vector3 Angular;
     }
     /// <summary>
-    /// Collection of allocated bodies. For now, it is assumed that all bodies are active and dynamic.
+    /// Collection of allocated bodies.
     /// </summary>
     public class Bodies
     {
@@ -62,8 +66,10 @@ namespace SolverPrototype
         /// </summary>
         public int[] IndexToHandle;
 
-        public BodyVelocities[] VelocityBundles;
-        public BodyInertias[] LocalInertiaBundles;
+        public BodyPoses[] Poses;
+        public BodyVelocities[] Velocities;
+        public BodyInertias[] LocalInertias;
+        public BodyInertias[] Inertias;
         //TODO: While our current tests do not actually integrate orientation, when we do, we'll need to also update the world inertia.
         //The constraints will need to gather from the transformed inertia rather than from the local variants.
         //Note that the inverse mass is included in the BodyInertias bundle. InverseMass is rotationally invariant, so it doesn't need to be updated...
@@ -72,12 +78,25 @@ namespace SolverPrototype
         //public BodyInertias[] InertiaBundles;
         public IdPool IdPool;
         public int BodyCount;
+        /// <summary>
+        /// Gets the number of body bundles. Any trailing partial bundle is counted as a full bundle.
+        /// </summary>
+        public int BodyBundleCount
+        {
+            get
+            {
+                var bundleCount = BodyCount >> BundleIndexing.VectorShift;
+                if ((bundleCount << BundleIndexing.VectorShift) < BodyCount)
+                    ++bundleCount;
+                return bundleCount;
+            }
+        }
 
         public unsafe Bodies(int initialCapacity = 4096)
         {
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
-            VelocityBundles = new BodyVelocities[initialCapacityInBundles];
-            LocalInertiaBundles = new BodyInertias[initialCapacityInBundles];
+            Velocities = new BodyVelocities[initialCapacityInBundles];
+            LocalInertias = new BodyInertias[initialCapacityInBundles];
 
             IdPool = new IdPool(initialCapacity);
             HandleToIndex = new int[initialCapacity];
@@ -101,8 +120,8 @@ namespace SolverPrototype
             {
                 //Out of room; need to resize.
                 var newSize = HandleToIndex.Length << 1;
-                Array.Resize(ref VelocityBundles, newSize);
-                Array.Resize(ref LocalInertiaBundles, newSize);
+                Array.Resize(ref Velocities, newSize);
+                Array.Resize(ref LocalInertias, newSize);
                 Array.Resize(ref IndexToHandle, newSize);
                 Array.Resize(ref HandleToIndex, newSize);
 
@@ -115,8 +134,8 @@ namespace SolverPrototype
             IndexToHandle[index] = handle;
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
-            GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
-            GatherScatter.SetLane(ref VelocityBundles[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
+            GatherScatter.SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
+            GatherScatter.SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
 
             return handle;
         }
@@ -145,8 +164,8 @@ namespace SolverPrototype
                 //Copy the memory state of the last element down.
                 BundleIndexing.GetBundleIndices(removedIndex, out var targetBundle, out var targetInner);
                 BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
-                GatherScatter.CopyLane(ref VelocityBundles[sourceBundle], sourceInner, ref VelocityBundles[targetBundle], targetInner);
-                GatherScatter.CopyLane(ref LocalInertiaBundles[sourceBundle], sourceInner, ref LocalInertiaBundles[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
                 //Point the body handles at the new location.
                 var lastHandle = IndexToHandle[movedBodyOriginalIndex];
                 HandleToIndex[lastHandle] = removedIndex;
@@ -194,25 +213,25 @@ namespace SolverPrototype
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetLane(ref VelocityBundles[bundleIndex], innerIndex, ref velocity);
+            GatherScatter.SetLane(ref Velocities[bundleIndex], innerIndex, ref velocity);
         }
         public void GetVelocity(int handle, out BodyVelocity velocity)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.GetLane(ref VelocityBundles[bundleIndex], innerIndex, out velocity);
+            GatherScatter.GetLane(ref Velocities[bundleIndex], innerIndex, out velocity);
         }
         public void SetLocalInertia(int handle, ref BodyInertia inertia)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.SetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, ref inertia);
+            GatherScatter.SetLane(ref LocalInertias[bundleIndex], innerIndex, ref inertia);
         }
         public void GetLocalInertia(int handle, out BodyInertia inertia)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GatherScatter.GetLane(ref LocalInertiaBundles[bundleIndex], innerIndex, out inertia);
+            GatherScatter.GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
 
         public float GetBodyEnergyHeuristic()
@@ -224,12 +243,12 @@ namespace SolverPrototype
             var zeroVelocity = new BodyVelocity();
             for (int i = lastBundleCount; i < Vector<float>.Count; ++i)
             {
-                GatherScatter.SetLane(ref VelocityBundles[lastBundleIndex], lastBundleCount, ref zeroVelocity);
+                GatherScatter.SetLane(ref Velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
             }
             for (int bundleIndex = 0; bundleIndex <= lastBundleIndex; ++bundleIndex)
             {
-                Vector3Wide.Dot(ref VelocityBundles[bundleIndex].LinearVelocity, ref VelocityBundles[bundleIndex].LinearVelocity, out var linearDot);
-                Vector3Wide.Dot(ref VelocityBundles[bundleIndex].AngularVelocity, ref VelocityBundles[bundleIndex].AngularVelocity, out var angularDot);
+                Vector3Wide.Dot(ref Velocities[bundleIndex].LinearVelocity, ref Velocities[bundleIndex].LinearVelocity, out var linearDot);
+                Vector3Wide.Dot(ref Velocities[bundleIndex].AngularVelocity, ref Velocities[bundleIndex].AngularVelocity, out var angularDot);
 
                 accumulated += Vector.Dot(linearDot, Vector<float>.One) + Vector.Dot(angularDot, Vector<float>.One);
             }
@@ -252,8 +271,8 @@ namespace SolverPrototype
             IndexToHandle[slotB] = oldHandleA;
             BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
             BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
-            GatherScatter.SwapLanes(ref VelocityBundles[bundleA], innerA, ref VelocityBundles[bundleB], innerB);
-            GatherScatter.SwapLanes(ref LocalInertiaBundles[bundleA], innerA, ref LocalInertiaBundles[bundleB], innerB);
+            GatherScatter.SwapLanes(ref Velocities[bundleA], innerA, ref Velocities[bundleB], innerB);
+            GatherScatter.SwapLanes(ref LocalInertias[bundleA], innerA, ref LocalInertias[bundleB], innerB);
         }
     }
 }

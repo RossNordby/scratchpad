@@ -212,6 +212,8 @@ namespace SolverPrototype
             //Most likely we won't get more than about 2.5x speedup on a computer with bandwidth/compute ratios similar to a 3770K with 1600mhz memory.
             if (workerIndex == threadDispatcher.ThreadCount - 1)
             {
+                //TODO: If this ends up being the only place where you actually make use of the thread memory pools, you might as well get rid of it
+                //in favor of just preallocating workerCount buffers of 1024 ints each. Its original use of creating the typebatch-specific memory no longer exists.
                 LSBRadixSort.Sort<int, Buffer<int>, Buffer<int>>(
                     ref context.SortKeys, ref context.SourceIndices,
                     ref context.ScratchKeys, ref context.ScratchValues, 0, context.ConstraintsInSortRegionCount,

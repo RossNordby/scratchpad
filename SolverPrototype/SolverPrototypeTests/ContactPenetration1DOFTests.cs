@@ -88,21 +88,21 @@ namespace SolverPrototypeTests
                 {
                     ContactPenetrationLimit.ComputeJacobiansAndError(ref contactData[i], out var jacobians, out var error);
                     var maximumRecoveryVelocity = new Vector<float>(1);
-                    GatherScatter.GatherInertia(bodies.LocalInertiaBundles, ref bodyReferences[i], out var inertiaA, out var inertiaB);
+                    GatherScatter.GatherInertia(bodies.LocalInertias, ref bodyReferences[i], out var inertiaA, out var inertiaB);
                     Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref springSettings[i],
                         ref error, dt, inverseDt, out projectionData[i]);
 
-                    GatherScatter.GatherVelocities(bodies.VelocityBundles, ref bodyReferences[i], out var wsvA, out var wsvB);
+                    GatherScatter.GatherVelocities(bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);
                     Inequality2Body1DOF.WarmStart(ref projectionData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
-                    GatherScatter.ScatterVelocities(bodies.VelocityBundles, ref bodyReferences[i], ref wsvA, ref wsvB);
+                    GatherScatter.ScatterVelocities(bodies.Velocities, ref bodyReferences[i], ref wsvA, ref wsvB);
                 }
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
                 {
                     for (int i = 0; i < constraintBundleCount; ++i)
                     {
-                        GatherScatter.GatherVelocities(bodies.VelocityBundles, ref bodyReferences[i], out var wsvA, out var wsvB);
+                        GatherScatter.GatherVelocities(bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);
                         Inequality2Body1DOF.Solve(ref projectionData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
-                        GatherScatter.ScatterVelocities(bodies.VelocityBundles, ref bodyReferences[i], ref wsvA, ref wsvB);
+                        GatherScatter.ScatterVelocities(bodies.Velocities, ref bodyReferences[i], ref wsvA, ref wsvB);
                     }
                 }
             }
