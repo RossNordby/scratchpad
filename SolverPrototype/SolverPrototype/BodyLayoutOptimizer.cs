@@ -433,7 +433,7 @@ namespace SolverPrototype
         /// </summary>
         public void ResizeForBodiesCapacity(BufferPool pool)
         {
-            var bodiesCapacity = (bodies.Poses.Length << BundleIndexing.VectorShift);
+            var bodiesCapacity = bodies.IndexToHandle.Length;
             if (claims.Length != BufferPool<int>.GetLowestContainingElementCount(bodiesCapacity))
             {
                 //We need a new claims buffer. Get rid of the old one.

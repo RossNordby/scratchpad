@@ -16,7 +16,7 @@ namespace SolverPrototype
         //There may be an argument for the matrix variant to ALSO be stored for some bandwidth-unconstrained stages, but don't worry about that until there's a reason to worry about it.
         public QuaternionWide Orientation;
     }
-    
+
     public struct BodyVelocities
     {
         public Vector3Wide LinearVelocity;
@@ -70,21 +70,22 @@ namespace SolverPrototype
         /// Remaps a body handle to the actual array index of the body.
         /// The backing array index may change in response to cache optimization.
         /// </summary>
-        public int[] HandleToIndex;
+        public Buffer<int> HandleToIndex;
         /// <summary>
         /// Remaps a body index to its handle.
         /// </summary>
-        public int[] IndexToHandle;
+        public Buffer<int> IndexToHandle;
 
-        public BodyPoses[] Poses;
-        public BodyVelocities[] Velocities;
-        public BodyInertias[] LocalInertias;
+        public Buffer<BodyPoses> Poses;
+        public Buffer<BodyVelocities> Velocities;
+        public Buffer<BodyInertias> LocalInertias;
         /// <summary>
-        /// The world transformed inertias of bodies as of the last update. Note that direct modifications to the orientation do not automatically update the world inertia tensor;
-        /// this is only updated once during the frame. It should be treated as ephemeral information.
+        /// The world transformed inertias of bodies as of the last update. Note that this is not automatically updated for direct orientation changes or for body memory moves.
+        /// It is only updated once during the frame. It should be treated as ephemeral information.
         /// </summary>
-        public BodyInertias[] Inertias;
+        internal Buffer<BodyInertias> Inertias;
         public IdPool IdPool;
+        BufferPool pool;
         public int BodyCount;
         /// <summary>
         /// Gets the number of body bundles. Any trailing partial bundle is counted as a full bundle.
@@ -93,52 +94,65 @@ namespace SolverPrototype
         {
             get
             {
-                var bundleCount = BodyCount >> BundleIndexing.VectorShift;
-                if ((bundleCount << BundleIndexing.VectorShift) < BodyCount)
-                    ++bundleCount;
-                return bundleCount;
+                return BundleIndexing.GetBundleCount(BodyCount);
             }
         }
 
-        public unsafe Bodies(int initialCapacity = 4096)
+        public unsafe Bodies(BufferPool pool, int initialCapacity = 4096)
         {
+            this.pool = pool;
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
-            Poses = new BodyPoses[initialCapacityInBundles];
-            Velocities = new BodyVelocities[initialCapacityInBundles];
-            LocalInertias = new BodyInertias[initialCapacityInBundles];
-            Inertias = new BodyInertias[initialCapacityInBundles];
+            InternalResize(initialCapacity);
 
             IdPool = new IdPool(initialCapacity);
-            HandleToIndex = new int[initialCapacity];
-            IndexToHandle = new int[initialCapacity];
-            //Initialize all the indices to -1.
-            InitializeIndices(HandleToIndex, 0, HandleToIndex.Length);
-            InitializeIndices(IndexToHandle, 0, IndexToHandle.Length);
         }
 
-        unsafe static void InitializeIndices(int[] array, int start, int count)
+        unsafe void InternalResize(int targetBodyCapacity)
         {
-            fixed (int* pointer = &array[start])
+            Debug.Assert(targetBodyCapacity > 0, "Resize is not meant to be used as Dispose. If you want to return everything to the pool, use Dispose instead.");
+            var targetBundleCapacity = BundleIndexing.GetBundleCount(targetBodyCapacity);
+            Debug.Assert(Poses.Length != BufferPool<BodyPoses>.GetLowestContainingElementCount(targetBundleCapacity), "Should not try to use internal resize of the result won't change the size.");
+            pool.SpecializeFor<BodyPoses>().Take(targetBundleCapacity, out var newPoses);
+            pool.SpecializeFor<BodyVelocities>().Take(targetBundleCapacity, out var newVelocities);
+            pool.SpecializeFor<BodyInertias>().Take(targetBundleCapacity, out var newLocalInertias);
+            pool.SpecializeFor<BodyInertias>().Take(targetBundleCapacity, out var newInertias);
+            pool.SpecializeFor<int>().Take(targetBundleCapacity, out var newHandleToIndex);
+            pool.SpecializeFor<int>().Take(targetBundleCapacity, out var newIndexToHandle);
+            if (Poses.Length > 0)
             {
-                Unsafe.InitBlock(pointer, 0xFF, (uint)(sizeof(int) * count));
+                Debug.Assert(Velocities.Length > 0 && LocalInertias.Length > 0 && Inertias.Length > 0 && HandleToIndex.Length > 0 && IndexToHandle.Length > 0,
+                    "While individual capacities may differ, if any buffer has nonzero length, all should.");
+                var bundleCount = BodyBundleCount;
+                Poses.CopyTo(0, ref newPoses, 0, bundleCount);
+                Velocities.CopyTo(0, ref newVelocities, 0, bundleCount);
+                LocalInertias.CopyTo(0, ref newLocalInertias, 0, bundleCount);
+                Inertias.CopyTo(0, ref newInertias, 0, bundleCount);
+                IndexToHandle.CopyTo(0, ref newIndexToHandle, 0, bundleCount);
+                HandleToIndex.CopyTo(0, ref newHandleToIndex, 0, bundleCount);
+                ReturnBodyResources();
             }
+            Poses = newPoses;
+            Velocities = newVelocities;
+            Inertias = newInertias;
+            LocalInertias = newLocalInertias;
+            IndexToHandle = newIndexToHandle;
+            HandleToIndex = newHandleToIndex;
+            //Initialize all the indices beyond the copied region to -1.
+            Unsafe.InitBlock(((int*)HandleToIndex.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - BodyCount)));
+            Unsafe.InitBlock(((int*)IndexToHandle.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - BodyCount)));
+            //Note that we do NOT modify the idpool's internal queue size here. We lazily handle that during adds, and during explicit calls to EnsureCapacity, Compact, and Resize.
+            //The idpool's internal queue will often be nowhere near as large as the actual body size except in corner cases, so in the usual case, being lazy saves a little space.
+            //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.
         }
 
         public unsafe int Add(ref BodyDescription bodyDescription)
         {
             if (BodyCount == HandleToIndex.Length)
             {
+                Debug.Assert(HandleToIndex.Length > 0, "The backing memory of the bodies set should be initialized before use. Did you dispose and then not call EnsureCapacity/Resize?");
                 //Out of room; need to resize.
                 var newSize = HandleToIndex.Length << 1;
-                Array.Resize(ref Poses, newSize);
-                Array.Resize(ref Velocities, newSize);
-                Array.Resize(ref LocalInertias, newSize);
-                Array.Resize(ref Inertias, newSize);
-                Array.Resize(ref IndexToHandle, newSize);
-                Array.Resize(ref HandleToIndex, newSize);
-
-                InitializeIndices(HandleToIndex, BodyCount, BodyCount);
-                InitializeIndices(IndexToHandle, BodyCount, BodyCount);
+                InternalResize(newSize);
             }
             var handle = IdPool.Take();
             var index = BodyCount++;
@@ -146,9 +160,9 @@ namespace SolverPrototype
             IndexToHandle[index] = handle;
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
-            Bodies.SetLane(ref Poses[bundleIndex], indexInBundle, ref bodyDescription.Pose);
-            Bodies.SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
-            Bodies.SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
+            SetLane(ref Poses[bundleIndex], indexInBundle, ref bodyDescription.Pose);
+            SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
+            SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
             //TODO: Should the world inertias be updated on add? That would suggest a convention of also updating world inertias on any orientation change, which might not be wise given the API.
 
             return handle;
@@ -181,6 +195,7 @@ namespace SolverPrototype
                 GatherScatter.CopyLane(ref Poses[sourceBundle], sourceInner, ref Poses[targetBundle], targetInner);
                 GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
                 GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
+                //Note that if you ever treat the world inertias as 'always updated', it would need to be copied here.
                 //Point the body handles at the new location.
                 var lastHandle = IndexToHandle[movedBodyOriginalIndex];
                 HandleToIndex[lastHandle] = removedIndex;
@@ -262,6 +277,7 @@ namespace SolverPrototype
                 Unsafe.Add(ref sourceLane, 9 * Vector<float>.Count);
 
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void SetLane(ref BodyVelocities targetBundle, int innerIndex, ref BodyVelocity velocity)
         {
@@ -396,6 +412,47 @@ namespace SolverPrototype
             GatherScatter.SwapLanes(ref Poses[bundleA], innerA, ref Poses[bundleB], innerB);
             GatherScatter.SwapLanes(ref Velocities[bundleA], innerA, ref Velocities[bundleB], innerB);
             GatherScatter.SwapLanes(ref LocalInertias[bundleA], innerA, ref LocalInertias[bundleB], innerB);
+        }
+
+
+        /// <summary>
+        /// Clears all bodies from the set without returning any memory to the pool.
+        /// </summary>
+        public void Clear()
+        {
+            //Well that's pretty easy.
+            BodyCount = 0;
+        }
+
+
+        /// <summary>
+        /// Returns the currently used resources.
+        /// </summary>
+        private void ReturnBodyResources()
+        {
+            pool.SpecializeFor<BodyPoses>().Return(ref Poses);
+            pool.SpecializeFor<BodyVelocities>().Return(ref Velocities);
+            pool.SpecializeFor<BodyInertias>().Return(ref LocalInertias);
+            pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
+            pool.SpecializeFor<int>().Return(ref HandleToIndex);
+            pool.SpecializeFor<int>().Return(ref IndexToHandle);
+        }
+
+        /// <summary>
+        /// Returns all body resources to the pool used to create them.
+        /// </summary>
+        /// <remarks>The object can be reused if it is reinitialized by using EnsureCapacity or Resize.</remarks>
+        public void Dispose()
+        {
+            ReturnBodyResources();
+            //Zeroing the lengths is useful for reuse- resizes know not to copy old invalid data.
+            Poses = new Buffer<BodyPoses>();
+            Velocities = new Buffer<BodyVelocities>();
+            LocalInertias = new Buffer<BodyInertias>();
+            Inertias = new Buffer<BodyInertias>();
+            HandleToIndex = new Buffer<int>();
+            IndexToHandle = new Buffer<int>();
+            IdPool.Dispose();
         }
     }
 }
