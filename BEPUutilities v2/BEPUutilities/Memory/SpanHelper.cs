@@ -186,6 +186,5 @@ namespace BEPUutilities2.Memory
                 targetHandle.Free();
         }
 
-
     }
 }

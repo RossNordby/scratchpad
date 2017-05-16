@@ -399,6 +399,14 @@ namespace BEPUutilities2.Memory
         {
             Raw = pool;
         }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetLowestContainingElementCount(int count)
+        {
+            if (count == 0)
+                count = 1;
+            return (1 << SpanHelper.GetContainingPowerOf2(count * Unsafe.SizeOf<T>())) / Unsafe.SizeOf<T>();
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Take(int count, out Buffer<T> span)

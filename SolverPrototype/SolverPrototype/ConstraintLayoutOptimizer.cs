@@ -128,20 +128,19 @@ namespace SolverPrototype
 
             return o;
         }
-        
-      
+
+
         public void Update(BufferPool bufferPool, IThreadDispatcher threadDispatcher = null)
         {
+            //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
+            if (solver.Batches.Count == 0)
+                return;
             var regionSizeInBundles = (int)Math.Max(2, Math.Round(solver.BundleCount * optimizationFraction));
             //The region size in bundles should be divisible by two so that it can be offset by half.
             if ((regionSizeInBundles & 1) == 1)
                 ++regionSizeInBundles;
             //Note that we require that all regions are bundle aligned. This is important for the typebatch sorting process, which tends to use bulk copies from bundle arrays to cache.
             //If not bundle aligned, those bulk copies would become complex due to the constraint AOSOA layout.
-            Debug.Assert((regionSizeInBundles & 1) == 0, "Region size in bundles should be divisible by two to allow offsets.");
-            //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
-            if (solver.Batches.Count == 0)
-                return;
 
             Optimization target;
             if (shouldOffset)

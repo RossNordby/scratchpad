@@ -413,7 +413,7 @@ namespace SolverPrototype
             //No harm to correctness; we'll eventually optimize it during a later frame.
             nextBodyIndex += Math.Max(lowestWorkerJobsCompleted, Math.Max(1, optimizationCount / (threadPool.ThreadCount * 4)));
         }
-
+        
         /// <summary>
         /// Returns the multithreaded claims array to the provided pool.
         /// </summary>
@@ -428,5 +428,6 @@ namespace SolverPrototype
                 claims = new Buffer<int>();
             }
         }
+
     }
 }

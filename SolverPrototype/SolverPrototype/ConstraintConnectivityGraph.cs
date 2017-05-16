@@ -1,28 +1,14 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
     public class ConstraintConnectivityGraph
     {
-        int initialConstraintCountPerBodyPower;
-        /// <summary>
-        /// Gets or sets the expected number of constraints associated with each body.
-        /// Note that this should be a power of 2; if a non-power of 2 is set, it will be interpreted as the next higher power of 2.
-        /// </summary>
-        public int ConstraintCountPerBodyEstimate
-        {
-            get
-            {
-                return 1 << initialConstraintCountPerBodyPower;
-            }
-            set
-            {
-                initialConstraintCountPerBodyPower = SpanHelper.GetContainingPowerOf2(value);
-            }
-        }
+        int constraintCountPerBodyEstimate;
 
 
         //We need a per-body list of constraints because any movement of a body requires updating the connected constraints.
@@ -41,7 +27,7 @@ namespace SolverPrototype
 
         //QuickLists based on a pointer-backed Buffer<int> contain no references at all, so QuickList<int, Buffer<int>>[] only costs a single reference- for the top level array.
         //The rest of it is just a bunch of value types.
-        QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>[] constraintLists;
+        Buffer<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>> constraintLists;
         BufferPool<BodyConstraintReference> bufferPool;
         Solver solver;
 
@@ -59,17 +45,17 @@ namespace SolverPrototype
         /// <param name="solver">Solver associated with the constraints in this graph.</param>
         /// <param name="rawPool">Pool from which per-body lists are allocated.</param>
         /// <param name="initialBodyCountEstimate">Initial estimate for the number of bodies which will exist in the graph.
-        /// If the number is exceeded, an internal buffer will resize and produce garbage.</param>
+        /// If the number is exceeded, an internal buffer will resize and the old buffer will return to the pool.</param>
         /// <param name="initialConstraintCountPerBodyEstimate">Initial estimate for the number of constraints that will exist for each body.
         /// If the number is exceeded, the body list will be resized, but the old list will be returned to the pool for reuse.</param>
-        public ConstraintConnectivityGraph(Solver solver, BufferPool rawPool, int initialBodyCountEstimate = 8192, int initialConstraintCountPerBodyEstimate = 8)
+        public ConstraintConnectivityGraph(Solver solver, BufferPool rawPool, int initialBodyCountEstimate, int initialConstraintCountPerBodyEstimate)
         {
             this.solver = solver;
-            ConstraintCountPerBodyEstimate = initialConstraintCountPerBodyEstimate;
+            constraintCountPerBodyEstimate = initialConstraintCountPerBodyEstimate;
             var capacityInBytes = initialBodyCountEstimate * initialConstraintCountPerBodyEstimate * sizeof(int);
             bufferPool = rawPool.SpecializeFor<BodyConstraintReference>();
 
-            constraintLists = new QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>[initialBodyCountEstimate];
+            rawPool.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Take(initialBodyCountEstimate, out constraintLists);
         }
 
         //Note that constraints only contain direct references to the memory locations of bodies, not to their handles.
@@ -90,16 +76,16 @@ namespace SolverPrototype
         /// </summary>
         /// <param name="bodyIndex">Location to allocate a list.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddBodyList(int bodyIndex)
+        public void AddBodyList(int bodyIndex, BufferPool pool)
         {
             //Note that we trust the user to provide valid locations. The graph shouldn't do any of its own positioning- it is slaved to the body memory layout.
             //This isn't a system that external users will be using under any normal circumstance, so trust should be okay.
             if (bodyIndex >= constraintLists.Length)
             {
                 //Not enough room for this body! Resize required.
-                Array.Resize(ref constraintLists, 1 << SpanHelper.GetContainingPowerOf2(bodyIndex + 1));
+                Resize(ref constraintLists, SpanHelper.GetContainingPowerOf2(bodyIndex + 1), bodyIndex - 1, bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>());
             }
-            QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>.Create(bufferPool, initialConstraintCountPerBodyPower, out constraintLists[bodyIndex]);
+            QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>.Create(bufferPool, constraintCountPerBodyEstimate, out constraintLists[bodyIndex]);
         }
 
         /// <summary>
@@ -154,6 +140,11 @@ namespace SolverPrototype
             RemovalPredicate predicate;
             predicate.ConstraintHandleToRemove = constraintHandle;
             list.FastRemove(ref predicate);
+            if (list.Count <= list.Span.Length / 2 && list.Count >= constraintCountPerBodyEstimate)
+            {
+                //The list has shrunk quite a bit, and it's above the maximum size. Might as well try to trim a little.
+                Resize(ref list.Span, list.Count, list.Count, bufferPool);
+            }
         }
 
         //TODO: It's likely that we'll eventually have something very similar to all of this per body list stuff for collision detection pairs. We'll worry about
@@ -229,7 +220,7 @@ namespace SolverPrototype
         {
             //This is a special case that bypasses the need for a predicate.
             //It's unclear how valuable this actually is- this shouldn't be a particularly common operation. We actually only added it for debugging purposes.
-            ref var list = ref constraintLists[bodyIndex];            
+            ref var list = ref constraintLists[bodyIndex];
             for (int i = 0; i < list.Count; ++i)
             {
                 if (list[i].ConnectingConstraintHandle == constraintHandle)
@@ -237,5 +228,101 @@ namespace SolverPrototype
             }
             return false;
         }
+
+        /// <summary>
+        /// Returns all per-body lists to the buffer pool, but leaves the backing buffer in place. 
+        /// </summary>
+        /// <remarks>This does not track the state necessary to protect against redundant clears. It is assumed that the graph contains as many bodies as are in the given body set.</remarks>
+        internal void Clear(Bodies bodies)
+        {
+            for (int i = 0; i < bodies.BodyCount; ++i)
+            {
+                Debug.Assert(constraintLists[i].Span.Length != 0, "Clears should only be performed if the graph was not already cleared.");
+                constraintLists[i].Dispose(bufferPool);
+#if DEBUG
+                constraintLists[i] = new QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>();
+#endif
+            }
+        }
+        /// <summary>
+        /// Returns the graph's backing buffer to the pool. Does not make any changes to the constraint lists held within it.
+        /// </summary>
+        /// <remarks>This does not track the state necessary to protect against redundant clears. It is assumed that the graph contains as many bodies as are in the given body set.</remarks>
+        internal void Dispose()
+        {
+            Debug.Assert(constraintLists[0].Span.Length == 0, "The graph should be cleared before it is disposed.");
+            Debug.Assert(constraintLists.Length > 0, "The graph should not be redundantly disposed.");
+            bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Return(ref constraintLists);
+            constraintLists = new Buffer<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>();
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void Resize<T>(ref Buffer<T> buffer, int targetSize, int copyCount, BufferPool<T> pool)
+        {
+            Debug.Assert(targetSize != buffer.Length);
+            pool.Take(targetSize, out var newBuffer);
+            buffer.CopyTo(0, ref newBuffer, 0, copyCount);
+            pool.Return(ref buffer);
+            buffer = newBuffer;
+        }
+
+        internal void EnsureCapacity(Bodies bodies, int bodyCount, int constraintsPerBody)
+        {
+            if (constraintLists.Length < bodyCount)
+                Resize(ref constraintLists, bodyCount, bodies.BodyCount, bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>());
+            if (constraintsPerBody > constraintCountPerBodyEstimate)
+            {
+                constraintCountPerBodyEstimate = constraintsPerBody;
+                for (int i = 0; i < bodies.BodyCount; ++i)
+                {
+                    ref var list = ref constraintLists[i];
+                    if (list.Span.Length < constraintsPerBody)
+                        Resize(ref list.Span, constraintsPerBody, list.Count, bufferPool);
+                }
+            }
+        }
+
+        internal void Compact(Bodies bodies, int bodyCount, int constraintsPerBody)
+        {
+            var targetBodyCapacity = BufferPool<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>.GetLowestContainingElementCount(bodyCount);
+            if (constraintLists.Length > targetBodyCapacity)
+                Resize(ref constraintLists, targetBodyCapacity, bodies.BodyCount, bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>());
+            if (constraintsPerBody < constraintCountPerBodyEstimate)
+            {
+                //Note that we still compact per body lists, even though the constraint removal trim is aggressive. The user may have changed the 
+                //minimum size per body list. Performance is assumed to not really matter here- resizing stuff is not a fast operation.
+                this.constraintCountPerBodyEstimate = constraintsPerBody;
+                for (int i = 0; i < bodies.BodyCount; ++i)
+                {
+                    ref var list = ref constraintLists[i];
+                    //Don't resize below the current constraint count.
+                    var targetListCapacity = BufferPool<BodyConstraintReference>.GetLowestContainingElementCount(constraintsPerBody < list.Count ? list.Count : constraintsPerBody);
+                    if (targetListCapacity < list.Span.Length)
+                        Resize(ref list.Span, targetListCapacity, list.Count, bufferPool);
+                }
+            }
+        }
+        internal void Resize(Bodies bodies, int bodyCount, int constraintsPerBody)
+        {
+            var targetBodyCapacity = BufferPool<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>.GetLowestContainingElementCount(bodyCount);
+            if (constraintLists.Length != targetBodyCapacity)
+                Resize(ref constraintLists, targetBodyCapacity, bodies.BodyCount, bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>());
+            if (constraintsPerBody < constraintCountPerBodyEstimate)
+            {
+                //Note that we still compact per body lists, even though the constraint removal trim is aggressive. The user may have changed the 
+                //minimum size per body list. Performance is assumed to not really matter here- resizing stuff is not a fast operation.
+                this.constraintCountPerBodyEstimate = constraintsPerBody;
+                for (int i = 0; i < bodies.BodyCount; ++i)
+                {
+                    ref var list = ref constraintLists[i];
+                    //Don't resize below the current constraint count.
+                    var targetListCapacity = BufferPool<BodyConstraintReference>.GetLowestContainingElementCount(constraintsPerBody < list.Count ? list.Count : constraintsPerBody);
+                    if (targetListCapacity != list.Span.Length)
+                        Resize(ref list.Span, targetListCapacity, list.Count, bufferPool);
+                }
+            }
+        }
+
     }
 }

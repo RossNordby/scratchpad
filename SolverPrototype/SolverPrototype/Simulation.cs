@@ -174,6 +174,9 @@ namespace SolverPrototype
         /// </summary>
         public void Clear()
         {
+            ConstraintGraph.Clear(Bodies);
+            Solver.Clear();
+            Bodies.Clear();
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target.
@@ -184,6 +187,7 @@ namespace SolverPrototype
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
         public void EnsureCapacity(ref SimulationAllocationSizes allocationTarget)
         {
+            ConstraintGraph.EnsureCapacity(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
 
         }
         /// <summary>
@@ -195,7 +199,7 @@ namespace SolverPrototype
         /// <param name="allocationTarget">Target size to compact to. Buffers may be larger to guarantee sufficient room for existing simulation objects.</param>
         public void Compact(ref SimulationAllocationSizes allocationTarget)
         {
-
+            ConstraintGraph.Compact(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target, and decreases the allocation size of any buffers that are unnecessarily large.
@@ -206,7 +210,7 @@ namespace SolverPrototype
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
         public void Resize(ref SimulationAllocationSizes allocationTarget)
         {
-
+            ConstraintGraph.Resize(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
         }
         /// <summary>
         /// Clears the simulation of every object and returns all pooled memory to the buffer pool.
@@ -215,6 +219,10 @@ namespace SolverPrototype
         public void Dispose()
         {
             Clear();
+            Solver.Dispose(BufferPool);
+            Bodies.Dispose(BufferPool);
+            BodyLayoutOptimizer.Dispose(BufferPool);
+            ConstraintGraph.Dispose();
         }
     }
 

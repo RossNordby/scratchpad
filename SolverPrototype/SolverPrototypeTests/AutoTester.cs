@@ -25,10 +25,10 @@ namespace SolverPrototypeTests
             GC.Collect(3, GCCollectionMode.Forced, true);
             SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            //SimulationSetup.ScrambleBodies(simulation);
-            //SimulationSetup.ScrambleConstraints(simulation.Solver);
-            //SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            SimulationSetup.ScrambleBodies(simulation);
+            SimulationSetup.ScrambleConstraints(simulation.Solver);
+            SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             const int batchCompressionIterations = 1000;
             simulation.SolverBatchCompressor.TargetCandidateFraction = .005f;
@@ -39,16 +39,16 @@ namespace SolverPrototypeTests
             }
 
             //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length / 15;
+            int bodyOptimizationIterations = bodyHandles.Length / 4;
             simulation.BodyLayoutOptimizer.OptimizationFraction = 0.005f;
             for (int i = 0; i < bodyOptimizationIterations; ++i)
             {
-                //simulation.BodyLayoutOptimizer.IncrementalOptimize();// simulation.BufferPool, initializationThreadPool);
+                //simulation.BodyLayoutOptimizer.IncrementalOptimize();
                 simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, initializationThreadPool);
             }
 
             simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.044f;
-            int constraintOptimizationIterations = 361;         
+            int constraintOptimizationIterations = 1024;         
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
                 simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, initializationThreadPool);
