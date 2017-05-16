@@ -349,16 +349,9 @@ namespace SolverPrototype
         int workerClaimsBufferSize = 512;
         public void IncrementalOptimize(BufferPool rawPool, IThreadDispatcher threadPool)
         {
-            if (SpanHelper.GetContainingPowerOf2(bodies.BodyCount) > claims.Length || claims.Length > bodies.BodyCount * 2)
-            {
-                //We need a new claims buffer. Get rid of the old one.
-                Dispose(rawPool);
-                rawPool.SpecializeFor<int>().Take(bodies.BodyCount, out claims);
-                //Claims need to be zeroed so that workers can claim by identity.
-                //Go ahead and clear the full buffer so we don't have to worry about later body additions resulting in accesses to uncleared memory.
-                //Easier to clear upfront than track every single add.
-                claims.Clear(0, claims.Length);
-            }
+            //Note that, while we COULD aggressively downsize the claims array in response to body count, we'll instead let it stick around unless the bodies allocations change.
+            Resize(bodiesCapacity);
+
             rawPool.SpecializeFor<Worker>().Take(threadPool.ThreadCount, out workers);
 
             //Note that we ignore the last two slots as optimization targets- no swaps are possible.
@@ -413,19 +406,43 @@ namespace SolverPrototype
             //No harm to correctness; we'll eventually optimize it during a later frame.
             nextBodyIndex += Math.Max(lowestWorkerJobsCompleted, Math.Max(1, optimizationCount / (threadPool.ThreadCount * 4)));
         }
-        
+
+
         /// <summary>
         /// Returns the multithreaded claims array to the provided pool.
         /// </summary>
-        /// <remarks>Apart from its use in the optimization function itself, this only needs to be called when the simulation is being torn down 
-        /// and outstanding pinned resources need to be reclaimed (with the assumption that the underlying bufferpool will be reused).</remarks>
-        /// <param name="rawPool">Pool to return the claims array to.</param>
-        public void Dispose(BufferPool rawPool)
+        /// <remarks><para>Apart from its use in the optimization function itself, this only needs to be called when the simulation is being torn down 
+        /// and outstanding pinned resources need to be reclaimed (with the assumption that the underlying bufferpool will be reused).</para>
+        /// <para>Note that it's possible to reuse the body layout optimizer after disposal. The update function will reallocate a claims array as needed.</para></remarks>
+        /// <param name="pool">Pool to return the claims array to.</param>
+        public void Dispose(BufferPool pool)
         {
             if (claims.Length > 0)
             {
-                rawPool.SpecializeFor<int>().Return(ref claims);
+                pool.SpecializeFor<int>().Return(ref claims);
                 claims = new Buffer<int>();
+            }
+        }
+
+        //Note that we don't have explicit support for compaction or ensure capacity here.
+        //The BodyLayoutOptimizer is effectively a slave of the Bodies set in terms of its resource allocation sizes.
+        //(The only reason it's stored in here is because, at the moment, no other system requires a claims array.)
+   
+        /// <summary>
+        /// Checks the referenced bodies set and resizes the claims array if it does not match the size needed to contain the bodies set.
+        /// </summary>
+        public void ResizeForBodiesCapacity(BufferPool pool)
+        {
+            var bodiesCapacity = (bodies.Poses.Length << BundleIndexing.VectorShift);
+            if (claims.Length != BufferPool<int>.GetLowestContainingElementCount(bodiesCapacity))
+            {
+                //We need a new claims buffer. Get rid of the old one.
+                Dispose(pool);
+                pool.SpecializeFor<int>().Take(bodiesCapacity, out claims);
+                //Claims need to be zeroed so that workers can claim by identity.
+                //Go ahead and clear the full buffer so we don't have to worry about later body additions resulting in accesses to uncleared memory.
+                //Easier to clear upfront than track every single add.
+                claims.Clear(0, claims.Length);
             }
         }
 

@@ -188,6 +188,7 @@ namespace SolverPrototype
         public void EnsureCapacity(ref SimulationAllocationSizes allocationTarget)
         {
             ConstraintGraph.EnsureCapacity(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
+            BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
 
         }
         /// <summary>
@@ -200,6 +201,7 @@ namespace SolverPrototype
         public void Compact(ref SimulationAllocationSizes allocationTarget)
         {
             ConstraintGraph.Compact(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
+            BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target, and decreases the allocation size of any buffers that are unnecessarily large.
@@ -211,6 +213,7 @@ namespace SolverPrototype
         public void Resize(ref SimulationAllocationSizes allocationTarget)
         {
             ConstraintGraph.Resize(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
+            BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
         }
         /// <summary>
         /// Clears the simulation of every object and returns all pooled memory to the buffer pool.

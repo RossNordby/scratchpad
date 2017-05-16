@@ -433,5 +433,44 @@ namespace BEPUutilities2.Memory
             var rawBuffer = new RawBuffer(span.Memory, 1 << SpanHelper.GetContainingPowerOf2(Unsafe.SizeOf<T>() * span.Length), span.Id);
             Raw.Return(ref rawBuffer);
         }
+
+
+        /// <summary>
+        /// Resizes a buffer to the smallest size available in the pool which contains the target size. Copies a subset of elements into the new buffer.
+        /// </summary>
+        /// <param name="buffer">Buffer to resize. The new buffer will replace the old buffer in this reference.</param>
+        /// <param name="targetSize">Number of elements to resize the buffer for.</param>
+        /// <param name="copyCount">Number of elements to copy into the new buffer from the old buffer.</param>
+        /// <param name="pool">Pool to return the old buffer to, if it actually exists, and to pull the new buffer from.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Resize(ref Buffer<T> buffer, int targetSize, int copyCount, BufferPool<T> pool)
+        {
+            Debug.Assert(GetLowestContainingElementCount(targetSize) != GetLowestContainingElementCount(buffer.Length),
+                "There's no reason to resize this buffer; the target size produces the same result.");
+            pool.Take(targetSize, out var newBuffer);
+            if (buffer.Length > 0)
+            {
+                //Don't bother copying from or re-pooling empty buffers. They're uninitialized.
+                buffer.CopyTo(0, ref newBuffer, 0, copyCount);
+                pool.Return(ref buffer);
+            }
+            else
+            {
+                Debug.Assert(copyCount == 0, "Should not be trying to copy elements from an empty span.");
+            }
+            buffer = newBuffer;
+        }
+
+        /// <summary>
+        /// Resizes a buffer to the smallest size available in the pool which contains the target size. Copies a subset of elements into the new buffer.
+        /// </summary>
+        /// <param name="targetSize">Number of elements to resize the buffer for.</param>
+        /// <param name="copyCount">Number of elements to copy into the new buffer from the old buffer.</param>
+        /// <param name="pool">Pool to return the old buffer to, if it actually exists, and to pull the new buffer from.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Resize(ref Buffer<T> buffer, int targetSize, int copyCount)
+        {
+            Resize(ref buffer, targetSize, copyCount, this);
+        }
     }
 }
