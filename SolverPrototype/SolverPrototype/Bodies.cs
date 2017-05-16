@@ -104,7 +104,7 @@ namespace SolverPrototype
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
             InternalResize(initialCapacity);
 
-            IdPool = new IdPool(initialCapacity);
+            IdPool = new IdPool(pool, initialCapacity);
         }
 
         unsafe void InternalResize(int targetBodyCapacity)
@@ -436,6 +436,36 @@ namespace SolverPrototype
             pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
             pool.SpecializeFor<int>().Return(ref HandleToIndex);
             pool.SpecializeFor<int>().Return(ref IndexToHandle);
+        }
+
+        public void EnsureCapacity(int bodyCapacity)
+        {
+            if (IndexToHandle.Length < bodyCapacity)
+            {
+                InternalResize(bodyCapacity);
+            }
+            //When ensuring capacity, we assume the user wants to avoid all related resizes.
+            //So we bump up the idpool's capacity, too. This is likely a massive overestimate, but it doesn't cost that much, and it does provide the necessary guarantee.
+            IdPool.EnsureCapacity(bodyCapacity);
+        }
+        public void Compact(int bodyCapacity)
+        {
+            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
+            if (IndexToHandle.Length > targetBodyCapacity)
+            {
+                InternalResize(targetBodyCapacity);
+            }
+            IdPool.Compact(bodyCapacity);
+        }
+
+        public void Resize(int bodyCapacity)
+        {
+            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
+            if (IndexToHandle.Length != targetBodyCapacity)
+            {
+                InternalResize(targetBodyCapacity);
+            }
+            IdPool.Resize(bodyCapacity);
         }
 
         /// <summary>

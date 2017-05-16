@@ -41,7 +41,7 @@ namespace SolverPrototype
         public Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
             BufferPool = bufferPool;
-            Bodies = new Bodies(initialAllocationSizes.Bodies);
+            Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
             Solver = new Solver(Bodies, BufferPool, initialCapacity: initialAllocationSizes.Constraints, minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
@@ -187,6 +187,8 @@ namespace SolverPrototype
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
         public void EnsureCapacity(ref SimulationAllocationSizes allocationTarget)
         {
+            //Note that the bodies set has to come before the body layout optimizer; the body layout optimizer's sizes are dependent upon the bodies set.
+            Bodies.EnsureCapacity(allocationTarget.Bodies);
             ConstraintGraph.EnsureCapacity(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
 
@@ -200,6 +202,8 @@ namespace SolverPrototype
         /// <param name="allocationTarget">Target size to compact to. Buffers may be larger to guarantee sufficient room for existing simulation objects.</param>
         public void Compact(ref SimulationAllocationSizes allocationTarget)
         {
+            //Note that the bodies set has to come before the body layout optimizer; the body layout optimizer's sizes are dependent upon the bodies set.
+            Bodies.Compact(allocationTarget.Bodies);
             ConstraintGraph.Compact(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
         }
@@ -212,6 +216,8 @@ namespace SolverPrototype
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
         public void Resize(ref SimulationAllocationSizes allocationTarget)
         {
+            //Note that the bodies set has to come before the body layout optimizer; the body layout optimizer's sizes are dependent upon the bodies set.
+            Bodies.Resize(allocationTarget.Bodies);
             ConstraintGraph.Resize(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
         }
@@ -223,7 +229,7 @@ namespace SolverPrototype
         {
             Clear();
             Solver.Dispose(BufferPool);
-            Bodies.Dispose(BufferPool);
+            Bodies.Dispose();
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();
         }
