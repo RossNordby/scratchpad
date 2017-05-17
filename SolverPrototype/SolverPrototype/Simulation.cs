@@ -42,7 +42,9 @@ namespace SolverPrototype
         {
             BufferPool = bufferPool;
             Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
-            Solver = new Solver(Bodies, BufferPool, initialCapacity: initialAllocationSizes.Constraints, minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
+            Solver = new Solver(Bodies, BufferPool,
+                initialCapacity: initialAllocationSizes.Constraints,
+                minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
@@ -228,7 +230,7 @@ namespace SolverPrototype
         public void Dispose()
         {
             Clear();
-            Solver.Dispose(BufferPool);
+            Solver.Dispose();
             Bodies.Dispose();
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();

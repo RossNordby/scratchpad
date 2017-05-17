@@ -18,17 +18,22 @@ namespace SolverPrototype
         /// This can grow up to the number of (bodies / 8) bytes in the worst case, but that is much, much smaller than using a dictionary or set.
         /// 16384 bodies would only take 2KB. Even if you have 1000 batches all at that size, it's a pretty unconcerning amount of storage.
         /// (And to be clear, 1000 batches is a crazy pathological number. Most simulations will have less than 20 batches.)
-        /// This is sufficiently irrelevant that we don't even bother pooling these arrays independently from the owning batches, so they can all become worst case sized.
         /// </remarks>
-        ulong[] packedHandles;
+        Buffer<ulong> packedHandles;
 
         const int shift = 6;
         const int mask = 63;
 
-        public BatchReferencedHandles(int initialCapacityInConstraints)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static int GetSizeInLongs(int count)
+        {
+            return (count >> shift) + ((count & mask) > 0 ? 1 : 0);
+        }
+
+        public BatchReferencedHandles(BufferPool pool, int initialHandleCapacity)
         {
             //Remember; the bundles are 64 bodies wide. A default of 128 supports up to 8192 handles without needing resizing...
-            packedHandles = new ulong[(initialCapacityInConstraints >> shift) + ((initialCapacityInConstraints & mask) > 0 ? 1 : 0)];
+            pool.SpecializeFor<ulong>().Take(GetSizeInLongs(initialHandleCapacity), out packedHandles);
         }
 
 
@@ -39,38 +44,13 @@ namespace SolverPrototype
             return packedIndex < packedHandles.Length && (packedHandles[packedIndex] & (1ul << (handleIndex & mask))) > 0;
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public bool AddIfNotPresent(int handleIndex)
-        //{
-        //    var bundleIndex = handleIndex >> shift;
-        //    if (bundleIndex >= packedHandles.Length)
-        //    {
-        //        //Note that we don't bother caching these arrays. For now, we treat them as too small to matter- allowing every single one to expand to the worst case size is totally fine,
-        //        //and not trying to reuse them just saves some complexity.
-        //        //Also note that we go ahead and jump to the next higher power of 2 rather than exactly matching the handle index. Avoids pointless resizing.
-        //        //(Any waste is, again, basically ignorable.)
-        //        Array.Resize(ref packedHandles, 1 << BufferPool.GetPoolIndex(handleIndex));
-        //    }
-        //    ref var bundle = ref packedHandles[bundleIndex];
-        //    var slot = 1ul << (handleIndex & mask);
-        //    var newlyAdded = (bundle & slot) == 0;
-        //    //Not much point in branching to stop a single instruction that doesn't change the result.
-        //    bundle |= slot;
-        //    return newlyAdded;
-        //}
-
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(int handleIndex)
+        public void Add(int handleIndex, BufferPool pool)
         {
             var bundleIndex = handleIndex >> shift;
             if (bundleIndex >= packedHandles.Length)
             {
-                //Note that we don't bother caching these arrays. For now, we treat them as too small to matter- allowing every single one to expand to the worst case size is totally fine,
-                //and not trying to reuse them just saves some complexity.
-                //Also note that we go ahead and jump to the next higher power of 2 rather than exactly matching the handle index. Avoids pointless resizing.
-                //(Any waste is, again, basically ignorable.)
-                Array.Resize(ref packedHandles, 1 << SpanHelper.GetContainingPowerOf2(bundleIndex + 1));
+                pool.SpecializeFor<ulong>().Resize(ref packedHandles, 1 << SpanHelper.GetContainingPowerOf2(bundleIndex + 1), packedHandles.Length);
             }
             ref var bundle = ref packedHandles[bundleIndex];
             var slot = 1ul << (handleIndex & mask);
@@ -84,6 +64,49 @@ namespace SolverPrototype
         {
             Debug.Assert((packedHandles[handleIndex >> shift] & (1ul << (handleIndex & mask))) > 0, "If you remove a handle, it should be present.");
             packedHandles[handleIndex >> shift] &= ~(1ul << (handleIndex & mask));
+        }
+
+        public void Clear()
+        {
+            packedHandles.Clear(0, packedHandles.Length);
+        }
+
+        public void EnsureCapacity(int handleCount, BufferPool pool)
+        {
+            var desiredSize = GetSizeInLongs(handleCount);
+            if (packedHandles.Length < desiredSize)
+            {
+                pool.SpecializeFor<ulong>().Resize(ref packedHandles, desiredSize, packedHandles.Length);
+            }
+        }
+
+        //While we expose a compaction and resize, using it requires care. It would be a mistake to shrink beyond the current bodies handles size.
+        public void Compact(int handleCount, BufferPool pool)
+        {
+            var desiredSize = BufferPool<ulong>.GetLowestContainingElementCount(GetSizeInLongs(handleCount));
+            if (packedHandles.Length > desiredSize)
+            {
+                pool.SpecializeFor<ulong>().Resize(ref packedHandles, desiredSize, packedHandles.Length);
+            }
+        }
+        public void Resize(int handleCount, BufferPool pool)
+        {
+            var desiredSize = BufferPool<ulong>.GetLowestContainingElementCount(GetSizeInLongs(handleCount));
+            if (packedHandles.Length != desiredSize)
+            {
+                pool.SpecializeFor<ulong>().Resize(ref packedHandles, desiredSize, packedHandles.Length);
+            }
+        }
+        /// <summary>
+        /// Disposes the internal buffer.
+        /// </summary>
+        /// <remarks>The instance can be reused after a Dispose if EnsureCapacity or Resize is called.
+        /// That's a little meaningless given that the instance is a value type, but hey, you don't have to new another one, that's something.</remarks>
+        public void Dispose(BufferPool pool)
+        {
+            Debug.Assert(packedHandles.Length > 0, "Cannot double-dispose.");
+            pool.SpecializeFor<ulong>().Return(ref packedHandles);
+            packedHandles = new Buffer<ulong>();
         }
     }
 }

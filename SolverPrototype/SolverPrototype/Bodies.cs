@@ -83,8 +83,8 @@ namespace SolverPrototype
         /// The world transformed inertias of bodies as of the last update. Note that this is not automatically updated for direct orientation changes or for body memory moves.
         /// It is only updated once during the frame. It should be treated as ephemeral information.
         /// </summary>
-        internal Buffer<BodyInertias> Inertias;
-        public IdPool IdPool;
+        public Buffer<BodyInertias> Inertias;
+        public IdPool<Buffer<int>, BufferPool<int>> IdPool;
         BufferPool pool;
         public int BodyCount;
         /// <summary>
@@ -104,7 +104,7 @@ namespace SolverPrototype
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
             InternalResize(initialCapacity);
 
-            IdPool = new IdPool(pool, initialCapacity);
+            IdPool = new IdPool<Buffer<int>, BufferPool<int>>(pool.SpecializeFor<int>(), initialCapacity);
         }
 
         unsafe void InternalResize(int targetBodyCapacity)

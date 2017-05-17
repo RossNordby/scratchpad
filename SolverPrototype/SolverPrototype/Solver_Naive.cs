@@ -19,7 +19,7 @@ namespace SolverPrototype
             while ((blockIndex = Interlocked.Increment(ref manualNaiveBlockIndex)) <= manualNaiveExclusiveEndIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies.Inertias, context.Dt, context.InverseDt, block.StartBundle, block.End);
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(ref bodies.Inertias, context.Dt, context.InverseDt, block.StartBundle, block.End);
             }
         }
         void ManualNaiveWarmStart(int workBlockIndex)
@@ -28,7 +28,7 @@ namespace SolverPrototype
             while ((blockIndex = Interlocked.Increment(ref manualNaiveBlockIndex)) <= manualNaiveExclusiveEndIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(bodies.Velocities, block.StartBundle, block.End);
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].WarmStart(ref bodies.Velocities, block.StartBundle, block.End);
             }
         }
 
@@ -38,7 +38,7 @@ namespace SolverPrototype
             while ((blockIndex = Interlocked.Increment(ref manualNaiveBlockIndex)) <= manualNaiveExclusiveEndIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].SolveIteration(bodies.Velocities, block.StartBundle, block.End);
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].SolveIteration(ref bodies.Velocities, block.StartBundle, block.End);
             }
         }
 

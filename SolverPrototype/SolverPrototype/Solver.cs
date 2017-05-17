@@ -53,8 +53,9 @@ namespace SolverPrototype
 
         Bodies bodies;
 
-        IdPool handlePool = new IdPool();
-        public ConstraintLocation[] HandlesToConstraints;
+        IdPool<Buffer<int>, BufferPool<int>> handlePool;
+        BufferPool bufferPool;
+        public Buffer<ConstraintLocation> HandleToConstraint;
 
         public TypeBatchAllocation TypeBatchAllocation { get; private set; }
 
@@ -97,14 +98,24 @@ namespace SolverPrototype
             }
         }
 
-        public Solver(Bodies bodies, BufferPool bufferPool, int iterationCount = 5, int initialCapacity = 1024, int minimumCapacityPerTypeBatch = 64, int initialTypeCountEstimate = 32)
+        const int TypeCountEstimate = 32;
+        const int BatchCountEstimate = 32;
+        public Solver(Bodies bodies, BufferPool bufferPool, int iterationCount = 5,
+            int initialCapacity = 1024,
+            int minimumCapacityPerTypeBatch = 64)
         {
             this.iterationCount = iterationCount;
             this.bodies = bodies;
+            this.bufferPool = bufferPool;
+            handlePool = new IdPool<Buffer<int>, BufferPool<int>>(bufferPool.SpecializeFor<int>());
+            //Note that managed arrays must be used to hold the reference types. It's technically possible to bypass this by completely abandoning inheritance in the typebatches, but
+            //that would make a variety of things more annoying to handle. We can make use of just a tiny amount of idiomatic C#-ness. This won't be many references anyway.
+            //We also don't bother pooling this stuff, and we don't have an API for preallocating it- because we're talking about a very, very small amount of data.
+            //It's not worth the introduced API complexity.
             batchArrayPool = new PassthroughArrayPool<ConstraintBatch>();
-            QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, 32, out Batches);
-            HandlesToConstraints = new ConstraintLocation[initialCapacity];
-            TypeBatchAllocation = new TypeBatchAllocation(initialTypeCountEstimate, minimumCapacityPerTypeBatch, bufferPool);
+            QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
+            bufferPool.SpecializeFor<ConstraintLocation>().Take(initialCapacity, out HandleToConstraint);
+            TypeBatchAllocation = new TypeBatchAllocation(TypeCountEstimate, minimumCapacityPerTypeBatch, bufferPool);
         }
 
         /// <summary>
@@ -117,7 +128,7 @@ namespace SolverPrototype
         /// May be invalidated by constraint removals.</param>
         public void GetConstraintReference(int handle, out ConstraintReference reference)
         {
-            ref var constraintLocation = ref HandlesToConstraints[handle];
+            ref var constraintLocation = ref HandleToConstraint[handle];
             reference.TypeBatch = Batches[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId);
             reference.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
         }
@@ -161,7 +172,7 @@ namespace SolverPrototype
                 else
                 {
                     //No reusable batch found. Create a new one.
-                    targetBatch = new ConstraintBatch();
+                    targetBatch = new ConstraintBatch(bufferPool, bodies.BodyCount, TypeCountEstimate);
                     Batches.Add(targetBatch, batchArrayPool);
                 }
             }
@@ -172,14 +183,14 @@ namespace SolverPrototype
             var handle = handlePool.Take();
             targetBatch.Allocate(handle, ref bodyHandles, bodyCount, bodies, TypeBatchAllocation, typeId, out reference);
 
-            if (handle >= HandlesToConstraints.Length)
+            if (handle >= HandleToConstraint.Length)
             {
-                Array.Resize(ref HandlesToConstraints, HandlesToConstraints.Length << 1);
-                Debug.Assert(handle < HandlesToConstraints.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
+                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, HandleToConstraint.Length * 2, HandleToConstraint.Length);
+                Debug.Assert(handle < HandleToConstraint.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
             }
-            HandlesToConstraints[handle].IndexInTypeBatch = reference.IndexInTypeBatch;
-            HandlesToConstraints[handle].TypeId = typeId;
-            HandlesToConstraints[handle].BatchIndex = targetBatchIndex;
+            HandleToConstraint[handle].IndexInTypeBatch = reference.IndexInTypeBatch;
+            HandleToConstraint[handle].TypeId = typeId;
+            HandleToConstraint[handle].BatchIndex = targetBatchIndex;
             return handle;
         }
 
@@ -237,7 +248,7 @@ namespace SolverPrototype
         internal void RemoveFromBatch(int batchIndex, int typeId, int indexInTypeBatch)
         {
             var batch = Batches[batchIndex];
-            batch.Remove(typeId, indexInTypeBatch, bodies, HandlesToConstraints, TypeBatchAllocation);
+            batch.Remove(typeId, indexInTypeBatch, bodies, ref HandleToConstraint, TypeBatchAllocation);
             if (batch.TypeBatches.Count == 0)
             {
                 //No more constraints exist within the batch; we may be able to get rid of this batch.
@@ -277,7 +288,7 @@ namespace SolverPrototype
         {
             //Note that we don't use a ref var here. Have to be careful; we make use of the constraint location after removal. Direct ref would be invalidated.
             //(Could cache the batch index, but that's splitting some very fine hairs.)
-            var constraintLocation = HandlesToConstraints[handle];
+            var constraintLocation = HandleToConstraint[handle];
             RemoveFromBatch(constraintLocation.BatchIndex, constraintLocation.TypeId, constraintLocation.IndexInTypeBatch);
             handlePool.Return(handle);
         }
@@ -300,7 +311,7 @@ namespace SolverPrototype
             //Note that the inlining behavior of the BuildDescription function is critical for efficiency here.
             //If the compiler can prove that the BuildDescription function never references any of the instance fields, it will elide the (potentially expensive) initialization.
             //The BuildDescription and ConstraintTypeId members are basically static. It would be nice if C# could express that a little more cleanly with no overhead.
-            ref var location = ref HandlesToConstraints[handle];
+            ref var location = ref HandleToConstraint[handle];
             var dummy = default(TConstraintDescription);
             var typeBatch = Batches[location.BatchIndex].GetTypeBatch(dummy.ConstraintTypeId);
             BundleIndexing.GetBundleIndices(location.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
@@ -323,7 +334,7 @@ namespace SolverPrototype
             //That's not impossible by any means, but consider that this function will tend to be called in a deferred way- we have control over how many cache optimizations
             //we perform. We do not, however, have any control over how many adds must be performed. Those must be performed immediately for correctness.
             //In other words, doing a little more work here can reduce the overall work required, in addition to simplifying the storage requirements.
-            ref var constraintLocation = ref HandlesToConstraints[constraintHandle];
+            ref var constraintLocation = ref HandleToConstraint[constraintHandle];
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
@@ -337,7 +348,7 @@ namespace SolverPrototype
         /// <param name="enumerator">Enumerator to use.</param>
         internal void EnumerateConnectedBodyIndices<TEnumerator>(int constraintHandle, ref TEnumerator enumerator) where TEnumerator : IForEach<int>
         {
-            ref var constraintLocation = ref HandlesToConstraints[constraintHandle];
+            ref var constraintLocation = ref HandleToConstraint[constraintHandle];
             //This does require a virtual call, but memory swaps should not be an ultra-frequent thing.
             //(A few hundred calls per frame in a simulation of 10000 active objects would probably be overkill.)
             //(Also, there's a sufficient number of cache-missy indirections here that a virtual call is pretty irrelevant.)
@@ -352,7 +363,7 @@ namespace SolverPrototype
                 var batch = Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches[j].Prestep(bodies.Inertias, dt, inverseDt);
+                    batch.TypeBatches[j].Prestep(ref bodies.Inertias, dt, inverseDt);
                 }
             }
             //TODO: May want to consider executing warmstart immediately following the prestep. Multithreading can't do that, so there could be some bitwise differences introduced.
@@ -362,7 +373,7 @@ namespace SolverPrototype
                 var batch = Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches[j].WarmStart(bodies.Velocities);
+                    batch.TypeBatches[j].WarmStart(ref bodies.Velocities);
                 }
             }
             for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
@@ -372,10 +383,108 @@ namespace SolverPrototype
                     var batch = Batches[i];
                     for (int j = 0; j < batch.TypeBatches.Count; ++j)
                     {
-                        batch.TypeBatches[j].SolveIteration(bodies.Velocities);
+                        batch.TypeBatches[j].SolveIteration(ref bodies.Velocities);
                     }
                 }
             }
+        }
+
+        //Note that none of these affect the constraint batch estimates or type batch estimates. The assumption is that those are too small to bother with.
+        //In the worst case you might see a couple of kilobytes. The reason why these functions exist is to deal with the potential many *megabytes* worth of constraint and body buffers.
+        //Maybe something weird happens where this assumption is invalidated later, but I doubt it. There is a cost in API complexity to support it, so we don't.
+
+        /// <summary>
+        /// Removes all objects from the solver without returning any resources to the memory pool.
+        /// </summary>
+        public void Clear()
+        {
+            for (int i = 0; i < Batches.Count; ++i)
+            {
+                Batches[i].Clear(TypeBatchAllocation);
+            }
+            //Note that the 'pooled' batches are stored in place. By changing the count, we move all existing batches into the pool.
+            Batches.Count = 0;
+            handlePool.Clear();
+        }
+
+        public void EnsureCapacity(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
+        {
+            if (Batches.Span.Length == 0)
+            {
+                //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
+                QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
+            }
+            if (HandleToConstraint.Length < constraintCount)
+            {
+                //Note that the handle pool, if disposed, will have a -1 highest claimed id, corresponding to a 0 length copy region.
+                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, constraintCount, handlePool.HighestPossiblyClaimedId + 1);
+            }
+            //Note that we modify the type batch allocation and pass it to the batches. 
+            //The idea here is that the user may also have modified the per-type sizes and wants them to affect the result of this call.
+            if (TypeBatchAllocation.MinimumCapacity < constraintsPerTypeBatch)
+                TypeBatchAllocation.MinimumCapacity = constraintsPerTypeBatch;
+            for (int i = 0; i < Batches.Count; ++i)
+            {
+                Batches[i].EnsureCapacity(TypeBatchAllocation, bodiesCount, TypeCountEstimate);
+            }
+            //Like the bodies set, we lazily handle handlePool internal capacity unless explicitly told to expand by ensure capacity.
+            //This will likely be overkill, but it's a pretty small cost (oh no four hundred kilobytes for a simulation with 100,000 constraints).
+            //If the user really wants to stop resizes, well, this will do that.
+            handlePool.EnsureCapacity(constraintCount);
+        }
+
+        public void Compact(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
+        {
+            if (TypeBatchAllocation.MinimumCapacity > constraintsPerTypeBatch)
+                TypeBatchAllocation.MinimumCapacity = constraintsPerTypeBatch;
+            //Note that we cannot safely compact the handles array below the highest potentially allocated id. This could be a little disruptive sometimes, but the cost is low.
+            //If it ever ecomes a genuine problem, you can change the way the idpool works to permit a tighter maximum.
+            if (HandleToConstraint.Length > BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1)))
+            {
+                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, constraintCount, handlePool.HighestPossiblyClaimedId + 1);
+            }
+            for (int i = 0; i < Batches.Count; ++i)
+            {
+                Batches[i].Compact(TypeBatchAllocation, bodies, bodiesCount);
+            }
+            handlePool.Compact(constraintCount);
+        }
+
+        public void Resize(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
+        {
+            if (Batches.Span.Length == 0)
+            {
+                //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
+                QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
+            }
+            if (HandleToConstraint.Length != BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1)))
+            {
+                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, constraintCount, handlePool.HighestPossiblyClaimedId + 1);
+            }
+            TypeBatchAllocation.MinimumCapacity = constraintsPerTypeBatch;
+            for (int i = 0; i < Batches.Count; ++i)
+            {
+                Batches[i].Resize(TypeBatchAllocation, bodies, bodiesCount, TypeCountEstimate);
+            }
+            handlePool.Resize(constraintCount);
+        }
+
+        /// <summary>
+        /// Disposes all resources in the solver, returning unmanaged resources to the pool and dropping all pooled managed resource references.
+        /// </summary>
+        /// <remarks>The solver object can be reused if EnsureCapacity or Resize is called to rehydrate the resources.</remarks>
+        public void Dispose()
+        {
+            for (int i = 0; i < Batches.Count; ++i)
+            {
+                Batches[i].Dispose(TypeBatchAllocation);
+            }
+            bufferPool.SpecializeFor<ConstraintLocation>().Return(ref HandleToConstraint);
+            HandleToConstraint = new Buffer<ConstraintLocation>();
+            handlePool.Dispose();
+            Batches.Dispose(batchArrayPool);
+            Batches = new QuickList<ConstraintBatch, Array<ConstraintBatch>>();
+            TypeBatchAllocation.ResetPools();
         }
 
 

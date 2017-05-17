@@ -55,7 +55,7 @@ namespace SolverPrototypeTests
             }
 
             //If we don't initialize the inertias in a per-frame update, we must do so explicitly.
-            simulation.Bodies.LocalInertias.CopyTo(simulation.Bodies.Inertias, 0);
+            simulation.Bodies.LocalInertias.CopyTo(0, ref simulation.Bodies.Inertias, 0, simulation.Bodies.LocalInertias.Length);
 
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;

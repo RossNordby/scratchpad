@@ -184,7 +184,7 @@ namespace SolverPrototype.Constraints
 
         internal sealed override void Regather(int constraintStart, int constraintCount, ref int firstSourceIndex,
             ref Buffer<int> indexToHandleCache, ref RawBuffer bodyReferencesCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache,
-            ConstraintLocation[] handlesToConstraints)
+            ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             var typedBodyReferencesCache = bodyReferencesCache.As<TwoBodyReferences>();
             var typedPrestepCache = prestepCache.As<TPrestepData>();
@@ -201,7 +201,7 @@ namespace SolverPrototype.Constraints
 
                 Move(ref typedBodyReferencesCache[sourceBundle], ref typedPrestepCache[sourceBundle], ref typedAccumulatedImpulsesCache[sourceBundle],
                     sourceInner, indexToHandleCache[sourceIndex],
-                    targetBundle, targetInner, targetIndex, handlesToConstraints);
+                    targetBundle, targetInner, targetIndex, ref handlesToConstraints);
 
             }
         }

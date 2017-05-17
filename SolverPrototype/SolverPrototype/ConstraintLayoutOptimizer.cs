@@ -169,13 +169,13 @@ namespace SolverPrototype
 
             var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
             SortByBodyLocation(typeBatch, target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints),
-                solver.HandlesToConstraints, bodies.BodyCount, bufferPool, threadDispatcher);
+                solver.HandleToConstraint, bodies.BodyCount, bufferPool, threadDispatcher);
 
         }
 
         TypeBatch typeBatch;
         IThreadDispatcher threadDispatcher;
-        ConstraintLocation[] handlesToConstraints;
+        Buffer<ConstraintLocation> handlesToConstraints;
         struct MultithreadingContext
         {
             public Buffer<int> SortKeys;
@@ -270,13 +270,13 @@ namespace SolverPrototype
             ref var firstSourceIndex = ref context.SortedSourceIndices[localWorkerConstraintStart];
 
             typeBatch.Regather(workerConstraintStart, workerConstraintCount, ref firstSourceIndex,
-                ref context.IndexToHandleCache, ref context.BodyReferencesCache, ref context.PrestepDataCache, ref context.AccumulatesImpulsesCache, handlesToConstraints);
+                ref context.IndexToHandleCache, ref context.BodyReferencesCache, ref context.PrestepDataCache, ref context.AccumulatesImpulsesCache, ref handlesToConstraints);
 
         }
 
 
 
-        void SortByBodyLocation(TypeBatch typeBatch, int bundleStartIndex, int constraintCount, ConstraintLocation[] handlesToConstraints, int bodyCount,
+        void SortByBodyLocation(TypeBatch typeBatch, int bundleStartIndex, int constraintCount, Buffer<ConstraintLocation> handlesToConstraints, int bodyCount,
             BufferPool rawPool, IThreadDispatcher threadDispatcher)
         {
             int bundleCount = (constraintCount >> BundleIndexing.VectorShift);
@@ -338,7 +338,7 @@ namespace SolverPrototype
 
             this.typeBatch = null;
             this.threadDispatcher = null;
-            this.handlesToConstraints = null;
+            this.handlesToConstraints = new Buffer<ConstraintLocation>();
 
             //This is a pure debug function.
             typeBatch.VerifySortRegion(bundleStartIndex, constraintCount, ref context.SortedKeys, ref context.SortedSourceIndices);

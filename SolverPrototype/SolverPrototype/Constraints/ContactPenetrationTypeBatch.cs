@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using BEPUutilities2.Memory;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Constraints
@@ -9,34 +10,34 @@ namespace SolverPrototype.Constraints
     public class ContactPenetrationTypeBatch : TwoBodyTypeBatch<ContactData, Projection2Body1DOF, Vector<float>>
     {
 
-        public override void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
+        public override void Prestep(ref Buffer<BodyInertias> bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 ContactPenetrationLimit.ComputeJacobiansAndError(ref PrestepData[i], out var jacobians, out var error);
                 BodyReferences[i].Unpack(i, constraintCount, out var bodyReferences);
-                GatherScatter.GatherInertia(bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
+                GatherScatter.GatherInertia(ref bodyInertias, ref bodyReferences, out var inertiaA, out var inertiaB);
                 Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref PrestepData[i].SpringSettings, ref error, dt, inverseDt, out Projection[i]);
             }
         }
-        public override void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
+        public override void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 BodyReferences[i].Unpack(i, constraintCount, out var bodyReferences);
-                GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
+                GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 Inequality2Body1DOF.WarmStart(ref Projection[i], ref AccumulatedImpulses[i], ref wsvA, ref wsvB);
-                GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
+                GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
-        public override void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle)
+        public override void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 BodyReferences[i].Unpack(i, constraintCount, out var bodyReferences);
-                GatherScatter.GatherVelocities(bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
+                GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
                 Inequality2Body1DOF.Solve(ref Projection[i], ref AccumulatedImpulses[i], ref wsvA, ref wsvB);
-                GatherScatter.ScatterVelocities(bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
+                GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
 
@@ -44,12 +45,12 @@ namespace SolverPrototype.Constraints
         /// <summary>
         /// Performs an iteration in the batch, collecting velocity changes. This changes the state of the simulation!
         /// </summary>
-        public void GetVelocityChanges(BodyVelocities[] velocities, ref BodyVelocities velocityChangesA, ref BodyVelocities velocityChangesB)
+        public void GetVelocityChanges(ref Buffer<BodyVelocities> velocities, ref BodyVelocities velocityChangesA, ref BodyVelocities velocityChangesB)
         {
             for (int i = 0; i < bundleCount; ++i)
             {
                 BodyReferences[i].Unpack(i, constraintCount, out var bodyReferences);
-                GatherScatter.GatherVelocities(velocities, ref bodyReferences, out var wsvA, out var wsvB);
+                GatherScatter.GatherVelocities(ref velocities, ref bodyReferences, out var wsvA, out var wsvB);
                 Inequality2Body1DOF.ComputeCorrectiveImpulse(ref wsvA, ref wsvB, ref Projection[i], ref AccumulatedImpulses[i], out var correctiveCSI);
                 var previousA = wsvA;
                 var previousB = wsvB;
@@ -62,11 +63,11 @@ namespace SolverPrototype.Constraints
                 Vector3Wide.Subtract(ref wsvB.AngularVelocity, ref previousB.AngularVelocity, out bundleB.AngularVelocity);
             }
         }
-        public unsafe float GetVelocityChangeHeuristic(BodyVelocities[] velocities)
+        public unsafe float GetVelocityChangeHeuristic(ref Buffer<BodyVelocities> velocities)
         {
             var velocityChangesVectorizedA = new BodyVelocities[bundleCount];
             var velocityChangesVectorizedB = new BodyVelocities[bundleCount];
-            GetVelocityChanges(velocities, ref velocityChangesVectorizedA[0], ref velocityChangesVectorizedB[0]);
+            GetVelocityChanges(ref velocities, ref velocityChangesVectorizedA[0], ref velocityChangesVectorizedB[0]);
 
             //Clamp away any unfilled lanes.
             var lastBundleIndex = bundleCount - 1;

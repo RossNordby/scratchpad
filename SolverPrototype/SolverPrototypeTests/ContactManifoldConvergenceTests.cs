@@ -82,7 +82,7 @@ namespace SolverPrototypeTests
             simulation.Solver.IterationCount = iterationCount;
 
             //If we don't initialize the inertias in a per-frame update, we must do so explicitly.
-            simulation.Bodies.LocalInertias.CopyTo(simulation.Bodies.Inertias, 0);
+            simulation.Bodies.LocalInertias.CopyTo(0, ref simulation.Bodies.Inertias, 0, simulation.Bodies.LocalInertias.Length);
 
             //prejit
             simulation.Solver.Update(dt, inverseDt);

@@ -33,7 +33,7 @@ namespace SolverPrototype.Constraints
         /// <param name="rawPool">Pool to use if the type batch has to be resized.</param>
         /// <returns>Index of the slot in the batch.</returns>
         public unsafe abstract int Allocate(int handle, int* bodyIndices, BufferPool rawPool);
-        public abstract void Remove(int index, ConstraintLocation[] handlesToConstraints);
+        public abstract void Remove(int index, ref Buffer<ConstraintLocation> handlesToConstraints);
 
         /// <summary>
         /// Moves a constraint from one ConstraintBatch's TypeBatch to another ConstraintBatch's TypeBatch of the same type.
@@ -53,9 +53,9 @@ namespace SolverPrototype.Constraints
         /// <param name="indexA">Index of the first constraint to swap.</param>
         /// <param name="indexB">Index of the second constraint to swap.</param>
         /// <param name="handlesToConstraints">The owning solver's handle to constraint mapping.</param>
-        public abstract void SwapConstraints(int a, int b, ConstraintLocation[] handlesToConstraints);
+        public abstract void SwapConstraints(int a, int b, ref Buffer<ConstraintLocation> handlesToConstraints);
 
-        public abstract void Scramble(Random random, ConstraintLocation[] handlesToConstraints);
+        public abstract void Scramble(Random random, ref Buffer<ConstraintLocation> handlesToConstraints);
 
         internal abstract void GetBundleTypeSizes(out int bodyReferencesBundleSize, out int prestepBundleSize, out int accumulatedImpulseBundleSize);
 
@@ -71,35 +71,37 @@ namespace SolverPrototype.Constraints
 
         internal abstract void Regather(int constraintStart, int constraintCount, ref int firstSourceIndex,
            ref Buffer<int> indexToHandleCache, ref RawBuffer bodyReferencesCache, ref RawBuffer prestepCache, ref RawBuffer accumulatedImpulsesCache,
-            ConstraintLocation[] handlesToConstraints);
+            ref Buffer<ConstraintLocation> handlesToConstraints);
 
         [Conditional("DEBUG")]
         internal abstract void VerifySortRegion(int bundleStartIndex, int constraintCount, ref Buffer<int> sortedKeys, ref Buffer<int> sortedSourceIndices);
 
-        public abstract void Initialize(BufferPool rawPool, int initialCapacityInBundles, int typeId);
-        public abstract void Reset(BufferPool rawPool);
+        public abstract void Initialize(TypeBatchAllocation typeBatchAllocation, int typeId);
+        public abstract void EnsureCapacity(TypeBatchAllocation typeBatchAllocation);
+        public abstract void Compact(TypeBatchAllocation typeBatchAllocation);
+        public abstract void Resize(TypeBatchAllocation typeBatchAllocation);
+        public abstract void Dispose(BufferPool rawPool);
 
-        public abstract void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle);
-        public abstract void WarmStart(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle);
-        public abstract void SolveIteration(BodyVelocities[] bodyVelocities, int startBundle, int exclusiveEndBundle);
+        public abstract void Prestep(ref Buffer<BodyInertias> bodyInertias, float dt, float inverseDt, int startBundle, int exclusiveEndBundle);
+        public abstract void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
+        public abstract void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep(BodyInertias[] bodyInertias, float dt, float inverseDt)
+        public void Prestep(ref Buffer<BodyInertias> bodyInertias, float dt, float inverseDt)
         {
-            Prestep(bodyInertias, dt, inverseDt, 0, bundleCount);
+            Prestep(ref bodyInertias, dt, inverseDt, 0, bundleCount);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WarmStart(BodyVelocities[] bodyVelocities)
+        public void WarmStart(ref Buffer<BodyVelocities> bodyVelocities)
         {
-            WarmStart(bodyVelocities, 0, bundleCount);
+            WarmStart(ref bodyVelocities, 0, bundleCount);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SolveIteration(BodyVelocities[] bodyVelocities)
+        public void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities)
         {
-            SolveIteration(bodyVelocities, 0, bundleCount);
+            SolveIteration(ref bodyVelocities, 0, bundleCount);
         }
-
 
     }
     //You are allowed to squint at this triple-class separation.
@@ -232,7 +234,7 @@ namespace SolverPrototype.Constraints
             ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
             ref Buffer<TBodyReferences> bodyReferences, ref Buffer<TPrestepData> prestepData, ref Buffer<TAccumulatedImpulse> accumulatedImpulses,
             ref Buffer<int> indexToHandle,
-            int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ConstraintLocation[] handlesToConstraints)
+            int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             CopyConstraintData(
                 ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, sourceInner,
@@ -247,26 +249,26 @@ namespace SolverPrototype.Constraints
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Move(
             ref TBodyReferences sourceReferencesBundle, ref TPrestepData sourcePrestepBundle, ref TAccumulatedImpulse sourceAccumulatedBundle,
-            int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ConstraintLocation[] handlesToConstraints)
+            int sourceInner, int sourceHandle, int targetBundle, int targetInner, int targetIndex, ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             Move(ref sourceReferencesBundle, ref sourcePrestepBundle, ref sourceAccumulatedBundle, ref BodyReferences, ref PrestepData, ref AccumulatedImpulses, ref IndexToHandle,
-                sourceInner, sourceHandle, targetBundle, targetInner, targetIndex, handlesToConstraints);
+                sourceInner, sourceHandle, targetBundle, targetInner, targetIndex, ref handlesToConstraints);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Move(int sourceBundle, int sourceInner, int sourceIndex, int targetBundle, int targetInner, int targetIndex,
-             ConstraintLocation[] handlesToConstraints)
+             ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, IndexToHandle[sourceIndex],
-                targetBundle, targetInner, targetIndex, handlesToConstraints);
+                targetBundle, targetInner, targetIndex, ref handlesToConstraints);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected void Move(int sourceIndex, int targetIndex,
-            ConstraintLocation[] handlesToConstraints)
+            ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             BundleIndexing.GetBundleIndices(sourceIndex, out var sourceBundle, out var sourceInner);
             BundleIndexing.GetBundleIndices(targetIndex, out var targetBundle, out var targetInner);
             Move(ref BodyReferences[sourceBundle], ref PrestepData[sourceBundle], ref AccumulatedImpulses[sourceBundle], sourceInner, IndexToHandle[sourceIndex],
-                targetBundle, targetInner, targetIndex, handlesToConstraints);
+                targetBundle, targetInner, targetIndex, ref handlesToConstraints);
         }
 
         /// <summary>
@@ -275,7 +277,7 @@ namespace SolverPrototype.Constraints
         /// <param name="a">Index of the first constraint to swap.</param>
         /// <param name="b">Index of the second constraint to swap.</param>
         /// <param name="handlesToConstraints">The owning solver's handle to constraint mapping.</param>
-        public override sealed void SwapConstraints(int a, int b, ConstraintLocation[] handlesToConstraints)
+        public override sealed void SwapConstraints(int a, int b, ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             //TODO: It would probably be a good idea to preallocate a memory blob for use as a cache rather than initializes a bunch of new locals.
             //Maybe newer JITs won't require init, but it doesn't require that much effort to preallocate a blob of sufficient size.
@@ -290,12 +292,12 @@ namespace SolverPrototype.Constraints
             var aHandle = IndexToHandle[a];
 
             BundleIndexing.GetBundleIndices(b, out var bBundle, out var bInner);
-            Move(bBundle, bInner, b, aBundle, aInner, a, handlesToConstraints);
-            Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, aHandle, bBundle, bInner, b, handlesToConstraints);
+            Move(bBundle, bInner, b, aBundle, aInner, a, ref handlesToConstraints);
+            Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, aHandle, bBundle, bInner, b, ref handlesToConstraints);
         }
 
 
-        public sealed override void Scramble(Random random, ConstraintLocation[] handlesToConstraints)
+        public sealed override void Scramble(Random random, ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             //This is a pure debug function used to compare cache optimization strategies. Performance doesn't matter. 
             TPrestepData aPrestep = default(TPrestepData);
@@ -313,8 +315,8 @@ namespace SolverPrototype.Constraints
 
                 var b = random.Next(a);
                 BundleIndexing.GetBundleIndices(b, out var bBundle, out var bInner);
-                Move(bBundle, bInner, b, aBundle, aInner, a, handlesToConstraints);
-                Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, aHandle, bBundle, bInner, b, handlesToConstraints);
+                Move(bBundle, bInner, b, aBundle, aInner, a, ref handlesToConstraints);
+                Move(ref aBodyReferences, ref aPrestep, ref aAccumulated, 0, aHandle, bBundle, bInner, b, ref handlesToConstraints);
             }
         }
 
@@ -323,7 +325,7 @@ namespace SolverPrototype.Constraints
         /// </summary>
         /// <param name="index">Index of the constraint to remove.</param>
         /// <param name="handlesToConstraints">The handle to constraint mapping used by the solver that could be modified by a swap on removal.</param>
-        public override void Remove(int index, ConstraintLocation[] handlesToConstraints)
+        public override void Remove(int index, ref Buffer<ConstraintLocation> handlesToConstraints)
         {
             Debug.Assert(index >= 0 && index < constraintCount, "Can only remove elements that are actually in the batch!");
             var lastIndex = constraintCount - 1;
@@ -339,7 +341,7 @@ namespace SolverPrototype.Constraints
             {
                 //Need to swap.
                 BundleIndexing.GetBundleIndices(index, out var targetBundleIndex, out var targetInnerIndex);
-                Move(sourceBundleIndex, sourceInnerIndex, lastIndex, targetBundleIndex, targetInnerIndex, index, handlesToConstraints);
+                Move(sourceBundleIndex, sourceInnerIndex, lastIndex, targetBundleIndex, targetInnerIndex, index, ref handlesToConstraints);
             }
             //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
             GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);
@@ -397,20 +399,16 @@ namespace SolverPrototype.Constraints
             solver.RemoveFromBatch(sourceBatchIndex, typeId, indexInTypeBatch);
 
             //Don't forget to keep the solver's pointers consistent! We bypassed the usual add procedure, so the solver hasn't been notified yet.
-            ref var constraintLocation = ref solver.HandlesToConstraints[constraintHandle];
+            ref var constraintLocation = ref solver.HandleToConstraint[constraintHandle];
             constraintLocation.BatchIndex = targetBatchIndex;
             constraintLocation.IndexInTypeBatch = newReference.IndexInTypeBatch;
             constraintLocation.TypeId = typeId;
 
         }
 
-        public override void Initialize(BufferPool bufferPool, int initialCapacityInBundles, int typeId)
+        public override void Initialize(TypeBatchAllocation typeBatchAllocation, int typeId)
         {
-            bufferPool.SpecializeFor<TProjection>().Take(initialCapacityInBundles, out Projection);
-            bufferPool.SpecializeFor<TBodyReferences>().Take(initialCapacityInBundles, out BodyReferences);
-            bufferPool.SpecializeFor<TPrestepData>().Take(initialCapacityInBundles, out PrestepData);
-            bufferPool.SpecializeFor<TAccumulatedImpulse>().Take(initialCapacityInBundles, out AccumulatedImpulses);
-            bufferPool.SpecializeFor<int>().Take(initialCapacityInBundles * Vector<float>.Count, out IndexToHandle);
+            InternalResize(typeBatchAllocation, typeBatchAllocation[typeId]);
             //Including this in the typebatch is a little bit hacky; it's just useful to know the typeid without any explicit generic parameters within the type batch 
             //when doing things like the MoveConstraint above- being able to know which type batch without external help simplifies the usage.
             //Given that the initializer always knows the typeid, and given that the cost is an extra 4 bytes at the level of type batches, this hack is pretty low concern.
@@ -418,7 +416,42 @@ namespace SolverPrototype.Constraints
             this.typeId = typeId;
         }
 
-        public override void Reset(BufferPool bufferPool)
+        void InternalResize(TypeBatchAllocation typeBatchAllocation, int constraintCapacity)
+        {
+            Debug.Assert(constraintCapacity >= typeBatchAllocation[typeId], "The constraint capacity should have already been validated.");
+            var bundleCapacity = BundleIndexing.GetBundleCount(constraintCapacity);
+            //Note that the projection is not copied over. It is ephemeral data.
+            typeBatchAllocation.BufferPool.SpecializeFor<TProjection>().Resize(ref Projection, bundleCapacity, 0);
+            typeBatchAllocation.BufferPool.SpecializeFor<TBodyReferences>().Resize(ref BodyReferences, bundleCapacity, bundleCount);
+            typeBatchAllocation.BufferPool.SpecializeFor<TPrestepData>().Resize(ref PrestepData, bundleCapacity, bundleCount);
+            typeBatchAllocation.BufferPool.SpecializeFor<TAccumulatedImpulse>().Resize(ref AccumulatedImpulses, bundleCapacity, bundleCount);
+            typeBatchAllocation.BufferPool.SpecializeFor<int>().Resize(ref IndexToHandle, constraintCapacity, constraintCount);
+        }
+        public override void EnsureCapacity(TypeBatchAllocation typeBatchAllocation)
+        {
+            var desiredConstraintCapacity = Math.Max(constraintCount, typeBatchAllocation[typeId]);
+            if (desiredConstraintCapacity < IndexToHandle.Length)
+            {
+                InternalResize(typeBatchAllocation, desiredConstraintCapacity);
+            }
+        }
+        public override void Compact(TypeBatchAllocation typeBatchAllocation)
+        {
+            var desiredConstraintCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(constraintCount, typeBatchAllocation[typeId]));
+            if (desiredConstraintCapacity < IndexToHandle.Length)
+            {
+                InternalResize(typeBatchAllocation, desiredConstraintCapacity);
+            }
+        }
+        public override void Resize(TypeBatchAllocation typeBatchAllocation)
+        {
+            var desiredConstraintCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(constraintCount, typeBatchAllocation[typeId]));
+            if (desiredConstraintCapacity != IndexToHandle.Length)
+            {
+                InternalResize(typeBatchAllocation, desiredConstraintCapacity);
+            }
+        }
+        public override void Dispose(BufferPool bufferPool)
         {
             bufferPool.SpecializeFor<TProjection>().Return(ref Projection);
             bufferPool.SpecializeFor<TBodyReferences>().Return(ref BodyReferences);
@@ -430,6 +463,10 @@ namespace SolverPrototype.Constraints
             AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
             AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
             IndexToHandle = new Buffer<int>();
+            //While the usual use case for Dispose is returning empty batches to the pool, explicit clears will result in pool returns of nonempty batches.
+            //In that case we need to clear the counts to zero.
+            bundleCount = 0;
+            constraintCount = 0;
         }
 
         internal sealed override void GetBundleTypeSizes(out int bodyReferencesBundleSize, out int prestepBundleSize, out int accumulatedImpulseBundleSize)

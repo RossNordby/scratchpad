@@ -8,7 +8,7 @@ namespace BEPUutilities2.Memory
     /// Manages a pool of identifier values. Grabbing an id from the pool picks a number that has been picked and returned before, 
     /// or if none of those are available, the minimum value greater than any existing id.
     /// </summary>
-    public class IdPool
+    public class IdPool<TSpan, TPool> where TSpan : ISpan<int> where TPool : IMemoryPool<int, TSpan>
     {
         private int nextIndex;
 
@@ -21,16 +21,16 @@ namespace BEPUutilities2.Memory
         {
             get { return nextIndex - 1; }
         }
-        BufferPool<int> pool;
-        public IdPool(BufferPool pool, int initialCapacity = 128)
+        TPool pool;
+        public IdPool(TPool pool, int initialCapacity = 128)
         {
-            this.pool = pool.SpecializeFor<int>();
-            QuickQueue<int, Buffer<int>>.Create(this.pool, initialCapacity, out AvailableIds);
+            this.pool = pool;
+            QuickQueue<int, TSpan>.Create(this.pool, initialCapacity, out AvailableIds);
         }
 
         //Note that all availableIds are guaranteed to be less than nextIndex.
         //[0, nextIndex) contains all currently used ids and ids contained within availableIds.
-        public QuickQueue<int, Buffer<int>> AvailableIds;
+        public QuickQueue<int, TSpan> AvailableIds;
 
         public int Take()
         {
@@ -96,7 +96,7 @@ namespace BEPUutilities2.Memory
             AvailableIds.Dispose(pool);
             //This simplifies reuse and makes it harder to use invalid data.
             nextIndex = 0;
-            AvailableIds = new QuickQueue<int, Buffer<int>>();
+            AvailableIds = new QuickQueue<int, TSpan>();
         }
 
     }

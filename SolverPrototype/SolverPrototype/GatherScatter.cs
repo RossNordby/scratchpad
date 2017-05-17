@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
@@ -185,7 +186,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void GatherVelocities(BodyVelocities[] velocities, ref UnpackedTwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
+        public static unsafe void GatherVelocities(ref Buffer<BodyVelocities> velocities, ref UnpackedTwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
         {
             velocitiesA = new BodyVelocities();
             velocitiesB = new BodyVelocities();
@@ -228,7 +229,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void ScatterVelocities(BodyVelocities[] velocities, ref UnpackedTwoBodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
+        public static unsafe void ScatterVelocities(ref Buffer<BodyVelocities> velocities, ref UnpackedTwoBodyReferences references, ref BodyVelocities velocitiesA, ref BodyVelocities velocitiesB)
         {
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
             ref var baseInnerA = ref Unsafe.As<Vector<int>, int>(ref references.InnerIndexA);
@@ -270,7 +271,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GatherInertia(BodyInertias[] bodyInertias, ref UnpackedTwoBodyReferences references,
+        public static void GatherInertia(ref Buffer<BodyInertias> bodyInertias, ref UnpackedTwoBodyReferences references,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
             //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.

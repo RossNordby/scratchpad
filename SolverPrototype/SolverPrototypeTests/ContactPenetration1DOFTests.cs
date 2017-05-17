@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Constraints;
 using System;
@@ -11,7 +12,8 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            Bodies bodies = new Bodies();
+            var pool = new BufferPool();
+            Bodies bodies = new Bodies(pool);
             const int bodyCount = 16384;
             var handleIndices = new int[bodyCount];
             for (int i = 0; i < bodyCount; ++i)
@@ -88,21 +90,21 @@ namespace SolverPrototypeTests
                 {
                     ContactPenetrationLimit.ComputeJacobiansAndError(ref contactData[i], out var jacobians, out var error);
                     var maximumRecoveryVelocity = new Vector<float>(1);
-                    GatherScatter.GatherInertia(bodies.LocalInertias, ref bodyReferences[i], out var inertiaA, out var inertiaB);
+                    GatherScatter.GatherInertia(ref bodies.LocalInertias, ref bodyReferences[i], out var inertiaA, out var inertiaB);
                     Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref springSettings[i],
                         ref error, dt, inverseDt, out projectionData[i]);
 
-                    GatherScatter.GatherVelocities(bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);
+                    GatherScatter.GatherVelocities(ref bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);
                     Inequality2Body1DOF.WarmStart(ref projectionData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
-                    GatherScatter.ScatterVelocities(bodies.Velocities, ref bodyReferences[i], ref wsvA, ref wsvB);
+                    GatherScatter.ScatterVelocities(ref bodies.Velocities, ref bodyReferences[i], ref wsvA, ref wsvB);
                 }
                 for (int iterationIndex = 0; iterationIndex < iterationCount; ++iterationIndex)
                 {
                     for (int i = 0; i < constraintBundleCount; ++i)
                     {
-                        GatherScatter.GatherVelocities(bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);
+                        GatherScatter.GatherVelocities(ref bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);
                         Inequality2Body1DOF.Solve(ref projectionData[i], ref accumulatedImpulses[i], ref wsvA, ref wsvB);
-                        GatherScatter.ScatterVelocities(bodies.Velocities, ref bodyReferences[i], ref wsvA, ref wsvB);
+                        GatherScatter.ScatterVelocities(ref bodies.Velocities, ref bodyReferences[i], ref wsvA, ref wsvB);
                     }
                 }
             }
@@ -116,7 +118,7 @@ namespace SolverPrototypeTests
             }
             var end = Stopwatch.GetTimestamp();
             Console.WriteLine($"Time (ms): {(1e3 * (end - start)) / Stopwatch.Frequency}");
-
+            pool.Clear();
         }
 
 

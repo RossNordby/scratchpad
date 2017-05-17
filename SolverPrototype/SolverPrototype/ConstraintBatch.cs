@@ -13,22 +13,23 @@ namespace SolverPrototype
     public class ConstraintBatch
     {
         internal BatchReferencedHandles BodyHandles;
-        public int[] TypeIndexToTypeBatchIndex;
+        //Pooling the type index to type batch index is a bit pointless, but we can do it easily, so we do.
+        public Buffer<int> TypeIndexToTypeBatchIndex;
         PassthroughArrayPool<TypeBatch> typeBatchArrayPool;
         public QuickList<TypeBatch, Array<TypeBatch>> TypeBatches;
 
-        public ConstraintBatch(int initialReferencedHandlesEstimate = 128 * 64, int initialTypeCountEstimate = 32)
+        public ConstraintBatch(BufferPool pool, int initialReferencedHandlesEstimate = 128 * 64, int initialTypeCountEstimate = 32)
         {
-            BodyHandles = new BatchReferencedHandles(initialReferencedHandlesEstimate);
-            ResizeTypeMap(initialTypeCountEstimate);
+            BodyHandles = new BatchReferencedHandles(pool, initialReferencedHandlesEstimate);
+            ResizeTypeMap(pool, initialTypeCountEstimate);
             typeBatchArrayPool = new PassthroughArrayPool<TypeBatch>();
-            QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, 16, out TypeBatches);
+            QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, initialTypeCountEstimate, out TypeBatches);
         }
 
-        void ResizeTypeMap(int newSize)
+        void ResizeTypeMap(BufferPool pool, int newSize)
         {
-            var oldLength = TypeIndexToTypeBatchIndex == null ? 0 : TypeIndexToTypeBatchIndex.Length;
-            Array.Resize(ref TypeIndexToTypeBatchIndex, newSize);
+            var oldLength = TypeIndexToTypeBatchIndex.Length;
+            pool.SpecializeFor<int>().Resize(ref TypeIndexToTypeBatchIndex, newSize, oldLength);
             for (int i = oldLength; i < TypeIndexToTypeBatchIndex.Length; ++i)
             {
                 TypeIndexToTypeBatchIndex[i] = -1;
@@ -80,7 +81,7 @@ namespace SolverPrototype
         {
             if (typeId >= TypeIndexToTypeBatchIndex.Length)
             {
-                ResizeTypeMap(1 << SpanHelper.GetContainingPowerOf2(typeId));
+                ResizeTypeMap(typeBatchAllocation.BufferPool, 1 << SpanHelper.GetContainingPowerOf2(typeId));
                 TypeIndexToTypeBatchIndex[typeId] = TypeBatches.Count;
                 return CreateNewTypeBatch(typeId, typeBatchAllocation);
             }
@@ -126,7 +127,7 @@ namespace SolverPrototype
             for (int j = 0; j < bodyCount; ++j)
             {
                 var bodyHandle = Unsafe.Add(ref bodyHandles, j);
-                BodyHandles.Add(bodyHandle);
+                BodyHandles.Add(bodyHandle, typeBatchAllocation.BufferPool);
                 bodyIndices[j] = bodies.HandleToIndex[bodyHandle];
             }
             reference.TypeBatch = GetOrCreateTypeBatch(typeId, typeBatchAllocation);
@@ -140,7 +141,7 @@ namespace SolverPrototype
             //(While resizes will definitely occur, remember that it only really matters for *new* type batches- 
             //and it is rare that a new type batch will be created that actually needs to be enormous.)
         }
-        
+
 
         unsafe struct BodyHandleRemover : IForEach<int>
         {
@@ -162,7 +163,7 @@ namespace SolverPrototype
         }
 
 
-        public unsafe void Remove(int constraintTypeId, int indexInTypeBatch, Bodies bodies, ConstraintLocation[] handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
+        public unsafe void Remove(int constraintTypeId, int indexInTypeBatch, Bodies bodies, ref Buffer<ConstraintLocation> handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
         {
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
 
@@ -174,7 +175,7 @@ namespace SolverPrototype
             var handleRemover = new BodyHandleRemover(bodies, this);
             typeBatch.EnumerateConnectedBodyIndices(indexInTypeBatch, ref handleRemover);
 
-            typeBatch.Remove(indexInTypeBatch, handlesToConstraints);
+            typeBatch.Remove(indexInTypeBatch, ref handlesToConstraints);
             if (typeBatch.ConstraintCount == 0)
             {
                 TypeIndexToTypeBatchIndex[constraintTypeId] = -1;
@@ -190,5 +191,81 @@ namespace SolverPrototype
 
         }
 
+        /// <summary>
+        /// Clears all constraints from the constraint batch.
+        /// </summary>
+        public void Clear(TypeBatchAllocation typeBatchAllocation)
+        {
+            BodyHandles.Clear();
+            for (int i = 0; i < TypeBatches.Count; ++i)
+            {
+                //Returning a type batch clears and disposes it.
+                typeBatchAllocation.Return(TypeBatches[i], TypeBatches[i].TypeId);
+            }
+            TypeBatches.Clear();
+        }
+        public void EnsureCapacity(TypeBatchAllocation typeBatchAllocation, int bodiesCount, int constraintTypeCount)
+        {
+            for (int i = 0; i < TypeBatches.Count; ++i)
+            {
+                TypeBatches[i].EnsureCapacity(typeBatchAllocation);
+            }
+            BodyHandles.EnsureCapacity(bodiesCount, typeBatchAllocation.BufferPool);
+            //For now this is mostly just for rehydration.
+            if (TypeIndexToTypeBatchIndex.Length < constraintTypeCount)
+            {
+                ResizeTypeMap(typeBatchAllocation.BufferPool, constraintTypeCount);
+                if (TypeBatches.Span.Length == 0)
+                    QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, constraintTypeCount, out TypeBatches);
+                else
+                    TypeBatches.Resize(constraintTypeCount, typeBatchArrayPool);
+            }
+        }
+        public void Compact(TypeBatchAllocation typeBatchAllocation, Bodies bodies, int bodiesCount)
+        {
+            for (int i = 0; i < TypeBatches.Count; ++i)
+            {
+                TypeBatches[i].Compact(typeBatchAllocation);
+            }
+            //Note that we can't shrink below the bodies handle capacity, since the handle distribution could be arbitrary.
+            BodyHandles.Compact(Math.Max(bodies.IndexToHandle.Length, bodiesCount), typeBatchAllocation.BufferPool);
+            //Compaction just doesn't change the type batch array sizes. It's a bit complicated and practically irrelevant.
+        }
+        public void Resize(TypeBatchAllocation typeBatchAllocation, Bodies bodies, int bodiesCount, int constraintTypeCount)
+        {
+            for (int i = 0; i < TypeBatches.Count; ++i)
+            {
+                TypeBatches[i].Resize(typeBatchAllocation);
+            }
+            //Note that we can't shrink below the bodies handle capacity, since the handle distribution could be arbitrary.
+            BodyHandles.Resize(Math.Max(bodies.IndexToHandle.Length, bodiesCount), typeBatchAllocation.BufferPool);
+            //For now this is mostly just for rehydration. Note that it's actually an EnsureCapacity. For simplicity, we just don't permit the compaction of the type batch arrays.
+            if (TypeIndexToTypeBatchIndex.Length < constraintTypeCount)
+            {
+                ResizeTypeMap(typeBatchAllocation.BufferPool, constraintTypeCount);
+                if (TypeBatches.Span.Length == 0)
+                    QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, constraintTypeCount, out TypeBatches);
+                else
+                    TypeBatches.Resize(constraintTypeCount, typeBatchArrayPool);
+            }
+        }
+        /// <summary>
+        /// Disposes the unmanaged resources used by the batch and drops all pooled managed resources.
+        /// </summary>
+        /// <remarks>Calling EnsureCapacity or Resize will make the batch usable again after disposal.</remarks>
+        public void Dispose(TypeBatchAllocation typeBatchAllocation)
+        {
+            for (int i = 0; i < TypeBatches.Count; ++i)
+            {
+                //Returning a type batch clears and disposes it.
+                typeBatchAllocation.Return(TypeBatches[i], TypeBatches[i].TypeId);
+            }
+            TypeBatches.Clear();
+            BodyHandles.Dispose(typeBatchAllocation.BufferPool);
+            typeBatchAllocation.BufferPool.SpecializeFor<int>().Return(ref TypeIndexToTypeBatchIndex);
+            TypeIndexToTypeBatchIndex = new Buffer<int>();
+            TypeBatches.Dispose(typeBatchArrayPool);
+            TypeBatches = new QuickList<TypeBatch, Array<TypeBatch>>();
+        }
     }
 }

@@ -347,12 +347,12 @@ namespace SolverPrototype
         Buffer<int> claims;
         //We pick an extremely generous value to begin with because there's not much reason not to. This avoids problems in most reasonable simulations.
         int workerClaimsBufferSize = 512;
-        public void IncrementalOptimize(BufferPool rawPool, IThreadDispatcher threadPool)
+        public void IncrementalOptimize(BufferPool pool, IThreadDispatcher threadPool)
         {
             //Note that, while we COULD aggressively downsize the claims array in response to body count, we'll instead let it stick around unless the bodies allocations change.
-            Resize(bodiesCapacity);
+            ResizeForBodiesCapacity(pool);
 
-            rawPool.SpecializeFor<Worker>().Take(threadPool.ThreadCount, out workers);
+            pool.SpecializeFor<Worker>().Take(threadPool.ThreadCount, out workers);
 
             //Note that we ignore the last two slots as optimization targets- no swaps are possible.
             if (nextBodyIndex >= bodies.BodyCount - 2)
@@ -369,7 +369,7 @@ namespace SolverPrototype
                 ref var worker = ref workers[i];
                 worker.Index = nextStartIndex;
                 worker.CompletedJobs = 0;
-                QuickList<int, Buffer<int>>.Create(rawPool.SpecializeFor<int>(), workerClaimsBufferSize, out worker.WorkerClaims);
+                QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), workerClaimsBufferSize, out worker.WorkerClaims);
 
                 nextStartIndex += spacingBetweenWorkers;
                 if (--spacingRemainder >= 0)
@@ -396,9 +396,9 @@ namespace SolverPrototype
                     lowestWorkerJobsCompleted = worker.CompletedJobs;
 
                 Debug.Assert(worker.WorkerClaims.Count == 0, "After execution, all worker claims should be relinquished.");
-                worker.WorkerClaims.Dispose(rawPool.SpecializeFor<int>());
+                worker.WorkerClaims.Dispose(pool.SpecializeFor<int>());
             }
-            rawPool.SpecializeFor<Worker>().Return(ref workers);
+            pool.SpecializeFor<Worker>().Return(ref workers);
 
             //Push all workers forward by the amount the slowest one got done- or a fixed minimum to avoid stalls.
             //The goal is to ensure each worker gets to keep working on a contiguous blob as much as possible for higher cache coherence.

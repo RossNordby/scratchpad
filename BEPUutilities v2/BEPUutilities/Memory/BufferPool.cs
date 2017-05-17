@@ -89,7 +89,7 @@ namespace BEPUutilities2.Memory
             /// <summary>
             /// Pool of slots available to this power level.
             /// </summary>
-            public readonly IdPool Slots;
+            public readonly IdPool<Array<int>, PassthroughArrayPool<int>> Slots;
 #if DEBUG
             HashSet<int> outstandingIds;
 #endif
@@ -109,7 +109,7 @@ namespace BEPUutilities2.Memory
                 SuballocationSize = 1 << power;
 
                 BlockSize = Math.Max(SuballocationSize, minimumBlockSize);
-                Slots = new IdPool(expectedPooledCount);
+                Slots = new IdPool<Array<int>, PassthroughArrayPool<int>>(new PassthroughArrayPool<int>(), expectedPooledCount);
                 SuballocationsPerBlock = BlockSize / SuballocationSize;
                 SuballocationsPerBlockShift = SpanHelper.GetContainingPowerOf2(SuballocationsPerBlock);
                 SuballocationsPerBlockMask = (1 << SuballocationsPerBlockShift) - 1;

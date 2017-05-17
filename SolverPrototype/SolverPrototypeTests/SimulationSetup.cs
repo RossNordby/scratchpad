@@ -80,7 +80,7 @@ namespace SolverPrototypeTests
             {
                 for (int j = 0; j < solver.Batches[i].TypeBatches.Count; ++j)
                 {
-                    solver.Batches[i].TypeBatches[j].Scramble(random, solver.HandlesToConstraints);
+                    solver.Batches[i].TypeBatches[j].Scramble(random, ref solver.HandleToConstraint);
                 }
             }
         }
@@ -313,7 +313,7 @@ namespace SolverPrototypeTests
                     for (int indexInTypeBatch = 0; indexInTypeBatch < typeBatch.ConstraintCount; ++indexInTypeBatch)
                     {
                         var constraintHandle = typeBatch.IndexToHandle[indexInTypeBatch];
-                        var constraintLocation = simulation.Solver.HandlesToConstraints[constraintHandle];
+                        var constraintLocation = simulation.Solver.HandleToConstraint[constraintHandle];
                         Debug.Assert(
                             constraintLocation.IndexInTypeBatch == indexInTypeBatch &&
                             batch.TypeIndexToTypeBatchIndex[constraintLocation.TypeId] == typeBatchIndex &&
@@ -466,7 +466,7 @@ namespace SolverPrototypeTests
             var bodyHandlesToIdentity = new int[simulation.Bodies.HandleToIndex.Length];
             for (int i = 0; i < bodyHandlesToIdentity.Length; ++i)
                 bodyHandlesToIdentity[i] = -1;
-            var constraintHandlesToIdentity = new int[simulation.Solver.HandlesToConstraints.Length];
+            var constraintHandlesToIdentity = new int[simulation.Solver.HandleToConstraint.Length];
             for (int i = 0; i < constraintHandlesToIdentity.Length; ++i)
                 constraintHandlesToIdentity[i] = -1;
 

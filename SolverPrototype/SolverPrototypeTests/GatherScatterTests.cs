@@ -1,4 +1,5 @@
-﻿using SolverPrototype;
+﻿using BEPUutilities2.Memory;
+using SolverPrototype;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
@@ -11,7 +12,7 @@ namespace SolverPrototypeTests
     {
         struct Context
         {
-            public BodyVelocities[] BodyVelocities;
+            public Buffer<BodyVelocities> BodyVelocities;
             public UnpackedTwoBodyReferences[] BodyReferences;
             public int ConstraintCount;
         }
@@ -23,7 +24,8 @@ namespace SolverPrototypeTests
         {
             Context context;
             context.ConstraintCount = constraintCount;
-            context.BodyVelocities = new BodyVelocities[bodyBundleCount];
+            var pool = new BufferPool();
+            pool.SpecializeFor<BodyVelocities>().Take(bodyBundleCount, out context.BodyVelocities);
             var connections = new ConstraintBodies[constraintCount * Vector<int>.Count];
             var random = new Random(5);
             int maximumBodyIndex = bodyBundleCount * Vector<float>.Count;
@@ -90,7 +92,7 @@ namespace SolverPrototypeTests
         {
             for (int i = 0; i < context.ConstraintCount; ++i)
             {
-                GatherScatter.GatherVelocities(context.BodyVelocities, ref context.BodyReferences[i], out var a, out var b);
+                GatherScatter.GatherVelocities(ref context.BodyVelocities, ref context.BodyReferences[i], out var a, out var b);
             }
         }
 
@@ -102,7 +104,7 @@ namespace SolverPrototypeTests
             var b = new BodyVelocities();
             for (int i = 0; i < context.ConstraintCount; ++i)
             {
-                GatherScatter.ScatterVelocities(context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+                GatherScatter.ScatterVelocities(ref context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
             }
         }
 

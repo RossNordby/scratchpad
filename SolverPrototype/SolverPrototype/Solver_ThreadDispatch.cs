@@ -281,30 +281,30 @@ namespace SolverPrototype
         struct PrestepStageFunction : IStageFunction
         {
             public float Dt, InverseDt;
-            public BodyInertias[] Inertias;
+            public Buffer<BodyInertias> Inertias;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                typeBatch.Prestep(Inertias, Dt, InverseDt, start, end);
+                typeBatch.Prestep(ref Inertias, Dt, InverseDt, start, end);
             }
         }
 
         struct WarmStartStageFunction : IStageFunction
         {
-            public BodyVelocities[] Velocities;
+            public Buffer<BodyVelocities> Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                typeBatch.WarmStart(Velocities, start, end);
+                typeBatch.WarmStart(ref Velocities, start, end);
             }
         }
         struct SolveStageFunction : IStageFunction
         {
-            public BodyVelocities[] Velocities;
+            public Buffer<BodyVelocities> Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                typeBatch.SolveIteration(Velocities, start, end);
+                typeBatch.SolveIteration(ref Velocities, start, end);
             }
         }
 
