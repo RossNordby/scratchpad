@@ -421,6 +421,7 @@ namespace SolverPrototype
             }
             //Note that we modify the type batch allocation and pass it to the batches. 
             //The idea here is that the user may also have modified the per-type sizes and wants them to affect the result of this call.
+            constraintsPerTypeBatch = Math.Max(1, constraintsPerTypeBatch);
             if (TypeBatchAllocation.MinimumCapacity < constraintsPerTypeBatch)
                 TypeBatchAllocation.MinimumCapacity = constraintsPerTypeBatch;
             for (int i = 0; i < Batches.Count; ++i)
@@ -435,13 +436,15 @@ namespace SolverPrototype
 
         public void Compact(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
         {
+            constraintsPerTypeBatch = Math.Max(1, constraintsPerTypeBatch);
             if (TypeBatchAllocation.MinimumCapacity > constraintsPerTypeBatch)
                 TypeBatchAllocation.MinimumCapacity = constraintsPerTypeBatch;
             //Note that we cannot safely compact the handles array below the highest potentially allocated id. This could be a little disruptive sometimes, but the cost is low.
             //If it ever ecomes a genuine problem, you can change the way the idpool works to permit a tighter maximum.
-            if (HandleToConstraint.Length > BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1)))
+            var targetConstraintCount = BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1));
+            if (HandleToConstraint.Length > targetConstraintCount)
             {
-                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, constraintCount, handlePool.HighestPossiblyClaimedId + 1);
+                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, targetConstraintCount, handlePool.HighestPossiblyClaimedId + 1);
             }
             for (int i = 0; i < Batches.Count; ++i)
             {
@@ -457,11 +460,12 @@ namespace SolverPrototype
                 //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
                 QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
             }
-            if (HandleToConstraint.Length != BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1)))
+            var targetConstraintCount = BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1));
+            if (HandleToConstraint.Length != targetConstraintCount)
             {
-                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, constraintCount, handlePool.HighestPossiblyClaimedId + 1);
+                bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, targetConstraintCount, handlePool.HighestPossiblyClaimedId + 1);
             }
-            TypeBatchAllocation.MinimumCapacity = constraintsPerTypeBatch;
+            TypeBatchAllocation.MinimumCapacity = Math.Max(1, constraintsPerTypeBatch);
             for (int i = 0; i < Batches.Count; ++i)
             {
                 Batches[i].Resize(TypeBatchAllocation, bodies, bodiesCount, TypeCountEstimate);

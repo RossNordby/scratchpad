@@ -110,6 +110,8 @@ namespace SolverPrototype
         unsafe void InternalResize(int targetBodyCapacity)
         {
             Debug.Assert(targetBodyCapacity > 0, "Resize is not meant to be used as Dispose. If you want to return everything to the pool, use Dispose instead.");
+            //Note that we base the bundle capacities on the body capacity. This simplifies the conditions on allocation
+            targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(targetBodyCapacity);
             var targetBundleCapacity = BundleIndexing.GetBundleCount(targetBodyCapacity);
             Debug.Assert(Poses.Length != BufferPool<BodyPoses>.GetLowestContainingElementCount(targetBundleCapacity), "Should not try to use internal resize of the result won't change the size.");
             var bodyBundleCount = BodyBundleCount;
@@ -131,7 +133,7 @@ namespace SolverPrototype
         {
             if (BodyCount == HandleToIndex.Length)
             {
-                Debug.Assert(HandleToIndex.Length > 0, "The backing memory of the bodies set should be initialized before use. Did you dispose and then not call EnsureCapacity/Resize?");
+                Debug.Assert(HandleToIndex.Allocated, "The backing memory of the bodies set should be initialized before use. Did you dispose and then not call EnsureCapacity/Resize?");
                 //Out of room; need to resize.
                 var newSize = HandleToIndex.Length << 1;
                 InternalResize(newSize);

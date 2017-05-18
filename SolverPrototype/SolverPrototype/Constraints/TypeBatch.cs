@@ -200,6 +200,8 @@ namespace SolverPrototype.Constraints
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
             AddBodyReferencesLane(ref bundle, innerIndex, bodyIndices);
+            //Clear the slot's accumulated impulse. The backing memory could be initialized to any value.
+            GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[bundleIndex], innerIndex);
             Debug.Assert(PrestepData.Length >= bundleCount);
             Debug.Assert(Projection.Length >= bundleCount);
             Debug.Assert(BodyReferences.Length >= bundleCount);
@@ -337,8 +339,6 @@ namespace SolverPrototype.Constraints
                 BundleIndexing.GetBundleIndices(index, out var targetBundleIndex, out var targetInnerIndex);
                 Move(sourceBundleIndex, sourceInnerIndex, lastIndex, targetBundleIndex, targetInnerIndex, index, ref handlesToConstraints);
             }
-            //Clear the last slot's accumulated impulse regardless of whether a swap takes place. This avoids new constraints getting a weird initial guess.
-            GatherScatter.ClearLane<TAccumulatedImpulse, float>(ref AccumulatedImpulses[sourceBundleIndex], sourceInnerIndex);
             RemoveBodyReferences(sourceBundleIndex, sourceInnerIndex);
 
 #if DEBUG
