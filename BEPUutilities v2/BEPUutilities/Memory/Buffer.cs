@@ -52,12 +52,20 @@ namespace BEPUutilities2.Memory
             ValidateRegion(start, count);
             return new Buffer<T>(Memory + Unsafe.SizeOf<T>() * start, count);
         }
-
-
+        
         public int Length
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return length; }
+        }
+
+        public bool Allocated
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return Memory != null;
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

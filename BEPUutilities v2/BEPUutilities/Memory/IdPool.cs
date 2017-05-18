@@ -59,7 +59,15 @@ namespace BEPUutilities2.Memory
         /// <param name="queuedCount">Number of elements to preallocate space for in the available ids queue.</param>
         public void EnsureCapacity(int queuedCount)
         {
-            AvailableIds.EnsureCapacity(queuedCount, pool);
+            if (!AvailableIds.Span.Allocated)
+            {
+                //If this was disposed, we must explicitly rehydrate it.
+                QuickQueue<int, TSpan>.Create(pool, queuedCount, out AvailableIds);
+            }
+            else
+            {
+                AvailableIds.EnsureCapacity(queuedCount, pool);
+            }
         }
 
         /// <summary>
@@ -80,6 +88,12 @@ namespace BEPUutilities2.Memory
         /// <param name="queuedCount">Number of elements to guarantee space for in the available ids queue.</param>
         public void Resize(int queuedCount)
         {
+            if (!AvailableIds.Span.Allocated)
+            {
+                //If this was disposed, we must explicitly rehydrate it.
+                QuickQueue<int, TSpan>.Create(pool, queuedCount, out AvailableIds);
+                return;
+            }
             var targetLength = BufferPool<int>.GetLowestContainingElementCount(Math.Max(queuedCount, AvailableIds.Count));
             if (AvailableIds.Span.Length != targetLength)
             {

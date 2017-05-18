@@ -157,7 +157,6 @@ namespace SolverPrototypeTests
             }
 
         }
-
         public static void BuildLattice(int width, int height, int length, out Simulation simulation,
             out int[] bodyHandles, out int[] constraintHandles)
         {
@@ -171,6 +170,13 @@ namespace SolverPrototypeTests
                     ConstraintsPerTypeBatch = (bodyCount * 3) / 6,
                     ConstraintCountPerBodyEstimate = 6
                 });
+            BuildLattice(width, height, length, simulation, out bodyHandles, out constraintHandles);
+
+        }
+        public static void BuildLattice(int width, int height, int length, Simulation simulation,
+            out int[] bodyHandles, out int[] constraintHandles)
+        {
+            var bodyCount = width * height * length;
             bodyHandles = new int[bodyCount];
             int ToId(int columnIndex, int rowIndex, int sliceIndex)
             {
@@ -439,7 +445,7 @@ namespace SolverPrototypeTests
                 Validate(simulation, removedConstraints, removedBodies, originalBodyCount, constraintHandles.Length);
             }
         }
-
+        
         public static double AddRemoveChurn(Simulation simulation, int iterations, int[] bodyHandles, int[] constraintHandles)
         {
             //There are three levels of 'index' for each object in this test:

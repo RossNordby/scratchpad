@@ -409,7 +409,7 @@ namespace SolverPrototype
 
         public void EnsureCapacity(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
         {
-            if (Batches.Span.Length == 0)
+            if (!Batches.Span.Allocated)
             {
                 //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
                 QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
@@ -452,7 +452,7 @@ namespace SolverPrototype
 
         public void Resize(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
         {
-            if (Batches.Span.Length == 0)
+            if (!Batches.Span.Allocated)
             {
                 //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
                 QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);

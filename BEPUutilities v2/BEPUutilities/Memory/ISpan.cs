@@ -35,6 +35,11 @@ namespace BEPUutilities2.Memory
         /// Gets the number of elements in the span.
         /// </summary>
         int Length { get; }
+
+        /// <summary>
+        /// Gets whether the span has any backing memory.
+        /// </summary>
+        bool Allocated { get;  }
         
         /// <summary>
         /// Copies elements from one span region to another.

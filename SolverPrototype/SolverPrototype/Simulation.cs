@@ -187,8 +187,9 @@ namespace SolverPrototype
         /// The final size of the allocated buffers are constrained by the allocator. It is not guaranteed to be exactly equal to the target, but it is guaranteed to be at least as large.
         /// </remarks>
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
-        public void EnsureCapacity(ref SimulationAllocationSizes allocationTarget)
+        public void EnsureCapacity(SimulationAllocationSizes allocationTarget)
         {
+            Solver.EnsureCapacity(allocationTarget.Bodies, allocationTarget.Constraints, allocationTarget.ConstraintsPerTypeBatch);
             //Note that the bodies set has to come before the body layout optimizer; the body layout optimizer's sizes are dependent upon the bodies set.
             Bodies.EnsureCapacity(allocationTarget.Bodies);
             ConstraintGraph.EnsureCapacity(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
@@ -202,8 +203,9 @@ namespace SolverPrototype
         /// The final size of the allocated buffers are constrained by the allocator. It is not guaranteed to be exactly equal to the target, but it is guaranteed to be at least as large.
         /// </remarks>
         /// <param name="allocationTarget">Target size to compact to. Buffers may be larger to guarantee sufficient room for existing simulation objects.</param>
-        public void Compact(ref SimulationAllocationSizes allocationTarget)
+        public void Compact(SimulationAllocationSizes allocationTarget)
         {
+            Solver.Compact(allocationTarget.Bodies, allocationTarget.Constraints, allocationTarget.ConstraintsPerTypeBatch);
             //Note that the bodies set has to come before the body layout optimizer; the body layout optimizer's sizes are dependent upon the bodies set.
             Bodies.Compact(allocationTarget.Bodies);
             ConstraintGraph.Compact(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
@@ -216,8 +218,9 @@ namespace SolverPrototype
         /// The final size of the allocated buffers are constrained by the allocator. It is not guaranteed to be exactly equal to the target, but it is guaranteed to be at least as large.
         /// </remarks>
         /// <param name="allocationTarget">Allocation sizes to guarantee sufficient size for.</param>
-        public void Resize(ref SimulationAllocationSizes allocationTarget)
+        public void Resize(SimulationAllocationSizes allocationTarget)
         {
+            Solver.Resize(allocationTarget.Bodies, allocationTarget.Constraints, allocationTarget.ConstraintsPerTypeBatch);
             //Note that the bodies set has to come before the body layout optimizer; the body layout optimizer's sizes are dependent upon the bodies set.
             Bodies.Resize(allocationTarget.Bodies);
             ConstraintGraph.Resize(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);

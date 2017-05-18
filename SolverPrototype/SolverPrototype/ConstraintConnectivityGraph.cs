@@ -252,7 +252,7 @@ namespace SolverPrototype
         /// <para>The graph can be reused after disposal, though it is a good idea to use EnsureCapacity or Resize to avoid a bunch of unnecessary resizes.</para></remarks>
         internal void Dispose()
         {
-            Debug.Assert(constraintLists[0].Span.Length == 0, "The graph should be cleared before it is disposed.");
+            Debug.Assert(!constraintLists[0].Span.Allocated, "The graph should be cleared before it is disposed.");
             Debug.Assert(constraintLists.Length > 0, "The graph should not be redundantly disposed.");
             bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Return(ref constraintLists);
             constraintLists = new Buffer<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>();
@@ -281,6 +281,7 @@ namespace SolverPrototype
             var targetBodyCapacity = BufferPool<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>.GetLowestContainingElementCount(Math.Max(bodies.BodyCount, bodyCount));
             if (constraintLists.Length > targetBodyCapacity)
                 bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Resize(ref constraintLists, targetBodyCapacity, bodies.BodyCount);
+            constraintsPerBody = Math.Max(1, constraintsPerBody);
             if (constraintsPerBody < constraintCountPerBodyEstimate)
             {
                 //Note that we still compact per body lists, even though the constraint removal trim is aggressive. The user may have changed the 
@@ -301,6 +302,7 @@ namespace SolverPrototype
             var targetBodyCapacity = BufferPool<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>.GetLowestContainingElementCount(Math.Max(bodies.BodyCount, bodyCount));
             if (constraintLists.Length != targetBodyCapacity)
                 bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Resize(ref constraintLists, targetBodyCapacity, bodies.BodyCount);
+            constraintsPerBody = Math.Max(1, constraintsPerBody);
             if (constraintsPerBody < constraintCountPerBodyEstimate)
             {
                 //Note that we still compact per body lists, even though the constraint removal trim is aggressive. The user may have changed the 

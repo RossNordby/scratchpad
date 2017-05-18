@@ -52,7 +52,7 @@ namespace SolverPrototype
 
         public void PartialIslandOptimizeDFS(BufferPool pool, int maximumBodiesToVisit = 32)
         {
-            if (islandEnumerator.traversalStack.Span.Length == 0)
+            if (!islandEnumerator.traversalStack.Span.Allocated)
             {
                 islandEnumerator = new PartialIslandDFSEnumerator
                 {

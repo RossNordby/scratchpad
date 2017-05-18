@@ -131,7 +131,7 @@ namespace SolverPrototype
                 bodyIndices[j] = bodies.HandleToIndex[bodyHandle];
             }
             reference.TypeBatch = GetOrCreateTypeBatch(typeId, typeBatchAllocation);
-            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices, typeBatchAllocation.BufferPool);
+            reference.IndexInTypeBatch = reference.TypeBatch.Allocate(handle, bodyIndices, typeBatchAllocation);
             //TODO: We could adjust the typeBatchAllocation capacities in response to the allocated index.
             //If it exceeds the current capacity, we could ensure the new size is still included.
             //The idea here would be to avoid resizes later by ensuring that the historically encountered size is always used to initialize.
@@ -202,6 +202,11 @@ namespace SolverPrototype
                 //Returning a type batch clears and disposes it.
                 typeBatchAllocation.Return(TypeBatches[i], TypeBatches[i].TypeId);
             }
+            //Since there are no more type batches, the mapping must be cleared out.
+            for (int i = 0; i < TypeIndexToTypeBatchIndex.Length; ++i)
+            {
+                TypeIndexToTypeBatchIndex[i] = -1;
+            }
             TypeBatches.Clear();
         }
         public void EnsureCapacity(TypeBatchAllocation typeBatchAllocation, int bodiesCount, int constraintTypeCount)
@@ -215,7 +220,7 @@ namespace SolverPrototype
             if (TypeIndexToTypeBatchIndex.Length < constraintTypeCount)
             {
                 ResizeTypeMap(typeBatchAllocation.BufferPool, constraintTypeCount);
-                if (TypeBatches.Span.Length == 0)
+                if (!TypeBatches.Span.Allocated)
                     QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, constraintTypeCount, out TypeBatches);
                 else
                     TypeBatches.Resize(constraintTypeCount, typeBatchArrayPool);
@@ -243,7 +248,7 @@ namespace SolverPrototype
             if (TypeIndexToTypeBatchIndex.Length < constraintTypeCount)
             {
                 ResizeTypeMap(typeBatchAllocation.BufferPool, constraintTypeCount);
-                if (TypeBatches.Span.Length == 0)
+                if (!TypeBatches.Span.Allocated)
                     QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, constraintTypeCount, out TypeBatches);
                 else
                     TypeBatches.Resize(constraintTypeCount, typeBatchArrayPool);

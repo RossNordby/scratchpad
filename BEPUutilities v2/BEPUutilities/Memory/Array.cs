@@ -42,6 +42,15 @@ namespace BEPUutilities2.Memory
             }
         }
 
+        public bool Allocated
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return Memory != null;
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Clear(int start, int count)
         {

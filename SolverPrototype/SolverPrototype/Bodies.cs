@@ -118,7 +118,7 @@ namespace SolverPrototype
             pool.SpecializeFor<BodyInertias>().Resize(ref LocalInertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<BodyInertias>().Resize(ref Inertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, BodyCount);            
+            pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, BodyCount);
             //Initialize all the indices beyond the copied region to -1.
             Unsafe.InitBlock(((int*)HandleToIndex.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - BodyCount)));
             Unsafe.InitBlock(((int*)IndexToHandle.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - BodyCount)));
@@ -400,25 +400,16 @@ namespace SolverPrototype
         /// <summary>
         /// Clears all bodies from the set without returning any memory to the pool.
         /// </summary>
-        public void Clear()
+        public unsafe void Clear()
         {
-            //Well that's pretty easy.
             BodyCount = 0;
+            //Empty out all the index-handle mappings.
+            Unsafe.InitBlock(HandleToIndex.Memory, 0xFF, (uint)(sizeof(int) * HandleToIndex.Length));
+            Unsafe.InitBlock(IndexToHandle.Memory, 0xFF, (uint)(sizeof(int) * IndexToHandle.Length));
+            IdPool.Clear();
         }
 
 
-        /// <summary>
-        /// Returns the currently used resources.
-        /// </summary>
-        private void ReturnBodyResources()
-        {
-            pool.SpecializeFor<BodyPoses>().Return(ref Poses);
-            pool.SpecializeFor<BodyVelocities>().Return(ref Velocities);
-            pool.SpecializeFor<BodyInertias>().Return(ref LocalInertias);
-            pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
-            pool.SpecializeFor<int>().Return(ref HandleToIndex);
-            pool.SpecializeFor<int>().Return(ref IndexToHandle);
-        }
 
         public void EnsureCapacity(int bodyCapacity)
         {
@@ -456,7 +447,12 @@ namespace SolverPrototype
         /// <remarks>The object can be reused if it is reinitialized by using EnsureCapacity or Resize.</remarks>
         public void Dispose()
         {
-            ReturnBodyResources();
+            pool.SpecializeFor<BodyPoses>().Return(ref Poses);
+            pool.SpecializeFor<BodyVelocities>().Return(ref Velocities);
+            pool.SpecializeFor<BodyInertias>().Return(ref LocalInertias);
+            pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
+            pool.SpecializeFor<int>().Return(ref HandleToIndex);
+            pool.SpecializeFor<int>().Return(ref IndexToHandle);
             //Zeroing the lengths is useful for reuse- resizes know not to copy old invalid data.
             Poses = new Buffer<BodyPoses>();
             Velocities = new Buffer<BodyVelocities>();

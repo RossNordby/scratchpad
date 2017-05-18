@@ -30,9 +30,9 @@ namespace SolverPrototype.Constraints
         /// </summary>
         /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
         /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
-        /// <param name="rawPool">Pool to use if the type batch has to be resized.</param>
+        /// <param name="typeBatchAllocation">Type batch allocation provider to use if the type batch has to be resized.</param>
         /// <returns>Index of the slot in the batch.</returns>
-        public unsafe abstract int Allocate(int handle, int* bodyIndices, BufferPool rawPool);
+        public unsafe abstract int Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation);
         public abstract void Remove(int index, ref Buffer<ConstraintLocation> handlesToConstraints);
 
         /// <summary>
@@ -185,32 +185,26 @@ namespace SolverPrototype.Constraints
 
         protected abstract void RemoveBodyReferences(int bundleIndex, int innerIndex);
 
-
-        /// <summary>
-        /// Allocates a slot in the batch.
-        /// </summary>
-        /// <param name="handle">Handle of the constraint to allocate. Establishes a link from the allocated constraint to its handle.</param>
-        /// <param name="bodyIndices">Pointer to a list of body indices (not handles!) with count equal to the type batch's expected number of involved bodies.</param>
-        /// <param name="pool">Pool to use if the type batch has to be resized.</param>
-        /// <returns>Index of the slot in the batch.</returns>
-        public unsafe sealed override int Allocate(int handle, int* bodyIndices, BufferPool pool)
+        
+        public unsafe sealed override int Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation)
         {
             Debug.Assert(Projection.Memory != null, "Should initialize the batch before allocating anything from it.");
             if (constraintCount == IndexToHandle.Length)
             {
-                IncreaseSize(pool, ref BodyReferences);
-                IncreaseSize(pool, ref PrestepData);
-                IncreaseSize(pool, ref Projection);
-                IncreaseSize(pool, ref AccumulatedImpulses);
-                IncreaseSize(pool, ref IndexToHandle);
+                InternalResize(typeBatchAllocation, constraintCount * 2);
             }
             var index = constraintCount++;
-            IndexToHandle[index] = handle;
             if ((constraintCount & BundleIndexing.VectorMask) == 1)
                 ++bundleCount;
+            IndexToHandle[index] = handle;
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             ref var bundle = ref BodyReferences[bundleIndex];
             AddBodyReferencesLane(ref bundle, innerIndex, bodyIndices);
+            Debug.Assert(PrestepData.Length >= bundleCount);
+            Debug.Assert(Projection.Length >= bundleCount);
+            Debug.Assert(BodyReferences.Length >= bundleCount);
+            Debug.Assert(AccumulatedImpulses.Length >= bundleCount);
+            Debug.Assert(IndexToHandle.Length >= constraintCount);
             return index;
         }
 
@@ -419,18 +413,20 @@ namespace SolverPrototype.Constraints
         void InternalResize(TypeBatchAllocation typeBatchAllocation, int constraintCapacity)
         {
             Debug.Assert(constraintCapacity >= typeBatchAllocation[typeId], "The constraint capacity should have already been validated.");
-            var bundleCapacity = BundleIndexing.GetBundleCount(constraintCapacity);
-            //Note that the projection is not copied over. It is ephemeral data.
+            typeBatchAllocation.BufferPool.SpecializeFor<int>().Resize(ref IndexToHandle, constraintCapacity, constraintCount);
+            //Note that we construct the bundle capacity from the resized constraint capacity. This means we only have to check the IndexToHandle capacity
+            //before allocating, which simplifies things a little bit at the cost of some memory. Could revisit this if memory use is actually a concern.
+            var bundleCapacity = BundleIndexing.GetBundleCount(IndexToHandle.Length);
+            //Note that the projection is not copied over. It is ephemeral data. (In the same vein as above, if memory is an issue, we could just allocate projections on demand.)
             typeBatchAllocation.BufferPool.SpecializeFor<TProjection>().Resize(ref Projection, bundleCapacity, 0);
             typeBatchAllocation.BufferPool.SpecializeFor<TBodyReferences>().Resize(ref BodyReferences, bundleCapacity, bundleCount);
             typeBatchAllocation.BufferPool.SpecializeFor<TPrestepData>().Resize(ref PrestepData, bundleCapacity, bundleCount);
             typeBatchAllocation.BufferPool.SpecializeFor<TAccumulatedImpulse>().Resize(ref AccumulatedImpulses, bundleCapacity, bundleCount);
-            typeBatchAllocation.BufferPool.SpecializeFor<int>().Resize(ref IndexToHandle, constraintCapacity, constraintCount);
         }
         public override void EnsureCapacity(TypeBatchAllocation typeBatchAllocation)
         {
             var desiredConstraintCapacity = Math.Max(constraintCount, typeBatchAllocation[typeId]);
-            if (desiredConstraintCapacity < IndexToHandle.Length)
+            if (desiredConstraintCapacity > IndexToHandle.Length)
             {
                 InternalResize(typeBatchAllocation, desiredConstraintCapacity);
             }
