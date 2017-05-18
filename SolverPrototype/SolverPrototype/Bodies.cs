@@ -112,31 +112,13 @@ namespace SolverPrototype
             Debug.Assert(targetBodyCapacity > 0, "Resize is not meant to be used as Dispose. If you want to return everything to the pool, use Dispose instead.");
             var targetBundleCapacity = BundleIndexing.GetBundleCount(targetBodyCapacity);
             Debug.Assert(Poses.Length != BufferPool<BodyPoses>.GetLowestContainingElementCount(targetBundleCapacity), "Should not try to use internal resize of the result won't change the size.");
-            pool.SpecializeFor<BodyPoses>().Take(targetBundleCapacity, out var newPoses);
-            pool.SpecializeFor<BodyVelocities>().Take(targetBundleCapacity, out var newVelocities);
-            pool.SpecializeFor<BodyInertias>().Take(targetBundleCapacity, out var newLocalInertias);
-            pool.SpecializeFor<BodyInertias>().Take(targetBundleCapacity, out var newInertias);
-            pool.SpecializeFor<int>().Take(targetBundleCapacity, out var newHandleToIndex);
-            pool.SpecializeFor<int>().Take(targetBundleCapacity, out var newIndexToHandle);
-            if (Poses.Length > 0)
-            {
-                Debug.Assert(Velocities.Length > 0 && LocalInertias.Length > 0 && Inertias.Length > 0 && HandleToIndex.Length > 0 && IndexToHandle.Length > 0,
-                    "While individual capacities may differ, if any buffer has nonzero length, all should.");
-                var bundleCount = BodyBundleCount;
-                Poses.CopyTo(0, ref newPoses, 0, bundleCount);
-                Velocities.CopyTo(0, ref newVelocities, 0, bundleCount);
-                LocalInertias.CopyTo(0, ref newLocalInertias, 0, bundleCount);
-                Inertias.CopyTo(0, ref newInertias, 0, bundleCount);
-                IndexToHandle.CopyTo(0, ref newIndexToHandle, 0, bundleCount);
-                HandleToIndex.CopyTo(0, ref newHandleToIndex, 0, bundleCount);
-                ReturnBodyResources();
-            }
-            Poses = newPoses;
-            Velocities = newVelocities;
-            Inertias = newInertias;
-            LocalInertias = newLocalInertias;
-            IndexToHandle = newIndexToHandle;
-            HandleToIndex = newHandleToIndex;
+            var bodyBundleCount = BodyBundleCount;
+            pool.SpecializeFor<BodyPoses>().Resize(ref Poses, targetBundleCapacity, bodyBundleCount);
+            pool.SpecializeFor<BodyVelocities>().Resize(ref Velocities, targetBundleCapacity, bodyBundleCount);
+            pool.SpecializeFor<BodyInertias>().Resize(ref LocalInertias, targetBundleCapacity, bodyBundleCount);
+            pool.SpecializeFor<BodyInertias>().Resize(ref Inertias, targetBundleCapacity, bodyBundleCount);
+            pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, BodyCount);
+            pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, BodyCount);            
             //Initialize all the indices beyond the copied region to -1.
             Unsafe.InitBlock(((int*)HandleToIndex.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - BodyCount)));
             Unsafe.InitBlock(((int*)IndexToHandle.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - BodyCount)));

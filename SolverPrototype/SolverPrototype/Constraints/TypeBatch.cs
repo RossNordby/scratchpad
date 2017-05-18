@@ -460,7 +460,7 @@ namespace SolverPrototype.Constraints
             bufferPool.SpecializeFor<int>().Return(ref IndexToHandle);
             Projection = new Buffer<TProjection>();
             BodyReferences = new Buffer<TBodyReferences>();
-            AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
+            PrestepData = new Buffer<TPrestepData>();
             AccumulatedImpulses = new Buffer<TAccumulatedImpulse>();
             IndexToHandle = new Buffer<int>();
             //While the usual use case for Dispose is returning empty batches to the pool, explicit clears will result in pool returns of nonempty batches.

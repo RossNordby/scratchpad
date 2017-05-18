@@ -80,10 +80,11 @@ namespace SolverPrototype
         {
             //Note that we trust the user to provide valid locations. The graph shouldn't do any of its own positioning- it is slaved to the body memory layout.
             //This isn't a system that external users will be using under any normal circumstance, so trust should be okay.
-            if (bodyIndex >= constraintLists.Length)
+            Debug.Assert(constraintLists.Length >= bodyIndex, "We should only ever add body lists one by one, and they should always be appended. Indices beyond the count should not appear.");
+            if (bodyIndex == constraintLists.Length)
             {
                 //Not enough room for this body! Resize required.
-                bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Resize(ref constraintLists, SpanHelper.GetContainingPowerOf2(bodyIndex + 1), bodyIndex - 1);
+                bufferPool.Raw.SpecializeFor<QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>>().Resize(ref constraintLists, 1 << SpanHelper.GetContainingPowerOf2(bodyIndex + 1), constraintLists.Length);
             }
             QuickList<BodyConstraintReference, Buffer<BodyConstraintReference>>.Create(bufferPool, constraintCountPerBodyEstimate, out constraintLists[bodyIndex]);
         }

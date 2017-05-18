@@ -33,9 +33,25 @@ namespace SolverPrototype
         public BatchReferencedHandles(BufferPool pool, int initialHandleCapacity)
         {
             //Remember; the bundles are 64 bodies wide. A default of 128 supports up to 8192 handles without needing resizing...
-            pool.SpecializeFor<ulong>().Take(GetSizeInLongs(initialHandleCapacity), out packedHandles);
+            packedHandles = new Buffer<ulong>();
+            InternalResize(pool, initialHandleCapacity);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void InternalResize(BufferPool pool, int handleCapacity)
+        {
+            InternalResizeForBundleCount(pool, GetSizeInLongs(handleCapacity));
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void InternalResizeForBundleCount(BufferPool pool, int bundleCapacity)
+        {
+            var copyRegionLength = Math.Min(bundleCapacity, packedHandles.Length);
+            pool.SpecializeFor<ulong>().Resize(ref packedHandles, bundleCapacity, copyRegionLength);
+            //Since the pool's data is not guaranteed to be clean and the handles rely on it being clean, we must clear any memory beyond the copied region.
+            if (packedHandles.Length > copyRegionLength)
+                packedHandles.Clear(copyRegionLength, packedHandles.Length - copyRegionLength);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(int handleIndex)
@@ -50,7 +66,8 @@ namespace SolverPrototype
             var bundleIndex = handleIndex >> shift;
             if (bundleIndex >= packedHandles.Length)
             {
-                pool.SpecializeFor<ulong>().Resize(ref packedHandles, 1 << SpanHelper.GetContainingPowerOf2(bundleIndex + 1), packedHandles.Length);
+                //Note that the bundle index may be larger than two times the current capacity, since handles are not guaranteed to be appended.
+                InternalResizeForBundleCount(pool, 1 << SpanHelper.GetContainingPowerOf2(bundleIndex + 1));
             }
             ref var bundle = ref packedHandles[bundleIndex];
             var slot = 1ul << (handleIndex & mask);
@@ -73,28 +90,27 @@ namespace SolverPrototype
 
         public void EnsureCapacity(int handleCount, BufferPool pool)
         {
-            var desiredSize = GetSizeInLongs(handleCount);
-            if (packedHandles.Length < desiredSize)
+            if ((packedHandles.Length << shift) < handleCount)
             {
-                pool.SpecializeFor<ulong>().Resize(ref packedHandles, desiredSize, packedHandles.Length);
+                InternalResize(pool, handleCount);
             }
         }
 
         //While we expose a compaction and resize, using it requires care. It would be a mistake to shrink beyond the current bodies handles size.
         public void Compact(int handleCount, BufferPool pool)
         {
-            var desiredSize = BufferPool<ulong>.GetLowestContainingElementCount(GetSizeInLongs(handleCount));
-            if (packedHandles.Length > desiredSize)
+            var desiredBundleCount = BufferPool<ulong>.GetLowestContainingElementCount(GetSizeInLongs(handleCount));
+            if (packedHandles.Length > desiredBundleCount)
             {
-                pool.SpecializeFor<ulong>().Resize(ref packedHandles, desiredSize, packedHandles.Length);
+                InternalResizeForBundleCount(pool, desiredBundleCount);
             }
         }
         public void Resize(int handleCount, BufferPool pool)
         {
-            var desiredSize = BufferPool<ulong>.GetLowestContainingElementCount(GetSizeInLongs(handleCount));
-            if (packedHandles.Length != desiredSize)
+            var desiredBundleCount = BufferPool<ulong>.GetLowestContainingElementCount(GetSizeInLongs(handleCount));
+            if (packedHandles.Length != desiredBundleCount)
             {
-                pool.SpecializeFor<ulong>().Resize(ref packedHandles, desiredSize, packedHandles.Length);
+                InternalResizeForBundleCount(pool, desiredBundleCount);
             }
         }
         /// <summary>
