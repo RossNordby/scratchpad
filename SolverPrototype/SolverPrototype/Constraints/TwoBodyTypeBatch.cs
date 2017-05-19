@@ -82,12 +82,25 @@ namespace SolverPrototype.Constraints
         public int Count;
     }
 
+    /// <summary>
+    /// Warm start and solve iteration functions for a constraint type.
+    /// </summary>
+    /// <typeparam name="TAccumulatedImpulse">Type of the accumulated impulses used by the constraint.</typeparam>
+    /// <typeparam name="TProjection">Type of the projection to input.</typeparam>
+    public interface IWarmStartAndSolve<TProjection, TAccumulatedImpulse>
+    {
+        void WarmStart(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
+        void Solve(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
+    }
+
     //Not a big fan of complex generic-filled inheritance hierarchies, but this is the shortest evolutionary step to removing duplicates.
     //There are some other options if this inheritance hierarchy gets out of control.
     /// <summary>
-    /// Shared implementation of memory moves for all two body constraints.
+    /// Shared implementation across all two body constraints.
     /// </summary>
-    public abstract class TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse> : TypeBatch<TwoBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>
+    public abstract class TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse, TWarmStartAndSolveFunction>
+        : TypeBatch<TwoBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>
+        where TWarmStartAndSolveFunction : struct, IWarmStartAndSolve<TProjection, TAccumulatedImpulse>
     {
         public sealed override int BodiesPerConstraint => 2;
 
@@ -219,6 +232,50 @@ namespace SolverPrototype.Constraints
                 Debug.Assert(key == sortedKeys[i], "After the swap goes through, the rederived sort keys should match the previously sorted ones.");
                 previousKey = key;
 
+            }
+        }
+
+
+        //The following covers the common loop logic for all two body constraints. Each iteration invokes the warm start function type.
+        //This abstraction should, in theory, have zero overhead if the implementation of the interface is in a struct with aggressive inlining.
+        //Note that the prestep is not included here. The prestep phase input requirements vary. We wouldn't want to unnecessarily load the body poses
+        //for a constraint that does not need them.
+
+        //By providing the overrides at this level, the concrete implementation (assuming it inherits from one of the prestep-providing variants)
+        //only has to specify *type* arguments associated with the interface-implementing struct-delegates. It's going to look very strange, but it's low overhead
+        //and minimizes per-type duplication.
+
+        public override void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle)
+        {
+            ref var bodyReferencesBase = ref BodyReferences[0];
+            ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
+            ref var projectionBase = ref Projection[0];
+            var function = default(TWarmStartAndSolveFunction);
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
+            {
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
+                ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
+                GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
+                function.WarmStart(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulses);
+                GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
+            }
+        }
+
+        public override void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle)
+        {
+            ref var projectionBase = ref Projection[0];
+            ref var bodyReferencesBase = ref BodyReferences[0];
+            ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
+            var function = default(TWarmStartAndSolveFunction);
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
+            {
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
+                ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
+                GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
+                function.Solve(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulses);
+                GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
 

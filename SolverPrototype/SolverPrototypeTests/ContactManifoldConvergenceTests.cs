@@ -18,9 +18,9 @@ namespace SolverPrototypeTests
         {
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
-            const int width = 8;
-            const int height = 8;
-            const int length = 8;
+            const int width = 32;
+            const int height = 32;
+            const int length = 32;
             SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.ScrambleBodies(simulation);
