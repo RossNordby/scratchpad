@@ -253,11 +253,9 @@ namespace SolverPrototype.Constraints
             var function = default(TWarmStartAndSolveFunction);
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
-                ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
-                ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                function.WarmStart(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulses);
+                function.WarmStart(ref wsvA, ref wsvB, ref Unsafe.Add(ref projectionBase, i), ref Unsafe.Add(ref accumulatedImpulsesBase, i));
                 GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
@@ -270,11 +268,9 @@ namespace SolverPrototype.Constraints
             var function = default(TWarmStartAndSolveFunction);
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
-                ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
-                ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                function.Solve(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulses);
+                function.Solve(ref wsvA, ref wsvB, ref Unsafe.Add(ref projectionBase, i), ref Unsafe.Add(ref accumulatedImpulsesBase, i));
                 GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }

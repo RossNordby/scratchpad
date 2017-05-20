@@ -188,8 +188,6 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static unsafe void GatherVelocities(ref Buffer<BodyVelocities> velocities, ref UnpackedTwoBodyReferences references, out BodyVelocities velocitiesA, out BodyVelocities velocitiesB)
         {
-            velocitiesA = new BodyVelocities();
-            velocitiesB = new BodyVelocities();
             ref var baseLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);
             ref var baseLinearBX = ref Unsafe.As<Vector<float>, float>(ref velocitiesB.LinearVelocity.X);
 
@@ -270,15 +268,20 @@ namespace SolverPrototype
             }
         }
 
+
+        /// <summary>
+        /// Gathers the inertia associated with the bodies of a bundle.
+        /// </summary>
+        /// <param name="bodyInertias">Set of all body inertias.</param>
+        /// <param name="references">Body references of the constraint to gather.</param>
+        /// <param name="inertiaA">Gathered inertia of the first body in the pair.</param>
+        /// <param name="inertiaB">Gathered inertia of the second body in the pair.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GatherInertia(ref Buffer<BodyInertias> bodyInertias, ref UnpackedTwoBodyReferences references,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
             //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.
-            //Branches are not particularly cheap, especially when they mispredict. Better to just gather it regardless.
-
-            inertiaA = new BodyInertias();
-            inertiaB = new BodyInertias();
+            //Branches are not particularly cheap, especially when they mispredict. Better to just gather it regardless.            
             ref var targetBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.X.X);
             ref var targetBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.X.X);
 
@@ -346,7 +349,7 @@ namespace SolverPrototype
             }
         }
 
-        
+
     }
 }
 
