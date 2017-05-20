@@ -25,7 +25,7 @@ namespace SolverPrototype.Constraints
         //it's a pretty clear win for any bandwidth constrained use.
         //And, while as of this writing the CoreCLR does not support AVX512, we should expect it someday- and memory bandwidth is going to be even a bigger concern.
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Unpack(int bundleIndex, int constraintCount, out UnpackedTwoBodyReferences unpacked)
         {
             //Having access to SIMD shift would be really nice. (There's not actually hardware support for int divide, so... per-slot shift it is.)

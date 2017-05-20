@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
-    <RuntimeFrameworkVersion>2.0.0-preview2-002093-00</RuntimeFrameworkVersion>
+    <RuntimeFrameworkVersion>2.0.0-preview2-25309-07</RuntimeFrameworkVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">

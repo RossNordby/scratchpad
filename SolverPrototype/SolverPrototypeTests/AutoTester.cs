@@ -71,13 +71,13 @@ namespace SolverPrototypeTests
             {
                 CacheBlaster.Blast();
                 var frameStartTime = Stopwatch.GetTimestamp();
-                //simulation.Solver.Update(dt, inverseDt);
+                simulation.Solver.Update(dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ManualNaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.IntermediateMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 //simulation.Solver.ContiguousClaimMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
-                simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
+                //simulation.Solver.MultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);
                 var frameEndTime = Stopwatch.GetTimestamp();
                 var frameTime = (frameEndTime - frameStartTime) / (double)Stopwatch.Frequency;
                 if (frameTime < testTimings.Min)

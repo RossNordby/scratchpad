@@ -41,8 +41,8 @@ namespace SolverPrototype
             //"ERP" is the error reduction per frame. Note that it can never exceed 1 given physically valid input.
             //Since it is a *per frame* term, note that the position error is additionally scaled by inverseDt to get the target velocity
             //needed to accomplish the desired error reduction in one frame.
-            var frequencyDt = settings.NaturalFrequency * dt;
-            var twiceDampingRatio = settings.DampingRatio * 2; //Could precompute.
+            var frequencyDt = settings.NaturalFrequency * new Vector<float>(dt);
+            var twiceDampingRatio = settings.DampingRatio * new Vector<float>(2); //Could precompute.
             positionErrorToVelocity = settings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
             var extra = Vector<float>.One / (frequencyDt * (frequencyDt + twiceDampingRatio));
             effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);
@@ -67,8 +67,8 @@ namespace SolverPrototype
             //This is derived from stiffness and damping. Since we want N constraints together to be as stiff as 1 constraint of the given spring settings,
             //we compute CFM and ERP from stiffness and damping coefficients that are scaled by 1/N. Omitting the derivation, it turns out 
             //that just scales the CFM by N.
-            var frequencyDt = settings.NaturalFrequency * dt;
-            var twiceDampingRatio = settings.DampingRatio * 2; //Could precompute.
+            var frequencyDt = settings.NaturalFrequency * new Vector<float>(dt);
+            var twiceDampingRatio = settings.DampingRatio * new Vector<float>(2f); //Could precompute.
             positionErrorToVelocity = settings.NaturalFrequency / (frequencyDt + twiceDampingRatio);
             var extra = new Vector<float>(constraintCount) / (frequencyDt * (frequencyDt + twiceDampingRatio));
             effectiveMassCFMScale = Vector<float>.One / (Vector<float>.One + extra);

@@ -71,7 +71,9 @@ namespace SolverPrototype.Constraints
         public TwistFrictionProjection Twist;
     }
 
-    public struct ContactManifold4Prestep : IUnposedPrestep<ContactManifold4PrestepData, ContactManifold4Projection>
+    public struct ContactManifold4 : 
+        IUnposedPrestep<ContactManifold4PrestepData, ContactManifold4Projection>,
+        IWarmStartAndSolve<ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Prestep(ref ContactManifold4PrestepData prestep, ref BodyInertias inertiaA, ref BodyInertias inertiaB,
@@ -108,9 +110,7 @@ namespace SolverPrototype.Constraints
             Vector3Wide.Distance(ref prestep.OffsetA3, ref offsetToManifoldCenterA, out projection.LeverArm3);
             TwistFriction.Prestep(ref inertiaA, ref inertiaB, ref surfaceBasis.Y, out projection.Twist);
         }
-    }
-    public struct ContactManifold4WarmStartAndSolve : IWarmStartAndSolve<ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
-    {
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WarmStart(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref ContactManifold4Projection projection, ref ContactManifold4AccumulatedImpulses accumulatedImpulses)
         {
@@ -153,8 +153,8 @@ namespace SolverPrototype.Constraints
     /// <summary>
     /// Handles the solve iterations of a bunch of 4-contact convex manifold constraints.
     /// </summary>
-    public class ContactManifold4TypeBatch : UnposedTwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses,
-        ContactManifold4Prestep, ContactManifold4WarmStartAndSolve>
+    public class ContactManifold4TypeBatch :
+        UnposedTwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4>
     {
 
     }
