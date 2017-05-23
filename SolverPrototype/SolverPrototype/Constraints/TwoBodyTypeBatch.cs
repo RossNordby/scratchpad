@@ -25,7 +25,7 @@ namespace SolverPrototype.Constraints
         //it's a pretty clear win for any bandwidth constrained use.
         //And, while as of this writing the CoreCLR does not support AVX512, we should expect it someday- and memory bandwidth is going to be even a bigger concern.
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public void Unpack(int bundleIndex, int constraintCount, out UnpackedTwoBodyReferences unpacked)
         {
             //Having access to SIMD shift would be really nice. (There's not actually hardware support for int divide, so... per-slot shift it is.)
@@ -36,7 +36,7 @@ namespace SolverPrototype.Constraints
             //Note that we don't bother using the bundle's count here. 
             //That would only be helpful in one bundle per type batch, so the branching would just be (a tiny amount of) wasted effort almost always.
             Debug.Assert((Vector<int>.Count & 3) == 0, "No current hardware has a non-4-multiple width of 32 bit types, but just in case, note that this requires a width that is a multiple of 4!");
-
+            
             bundleA = indexA >> BundleIndexing.VectorShift;
             bundleB = indexB >> BundleIndexing.VectorShift;
             Unsafe.Add(ref bundleA, 1) = Unsafe.Add(ref indexA, 1) >> BundleIndexing.VectorShift;
@@ -45,7 +45,7 @@ namespace SolverPrototype.Constraints
             Unsafe.Add(ref bundleB, 2) = Unsafe.Add(ref indexB, 2) >> BundleIndexing.VectorShift;
             Unsafe.Add(ref bundleA, 3) = Unsafe.Add(ref indexA, 3) >> BundleIndexing.VectorShift;
             Unsafe.Add(ref bundleB, 3) = Unsafe.Add(ref indexB, 3) >> BundleIndexing.VectorShift;
-
+            
             for (int i = 4; i < Vector<int>.Count; i += 4)
             {
                 ref var targetA = ref Unsafe.Add(ref bundleA, i);
@@ -83,12 +83,14 @@ namespace SolverPrototype.Constraints
     }
 
     /// <summary>
-    /// Warm start and solve iteration functions for a constraint type.
+    /// Prestep, warm start and solve iteration functions for a constraint type.
     /// </summary>
+    /// <typeparam name="TPrestepData">Type of the prestep data used by the constraint.</typeparam>
     /// <typeparam name="TAccumulatedImpulse">Type of the accumulated impulses used by the constraint.</typeparam>
     /// <typeparam name="TProjection">Type of the projection to input.</typeparam>
-    public interface IWarmStartAndSolve<TProjection, TAccumulatedImpulse>
+    public interface IConstraintFunctions<TPrestepData, TProjection, TAccumulatedImpulse>
     {
+        void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref TPrestepData prestepData, out TProjection projection);
         void WarmStart(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
         void Solve(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
     }
@@ -98,9 +100,9 @@ namespace SolverPrototype.Constraints
     /// <summary>
     /// Shared implementation across all two body constraints.
     /// </summary>
-    public abstract class TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse, TWarmStartAndSolveFunction>
+    public abstract class TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse, TConstraintFunctions>
         : TypeBatch<TwoBodyReferences, TPrestepData, TProjection, TAccumulatedImpulse>
-        where TWarmStartAndSolveFunction : struct, IWarmStartAndSolve<TProjection, TAccumulatedImpulse>
+        where TConstraintFunctions : struct, IConstraintFunctions<TPrestepData, TProjection, TAccumulatedImpulse>
     {
         public sealed override int BodiesPerConstraint => 2;
 
@@ -238,24 +240,41 @@ namespace SolverPrototype.Constraints
 
         //The following covers the common loop logic for all two body constraints. Each iteration invokes the warm start function type.
         //This abstraction should, in theory, have zero overhead if the implementation of the interface is in a struct with aggressive inlining.
-        //Note that the prestep is not included here. The prestep phase input requirements vary. We wouldn't want to unnecessarily load the body poses
-        //for a constraint that does not need them.
 
         //By providing the overrides at this level, the concrete implementation (assuming it inherits from one of the prestep-providing variants)
         //only has to specify *type* arguments associated with the interface-implementing struct-delegates. It's going to look very strange, but it's low overhead
         //and minimizes per-type duplication.
+
+        public override void Prestep(Bodies bodies, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
+        {
+            ref var prestepBase = ref PrestepData[0];
+            ref var bodyReferencesBase = ref BodyReferences[0];
+            ref var projectionBase = ref Projection[0];
+            var function = default(TConstraintFunctions);
+            for (int i = startBundle; i < exclusiveEndBundle; ++i)
+            {
+                ref var prestep = ref Unsafe.Add(ref prestepBase, i);
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
+                function.Prestep(bodies, ref bodyReferences,
+                    dt, inverseDt, ref prestep,
+                    out projection);
+            }
+        }
 
         public override void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle)
         {
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
             ref var projectionBase = ref Projection[0];
-            var function = default(TWarmStartAndSolveFunction);
+            var function = default(TConstraintFunctions);
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                function.WarmStart(ref wsvA, ref wsvB, ref Unsafe.Add(ref projectionBase, i), ref Unsafe.Add(ref accumulatedImpulsesBase, i));
+                function.WarmStart(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulses);
                 GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }
@@ -265,12 +284,14 @@ namespace SolverPrototype.Constraints
             ref var projectionBase = ref Projection[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
             ref var accumulatedImpulsesBase = ref AccumulatedImpulses[0];
-            var function = default(TWarmStartAndSolveFunction);
+            var function = default(TConstraintFunctions);
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
+                ref var accumulatedImpulses = ref Unsafe.Add(ref accumulatedImpulsesBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 GatherScatter.GatherVelocities(ref bodyVelocities, ref bodyReferences, out var wsvA, out var wsvB);
-                function.Solve(ref wsvA, ref wsvB, ref Unsafe.Add(ref projectionBase, i), ref Unsafe.Add(ref accumulatedImpulsesBase, i));
+                function.Solve(ref wsvA, ref wsvB, ref projection, ref accumulatedImpulses);
                 GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
             }
         }

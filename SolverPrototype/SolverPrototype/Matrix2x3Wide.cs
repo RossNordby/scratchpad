@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SolverPrototype
 {
-
+    
     public struct Matrix2x3Wide
     {
         /// <summary>

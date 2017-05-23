@@ -48,7 +48,7 @@ namespace SolverPrototypeTests
             }
 
             simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.044f;
-            int constraintOptimizationIterations = 1024;         
+            int constraintOptimizationIterations = 1024;
             for (int i = 0; i < constraintOptimizationIterations; ++i)
             {
                 simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, initializationThreadPool);
@@ -69,7 +69,7 @@ namespace SolverPrototypeTests
             testTimings.Max = double.MinValue;
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
-                CacheBlaster.Blast();
+                //CacheBlaster.Blast();
                 var frameStartTime = Stopwatch.GetTimestamp();
                 simulation.Solver.Update(dt, inverseDt);
                 //simulation.Solver.NaiveMultithreadedUpdate(threadPool, simulation.BufferPool, dt, inverseDt);

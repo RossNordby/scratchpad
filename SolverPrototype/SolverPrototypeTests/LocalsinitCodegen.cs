@@ -312,6 +312,106 @@ namespace SolverPrototypeTests
         }
 
 
+
+        
+        public struct StructType
+        {
+            public Vector<float> WX;
+            public Vector<float> WY;
+            public Vector<float> WZ;
+            public Vector<float> XX;
+            public Vector<float> XY;
+            public Vector<float> XZ;
+            public Vector<float> YX;
+            public Vector<float> YY;
+            public Vector<float> YZ;
+            public Vector<float> ZX;
+            public Vector<float> ZY;
+            public Vector<float> ZZ;
+        }
+
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void DoSomeWorkUnnested(ref Vector<float> source, out Vector<float> result)
+        {
+            StructType u;
+            u.WX = source;
+            u.WY = source;
+            u.WZ = source;
+            u.XX = source;
+            u.XY = source;
+            u.XZ = source;
+            u.YX = source;
+            u.YY = source;
+            u.YZ = source;
+            u.ZX = source;
+            u.ZY = source;
+            u.ZZ = source;
+            result = u.XX + u.XY + u.XZ + u.YX + u.YY + u.YZ + u.ZX + u.ZY + u.ZZ + u.WX + u.WY + u.WZ;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void TestUnnested()
+        {
+            Vector<float> result;
+            for (int i = 0; i < 100; ++i)
+            {
+                DoSomeWorkUnnested(ref result, out result);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void TestUnnestedManuallyInlined()
+        {
+            Vector<float> result;
+            for (int i = 0; i < 100; ++i)
+            {
+                StructType u;
+                u.WX = result;
+                u.WY = result;
+                u.WZ = result;
+                u.XX = result;
+                u.XY = result;
+                u.XZ = result;
+                u.YX = result;
+                u.YY = result;
+                u.YZ = result;
+                u.ZX = result;
+                u.ZY = result;
+                u.ZZ = result;
+                result = u.XX + u.XY + u.XZ + u.YX + u.YY + u.YZ + u.ZX + u.ZY + u.ZZ + u.WX + u.WY + u.WZ;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void DoSomeWorkStructless(ref Vector<float> source, out Vector<float> result)
+        {
+            var WX = new Vector<float>(2) * source;
+            var WY = new Vector<float>(3) * source;
+            var WZ = new Vector<float>(4) * source;
+            var XX = new Vector<float>(5) * source;
+            var XY = new Vector<float>(6) * source;
+            var XZ = new Vector<float>(7) * source;
+            var YX = new Vector<float>(8) * source;
+            var YY = new Vector<float>(9) * source;
+            var YZ = new Vector<float>(10) * source;
+            var ZX = new Vector<float>(11) * source;
+            var ZY = new Vector<float>(12) * source;
+            var ZZ = new Vector<float>(13) * source;
+            result = XX + XY + XZ + YX + YY + YZ + ZX + ZY + ZZ + WX + WY + WZ;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void TestStructless()
+        {
+            Vector<float> result;
+            for (int i = 0; i < 100; ++i)
+            {
+                DoSomeWorkStructless(ref result, out result);
+            }
+        }
+
+
         public static void Test()
         {
             {
@@ -360,7 +460,18 @@ namespace SolverPrototypeTests
                 DoDummies(ref s64, out var result64);
                 DoDummies(ref s80, out var result80);
             }
+
+            {
+                TestUnnested();
+                TestUnnestedManuallyInlined();
+                TestStructless();
+            }
         }
+
+
+
+
+
 
     }
 }

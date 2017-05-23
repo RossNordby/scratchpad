@@ -18,15 +18,15 @@ namespace SolverPrototypeTests
         {
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
-            const int width = 32;
-            const int height = 32;
-            const int length = 32;
+            const int width = 17;
+            const int height = 18;
+            const int length = 17;
             SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            //SimulationSetup.ScrambleBodies(simulation);
-            //SimulationSetup.ScrambleConstraints(simulation.Solver);
-            //SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            SimulationSetup.ScrambleBodies(simulation);
+            SimulationSetup.ScrambleConstraints(simulation.Solver);
+            SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(1);
@@ -76,7 +76,6 @@ namespace SolverPrototypeTests
             timer.Stop();
             Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
                 $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
-
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 32;
@@ -86,8 +85,6 @@ namespace SolverPrototypeTests
             //If we don't initialize the inertias in a per-frame update, we must do so explicitly.
             simulation.Bodies.LocalInertias.CopyTo(0, ref simulation.Bodies.Inertias, 0, simulation.Bodies.LocalInertias.Length);
 
-            //prejit
-            simulation.Solver.Update(dt, inverseDt);
             //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
             timer.Reset();
 
@@ -149,8 +146,8 @@ namespace SolverPrototypeTests
                     simulation.Bodies.Velocities[i].LinearVelocity.Y += simulation.Bodies.LocalInertias[i].InverseMass * impulse;
                 }
                 timer.Start();
-                //simulation.Solver.Update(dt, inverseDt);
-                simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.Update(dt, inverseDt);
+                //simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");

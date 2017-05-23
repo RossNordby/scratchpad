@@ -15,7 +15,7 @@ namespace SolverPrototype.Constraints
     }
     public abstract class UnposedTwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse,
         TConstraintFunctions> : TwoBodyTypeBatch<TPrestepData, TProjection, TAccumulatedImpulse, TConstraintFunctions>
-        where TConstraintFunctions : struct, IUnposedPrestep<TPrestepData, TProjection>, IWarmStartAndSolve<TProjection, TAccumulatedImpulse>
+        where TConstraintFunctions : struct, IConstraintFunctions<TPrestepData, TProjection, TAccumulatedImpulse>
     {
         //The following handle the looping and gather logic common to all two body constraints with zero overhead, so long as the interface implementations
         //are all aggressively inlined. Saves quite a bit of performance sensitive and error prone duplicate code.
@@ -28,12 +28,13 @@ namespace SolverPrototype.Constraints
             var function = default(TConstraintFunctions);
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
+                ref var prestep = ref Unsafe.Add(ref prestepBase, i);
+                ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
                 GatherScatter.GatherInertia(ref bodies.Inertias, ref bodyReferences, out var inertiaA, out var inertiaB);
-                function.Prestep(ref Unsafe.Add(ref prestepBase, i),
-                    ref inertiaA, ref inertiaB,
-                    dt, inverseDt,
-                    out Unsafe.Add(ref projectionBase, i));
+                function.Prestep(bodies, ref bodyReferences,
+                    dt, inverseDt, ref prestep,
+                    out projection);
 
             }
         }
