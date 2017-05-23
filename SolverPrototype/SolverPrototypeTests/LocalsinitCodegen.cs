@@ -312,102 +312,108 @@ namespace SolverPrototypeTests
         }
 
 
-
-        
-        public struct StructType
+        struct ScalarStructType
         {
-            public Vector<float> WX;
-            public Vector<float> WY;
-            public Vector<float> WZ;
-            public Vector<float> XX;
-            public Vector<float> XY;
-            public Vector<float> XZ;
-            public Vector<float> YX;
-            public Vector<float> YY;
-            public Vector<float> YZ;
-            public Vector<float> ZX;
-            public Vector<float> ZY;
-            public Vector<float> ZZ;
+            public float A;
+            public float B;
+            public float C;
+            public float D;
+            public float E;
+            public float F;
         }
 
-
-        [MethodImpl(MethodImplOptions.NoInlining)]
-        public static void DoSomeWorkUnnested(ref Vector<float> source, out Vector<float> result)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void DoSomeWorkWithAScalarStruct(ref float source, out float result)
         {
-            StructType u;
-            u.WX = source;
-            u.WY = source;
-            u.WZ = source;
-            u.XX = source;
-            u.XY = source;
-            u.XZ = source;
-            u.YX = source;
-            u.YY = source;
-            u.YZ = source;
-            u.ZX = source;
-            u.ZY = source;
-            u.ZZ = source;
-            result = u.XX + u.XY + u.XZ + u.YX + u.YY + u.YZ + u.ZX + u.ZY + u.ZZ + u.WX + u.WY + u.WZ;
+            ScalarStructType u;
+            u.A = 2 * source;
+            u.B = 3 * source;
+            u.C = 4 * source;
+            u.D = 5 * source;
+            u.E = 6 * source;
+            u.F = 7 * source;
+            result = u.A + u.B + u.C + u.D + u.E + u.F;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void TestUnnested()
+        static void TestScalarStruct()
         {
-            Vector<float> result;
+            float f = 0;
             for (int i = 0; i < 100; ++i)
             {
-                DoSomeWorkUnnested(ref result, out result);
+                DoSomeWorkWithAScalarStruct(ref f, out f);
+            }
+        }
+
+        struct StructType
+        {
+            public Vector<float> A;
+            public Vector<float> B;
+            public Vector<float> C;
+            public Vector<float> D;
+            public Vector<float> E;
+            public Vector<float> F;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void DoSomeWorkWithAStruct(ref Vector<float> source, out Vector<float> result)
+        {
+            StructType u;
+            u.A = new Vector<float>(2) * source;
+            u.B = new Vector<float>(3) * source;
+            u.C = new Vector<float>(4) * source;
+            u.D = new Vector<float>(5) * source;
+            u.E = new Vector<float>(6) * source;
+            u.F = new Vector<float>(7) * source;
+            result = u.A + u.B + u.C + u.D + u.E + u.F;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void TestStruct()
+        {
+            Vector<float> f;
+            for (int i = 0; i < 100; ++i)
+            {
+                DoSomeWorkWithAStruct(ref f, out f);
             }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void TestUnnestedManuallyInlined()
+        static void TestStructManuallyInlined()
         {
-            Vector<float> result;
+            Vector<float> f;
             for (int i = 0; i < 100; ++i)
             {
                 StructType u;
-                u.WX = result;
-                u.WY = result;
-                u.WZ = result;
-                u.XX = result;
-                u.XY = result;
-                u.XZ = result;
-                u.YX = result;
-                u.YY = result;
-                u.YZ = result;
-                u.ZX = result;
-                u.ZY = result;
-                u.ZZ = result;
-                result = u.XX + u.XY + u.XZ + u.YX + u.YY + u.YZ + u.ZX + u.ZY + u.ZZ + u.WX + u.WY + u.WZ;
+                u.A = new Vector<float>(2) * f;
+                u.B = new Vector<float>(3) * f;
+                u.C = new Vector<float>(4) * f;
+                u.D = new Vector<float>(5) * f;
+                u.E = new Vector<float>(6) * f;
+                u.F = new Vector<float>(7) * f;
+                f = u.A + u.B + u.C + u.D + u.E + u.F;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void DoSomeWorkStructless(ref Vector<float> source, out Vector<float> result)
+        static void DoSomeWorkStructless(ref Vector<float> source, out Vector<float> result)
         {
-            var WX = new Vector<float>(2) * source;
-            var WY = new Vector<float>(3) * source;
-            var WZ = new Vector<float>(4) * source;
-            var XX = new Vector<float>(5) * source;
-            var XY = new Vector<float>(6) * source;
-            var XZ = new Vector<float>(7) * source;
-            var YX = new Vector<float>(8) * source;
-            var YY = new Vector<float>(9) * source;
-            var YZ = new Vector<float>(10) * source;
-            var ZX = new Vector<float>(11) * source;
-            var ZY = new Vector<float>(12) * source;
-            var ZZ = new Vector<float>(13) * source;
-            result = XX + XY + XZ + YX + YY + YZ + ZX + ZY + ZZ + WX + WY + WZ;
+            var a = new Vector<float>(2) * source;
+            var b = new Vector<float>(3) * source;
+            var c = new Vector<float>(4) * source;
+            var d = new Vector<float>(5) * source;
+            var e = new Vector<float>(6) * source;
+            var f = new Vector<float>(7) * source;
+            result = d + e + f + a + b + c;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void TestStructless()
+        static void TestStructless()
         {
-            Vector<float> result;
+            Vector<float> f;
             for (int i = 0; i < 100; ++i)
             {
-                DoSomeWorkStructless(ref result, out result);
+                DoSomeWorkStructless(ref f, out f);
             }
         }
 
@@ -462,8 +468,9 @@ namespace SolverPrototypeTests
             }
 
             {
-                TestUnnested();
-                TestUnnestedManuallyInlined();
+                TestScalarStruct();
+                TestStruct();
+                TestStructManuallyInlined();
                 TestStructless();
             }
         }
