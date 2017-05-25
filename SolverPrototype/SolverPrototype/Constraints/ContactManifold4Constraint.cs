@@ -25,7 +25,7 @@ namespace SolverPrototype.Constraints
 
         //TODO: In a 'real' use case, we will likely split the description for contact manifolds into two parts: mutable contact data and initialize-once spring/friction data.
         //SpringSettings and FrictionCoefficient don't usually change over the lifetime of the constraint, so there's no reason to set them every time.
-        //For now, though, we'll use this combined representation.]
+        //For now, though, we'll use this combined representation.
         public ManifoldContactDataAOS Contact0;
         public ManifoldContactDataAOS Contact1;
         public ManifoldContactDataAOS Contact2;

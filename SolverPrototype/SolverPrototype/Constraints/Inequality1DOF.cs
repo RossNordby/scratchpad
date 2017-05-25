@@ -49,7 +49,7 @@ namespace SolverPrototype.Constraints
         public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
             ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection)
         {
-            //effective mass = (J * M^-1 * JT)^-1
+            //unsoftened effective mass = (J * M^-1 * JT)^-1
             //where J is a constraintDOF x bodyCount*3 sized matrix, JT is its transpose, and for two bodies M^-1 is:
             //[inverseMassA,    0, 0, 0]
             //[0, inverseInertiaA, 0, 0]
@@ -287,7 +287,7 @@ namespace SolverPrototype.Constraints
             //So we're really storing (JT * softenedEffectiveMass)T = softenedEffectiveMassT * J.
             //Since this constraint is 1DOF, the softenedEffectiveMass is a scalar and the order doesn't matter.
             //In the solve iterations, the WSVtoCSI term will be transposed during transformation,
-            //resulting in the proper wsv * (softenedEffectiveMassT * J)T = wsv * (JT * softenedEffectiveMass.
+            //resulting in the proper wsv * (softenedEffectiveMassT * J)T = wsv * (JT * softenedEffectiveMass).
             //You'll see this pattern repeated in higher DOF constraints. We explicitly compute softenedEffectiveMassT * J, and then apply the transpose in the solves.
             //(Why? Because creating a Matrix3x2 and Matrix2x3 and 4x3 and 3x4 and 5x3 and 3x5 and so on just doubles the number of representations with little value.)
             Vector3Wide.Scale(ref jacobians.LinearA, ref softenedEffectiveMass, out projection.WSVtoCSILinearA);

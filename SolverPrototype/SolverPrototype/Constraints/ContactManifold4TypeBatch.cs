@@ -71,7 +71,11 @@ namespace SolverPrototype.Constraints
         public TwistFrictionProjection Twist;
     }
 
-    public struct ContactManifold4 :
+    //TODO: at the time of writing (May 19 2017 2.0.0-preview2-25309-07), using the 'loop body structdelegate' style introduces additional inits and overhead.
+    //That isn't fundamental. With any luck, future compilers will change things. For now, we'll leave both of these parallel implementations in place.
+    //Since the difference is less than 5%, we'll use the loopbodystructdelegate approach for other constraints until the incremental performance improvement 
+    //of manual inlining is worth it.
+    public struct ContactManifold4Functions :
         //IUnposedPrestep<ContactManifold4PrestepData, ContactManifold4Projection>,
         IConstraintFunctions<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
@@ -155,7 +159,7 @@ namespace SolverPrototype.Constraints
     /// </summary>
     public class ContactManifold4TypeBatch :
         //UnposedTwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4>
-        TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4>
+        TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4Functions>
     {
         public override void Prestep(Bodies bodies, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
         {
