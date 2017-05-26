@@ -91,6 +91,7 @@ namespace SolverPrototype.Constraints
 
             //Note that friction constraints have no bias velocity. They target zero velocity.
         }
+
         /// <summary>
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
@@ -99,39 +100,18 @@ namespace SolverPrototype.Constraints
             ref Vector2Wide correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.LinearA, out var linearImpulseA);
-            Vector3Wide.Scale(ref linearImpulseA, ref inertiaA.InverseMass, out var correctiveLinearVelocityA);
-
             Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.AngularA, out var angularImpulseA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseA, ref inertiaA.InverseInertiaTensor, out var correctiveAngularVelocityA);
-            Vector3Wide.Scale(ref linearImpulseA, ref inertiaB.InverseMass, out var correctiveLinearVelocityB);
-
             Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.AngularB, out var angularImpulseB);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseB, ref inertiaB.InverseInertiaTensor, out var correctiveAngularVelocityB);
-            Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveLinearVelocityA, out wsvA.LinearVelocity);
-            Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveAngularVelocityA, out wsvA.AngularVelocity);
-            Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveLinearVelocityB, out wsvB.LinearVelocity); //note subtract- we based it on the LinearA jacobian.
-            Vector3Wide.Add(ref wsvB.AngularVelocity, ref correctiveAngularVelocityB, out wsvB.AngularVelocity);
+            BodyVelocities correctiveVelocityA, correctiveVelocityB;
+            Vector3Wide.Scale(ref linearImpulseA, ref inertiaA.InverseMass, out correctiveVelocityA.LinearVelocity);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseA, ref inertiaA.InverseInertiaTensor, out correctiveVelocityA.AngularVelocity);
+            Vector3Wide.Scale(ref linearImpulseA, ref inertiaB.InverseMass, out correctiveVelocityB.LinearVelocity);
+            Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseB, ref inertiaB.InverseInertiaTensor, out correctiveVelocityB.AngularVelocity);
+            Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityA.LinearVelocity, out wsvA.LinearVelocity);
+            Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityA.AngularVelocity, out wsvA.AngularVelocity);
+            Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveVelocityB.LinearVelocity, out wsvB.LinearVelocity); //note subtract- we based it on the LinearA jacobian.
+            Vector3Wide.Add(ref wsvB.AngularVelocity, ref correctiveVelocityB.AngularVelocity, out wsvB.AngularVelocity);
         }
-        ///// <summary>
-        ///// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
-        ///// </summary>
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static void ApplyImpulse(ref Jacobians jacobians, ref BodyInertias inertiaA, ref BodyInertias inertiaB,
-        //    ref Vector2Wide correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
-        //{
-        //    Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.LinearA, out var linearImpulseA);
-        //    Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.AngularA, out var angularImpulseA);
-        //    Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.AngularB, out var angularImpulseB);
-        //    BodyVelocities correctiveVelocityA, correctiveVelocityB;
-        //    Vector3Wide.Scale(ref linearImpulseA, ref inertiaA.InverseMass, out correctiveVelocityA.LinearVelocity);
-        //    Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseA, ref inertiaA.InverseInertiaTensor, out correctiveVelocityA.AngularVelocity);
-        //    Vector3Wide.Scale(ref linearImpulseA, ref inertiaB.InverseMass, out correctiveVelocityB.LinearVelocity);
-        //    Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseB, ref inertiaB.InverseInertiaTensor, out correctiveVelocityB.AngularVelocity);
-        //    Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityA.LinearVelocity, out wsvA.LinearVelocity);
-        //    Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityA.AngularVelocity, out wsvA.AngularVelocity);
-        //    Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveVelocityB.LinearVelocity, out wsvB.LinearVelocity); //note subtract- we based it on the LinearA jacobian.
-        //    Vector3Wide.Add(ref wsvB.AngularVelocity, ref correctiveVelocityB.AngularVelocity, out wsvB.AngularVelocity);
-        //}
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WarmStart(ref Vector3Wide tangentX, ref Vector3Wide tangentY, ref TangentFrictionProjection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB,

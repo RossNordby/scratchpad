@@ -13,12 +13,10 @@ namespace SolverPrototype
         //Be careful when fiddling with the memory layout. It's aligned with execution order.
         public Vector<float> NaturalFrequency;
         public Vector<float> DampingRatio;
-        public Vector<float> MaximumRecoveryVelocity;
     }
 
     public static class Springiness
     {
-        //1DOF
         /// <summary>
         /// Computes springiness values for a set of constraints.
         /// </summary>

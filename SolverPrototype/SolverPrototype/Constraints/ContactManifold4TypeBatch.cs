@@ -30,6 +30,7 @@ namespace SolverPrototype.Constraints
         public QuaternionWide SurfaceBasis;
         //All contacts also share the spring settings.
         public SpringSettings SpringSettings;
+        public Vector<float> MaximumRecoveryVelocity;
         public Vector<float> PenetrationDepth0;
         public Vector<float> PenetrationDepth1;
         public Vector<float> PenetrationDepth2;

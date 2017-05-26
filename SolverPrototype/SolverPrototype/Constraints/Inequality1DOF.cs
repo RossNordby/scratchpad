@@ -50,7 +50,7 @@ namespace SolverPrototype.Constraints
             ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection)
         {
             //unsoftened effective mass = (J * M^-1 * JT)^-1
-            //where J is a constraintDOF x bodyCount*3 sized matrix, JT is its transpose, and for two bodies M^-1 is:
+            //where J is a constraintDOF x bodyCount*6 sized matrix, JT is its transpose, and for two bodies M^-1 is:
             //[inverseMassA,    0, 0, 0]
             //[0, inverseInertiaA, 0, 0]
             //[0, 0, inverseMassB,    0]

@@ -19,17 +19,6 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetLengthSquared(ref Vector3Wide v, out Vector<float> lengthSquared)
-        {
-            lengthSquared = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetLength(ref Vector3Wide v, out Vector<float> length)
-        {
-            length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Add(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
         {
             result.X = a.X + b.X;
@@ -99,12 +88,18 @@ namespace SolverPrototype
             result = temp;
         }
 
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void LengthSquared(ref Vector3Wide v, out Vector<float> lengthSquared)
+        {
+            lengthSquared = v.X * v.X + v.Y * v.Y + v.Z * v.Z;
+        }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Length(ref Vector3Wide v, out Vector<float> length)
         {
             length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
         }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Distance(ref Vector3Wide a, ref Vector3Wide b, out Vector<float> distance)
         {
@@ -115,7 +110,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Normalize(ref Vector3Wide v, out Vector3Wide result)
         {
-            GetLength(ref v, out var length);
+            Length(ref v, out var length);
             var scale = Vector<float>.One / length;
             Scale(ref v, ref scale, out result);
         }

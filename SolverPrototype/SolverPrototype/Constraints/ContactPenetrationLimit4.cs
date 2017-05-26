@@ -110,10 +110,10 @@ namespace SolverPrototype.Constraints
             projection.Penetration2.EffectiveMass = effectiveMassCFMScale / (linear + angularA2 + angularB2);
             projection.Penetration3.EffectiveMass = effectiveMassCFMScale / (linear + angularA3 + angularB3);            
 
-            projection.Penetration0.BiasVelocity = Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            projection.Penetration1.BiasVelocity = Vector.Min(prestep.PenetrationDepth1 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            projection.Penetration2.BiasVelocity = Vector.Min(prestep.PenetrationDepth2 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
-            projection.Penetration3.BiasVelocity = Vector.Min(prestep.PenetrationDepth3 * positionErrorToVelocity, prestep.SpringSettings.MaximumRecoveryVelocity);
+            projection.Penetration0.BiasVelocity = Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
+            projection.Penetration1.BiasVelocity = Vector.Min(prestep.PenetrationDepth1 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
+            projection.Penetration2.BiasVelocity = Vector.Min(prestep.PenetrationDepth2 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
+            projection.Penetration3.BiasVelocity = Vector.Min(prestep.PenetrationDepth3 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
         }
 
 
