@@ -14,7 +14,7 @@ namespace SolverPrototype.Constraints
         //This saves 11 floats per constraint relative to the seminaive baseline of two shared linear jacobians and four angular jacobians. 
         public Vector3Wide OffsetA;
         public Vector3Wide OffsetB;
-        public Matrix2x2Wide EffectiveMass;
+        public Triangular2x2Wide EffectiveMass;
     }
 
     /// <summary>
@@ -56,12 +56,13 @@ namespace SolverPrototype.Constraints
             //           [ -tangentY ]
             //jAngularB = [ -offsetB x tangentX ] = [ tangentX x offsetB ]
             //            [ -offsetB x tangentY ]   [ tangentY x offsetB ]
+            //TODO: there would be a minor benefit in eliminating this copy manually, since it's very likely that the compiler won't. And it's probably also introducing more locals init.
             jacobians.LinearA.X = tangentX;
             jacobians.LinearA.Y = tangentY;
             Vector3Wide.CrossWithoutOverlap(ref offsetA, ref tangentX, out jacobians.AngularA.X);
-            Vector3Wide.CrossWithoutOverlap(ref offsetA, ref jacobians.LinearA.Y, out jacobians.AngularA.Y);
+            Vector3Wide.CrossWithoutOverlap(ref offsetA, ref tangentY, out jacobians.AngularA.Y);
             Vector3Wide.CrossWithoutOverlap(ref tangentX, ref offsetB, out jacobians.AngularB.X);
-            Vector3Wide.CrossWithoutOverlap(ref jacobians.LinearA.Y, ref offsetB, out jacobians.AngularB.Y);
+            Vector3Wide.CrossWithoutOverlap(ref tangentY, ref offsetB, out jacobians.AngularB.Y);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -71,21 +72,17 @@ namespace SolverPrototype.Constraints
         {
             ComputeJacobians(ref tangentX, ref tangentY, ref offsetA, ref offsetB, out var jacobians);
             //Compute effective mass matrix contributions.
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearIntermediateA);
-            Matrix2x3Wide.Scale(ref jacobians.LinearA, ref inertiaB.InverseMass, out var linearIntermediateB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref linearIntermediateA, ref jacobians.LinearA, out var linearContributionA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref linearIntermediateB, ref jacobians.LinearA, out var linearContributionB);
+            Triangular2x2Wide.SandwichScale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearContributionA);
+            Triangular2x2Wide.SandwichScale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearContributionB);
 
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out var angularIntermediateA);
-            Matrix2x3Wide.MultiplyWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out var angularIntermediateB);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref angularIntermediateA, ref jacobians.AngularA, out var angularContributionA);
-            Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref angularIntermediateB, ref jacobians.AngularB, out var angularContributionB);
+            Triangular3x3Wide.MatrixSandwich(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out var angularContributionA);
+            Triangular3x3Wide.MatrixSandwich(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out var angularContributionB);
 
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
-            Matrix2x2Wide.Add(ref linearContributionA, ref linearContributionB, out var linear);
-            Matrix2x2Wide.Subtract(ref angularContributionA, ref angularContributionB, out var angular);
-            Matrix2x2Wide.Add(ref linear, ref angular, out var inverseEffectiveMass);
-            Matrix2x2Wide.InvertWithoutOverlap(ref inverseEffectiveMass, out projection.EffectiveMass);
+            Triangular2x2Wide.Subtract(ref linearContributionA, ref linearContributionB, out var linear);
+            Triangular2x2Wide.Add(ref angularContributionA, ref angularContributionB, out var angular);
+            Triangular2x2Wide.Add(ref linear, ref angular, out var inverseEffectiveMass);
+            Triangular2x2Wide.InvertWithoutOverlap(ref inverseEffectiveMass, out projection.EffectiveMass);
             projection.OffsetA = offsetA;
             projection.OffsetB = offsetB;
 
@@ -104,9 +101,9 @@ namespace SolverPrototype.Constraints
             Matrix2x3Wide.Transform(ref correctiveImpulse, ref jacobians.AngularB, out var angularImpulseB);
             BodyVelocities correctiveVelocityA, correctiveVelocityB;
             Vector3Wide.Scale(ref linearImpulseA, ref inertiaA.InverseMass, out correctiveVelocityA.LinearVelocity);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseA, ref inertiaA.InverseInertiaTensor, out correctiveVelocityA.AngularVelocity);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref angularImpulseA, ref inertiaA.InverseInertiaTensor, out correctiveVelocityA.AngularVelocity);
             Vector3Wide.Scale(ref linearImpulseA, ref inertiaB.InverseMass, out correctiveVelocityB.LinearVelocity);
-            Matrix3x3Wide.TransformWithoutOverlap(ref angularImpulseB, ref inertiaB.InverseInertiaTensor, out correctiveVelocityB.AngularVelocity);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref angularImpulseB, ref inertiaB.InverseInertiaTensor, out correctiveVelocityB.AngularVelocity);
             Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityA.LinearVelocity, out wsvA.LinearVelocity);
             Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityA.AngularVelocity, out wsvA.AngularVelocity);
             Vector3Wide.Subtract(ref wsvB.LinearVelocity, ref correctiveVelocityB.LinearVelocity, out wsvB.LinearVelocity); //note subtract- we based it on the LinearA jacobian.
@@ -135,7 +132,7 @@ namespace SolverPrototype.Constraints
             Vector2Wide.Add(ref csvaAngular, ref csvbAngular, out var csvAngular);
             Vector2Wide.Add(ref csvLinear, ref csvAngular, out var csv);
 
-            Matrix2x2Wide.TransformWithoutOverlap(ref csv, ref data.EffectiveMass, out var csi);
+            Triangular2x2Wide.TransformBySymmetricWithoutOverlap(ref csv, ref data.EffectiveMass, out var csi);
 
             var previousAccumulated = accumulatedImpulse;
             Vector2Wide.Add(ref accumulatedImpulse, ref csi, out accumulatedImpulse);

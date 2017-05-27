@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using SolverPrototype.Constraints;
 
 namespace SolverPrototype
 {
@@ -25,7 +26,7 @@ namespace SolverPrototype
 
     public struct BodyInertias
     {
-        public Matrix3x3Wide InverseInertiaTensor;
+        public Triangular3x3Wide InverseInertiaTensor;
         //Note that the inverse mass is included in the BodyInertias bundle. InverseMass is rotationally invariant, so it doesn't need to be updated...
         //But it's included alongside the rotated inertia tensor because to split it out would require that constraint presteps suffer another cache miss when they
         //gather the inverse mass in isolation. (From the solver's perspective, inertia/mass gathering is incoherent.)
@@ -45,7 +46,7 @@ namespace SolverPrototype
     }
     public struct BodyInertia
     {
-        public Matrix3x3 InverseInertiaTensor;
+        public Triangular3x3 InverseInertiaTensor;
         public float InverseMass;
     }
     public struct BodyDescription
@@ -226,40 +227,29 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
         {
-            ref var targetLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
+            ref var targetLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
 
-            targetLane = inertia.InverseInertiaTensor.X.X;
-            Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.X.Y;
-            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inertia.InverseInertiaTensor.X.Z;
-            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.X;
-            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Y;
-            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inertia.InverseInertiaTensor.Y.Z;
-            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.X;
-            Unsafe.Add(ref targetLane, 7 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Y;
-            Unsafe.Add(ref targetLane, 8 * Vector<float>.Count) = inertia.InverseInertiaTensor.Z.Z;
-            Unsafe.Add(ref targetLane, 9 * Vector<float>.Count) = inertia.InverseMass;
+            targetLane = inertia.InverseInertiaTensor.M11;
+            Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.M21;
+            Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inertia.InverseInertiaTensor.M22;
+            Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inertia.InverseInertiaTensor.M31;
+            Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inertia.InverseInertiaTensor.M32;
+            Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inertia.InverseInertiaTensor.M33;
+            Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inertia.InverseMass;
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
         {
-            ref var sourceLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.X.X, innerIndex);
+            ref var sourceLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
 
-            inertia.InverseInertiaTensor.X = new Vector3(
-                sourceLane,
-                Unsafe.Add(ref sourceLane, Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
-            inertia.InverseInertiaTensor.Y = new Vector3(
-                Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
-            inertia.InverseInertiaTensor.Z = new Vector3(
-                Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 7 * Vector<float>.Count),
-                Unsafe.Add(ref sourceLane, 8 * Vector<float>.Count));
-            inertia.InverseMass =
-                Unsafe.Add(ref sourceLane, 9 * Vector<float>.Count);
-
+            inertia.InverseInertiaTensor.M11 = sourceLane;
+            inertia.InverseInertiaTensor.M21 = Unsafe.Add(ref sourceLane, Vector<float>.Count);
+            inertia.InverseInertiaTensor.M22 = Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count);
+            inertia.InverseInertiaTensor.M31 = Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count);
+            inertia.InverseInertiaTensor.M32 = Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count);
+            inertia.InverseInertiaTensor.M33 = Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count);
+            inertia.InverseMass = Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -464,5 +454,6 @@ namespace SolverPrototype
             IndexToHandle = new Buffer<int>();
             IdPool.Dispose();
         }
+
     }
 }

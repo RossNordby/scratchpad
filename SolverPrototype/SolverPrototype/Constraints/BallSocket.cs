@@ -34,11 +34,12 @@ namespace SolverPrototype.Constraints
         //There are very few cases where a combo constraint will have less than 3DOFs...)
         //The only reason not to do that is codegen concerns. But we may want to stop holding back just because of some hopefully-not-permanent quirks in the JIT.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref BallSocketPrestepData prestep,
-            out BallSocketProjection projection)
+        public void Prestep<TBodyDataSource>(ref TBodyDataSource bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref BallSocketPrestepData prestep,
+            out BallSocketProjection projection) where TBodyDataSource : IBodyDataSource
         {
             bodies.GatherInertiaAndPose(ref bodyReferences,
-                out var localPositionB, out var orientationA, out var orientationB, out projection.InertiaA, out projection.InertiaB);
+                out var localPositionB, out var orientationA, out var orientationB,
+                out projection.InertiaA, out projection.InertiaB);
 
             //Anchor points attached to each body are constrained to stay in the same position, yielding a position constraint of:
             //C = positionA + anchorOffsetA - (positionB + anchorOffsetB) = 0
@@ -88,19 +89,19 @@ namespace SolverPrototype.Constraints
             Vector3Wide.Scale(ref error, ref positionErrorToVelocity, out projection.BiasVelocity);
 
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ApplyImpulse(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref BallSocketProjection projection, ref Vector3Wide csi)
         {
             Vector3Wide.CrossWithoutOverlap(ref projection.OffsetA, ref csi, out var wsi);
-            Triangular3x3Wide.TransformWithoutOverlap(ref wsi, ref projection.InertiaA.InverseInertiaTensor, out var change);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref wsi, ref projection.InertiaA.InverseInertiaTensor, out var change);
             Vector3Wide.Add(ref velocityA.AngularVelocity, ref change, out velocityA.AngularVelocity);
 
             Vector3Wide.Scale(ref csi, ref projection.InertiaA.InverseMass, out change);
             Vector3Wide.Add(ref velocityA.LinearVelocity, ref change, out velocityA.LinearVelocity);
 
             Vector3Wide.CrossWithoutOverlap(ref csi, ref projection.OffsetB, out wsi); //note flip-negation
-            Triangular3x3Wide.TransformWithoutOverlap(ref wsi, ref projection.InertiaB.InverseInertiaTensor, out change);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref wsi, ref projection.InertiaB.InverseInertiaTensor, out change);
             Vector3Wide.Add(ref velocityB.AngularVelocity, ref change, out velocityB.AngularVelocity);
 
             Vector3Wide.Scale(ref csi, ref projection.InertiaB.InverseMass, out change);
@@ -112,7 +113,7 @@ namespace SolverPrototype.Constraints
         {
             ApplyImpulse(ref velocityA, ref velocityB, ref projection, ref accumulatedImpulse);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Solve(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref BallSocketProjection projection, ref Vector3Wide accumulatedImpulse)
         {
@@ -124,7 +125,7 @@ namespace SolverPrototype.Constraints
             Vector3Wide.Add(ref csv, ref angularCSV, out csv);
             Vector3Wide.Subtract(ref projection.BiasVelocity, ref csv, out csv);
 
-            Triangular3x3Wide.TransformWithoutOverlap(ref csv, ref projection.EffectiveMass, out var csi);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref csv, ref projection.EffectiveMass, out var csi);
             Vector3Wide.Scale(ref accumulatedImpulse, ref projection.SoftnessImpulseScale, out var softness);
             Vector3Wide.Subtract(ref csi, ref softness, out csi);
 

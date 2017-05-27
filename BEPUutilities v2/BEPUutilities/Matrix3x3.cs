@@ -223,10 +223,40 @@ namespace BEPUutilities2
                 var z = new Vector3(a.Z.Z);
                 result.Z = x * bX + y * bY + z * b.Z;
             }
-
-
         }
 
+        /// <summary>
+        /// Multiplies the two matrices, where a is treated as transposed: result = transpose(a) * b
+        /// </summary>
+        /// <param name="a">First matrix to multiply that will be transposed.</param>
+        /// <param name="b">Second matrix to multiply.</param>
+        /// <param name="result">Product of the multiplication.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void MultiplyTransposed(ref Matrix3x3 a, ref Matrix3x3 b, out Matrix3x3 result)
+        {
+            var bX = b.X;
+            var bY = b.Y;
+            {
+                var x = new Vector3(a.X.X);
+                var y = new Vector3(a.Y.X);
+                var z = new Vector3(a.Z.X);
+                result.X = x * bX + y * bY + z * b.Z;
+            }
+
+            {
+                var x = new Vector3(a.X.Y);
+                var y = new Vector3(a.Y.Y);
+                var z = new Vector3(a.Z.Y);
+                result.Y = x * bX + y * bY + z * b.Z;
+            }
+
+            {
+                var x = new Vector3(a.X.Z);
+                var y = new Vector3(a.Y.Z);
+                var z = new Vector3(a.Z.Z);
+                result.Z = x * bX + y * bY + z * b.Z;
+            }
+        }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

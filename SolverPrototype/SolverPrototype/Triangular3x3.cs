@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BEPUutilities2;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -9,32 +10,32 @@ namespace SolverPrototype
     /// <summary>
     /// Stores the lower left triangle (including diagonal) of a 3x3 matrix. Useful for triangular forms and (anti)symmetric matrices.
     /// </summary>
-    public struct Triangular3x3Wide
+    public struct Triangular3x3
     {
         /// <summary>
         /// First row, first column of the matrix.
         /// </summary>
-        public Vector<float> M11;
+        public float M11;
         /// <summary>
         /// Second row, first column of the matrix.
         /// </summary>
-        public Vector<float> M21;
+        public float M21;
         /// <summary>
         /// Second row, second column of the matrix.
         /// </summary>
-        public Vector<float> M22;
+        public float M22;
         /// <summary>
         /// Third row, first column of the matrix.
         /// </summary>
-        public Vector<float> M31;
+        public float M31;
         /// <summary>
         /// Third row, second column of the matrix.
         /// </summary>
-        public Vector<float> M32;
+        public float M32;
         /// <summary>
         /// Third row, third column of the matrix.
         /// </summary>
-        public Vector<float> M33;
+        public float M33;
 
         /// <summary>
         /// Inverts the matrix as if it is a symmetric matrix where M32 == M23, M13 == M31, and M21 == M12.
@@ -42,7 +43,7 @@ namespace SolverPrototype
         /// <param name="m">Symmetric matrix to invert.</param>
         /// <param name="inverse">Inverse of the symmetric matrix.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SymmetricInvert(ref Triangular3x3Wide m, out Triangular3x3Wide inverse)
+        public static void SymmetricInvert(ref Triangular3x3 m, out Triangular3x3 inverse)
         {
             var M11M22 = m.M11 * m.M22;
             var M21M31 = m.M21 * m.M31;
@@ -50,7 +51,7 @@ namespace SolverPrototype
             var M31M31 = m.M31 * m.M31;
             var M32M32 = m.M32 * m.M32;
             var M21M31M32 = M21M31 * m.M32;
-            var denom = Vector<float>.One / ((m.M22 * M31M31 - M21M31M32) + (m.M11 * M32M32 - M21M31M32) + (M21M21 - M11M22) * m.M33);
+            var denom = 1f / ((m.M22 * M31M31 - M21M31M32) + (m.M11 * M32M32 - M21M31M32) + (M21M21 - M11M22) * m.M33);
             var M22M33 = m.M22 * m.M33;
             var M31M32 = m.M31 * m.M32;
             var M21M33 = m.M21 * m.M33;
@@ -67,7 +68,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Add(ref Triangular3x3Wide a, ref Triangular3x3Wide b, out Triangular3x3Wide sum)
+        public static void Add(ref Triangular3x3 a, ref Triangular3x3 b, out Triangular3x3 sum)
         {
             sum.M11 = a.M11 + b.M11;
             sum.M21 = a.M21 + b.M21;
@@ -78,7 +79,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Scale(ref Triangular3x3Wide m, ref Vector<float> scale, out Triangular3x3Wide result)
+        public static void Scale(ref Triangular3x3 m, float scale, out Triangular3x3 result)
         {
             result.M11 = m.M11 * scale;
             result.M21 = m.M21 * scale;
@@ -112,7 +113,7 @@ namespace SolverPrototype
         /// <param name="sandwich">Result of skewSymmetric(v) * m * transpose(skewSymmetric(v)).</param>
         /// <remarks>This operation might have a formal name that isn't skew sandwich. But that's okay, its real name is skew sandwich.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void SkewSandwichWithoutOverlap(ref Vector3Wide v, ref Triangular3x3Wide m, out Triangular3x3Wide sandwich)
+        public static void SkewSandwichWithoutOverlap(ref Vector3 v, ref Triangular3x3 m, out Triangular3x3 sandwich)
         {
             var vxvx = v.X * v.X;
             var vyvy = v.Y * v.Y;
@@ -138,7 +139,7 @@ namespace SolverPrototype
         /// <param name="m">Succulent interior symmetric matrix.</param>
         /// <param name="sandwich">Result of v * m * transpose(v) for a symmetric matrix m.</param>
         /// <remarks>Since I called the other one a skew sandwich, I really don't have a choice in the naming convention anymore.</remarks>
-        public static void VectorSandwich(ref Vector3Wide v, ref Triangular3x3Wide m, out Vector<float> sandwich)
+        public static void VectorSandwich(ref Vector3 v, ref Triangular3x3 m, out float sandwich)
         {
             //This isn't actually fewer flops than the equivalent explicit operation, but it does avoid some struct locals and it's a pretty common operation.
             //(And at the moment, avoiding struct locals is unfortunately helpful for codegen reasons.)
@@ -153,6 +154,7 @@ namespace SolverPrototype
                 m32vyvz + m32vyvz +
                 m.M33 * v.Z * v.Z;
         }
+        
         /// <summary>
         /// Computes rT * m * r for a symmetric matrix m and a rotation matrix R. Assumes that the input and output do not overlap.
         /// </summary>
@@ -160,7 +162,7 @@ namespace SolverPrototype
         /// <param name="m">Succulent interior symmetric matrix.</param>
         /// <param name="sandwich">Result of v * m * transpose(v) for a symmetric matrix m.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void RotationSandwich(ref Matrix3x3Wide r, ref Triangular3x3Wide m, out Triangular3x3Wide sandwich)
+        public static void RotationSandwich(ref Matrix3x3 r, ref Triangular3x3 m, out Triangular3x3 sandwich)
         {
             var i11 = r.X.X * m.M11 + r.Y.X * m.M21 + r.Z.X * m.M31;
             var i12 = r.X.X * m.M21 + r.Y.X * m.M22 + r.Z.X * m.M32;
@@ -180,34 +182,6 @@ namespace SolverPrototype
             sandwich.M31 = i31 * r.X.X + i32 * r.Y.X + i33 * r.Z.X;
             sandwich.M32 = i31 * r.X.Y + i32 * r.Y.Y + i33 * r.Z.Y;
             sandwich.M33 = i31 * r.X.Z + i32 * r.Y.Z + i33 * r.Z.Z;
-        }
-
-        /// <summary>
-        /// Computes m * t * mT for a symmetric matrix t and a matrix m. Assumes that the input and output do not overlap.
-        /// </summary>
-        /// <param name="m">Matrix to use as the sandwich bread.</param>
-        /// <param name="t">Succulent interior symmetric matrix.</param>
-        /// <param name="sandwich">Result of m * t * mT for a symmetric matrix t.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void MatrixSandwich(ref Matrix2x3Wide m, ref Triangular3x3Wide t, out Triangular2x2Wide result)
-        {
-            var i11 = m.X.X * t.M11 + m.X.Y * t.M21 + m.X.Z * t.M31;
-            var i12 = m.X.X * t.M21 + m.X.Y * t.M22 + m.X.Z * t.M32;
-            var i13 = m.X.X * t.M31 + m.X.Y * t.M32 + m.X.Z * t.M33;
-            var i21 = m.Y.X * t.M11 + m.Y.Y * t.M21 + m.Y.Z * t.M31;
-            var i22 = m.Y.X * t.M21 + m.Y.Y * t.M22 + m.Y.Z * t.M32;
-            var i23 = m.Y.X * t.M31 + m.Y.Y * t.M32 + m.Y.Z * t.M33;
-            result.M11 = i11 * m.X.X + i12 * m.X.Y + i13 * m.X.Z;
-            result.M21 = i21 * m.X.X + i22 * m.X.Y + i23 * m.X.Z;
-            result.M22 = i21 * m.Y.X + i22 * m.Y.Y + i23 * m.Y.Z;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void TransformBySymmetricWithoutOverlap(ref Vector3Wide v, ref Triangular3x3Wide m, out Vector3Wide result)
-        {
-            result.X = v.X * m.M11 + v.Y * m.M21 + v.Z * m.M31;
-            result.Y = v.X * m.M21 + v.Y * m.M22 + v.Z * m.M32;
-            result.Z = v.X * m.M31 + v.Y * m.M32 + v.Z * m.M33;
         }
 
 

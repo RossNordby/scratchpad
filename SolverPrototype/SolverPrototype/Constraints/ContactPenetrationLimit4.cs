@@ -79,25 +79,14 @@ namespace SolverPrototype.Constraints
             Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB3, out projection.Penetration3.AngularB);
 
             //effective mass
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration0.AngularA, ref inertiaA.InverseInertiaTensor, out var intermediateA0);
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration0.AngularB, ref inertiaB.InverseInertiaTensor, out var intermediateB0);
-            Vector3Wide.Dot(ref intermediateA0, ref projection.Penetration0.AngularA, out var angularA0);
-            Vector3Wide.Dot(ref intermediateB0, ref projection.Penetration0.AngularB, out var angularB0);
-
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration1.AngularA, ref inertiaA.InverseInertiaTensor, out var intermediateA1);
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration1.AngularB, ref inertiaB.InverseInertiaTensor, out var intermediateB1);
-            Vector3Wide.Dot(ref intermediateA1, ref projection.Penetration1.AngularA, out var angularA1);
-            Vector3Wide.Dot(ref intermediateB1, ref projection.Penetration1.AngularB, out var angularB1);
-
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration2.AngularA, ref inertiaA.InverseInertiaTensor, out var intermediateA2);
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration2.AngularB, ref inertiaB.InverseInertiaTensor, out var intermediateB2);
-            Vector3Wide.Dot(ref intermediateA2, ref projection.Penetration2.AngularA, out var angularA2);
-            Vector3Wide.Dot(ref intermediateB2, ref projection.Penetration2.AngularB, out var angularB2);
-
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration3.AngularA, ref inertiaA.InverseInertiaTensor, out var intermediateA3);
-            Matrix3x3Wide.TransformWithoutOverlap(ref projection.Penetration3.AngularB, ref inertiaB.InverseInertiaTensor, out var intermediateB3);
-            Vector3Wide.Dot(ref intermediateA3, ref projection.Penetration3.AngularA, out var angularA3);
-            Vector3Wide.Dot(ref intermediateB3, ref projection.Penetration3.AngularB, out var angularB3);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration0.AngularA, ref inertiaA.InverseInertiaTensor, out var angularA0);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration0.AngularB, ref inertiaB.InverseInertiaTensor, out var angularB0);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration1.AngularA, ref inertiaA.InverseInertiaTensor, out var angularA1);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration1.AngularB, ref inertiaB.InverseInertiaTensor, out var angularB1);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration2.AngularA, ref inertiaA.InverseInertiaTensor, out var angularA2);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration2.AngularB, ref inertiaB.InverseInertiaTensor, out var angularB2);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration3.AngularA, ref inertiaA.InverseInertiaTensor, out var angularA3);
+            Triangular3x3Wide.VectorSandwich(ref projection.Penetration3.AngularB, ref inertiaB.InverseInertiaTensor, out var angularB3);
 
             //Linear effective mass contribution notes:
             //1) The J * M^-1 * JT can be reordered to J * JT * M^-1 for the linear components, since M^-1 is a scalar and dot(n * scalar, n) = dot(n, n) * scalar.
@@ -128,12 +117,12 @@ namespace SolverPrototype.Constraints
             var linearVelocityChangeA = correctiveImpulse * inertiaA.InverseMass;
             Vector3Wide.Scale(ref normal, ref linearVelocityChangeA, out var correctiveVelocityALinearVelocity);
             Vector3Wide.Scale(ref projection.AngularA, ref correctiveImpulse, out var correctiveAngularImpulseA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref correctiveAngularImpulseA, ref inertiaA.InverseInertiaTensor, out var correctiveVelocityAAngularVelocity);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref correctiveAngularImpulseA, ref inertiaA.InverseInertiaTensor, out var correctiveVelocityAAngularVelocity);
 
             var linearVelocityChangeB = correctiveImpulse * inertiaB.InverseMass;
             Vector3Wide.Scale(ref normal, ref linearVelocityChangeB, out var correctiveVelocityBLinearVelocity);
             Vector3Wide.Scale(ref projection.AngularB, ref correctiveImpulse, out var correctiveAngularImpulseB);
-            Matrix3x3Wide.TransformWithoutOverlap(ref correctiveAngularImpulseB, ref inertiaB.InverseInertiaTensor, out var correctiveVelocityBAngularVelocity);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref correctiveAngularImpulseB, ref inertiaB.InverseInertiaTensor, out var correctiveVelocityBAngularVelocity);
 
             Vector3Wide.Add(ref wsvA.LinearVelocity, ref correctiveVelocityALinearVelocity, out wsvA.LinearVelocity);
             Vector3Wide.Add(ref wsvA.AngularVelocity, ref correctiveVelocityAAngularVelocity, out wsvA.AngularVelocity);

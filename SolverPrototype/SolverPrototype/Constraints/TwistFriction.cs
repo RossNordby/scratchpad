@@ -23,11 +23,9 @@ namespace SolverPrototype.Constraints
         {
             //Compute effective mass matrix contributions. No linear contributions for the twist constraint.
             //Note that we use the angularJacobianA (that is, the normal) for both, despite angularJacobianB = -angularJacobianA. That's fine- J * M * JT is going to be positive regardless.
-            Matrix3x3Wide.Transform(ref angularJacobianA, ref inertiaA.InverseInertiaTensor, out var aIntermediate);
-            Matrix3x3Wide.Transform(ref angularJacobianA, ref inertiaB.InverseInertiaTensor, out var bIntermediate);
-            Vector3Wide.Dot(ref aIntermediate, ref angularJacobianA, out var angularA);
-            Vector3Wide.Dot(ref bIntermediate, ref angularJacobianA, out var angularB);
-
+            Triangular3x3Wide.VectorSandwich(ref angularJacobianA, ref inertiaA.InverseInertiaTensor, out var angularA);
+            Triangular3x3Wide.VectorSandwich(ref angularJacobianA, ref inertiaB.InverseInertiaTensor, out var angularB);
+    
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
             //Note that we have to guard against two bodies with infinite inertias. This is a valid state! 
             //(We do not have to do such guarding on constraints with linear jacobians; dynamic bodies cannot have zero *mass*.)
@@ -50,8 +48,8 @@ namespace SolverPrototype.Constraints
             ref Vector<float> correctiveImpulse, ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
             Vector3Wide.Scale(ref angularJacobianA, ref correctiveImpulse, out var worldCorrectiveImpulseA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref worldCorrectiveImpulseA, ref inertiaA.InverseInertiaTensor, out var worldCorrectiveVelocityA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref worldCorrectiveImpulseA, ref inertiaB.InverseInertiaTensor, out var worldCorrectiveVelocityB);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref worldCorrectiveImpulseA, ref inertiaA.InverseInertiaTensor, out var worldCorrectiveVelocityA);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref worldCorrectiveImpulseA, ref inertiaB.InverseInertiaTensor, out var worldCorrectiveVelocityB);
             Vector3Wide.Add(ref wsvA.AngularVelocity, ref worldCorrectiveVelocityA, out wsvA.AngularVelocity);
             Vector3Wide.Subtract(ref wsvB.AngularVelocity, ref worldCorrectiveVelocityB, out wsvB.AngularVelocity);
         }

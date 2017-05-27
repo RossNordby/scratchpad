@@ -46,7 +46,7 @@ namespace SolverPrototype.Constraints
     {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings,
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings, ref Vector<float> maximumRecoveryVelocity,
             ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection)
         {
             //unsoftened effective mass = (J * M^-1 * JT)^-1
@@ -79,8 +79,8 @@ namespace SolverPrototype.Constraints
             Vector3Wide.Dot(ref projection.CSIToWSVLinearB, ref jacobians.LinearB, out var linearB);
 
             //The angular components are a little more involved; (J * I^-1) * JT is explicitly computed.
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out projection.CSIToWSVAngularA);
-            Matrix3x3Wide.TransformWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out projection.CSIToWSVAngularB);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out projection.CSIToWSVAngularA);
+            Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out projection.CSIToWSVAngularB);
             Vector3Wide.Dot(ref projection.CSIToWSVAngularA, ref jacobians.AngularA, out var angularA);
             Vector3Wide.Dot(ref projection.CSIToWSVAngularB, ref jacobians.AngularB, out var angularB);
 
@@ -279,7 +279,7 @@ namespace SolverPrototype.Constraints
             //Note that we use a bit of a hack when computing the bias velocity- even if our damping ratio/natural frequency implies a strongly springy response
             //that could cause a significant velocity overshoot, we apply an arbitrary clamping value to keep it reasonable.
             //This is useful for a variety of inequality constraints (like contacts) because you don't always want them behaving as true springs.
-            var biasVelocity = Vector.Min(positionError * positionErrorToVelocity, springSettings.MaximumRecoveryVelocity);
+            var biasVelocity = Vector.Min(positionError * positionErrorToVelocity, maximumRecoveryVelocity);
             projection.BiasImpulse = biasVelocity * softenedEffectiveMass;
 
             //Precompute the wsv * (JT * softenedEffectiveMass) term.

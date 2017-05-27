@@ -36,7 +36,7 @@ namespace SolverPrototype.Constraints
             //Note that we don't bother using the bundle's count here. 
             //That would only be helpful in one bundle per type batch, so the branching would just be (a tiny amount of) wasted effort almost always.
             Debug.Assert((Vector<int>.Count & 3) == 0, "No current hardware has a non-4-multiple width of 32 bit types, but just in case, note that this requires a width that is a multiple of 4!");
-            
+
             bundleA = indexA >> BundleIndexing.VectorShift;
             bundleB = indexB >> BundleIndexing.VectorShift;
             Unsafe.Add(ref bundleA, 1) = Unsafe.Add(ref indexA, 1) >> BundleIndexing.VectorShift;
@@ -45,7 +45,7 @@ namespace SolverPrototype.Constraints
             Unsafe.Add(ref bundleB, 2) = Unsafe.Add(ref indexB, 2) >> BundleIndexing.VectorShift;
             Unsafe.Add(ref bundleA, 3) = Unsafe.Add(ref indexA, 3) >> BundleIndexing.VectorShift;
             Unsafe.Add(ref bundleB, 3) = Unsafe.Add(ref indexB, 3) >> BundleIndexing.VectorShift;
-            
+
             for (int i = 4; i < Vector<int>.Count; i += 4)
             {
                 ref var targetA = ref Unsafe.Add(ref bundleA, i);
@@ -90,7 +90,8 @@ namespace SolverPrototype.Constraints
     /// <typeparam name="TProjection">Type of the projection to input.</typeparam>
     public interface IConstraintFunctions<TPrestepData, TProjection, TAccumulatedImpulse>
     {
-        void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref TPrestepData prestepData, out TProjection projection);
+        void Prestep<TBodyDataSource>(ref TBodyDataSource bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref TPrestepData prestepData,
+            out TProjection projection) where TBodyDataSource : IBodyDataSource;
         void WarmStart(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
         void Solve(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
     }

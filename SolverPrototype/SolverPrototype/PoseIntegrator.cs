@@ -100,8 +100,7 @@ namespace SolverPrototype
                 ref var inertias = ref Unsafe.Add(ref baseInertias, i);
                 Matrix3x3Wide.CreateFromQuaternion(ref pose.Orientation, out var orientationMatrix);
                 //I^-1 = RT * Ilocal^-1 * R 
-                Matrix3x3Wide.MultiplyTransposedWithoutOverlap(ref orientationMatrix, ref localInertias.InverseInertiaTensor, out var multiplied);
-                Matrix3x3Wide.MultiplyWithoutOverlap(ref multiplied, ref orientationMatrix, out inertias.InverseInertiaTensor);
+                Triangular3x3Wide.RotationSandwich(ref orientationMatrix, ref localInertias.InverseInertiaTensor, out inertias.InverseInertiaTensor);
 
             }
         }

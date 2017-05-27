@@ -282,8 +282,8 @@ namespace SolverPrototype
         {
             //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.
             //Branches are not particularly cheap, especially when they mispredict. Better to just gather it regardless.            
-            ref var targetBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.X.X);
-            ref var targetBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.X.X);
+            ref var targetBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
+            ref var targetBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.M11);
 
             //Grab the base references for the body indices. Note that we make use of the references memory layout again.
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
@@ -294,7 +294,7 @@ namespace SolverPrototype
                 {
                     var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
 
-                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexA].InverseInertiaTensor.X.X, innerIndexA);
+                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexA].InverseInertiaTensor.M11, innerIndexA);
                     ref var targetSlot = ref Unsafe.Add(ref targetBaseA, i);
                     targetSlot = bundleSlot;
                     Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
@@ -303,16 +303,13 @@ namespace SolverPrototype
                     Unsafe.Add(ref targetSlot, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 4 * Vector<float>.Count);
                     Unsafe.Add(ref targetSlot, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 5 * Vector<float>.Count);
                     Unsafe.Add(ref targetSlot, 6 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 6 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 7 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 7 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 8 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 8 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 9 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 9 * Vector<float>.Count);
                 }
 
                 {
                     var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
                     var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
 
-                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexB].InverseInertiaTensor.X.X, innerIndexB);
+                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexB].InverseInertiaTensor.M11, innerIndexB);
                     ref var targetSlot = ref Unsafe.Add(ref targetBaseB, i);
                     targetSlot = bundleSlot;
                     Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
@@ -321,9 +318,6 @@ namespace SolverPrototype
                     Unsafe.Add(ref targetSlot, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 4 * Vector<float>.Count);
                     Unsafe.Add(ref targetSlot, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 5 * Vector<float>.Count);
                     Unsafe.Add(ref targetSlot, 6 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 6 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 7 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 7 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 8 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 8 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 9 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 9 * Vector<float>.Count);
                 }
             }
         }
