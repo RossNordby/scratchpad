@@ -1,4 +1,5 @@
 ﻿using SolverPrototype;
+using SolverPrototype.Constraints;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -8,12 +9,12 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
-            TriangularTests.Test();
+            //TriangularTests.Test();
             //LocalsinitCodegen.Test();
             //InterlockedOverheadTests.Test();
             //ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
-            //AutoTester.Test();
+            AutoTester.Test();
             //ContactManifoldConvergenceTests.Test();
             //MemoryResizeTests.Test();
             //ConstraintCacheOptimizationTests.Test();

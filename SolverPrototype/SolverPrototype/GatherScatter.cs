@@ -270,58 +270,6 @@ namespace SolverPrototype
 
 
         /// <summary>
-        /// Gathers the inertia associated with the bodies of a bundle.
-        /// </summary>
-        /// <param name="bodyInertias">Set of all body inertias.</param>
-        /// <param name="references">Body references of the constraint to gather.</param>
-        /// <param name="inertiaA">Gathered inertia of the first body in the pair.</param>
-        /// <param name="inertiaB">Gathered inertia of the second body in the pair.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GatherInertia(ref Buffer<BodyInertias> bodyInertias, ref UnpackedTwoBodyReferences references,
-            out BodyInertias inertiaA, out BodyInertias inertiaB)
-        {
-            //Note that there is no special handling of null or kinematic entities here. We gather them unconditionally.
-            //Branches are not particularly cheap, especially when they mispredict. Better to just gather it regardless.            
-            ref var targetBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
-            ref var targetBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.M11);
-
-            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
-            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
-
-            for (int i = 0; i < references.Count; ++i)
-            {
-                ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
-                {
-                    var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
-
-                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexA].InverseInertiaTensor.M11, innerIndexA);
-                    ref var targetSlot = ref Unsafe.Add(ref targetBaseA, i);
-                    targetSlot = bundleSlot;
-                    Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 2 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 3 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 3 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 4 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 5 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 6 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 6 * Vector<float>.Count);
-                }
-
-                {
-                    var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
-                    var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
-
-                    ref var bundleSlot = ref Get(ref bodyInertias[bundleIndexB].InverseInertiaTensor.M11, innerIndexB);
-                    ref var targetSlot = ref Unsafe.Add(ref targetBaseB, i);
-                    targetSlot = bundleSlot;
-                    Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 2 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 3 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 3 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 4 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 5 * Vector<float>.Count);
-                    Unsafe.Add(ref targetSlot, 6 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 6 * Vector<float>.Count);
-                }
-            }
-        }
-        /// <summary>
         /// Sets a lane of a container of vectors, assuming that the vectors are contiguous.
         /// </summary>
         /// <typeparam name="T">Type of the values to copy into the container lane.</typeparam>

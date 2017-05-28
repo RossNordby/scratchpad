@@ -23,10 +23,10 @@ namespace SolverPrototypeTests
             const int length = 17;
             SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.ScrambleBodies(simulation);
-            SimulationSetup.ScrambleConstraints(simulation.Solver);
-            SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            //SimulationSetup.ScrambleBodies(simulation);
+            //SimulationSetup.ScrambleConstraints(simulation.Solver);
+            //SimulationSetup.ScrambleBodyConstraintLists(simulation);
+            //SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(1);
@@ -37,7 +37,7 @@ namespace SolverPrototypeTests
             simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher); //prejit
             for (int i = 0; i < iterations; ++i)
             {
-                SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
+                //SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
                 GC.Collect(3, GCCollectionMode.Forced, true);
                 var start = Stopwatch.GetTimestamp();
                 for (int j = 0; j < internalCompressionIterations; ++j)

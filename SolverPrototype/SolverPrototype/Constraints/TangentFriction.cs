@@ -73,13 +73,13 @@ namespace SolverPrototype.Constraints
             ComputeJacobians(ref tangentX, ref tangentY, ref offsetA, ref offsetB, out var jacobians);
             //Compute effective mass matrix contributions.
             Triangular2x2Wide.SandwichScale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearContributionA);
-            Triangular2x2Wide.SandwichScale(ref jacobians.LinearA, ref inertiaA.InverseMass, out var linearContributionB);
+            Triangular2x2Wide.SandwichScale(ref jacobians.LinearA, ref inertiaB.InverseMass, out var linearContributionB);
 
             Triangular3x3Wide.MatrixSandwich(ref jacobians.AngularA, ref inertiaA.InverseInertiaTensor, out var angularContributionA);
             Triangular3x3Wide.MatrixSandwich(ref jacobians.AngularB, ref inertiaB.InverseInertiaTensor, out var angularContributionB);
 
             //No softening; this constraint is rigid by design. (It does support a maximum force, but that is distinct from a proper damping ratio/natural frequency.)
-            Triangular2x2Wide.Subtract(ref linearContributionA, ref linearContributionB, out var linear);
+            Triangular2x2Wide.Add(ref linearContributionA, ref linearContributionB, out var linear);
             Triangular2x2Wide.Add(ref angularContributionA, ref angularContributionB, out var angular);
             Triangular2x2Wide.Add(ref linear, ref angular, out var inverseEffectiveMass);
             Triangular2x2Wide.InvertWithoutOverlap(ref inverseEffectiveMass, out projection.EffectiveMass);

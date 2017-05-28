@@ -343,6 +343,39 @@ namespace SolverPrototype
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void GatherInertiaForBody(ref float targetInertiaBase, int i, int bundleIndex, int innerIndex)
+        {
+            ref var bundleSlot = ref GatherScatter.Get(ref Inertias[bundleIndex].InverseInertiaTensor.M11, innerIndex);
+            ref var targetSlot = ref Unsafe.Add(ref targetInertiaBase, i);
+            targetSlot = bundleSlot;
+            Unsafe.Add(ref targetSlot, Vector<float>.Count) = Unsafe.Add(ref bundleSlot, Vector<float>.Count);
+            Unsafe.Add(ref targetSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 2 * Vector<float>.Count);
+            Unsafe.Add(ref targetSlot, 3 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 3 * Vector<float>.Count);
+            Unsafe.Add(ref targetSlot, 4 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 4 * Vector<float>.Count);
+            Unsafe.Add(ref targetSlot, 5 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 5 * Vector<float>.Count);
+            Unsafe.Add(ref targetSlot, 6 * Vector<float>.Count) = Unsafe.Add(ref bundleSlot, 6 * Vector<float>.Count);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void GatherPoseForBody(ref float targetPositionBase, ref float targetOrientationBase, int i, int bundleIndex, int innerIndex)
+        {
+            ref var sourcePosition = ref GatherScatter.Get(ref Poses[bundleIndex].Position.X, innerIndex);
+            ref var sourceOrientation = ref Unsafe.Add(ref sourcePosition, 3 * Vector<float>.Count);
+            ref var targetPositionSlot = ref Unsafe.Add(ref targetPositionBase, i);
+            ref var targetOrientationSlot = ref Unsafe.Add(ref targetOrientationBase, i);
+            targetPositionSlot = sourcePosition;
+            Unsafe.Add(ref targetPositionSlot, Vector<float>.Count) = Unsafe.Add(ref sourcePosition, Vector<float>.Count);
+            Unsafe.Add(ref targetPositionSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref sourcePosition, 2 * Vector<float>.Count);
+            targetOrientationSlot = sourceOrientation;
+            Unsafe.Add(ref targetOrientationSlot, Vector<float>.Count) = Unsafe.Add(ref sourceOrientation, Vector<float>.Count);
+            Unsafe.Add(ref targetOrientationSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceOrientation, 2 * Vector<float>.Count);
+            Unsafe.Add(ref targetOrientationSlot, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceOrientation, 3 * Vector<float>.Count);
+        }
+
+
         //TODO: In future versions, we will likely store the body position in different forms to allow for extremely large worlds.
         //That will be an opt-in feature. The default implementation will use the FP32 representation, but the user could choose to swap it out for a int64 based representation.
         //This affects other systems- AABB calculation, pose integration, solving, and in extreme (64 bit) cases, the broadphase.
@@ -353,18 +386,56 @@ namespace SolverPrototype
         //Given the current limits of C# and the compiler, the best option seems to be a interface implementing struct that provides this functionality.
         //The users would be type specialized by the compiler, avoiding virtual invocation. 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GatherInertiaAndPose(ref UnpackedTwoBodyReferences bodyReferences,
+        public void GatherInertiaAndPose(ref UnpackedTwoBodyReferences references,
             out Vector3Wide localPositionB, out QuaternionWide orientationA, out QuaternionWide orientationB,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
 
+            ref var targetInertiaBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
+            ref var targetInertiaBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.M11);
+            Vector3Wide positionA, positionB;
+            ref var targetPositionBaseA = ref Unsafe.As<Vector<float>, float>(ref positionA.X);
+            ref var targetPositionBaseB = ref Unsafe.As<Vector<float>, float>(ref positionB.X);
+            ref var targetOrientationBaseA = ref Unsafe.As<Vector<float>, float>(ref orientationA.X);
+            ref var targetOrientationBaseB = ref Unsafe.As<Vector<float>, float>(ref orientationB.X);
+
+            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
+            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
+
+            for (int i = 0; i < references.Count; ++i)
+            {
+                ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
+                var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
+                GatherInertiaForBody(ref targetInertiaBaseA, i, bundleIndexA, innerIndexA);
+                GatherPoseForBody(ref targetPositionBaseA, ref targetOrientationBaseA, i, bundleIndexA, innerIndexA);
+                var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
+                var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
+                GatherInertiaForBody(ref targetInertiaBaseB, i, bundleIndexB, innerIndexB);
+                GatherPoseForBody(ref targetPositionBaseB, ref targetOrientationBaseB, i, bundleIndexB, innerIndexB);
+            }
+            Vector3Wide.Subtract(ref positionB, ref positionA, out localPositionB);
         }
 
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GatherInertia(ref UnpackedTwoBodyReferences bodyReferences,
+        public void GatherInertia(ref UnpackedTwoBodyReferences references,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
+            ref var targetInertiaBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
+            ref var targetInertiaBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.M11);
 
+            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
+            ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
+
+            for (int i = 0; i < references.Count; ++i)
+            {
+                ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
+                var innerIndexA = Unsafe.Add(ref bundleIndexA, Vector<float>.Count);
+                GatherInertiaForBody(ref targetInertiaBaseA, i, bundleIndexA, innerIndexA);
+                var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
+                var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
+                GatherInertiaForBody(ref targetInertiaBaseB, i, bundleIndexB, innerIndexB);
+            }
         }
 
         /// <summary>

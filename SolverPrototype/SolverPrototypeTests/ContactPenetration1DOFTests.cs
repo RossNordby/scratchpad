@@ -92,7 +92,7 @@ namespace SolverPrototypeTests
                     var maximumRecoveryVelocity = new Vector<float>(1);
                     //BodyInertias inertiaA, inertiaB;
                     //inertiaA = inertiaB = default(BodyInertias);
-                    GatherScatter.GatherInertia(ref bodies.LocalInertias, ref bodyReferences[i], out var inertiaA, out var inertiaB);
+                    bodies.GatherInertia(ref bodyReferences[i], out var inertiaA, out var inertiaB);
                     Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref springSettings[i], ref maximumRecoveryVelocity,
                         ref error, dt, inverseDt, out projectionData[i]);
 

@@ -249,6 +249,7 @@ namespace SolverPrototype.Constraints
                     accumulatedImpulses.Penetration3 * projection.LeverArm3);
                 TwistFriction.Solve(ref surfaceBasis.Y, ref projection.InertiaA, ref projection.InertiaB, ref projection.Twist, ref maximumTwistImpulse, ref accumulatedImpulses.Twist, ref wsvA, ref wsvB);
                 GatherScatter.ScatterVelocities(ref bodyVelocities, ref bodyReferences, ref wsvA, ref wsvB);
+
             }
         }
     }
