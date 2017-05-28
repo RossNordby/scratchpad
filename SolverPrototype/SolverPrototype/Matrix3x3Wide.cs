@@ -121,6 +121,20 @@ namespace SolverPrototype
             inverse.Z.Z = m33 * determinantInverse;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateCrossProduct(ref Vector3Wide v, out Matrix3x3Wide skew)
+        {
+            skew.X.X = Vector<float>.Zero;
+            skew.X.Y = -v.Z;
+            skew.X.Z = v.Y;
+            skew.Y.X = v.Z;
+            skew.Y.Y = Vector<float>.Zero;
+            skew.Y.Z = -v.X;
+            skew.Z.X = -v.Y;
+            skew.Z.Y = v.X;
+            skew.Z.Z = Vector<float>.Zero;
+        }
+
         /// <summary>
         /// Multiplies every component in the matrix by the given scalar value.
         /// </summary>

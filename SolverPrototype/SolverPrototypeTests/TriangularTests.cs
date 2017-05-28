@@ -57,7 +57,7 @@ namespace SolverPrototypeTests
             }
             var e11 = MeasureError(m.X.X, t.M11[0]);
             var e21 = MeasureError(m.Y.X, t.M21[0]);
-            var e22 = MeasureError(m.Y.X, t.M21[0]);
+            var e22 = MeasureError(m.Y.Y, t.M22[0]);
             var e31 = MeasureError(m.Z.X, t.M31[0]);
             var e32 = MeasureError(m.Z.Y, t.M32[0]);
             var e33 = MeasureError(m.Z.Z, t.M33[0]);
@@ -71,6 +71,24 @@ namespace SolverPrototypeTests
                 throw new Exception("Too much error in Matrix3x3 vs Triangular3x3Wide.");
             }
         }
+        static void Compare(ref Matrix2x2Wide m, ref Triangular2x2Wide t)
+        {
+            var se12 = MeasureError(m.X.Y[0], m.Y.X[0]);
+            if (se12 > epsilon)
+            {
+                throw new Exception("Matrix not symmetric; shouldn't compare against a symmetric triangular matrix.");
+            }
+            var e11 = MeasureError(m.X.X[0], t.M11[0]);
+            var e21 = MeasureError(m.Y.X[0], t.M21[0]);
+            var e22 = MeasureError(m.Y.Y[0], t.M22[0]);
+            if (e11 > epsilon ||
+                e21 > epsilon ||
+                e22 > epsilon)
+            {
+                throw new Exception("Too much error in Matrix2x2Wide vs Triangular2x2Wide.");
+            }
+        }
+
         static void Compare(ref Matrix3x3 m, ref Matrix3x3Wide wide)
         {
             var e11 = MeasureError(m.X.X, wide.X.X[0]);
@@ -96,7 +114,6 @@ namespace SolverPrototypeTests
                 throw new Exception("Too much error in Matrix3x3 vs Matrix3x3Wide.");
             }
         }
-
         struct TriangularWideVectorSandwich : ITest
         {
             public Triangular3x3Wide triangular;
@@ -135,6 +152,72 @@ namespace SolverPrototypeTests
                 Vector3Wide.Dot(ref v, ref intermediate, out result);
             }
         }
+        struct TriangularWide2x3Sandwich : ITest
+        {
+            public Triangular3x3Wide triangular;
+            public Matrix2x3Wide m;
+            public Triangular2x2Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Triangular3x3Wide.MatrixSandwich(ref m, ref triangular, out result);
+            }
+        }
+        struct SymmetricWide2x3Sandwich : ITest
+        {
+            public Matrix3x3Wide symmetric;
+            public Matrix2x3Wide m;
+            public Matrix2x2Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix2x3Wide.MultiplyWithoutOverlap(ref m, ref symmetric, out var intermediate);
+                Matrix2x3Wide.MultiplyByTransposeWithoutOverlap(ref intermediate, ref m, out result);
+            }
+        }
+        struct TriangularWideSkewSandwich : ITest
+        {
+            public Triangular3x3Wide triangular;
+            public Vector3Wide v;
+            public Triangular3x3Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Triangular3x3Wide.SkewSandwichWithoutOverlap(ref v, ref triangular, out result);
+            }
+        }
+        struct SymmetricSkewSandwich : ITest
+        {
+            public Matrix3x3 symmetric;
+            public Vector3 v;
+            public Matrix3x3 result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3.CreateCrossProduct(ref v, out var skew);
+                Matrix3x3.MultiplyTransposed(ref skew, ref symmetric, out var intermediate);
+                Matrix3x3.Multiply(ref intermediate, ref skew, out result);
+            }
+        }
+        struct SymmetricWideSkewSandwich : ITest
+        {
+            public Matrix3x3Wide symmetric;
+            public Vector3Wide v;
+            public Matrix3x3Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3Wide.CreateCrossProduct(ref v, out var skew);
+                Matrix3x3Wide.MultiplyTransposedWithoutOverlap(ref skew, ref symmetric, out var intermediate);
+                Matrix3x3Wide.MultiplyWithoutOverlap(ref intermediate, ref skew, out result);
+            }
+        }
+
 
         struct TriangularRotationSandwichWide : ITest
         {
@@ -218,6 +301,11 @@ namespace SolverPrototypeTests
             var symmetricVectorSandwichTime = 0.0;
             var symmetricWideVectorSandwichTime = 0.0;
             var triangularWideVectorSandwichTime = 0.0;
+            var symmetricWide2x3SandwichTime = 0.0;
+            var triangularWide2x3SandwichTime = 0.0;
+            var symmetricSkewSandwichTime = 0.0;
+            var symmetricWideSkewSandwichTime = 0.0;
+            var triangularWideSkewSandwichTime = 0.0;
             var symmetricRotationSandwichTime = 0.0;
             var symmetricWideRotationSandwichTime = 0.0;
             var triangularWideRotationSandwichTime = 0.0;
@@ -233,6 +321,8 @@ namespace SolverPrototypeTests
                 Vector3Wide.CreateFrom(ref rotation.X, out rotationWide.X);
                 Vector3Wide.CreateFrom(ref rotation.Y, out rotationWide.Y);
                 Vector3Wide.CreateFrom(ref rotation.Z, out rotationWide.Z);
+
+                var m2x3Wide = new Matrix2x3Wide() { X = axisWide, Y = new Vector3Wide { X = -axisWide.Y, Y = axisWide.Z, Z = axisWide.X } };
 
                 var triangular = new Triangular3x3
                 {
@@ -265,6 +355,11 @@ namespace SolverPrototypeTests
                 var symmetricVectorSandwich = new SymmetricVectorSandwich() { v = axis, symmetric = symmetric };
                 var symmetricWideVectorSandwich = new SymmetricWideVectorSandwich() { v = axisWide, symmetric = symmetricWide };
                 var triangularWideVectorSandwich = new TriangularWideVectorSandwich() { v = axisWide, triangular = triangularWide };
+                var symmetricWide2x3Sandwich = new SymmetricWide2x3Sandwich() { m = m2x3Wide, symmetric = symmetricWide };
+                var triangularWide2x3Sandwich = new TriangularWide2x3Sandwich() { m = m2x3Wide, triangular = triangularWide };
+                var symmetricSkewSandwich = new SymmetricSkewSandwich() { v = axis, symmetric = symmetric };
+                var symmetricWideSkewSandwich = new SymmetricWideSkewSandwich() { v = axisWide, symmetric = symmetricWide };
+                var triangularWideSkewSandwich = new TriangularWideSkewSandwich() { v = axisWide, triangular = triangularWide };
                 var symmetricSandwich = new SymmetricRotationSandwich() { rotation = rotation, symmetric = symmetric };
                 var symmetricWideSandwich = new SymmetricRotationSandwichWide() { rotation = rotationWide, symmetric = symmetricWide };
                 var triangularWideSandwich = new TriangularRotationSandwichWide() { rotation = rotationWide, triangular = triangularWide };
@@ -277,6 +372,11 @@ namespace SolverPrototypeTests
                 symmetricVectorSandwichTime += TimeTest(innerIterations, ref symmetricVectorSandwich);
                 symmetricWideVectorSandwichTime += TimeTest(innerIterations, ref symmetricWideVectorSandwich);
                 triangularWideVectorSandwichTime += TimeTest(innerIterations, ref triangularWideVectorSandwich);
+                symmetricWide2x3SandwichTime += TimeTest(innerIterations, ref symmetricWide2x3Sandwich);
+                triangularWide2x3SandwichTime += TimeTest(innerIterations, ref triangularWide2x3Sandwich);
+                symmetricSkewSandwichTime += TimeTest(innerIterations, ref symmetricSkewSandwich);
+                symmetricWideSkewSandwichTime += TimeTest(innerIterations, ref symmetricWideSkewSandwich);
+                triangularWideSkewSandwichTime += TimeTest(innerIterations, ref triangularWideSkewSandwich);
                 symmetricRotationSandwichTime += TimeTest(innerIterations, ref symmetricSandwich);
                 symmetricWideRotationSandwichTime += TimeTest(innerIterations, ref symmetricWideSandwich);
                 triangularWideRotationSandwichTime += TimeTest(innerIterations, ref triangularWideSandwich);
@@ -286,6 +386,9 @@ namespace SolverPrototypeTests
 
                 Compare(symmetricVectorSandwich.result, ref symmetricWideVectorSandwich.result);
                 Compare(symmetricVectorSandwich.result, ref triangularWideVectorSandwich.result);
+                Compare(ref symmetricWide2x3Sandwich.result, ref triangularWide2x3Sandwich.result);
+                Compare(ref symmetricSkewSandwich.result, ref symmetricWideSkewSandwich.result);
+                Compare(ref symmetricSkewSandwich.result, ref triangularWideSkewSandwich.result);
                 Compare(ref symmetricSandwich.result, ref symmetricWideSandwich.result);
                 Compare(ref symmetricSandwich.result, ref triangularWideSandwich.result);
                 Compare(ref symmetricInvert.result, ref symmetricWideInvert.result);
@@ -295,6 +398,11 @@ namespace SolverPrototypeTests
             Console.WriteLine($"Symmetric vector sandwich:       {symmetricVectorSandwichTime}");
             Console.WriteLine($"Symmetric wide vector sandwich:  {symmetricWideVectorSandwichTime}");
             Console.WriteLine($"Triangular wide vector sandwich: {triangularWideVectorSandwichTime}");
+            Console.WriteLine($"Symmetric wide 2x3 sandwich:  {symmetricWide2x3SandwichTime}");
+            Console.WriteLine($"Triangular wide 2x3 sandwich: {triangularWide2x3SandwichTime}");
+            Console.WriteLine($"Symmetric skew sandwich:       {symmetricSkewSandwichTime}");
+            Console.WriteLine($"Symmetric wide skew sandwich:  {symmetricWideSkewSandwichTime}");
+            Console.WriteLine($"Triangular wide skew sandwich: {triangularWideSkewSandwichTime}");
             Console.WriteLine($"Symmetric rotation sandwich:       {symmetricRotationSandwichTime}");
             Console.WriteLine($"Symmetric wide rotation sandwich:  {symmetricWideRotationSandwichTime}");
             Console.WriteLine($"Triangular wide rotation sandwich: {triangularWideRotationSandwichTime}");

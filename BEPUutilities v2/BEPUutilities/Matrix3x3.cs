@@ -154,6 +154,8 @@ namespace BEPUutilities2
 
 
 
+
+
         /// <summary>
         /// Transforms the vector by the matrix.
         /// </summary>
@@ -359,6 +361,7 @@ namespace BEPUutilities2
                 1 + oneMinusCosAngle * (zz - 1));
             
         }
+
         /// <summary>
         /// Creates a matrix representing a rotation derived from an axis and angle.
         /// </summary>
@@ -371,7 +374,26 @@ namespace BEPUutilities2
             CreateFromAxisAngle(ref axis, angle, out var result);
             return result;
 
-        }  
+        }
+
+        /// <summary>
+        /// Creates a matrix such that a x v = a * result.
+        /// </summary>
+        /// <param name="v">Vector to build the skew symmetric matrix from.</param>
+        /// <param name="result">Skew symmetric matrix representing the cross product.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateCrossProduct(ref Vector3 v, out Matrix3x3 result)
+        {
+            result.X.X = 0f;
+            result.X.Y = -v.Z;
+            result.X.Z = v.Y;
+            result.Y.X = v.Z;
+            result.Y.Y = 0f;
+            result.Y.Z = -v.X;
+            result.Z.X = -v.Y;
+            result.Z.Y = v.X;
+            result.Z.Z = 0f;
+        }
 
         /// <summary>
         /// Concatenates two matrices.

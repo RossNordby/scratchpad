@@ -110,44 +110,26 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SkewSandwichWithoutOverlap(ref Vector3Wide v, ref Triangular3x3Wide m, out Triangular3x3Wide sandwich)
         {
-            //var x32 = v.X * m.M32;
-            //var y31 = v.Y * m.M31;
-            //var z21 = v.Z * m.M21;
-            //var i11 = z21 + y31;
-            //var i12 = v.Z * m.M22 + v.Y * m.M32;
-            //var i13 = v.Z * m.M32 + v.Y * m.M33;
-            //var i21 = v.Z * m.M11 + v.X * m.M31;
-            //var i22 = z21 + x32;
-            //var i23 = v.Z * m.M31 + v.X * m.M33;
-            //var i31 = v.Y * m.M11 + v.X * m.M21;
-            //var i32 = v.Y * m.M21 + v.X * m.M22;
-            //var i33 = y31 + x32;
+            //27 muls, 15 adds.
+            var x32 = v.X * m.M32;
+            var y31 = v.Y * m.M31;
+            var z21 = v.Z * m.M21;
+            var i11 = y31 - z21;
+            var i12 = v.Y * m.M32 - v.Z * m.M22;
+            var i13 = v.Y * m.M33 - v.Z * m.M32;
+            var i21 = v.Z * m.M11 - v.X * m.M31;
+            var i22 = z21 - x32;
+            var i23 = v.Z * m.M31 - v.X * m.M33;
+            var i31 = v.X * m.M21 - v.Y * m.M11;
+            var i32 = v.X * m.M22 - v.Y * m.M21;
+            var i33 = x32 - y31;
 
-            //var ix32 = v.X * i32;
-            //var iy31 = v.Y * i31;
-            //var iz21 = v.Z * i21;
-            //sandwich.M11 = iz21 + iy31;
-            //sandwich.M21 = i22 * v.Z + i32 * v.Y;
-            //sandwich.M22 = iz21 + ix32;
-            //sandwich.M31 = i32 * v.Z + i33 * v.Y;
-            //sandwich.M32 = i31 * v.Z + i33 * v.X;
-            //sandwich.M33 = iy31 + ix32;
-
-            var vxvx = v.X * v.X;
-            var vyvy = v.Y * v.Y;
-            var vzvz = v.Z * v.Z;
-            var vxvy = v.X * v.Y;
-            var vxvz = v.X * v.Z;
-            var vyvz = v.Y * v.Z;
-            var M32vyvz = m.M32 * vyvz;
-            var M31vxvz = m.M31 * vxvz;
-            var M21vxvy = m.M21 * vxvy;
-            sandwich.M11 = (m.M33 * vyvy - M32vyvz) + (m.M22 * vzvz - M32vyvz);
-            sandwich.M21 = -m.M33 * vxvy + m.M32 * vxvz + m.M31 * vyvz - m.M21 * vzvz;
-            sandwich.M22 = (m.M33 * vxvx - M31vxvz) + (m.M11 * vzvz - M31vxvz);
-            sandwich.M31 = m.M32 * vxvy - m.M31 * vyvy - m.M22 * vxvz + m.M21 * vyvz;
-            sandwich.M32 = -m.M32 * vxvx + m.M31 * vxvy + m.M21 * vxvz - m.M11 * vyvz;
-            sandwich.M33 = (m.M22 * vxvx - M21vxvy) + (m.M11 * vyvy - M21vxvy);
+            sandwich.M11 = v.Y * i13 - v.Z * i12;
+            sandwich.M21 = v.Y * i23 - v.Z * i22;
+            sandwich.M22 = v.Z * i21 - v.X * i23;
+            sandwich.M31 = v.Y * i33 - v.Z * i32;
+            sandwich.M32 = v.Z * i31 - v.X * i33;
+            sandwich.M33 = v.X * i32 - v.Y * i31;
         }
 
         /// <summary>
