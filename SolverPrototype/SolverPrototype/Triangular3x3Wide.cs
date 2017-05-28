@@ -44,26 +44,22 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SymmetricInvert(ref Triangular3x3Wide m, out Triangular3x3Wide inverse)
         {
-            var M11M22 = m.M11 * m.M22;
-            var M21M31 = m.M21 * m.M31;
-            var M21M21 = m.M21 * m.M21;
-            var M31M31 = m.M31 * m.M31;
-            var M32M32 = m.M32 * m.M32;
-            var M21M31M32 = M21M31 * m.M32;
-            var denom = Vector<float>.One / ((m.M22 * M31M31 - M21M31M32) + (m.M11 * M32M32 - M21M31M32) + (M21M21 - M11M22) * m.M33);
-            var M22M33 = m.M22 * m.M33;
-            var M31M32 = m.M31 * m.M32;
-            var M21M33 = m.M21 * m.M33;
-            var M11M33 = m.M11 * m.M33;
-            var M22M31 = m.M22 * m.M31;
-            var M21M32 = m.M21 * m.M32;
-            var M11M32 = m.M11 * m.M32;
-            inverse.M11 = (M32M32 - M22M33) * denom;
-            inverse.M21 = (M21M33 - M31M32) * denom;
-            inverse.M22 = (M31M31 - M11M33) * denom;
-            inverse.M31 = (M22M31 - M21M32) * denom;
-            inverse.M32 = (M11M32 - M21M31) * denom;
-            inverse.M33 = (M21M21 - M11M22) * denom;
+            var m11 = m.M22 * m.M33 - m.M32 * m.M32;
+            var m21 = m.M32 * m.M31 - m.M33 * m.M21;
+            var m31 = m.M21 * m.M32 - m.M31 * m.M22;
+            var determinantInverse = Vector<float>.One / (m11 * m.M11 + m21 * m.M21 + m31 * m.M31);
+            
+            var m22 = m.M33 * m.M11 - m.M31 * m.M31;
+            var m32 = m.M31 * m.M21 - m.M11 * m.M32;
+            
+            var m33 = m.M11 * m.M22 - m.M21 * m.M21;
+
+            inverse.M11 = m11 * determinantInverse;
+            inverse.M21 = m21 * determinantInverse;
+            inverse.M31 = m31 * determinantInverse;
+            inverse.M22 = m22 * determinantInverse;
+            inverse.M32 = m32 * determinantInverse;
+            inverse.M33 = m33 * determinantInverse;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -174,9 +170,9 @@ namespace SolverPrototype
             var i32 = r.X.Z * m.M21 + r.Y.Z * m.M22 + r.Z.Z * m.M32;
             var i33 = r.X.Z * m.M31 + r.Y.Z * m.M32 + r.Z.Z * m.M33;
 
-            sandwich.M11 = i11 * r.X.X + i12 * r.Y.X + i31 * r.Z.X;
-            sandwich.M21 = i21 * r.X.X + i22 * r.Y.X + i32 * r.Z.X;
-            sandwich.M22 = i21 * r.X.Y + i22 * r.Y.Y + i32 * r.Z.Y;
+            sandwich.M11 = i11 * r.X.X + i12 * r.Y.X + i13 * r.Z.X;
+            sandwich.M21 = i21 * r.X.X + i22 * r.Y.X + i23 * r.Z.X;
+            sandwich.M22 = i21 * r.X.Y + i22 * r.Y.Y + i23 * r.Z.Y;
             sandwich.M31 = i31 * r.X.X + i32 * r.Y.X + i33 * r.Z.X;
             sandwich.M32 = i31 * r.X.Y + i32 * r.Y.Y + i33 * r.Z.Y;
             sandwich.M33 = i31 * r.X.Z + i32 * r.Y.Z + i33 * r.Z.Z;

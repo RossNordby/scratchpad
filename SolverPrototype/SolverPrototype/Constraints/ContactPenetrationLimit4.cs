@@ -37,7 +37,7 @@ namespace SolverPrototype.Constraints
     public static class ContactPenetrationLimit4
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold4PrestepData prestep, float dt, float inverseDt,
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold4PrestepData prestep, float dt,
             out ContactPenetrationLimit4Projection projection)
         {
             //We directly take the prestep data here since the jacobians and error don't undergo any processing.

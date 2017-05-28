@@ -77,12 +77,11 @@ namespace SolverPrototype.Constraints
     //Since the difference is less than 5%, we'll use the loopbodystructdelegate approach for other constraints until the incremental performance improvement 
     //of manual inlining is worth it.
     public struct ContactManifold4Functions :
-        //IUnposedPrestep<ContactManifold4PrestepData, ContactManifold4Projection>,
         IConstraintFunctions<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep<TBodyDataSource>(ref TBodyDataSource bodies, ref UnpackedTwoBodyReferences bodyReferences,
-            float dt, float inverseDt, ref ContactManifold4PrestepData prestep, out ContactManifold4Projection projection) where TBodyDataSource : IBodyDataSource
+        public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences,
+            float dt, ref ContactManifold4PrestepData prestep, out ContactManifold4Projection projection)
         {
             //Some speculative compression options not (yet) pursued:
             //1) Store the surface basis in a compressed fashion. It could be stored within 32 bits by using standard compression schemes, but we lack the necessary
@@ -107,7 +106,7 @@ namespace SolverPrototype.Constraints
             projection.SurfaceBasis = prestep.SurfaceBasis;
             Matrix3x3Wide.CreateFromQuaternion(ref prestep.SurfaceBasis, out var surfaceBasis);
             TangentFriction.Prestep(ref surfaceBasis.X, ref surfaceBasis.Z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
-            ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, inverseDt, out projection.Penetration);
+            ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, out projection.Penetration);
             //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
             Vector3Wide.Distance(ref prestep.OffsetA0, ref offsetToManifoldCenterA, out projection.LeverArm0);
             Vector3Wide.Distance(ref prestep.OffsetA1, ref offsetToManifoldCenterA, out projection.LeverArm1);
@@ -162,7 +161,7 @@ namespace SolverPrototype.Constraints
         //UnposedTwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4>
         TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4Functions>
     {
-        public override void Prestep(Bodies bodies, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
+        public override void Prestep(Bodies bodies, float dt, int startBundle, int exclusiveEndBundle)
         {
             ref var prestepBase = ref PrestepData[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
@@ -172,7 +171,7 @@ namespace SolverPrototype.Constraints
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
-                GatherScatter.GatherInertia(ref bodies.Inertias, ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
+                bodies.GatherInertia(ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
                 Vector3Wide.Add(ref prestep.OffsetA0, ref prestep.OffsetA1, out var a01);
                 Vector3Wide.Add(ref prestep.OffsetA2, ref prestep.OffsetA3, out var a23);
                 Vector3Wide.Add(ref a01, ref a23, out var offsetToManifoldCenterA);
@@ -186,7 +185,7 @@ namespace SolverPrototype.Constraints
                 projection.SurfaceBasis = prestep.SurfaceBasis;
                 Matrix3x3Wide.CreateFromQuaternion(ref prestep.SurfaceBasis, out var surfaceBasis);
                 TangentFriction.Prestep(ref surfaceBasis.X, ref surfaceBasis.Z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
-                ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, inverseDt, out projection.Penetration);
+                ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref surfaceBasis.Y, ref prestep, dt, out projection.Penetration);
                 //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
                 Vector3Wide.Distance(ref prestep.OffsetA0, ref offsetToManifoldCenterA, out projection.LeverArm0);
                 Vector3Wide.Distance(ref prestep.OffsetA1, ref offsetToManifoldCenterA, out projection.LeverArm1);

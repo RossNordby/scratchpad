@@ -22,11 +22,11 @@ namespace SolverPrototypeTests
                 {
                     LocalInertia = new BodyInertia
                     {
-                        InverseInertiaTensor = new Matrix3x3
+                        InverseInertiaTensor = new Triangular3x3
                         {
-                            X = new Vector3(1, 0, 0),
-                            Y = new Vector3(0, 1, 0),
-                            Z = new Vector3(0, 0, 1),
+                            M11 = 1,
+                            M22 = 1,
+                            M33 = 1
                         },
                         InverseMass = 1
                     },
@@ -93,7 +93,7 @@ namespace SolverPrototypeTests
                     //BodyInertias inertiaA, inertiaB;
                     //inertiaA = inertiaB = default(BodyInertias);
                     GatherScatter.GatherInertia(ref bodies.LocalInertias, ref bodyReferences[i], out var inertiaA, out var inertiaB);
-                    Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref springSettings[i],
+                    Inequality2Body1DOF.Prestep(ref inertiaA, ref inertiaB, ref jacobians, ref springSettings[i], ref maximumRecoveryVelocity,
                         ref error, dt, inverseDt, out projectionData[i]);
 
                     GatherScatter.GatherVelocities(ref bodies.Velocities, ref bodyReferences[i], out var wsvA, out var wsvB);

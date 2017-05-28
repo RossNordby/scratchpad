@@ -133,7 +133,7 @@ namespace SolverPrototypeTests
                 GenerateRandomVectorCandidate(random, out normal);
                 while (true)
                 {
-                    Vector3Wide.GetLengthSquared(ref normal, out var lengthSquared);
+                    Vector3Wide.LengthSquared(ref normal, out var lengthSquared);
                     if (Vector.LessThanAny(lengthSquared, new Vector<float>(0.0001f)))
                     {
                         GenerateRandomVectorCandidate(random, out normal);
@@ -161,11 +161,11 @@ namespace SolverPrototypeTests
                     QuaternionWide.TransformWithoutOverlap(ref v1, ref concatenated, out var v1TransformedToV1);
 
                     Vector3Wide.Subtract(ref v1TransformedToV2, ref v2, out var v1ToV2Error);
-                    Vector3Wide.GetLengthSquared(ref v1ToV2Error, out var v1ToV2ErrorLength);
+                    Vector3Wide.LengthSquared(ref v1ToV2Error, out var v1ToV2ErrorLength);
                     Vector3Wide.Subtract(ref v2TransformedToV1, ref v1, out var v2ToV1Error);
-                    Vector3Wide.GetLengthSquared(ref v2ToV1Error, out var v2ToV1ErrorLength);
+                    Vector3Wide.LengthSquared(ref v2ToV1Error, out var v2ToV1ErrorLength);
                     Vector3Wide.Subtract(ref v1TransformedToV1, ref v1, out var v1ToV1Error);
-                    Vector3Wide.GetLengthSquared(ref v1ToV1Error, out var v1ToV1ErrorLength);
+                    Vector3Wide.LengthSquared(ref v1ToV1Error, out var v1ToV1ErrorLength);
                     const float epsilon = 1e-6f;
                     Debug.Assert(
                         Vector.LessThanAll(v1ToV2ErrorLength, new Vector<float>(epsilon)) &&
@@ -198,11 +198,11 @@ namespace SolverPrototypeTests
                     QuaternionWide.TransformWithoutOverlap(ref v1, ref concatenated, out var v1TransformedToV1);
 
                     Vector3Wide.Subtract(ref v1TransformedToV2, ref v2, out var v1ToV2Error);
-                    Vector3Wide.GetLengthSquared(ref v1ToV2Error, out var v1ToV2ErrorLength);
+                    Vector3Wide.LengthSquared(ref v1ToV2Error, out var v1ToV2ErrorLength);
                     Vector3Wide.Subtract(ref v2TransformedToV1, ref v1, out var v2ToV1Error);
-                    Vector3Wide.GetLengthSquared(ref v2ToV1Error, out var v2ToV1ErrorLength);
+                    Vector3Wide.LengthSquared(ref v2ToV1Error, out var v2ToV1ErrorLength);
                     Vector3Wide.Subtract(ref v1TransformedToV1, ref v1, out var v1ToV1Error);
-                    Vector3Wide.GetLengthSquared(ref v1ToV1Error, out var v1ToV1ErrorLength);
+                    Vector3Wide.LengthSquared(ref v1ToV1Error, out var v1ToV1ErrorLength);
                     const float epsilon = 1e-6f;
                     Debug.Assert(
                         Vector.LessThanAll(v1ToV2ErrorLength, new Vector<float>(epsilon)) &&

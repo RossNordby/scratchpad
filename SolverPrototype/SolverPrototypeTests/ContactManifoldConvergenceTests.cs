@@ -146,7 +146,7 @@ namespace SolverPrototypeTests
                     simulation.Bodies.Velocities[i].LinearVelocity.Y += simulation.Bodies.LocalInertias[i].InverseMass * impulse;
                 }
                 timer.Start();
-                simulation.Solver.Update(dt, inverseDt);
+                simulation.Solver.Update(dt);
                 //simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt, inverseDt);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();

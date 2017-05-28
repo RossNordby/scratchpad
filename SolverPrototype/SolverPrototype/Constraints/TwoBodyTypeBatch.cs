@@ -90,8 +90,7 @@ namespace SolverPrototype.Constraints
     /// <typeparam name="TProjection">Type of the projection to input.</typeparam>
     public interface IConstraintFunctions<TPrestepData, TProjection, TAccumulatedImpulse>
     {
-        void Prestep<TBodyDataSource>(ref TBodyDataSource bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref TPrestepData prestepData,
-            out TProjection projection) where TBodyDataSource : IBodyDataSource;
+        void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, ref TPrestepData prestepData, out TProjection projection);
         void WarmStart(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
         void Solve(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref TProjection projection, ref TAccumulatedImpulse accumulatedImpulse);
     }
@@ -246,7 +245,7 @@ namespace SolverPrototype.Constraints
         //only has to specify *type* arguments associated with the interface-implementing struct-delegates. It's going to look very strange, but it's low overhead
         //and minimizes per-type duplication.
 
-        public override void Prestep(Bodies bodies, float dt, float inverseDt, int startBundle, int exclusiveEndBundle)
+        public override void Prestep(Bodies bodies, float dt, int startBundle, int exclusiveEndBundle)
         {
             ref var prestepBase = ref PrestepData[0];
             ref var bodyReferencesBase = ref BodyReferences[0];
@@ -257,9 +256,7 @@ namespace SolverPrototype.Constraints
                 ref var prestep = ref Unsafe.Add(ref prestepBase, i);
                 ref var projection = ref Unsafe.Add(ref projectionBase, i);
                 Unsafe.Add(ref bodyReferencesBase, i).Unpack(i, constraintCount, out var bodyReferences);
-                function.Prestep(bodies, ref bodyReferences,
-                    dt, inverseDt, ref prestep,
-                    out projection);
+                function.Prestep(bodies, ref bodyReferences, dt, ref prestep, out projection);
             }
         }
 

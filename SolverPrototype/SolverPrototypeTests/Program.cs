@@ -8,9 +8,10 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            TriangularTests.Test();
             //LocalsinitCodegen.Test();
             //InterlockedOverheadTests.Test();
-            ConstraintDescriptionMappingTests.Test();
+            //ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
             //AutoTester.Test();
             //ContactManifoldConvergenceTests.Test();

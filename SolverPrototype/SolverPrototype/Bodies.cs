@@ -343,6 +343,29 @@ namespace SolverPrototype
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
+        //TODO: In future versions, we will likely store the body position in different forms to allow for extremely large worlds.
+        //That will be an opt-in feature. The default implementation will use the FP32 representation, but the user could choose to swap it out for a int64 based representation.
+        //This affects other systems- AABB calculation, pose integration, solving, and in extreme (64 bit) cases, the broadphase.
+        //We want to insulate other systems from direct knowledge about the implementation of positions when possible.
+        //These functions support the solver's needs while hiding absolute positions.
+        //In order to support other absolute positions, we'll need alternate implementations of this and other functions.
+        //But for the most part, we don't want to pay the overhead of an abstract invocation within the inner loop of the solver. 
+        //Given the current limits of C# and the compiler, the best option seems to be a interface implementing struct that provides this functionality.
+        //The users would be type specialized by the compiler, avoiding virtual invocation. 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void GatherInertiaAndPose(ref UnpackedTwoBodyReferences bodyReferences,
+            out Vector3Wide localPositionB, out QuaternionWide orientationA, out QuaternionWide orientationB,
+            out BodyInertias inertiaA, out BodyInertias inertiaB)
+        {
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void GatherInertia(ref UnpackedTwoBodyReferences bodyReferences,
+            out BodyInertias inertiaA, out BodyInertias inertiaB)
+        {
+
+        }
 
         /// <summary>
         /// Gets a value roughly representing the amount of energy in the simulation. This is occasionally handy for debug purposes.

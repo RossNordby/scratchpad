@@ -94,6 +94,33 @@ namespace SolverPrototype
             result = temp;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Invert(ref Matrix3x3Wide m, out Matrix3x3Wide inverse)
+        {
+            var m11 = m.Y.Y * m.Z.Z - m.Z.Y * m.Y.Z;
+            var m21 = m.Y.Z * m.Z.X - m.Z.Z * m.Y.X;
+            var m31 = m.Y.X * m.Z.Y - m.Z.X * m.Y.Y;
+            var determinantInverse = Vector<float>.One / (m11 * m.X.X + m21 * m.X.Y + m31 * m.X.Z);
+
+            var m12 = m.Z.Y * m.X.Z - m.X.Y * m.Z.Z;
+            var m22 = m.Z.Z * m.X.X - m.X.Z * m.Z.X;
+            var m32 = m.Z.X * m.X.Y - m.X.X * m.Z.Y;
+
+            var m13 = m.X.Y * m.Y.Z - m.Y.Y * m.X.Z;
+            var m23 = m.X.Z * m.Y.X - m.Y.Z * m.X.X;
+            var m33 = m.X.X * m.Y.Y - m.Y.X * m.X.Y;
+
+            inverse.X.X = m11 * determinantInverse;
+            inverse.Y.X = m21 * determinantInverse;
+            inverse.Z.X = m31 * determinantInverse;
+            inverse.X.Y = m12 * determinantInverse;
+            inverse.Y.Y = m22 * determinantInverse;
+            inverse.Z.Y = m32 * determinantInverse;
+            inverse.X.Z = m13 * determinantInverse;
+            inverse.Y.Z = m23 * determinantInverse;
+            inverse.Z.Z = m33 * determinantInverse;
+        }
+
         /// <summary>
         /// Multiplies every component in the matrix by the given scalar value.
         /// </summary>

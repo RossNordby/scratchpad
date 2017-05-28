@@ -165,8 +165,7 @@ namespace SolverPrototype
                 ConstraintLayoutOptimizer.Update(BufferPool);
                 SolverBatchCompressor.Compress(BufferPool);
                 PoseIntegrator.Update(dt);
-                var inverseDt = 1f / dt;
-                Solver.Update(dt, inverseDt);
+                Solver.Update(dt);
             }
         }
 

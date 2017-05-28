@@ -356,14 +356,14 @@ namespace SolverPrototype
         }
 
 
-        public void Update(float dt, float inverseDt)
+        public void Update(float dt)
         {
             for (int i = 0; i < Batches.Count; ++i)
             {
                 var batch = Batches[i];
                 for (int j = 0; j < batch.TypeBatches.Count; ++j)
                 {
-                    batch.TypeBatches[j].Prestep(bodies, dt, inverseDt);
+                    batch.TypeBatches[j].Prestep(bodies, dt);
                 }
             }
             //TODO: May want to consider executing warmstart immediately following the prestep. Multithreading can't do that, so there could be some bitwise differences introduced.

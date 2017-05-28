@@ -82,16 +82,15 @@ namespace SolverPrototype.Constraints
         public abstract void Resize(TypeBatchAllocation typeBatchAllocation);
         public abstract void Dispose(BufferPool rawPool);
 
-        public abstract void Prestep(Bodies bodies, float dt, float inverseDt, int startBundle, int exclusiveEndBundle);
+        public abstract void Prestep(Bodies bodies, float dt, int startBundle, int exclusiveEndBundle);
         public abstract void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
         public abstract void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep(Bodies bodies, float dt, float inverseDt)
+        public void Prestep(Bodies bodies, float dt)
         {
-            Prestep(bodies, dt, inverseDt, 0, bundleCount);
+            Prestep(bodies, dt, 0, bundleCount);
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WarmStart(ref Buffer<BodyVelocities> bodyVelocities)
         {

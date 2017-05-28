@@ -278,14 +278,14 @@ namespace SolverPrototype
         {
             void Execute(TypeBatch typeBatch, int start, int end);
         }
-        struct PrestepStageFunction : IStageFunction
+        struct PrestepStageFunction : IStageFunction 
         {
-            public float Dt, InverseDt;
+            public float Dt;
             public Bodies Bodies;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                typeBatch.Prestep(Bodies, Dt, InverseDt, start, end);
+                typeBatch.Prestep(Bodies, Dt, start, end);
             }
         }
 
@@ -499,7 +499,7 @@ namespace SolverPrototype
             var boundsBackBuffer = context.WorkerBoundsB;
             //Note that every batch has a different start position. Each covers a different subset of constraints, so they require different start locations.
             //The same concept applies to the prestep- the prestep covers all constraints at once, rather than batch by batch.
-            var prestepStage = new PrestepStageFunction { Dt = context.Dt, InverseDt = context.InverseDt, Bodies = bodies };
+            var prestepStage = new PrestepStageFunction { Dt = context.Dt, Bodies = bodies };
             Debug.Assert(Batches.Count > 0, "Don't dispatch if there are no constraints.");
             //Technically this could mutate prestep starts, but at the moment we rebuild starts every frame anyway so it doesn't matter oen way or the other.
             ExecuteStage(ref prestepStage, ref bounds, ref boundsBackBuffer, workerIndex, 0, context.WorkBlocks.Count,
