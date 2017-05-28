@@ -48,10 +48,10 @@ namespace SolverPrototype
             var m21 = m.M32 * m.M31 - m.M33 * m.M21;
             var m31 = m.M21 * m.M32 - m.M31 * m.M22;
             var determinantInverse = Vector<float>.One / (m11 * m.M11 + m21 * m.M21 + m31 * m.M31);
-            
+
             var m22 = m.M33 * m.M11 - m.M31 * m.M31;
             var m32 = m.M31 * m.M21 - m.M11 * m.M32;
-            
+
             var m33 = m.M11 * m.M22 - m.M21 * m.M21;
 
             inverse.M11 = m11 * determinantInverse;
@@ -110,6 +110,29 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void SkewSandwichWithoutOverlap(ref Vector3Wide v, ref Triangular3x3Wide m, out Triangular3x3Wide sandwich)
         {
+            //var x32 = v.X * m.M32;
+            //var y31 = v.Y * m.M31;
+            //var z21 = v.Z * m.M21;
+            //var i11 = z21 + y31;
+            //var i12 = v.Z * m.M22 + v.Y * m.M32;
+            //var i13 = v.Z * m.M32 + v.Y * m.M33;
+            //var i21 = v.Z * m.M11 + v.X * m.M31;
+            //var i22 = z21 + x32;
+            //var i23 = v.Z * m.M31 + v.X * m.M33;
+            //var i31 = v.Y * m.M11 + v.X * m.M21;
+            //var i32 = v.Y * m.M21 + v.X * m.M22;
+            //var i33 = y31 + x32;
+
+            //var ix32 = v.X * i32;
+            //var iy31 = v.Y * i31;
+            //var iz21 = v.Z * i21;
+            //sandwich.M11 = iz21 + iy31;
+            //sandwich.M21 = i22 * v.Z + i32 * v.Y;
+            //sandwich.M22 = iz21 + ix32;
+            //sandwich.M31 = i32 * v.Z + i33 * v.Y;
+            //sandwich.M32 = i31 * v.Z + i33 * v.X;
+            //sandwich.M33 = iy31 + ix32;
+
             var vxvx = v.X * v.X;
             var vyvy = v.Y * v.Y;
             var vzvz = v.Z * v.Z;
@@ -138,16 +161,10 @@ namespace SolverPrototype
         {
             //This isn't actually fewer flops than the equivalent explicit operation, but it does avoid some struct locals and it's a pretty common operation.
             //(And at the moment, avoiding struct locals is unfortunately helpful for codegen reasons.)
-            var m21vxvy = m.M21 * v.X * v.Y;
-            var m31vxvz = m.M31 * v.X * v.Z;
-            var m32vyvz = m.M32 * v.Y * v.Z;
-            sandwich =
-                m.M11 * v.X * v.X +
-                m21vxvy + m21vxvy +
-                m.M22 * v.Y * v.Y +
-                m31vxvz + m31vxvz +
-                m32vyvz + m32vyvz +
-                m.M33 * v.Z * v.Z;
+            var x = v.X * m.M11 + v.Y * m.M21 + v.Z * m.M31;
+            var y = v.X * m.M21 + v.Y * m.M22 + v.Z * m.M32;
+            var z = v.X * m.M31 + v.Y * m.M32 + v.Z * m.M33;
+            sandwich = x * v.X + y * v.Y + z * v.Z;
         }
         /// <summary>
         /// Computes rT * m * r for a symmetric matrix m and a rotation matrix R. Assumes that the input and output do not overlap.

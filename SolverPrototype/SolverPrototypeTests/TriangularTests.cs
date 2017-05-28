@@ -29,78 +29,6 @@ namespace SolverPrototypeTests
             return (end - start) / (double)Stopwatch.Frequency;
         }
 
-        struct TriangularSandwichWide : ITest
-        {
-            public Triangular3x3Wide triangular;
-            public Matrix3x3Wide rotation;
-            public Triangular3x3Wide result;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Do()
-            {
-                Triangular3x3Wide.RotationSandwich(ref rotation, ref triangular, out result);
-            }
-        }
-        struct SymmetricSandwich : ITest
-        {
-            public Matrix3x3 symmetric;
-            public Matrix3x3 rotation;
-            public Matrix3x3 result;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Do()
-            {
-                Matrix3x3.MultiplyTransposed(ref rotation, ref symmetric, out var intermediate);
-                Matrix3x3.Multiply(ref intermediate, ref rotation, out result);
-            }
-        }
-        struct SymmetricSandwichWide : ITest
-        {
-            public Matrix3x3Wide symmetric;
-            public Matrix3x3Wide rotation;
-            public Matrix3x3Wide result;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Do()
-            {
-                Matrix3x3Wide.MultiplyTransposedWithoutOverlap(ref rotation, ref symmetric, out var intermediateWide);
-                Matrix3x3Wide.MultiplyWithoutOverlap(ref intermediateWide, ref rotation, out result);
-            }
-        }
-        struct TriangularInvertWide : ITest
-        {
-            public Triangular3x3Wide triangular;
-            public Triangular3x3Wide result;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Do()
-            {
-                Triangular3x3Wide.SymmetricInvert(ref triangular, out result);
-            }
-        }
-        struct SymmetricInvert : ITest
-        {
-            public Matrix3x3 symmetric;
-            public Matrix3x3 result;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Do()
-            {
-                Matrix3x3.Invert(ref symmetric, out result);
-            }
-        }
-        struct SymmetricInvertWide : ITest
-        {
-            public Matrix3x3Wide symmetric;
-            public Matrix3x3Wide result;
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Do()
-            {
-                Matrix3x3Wide.Invert(ref symmetric, out result);
-            }
-        }
-
         static double MeasureError(double a, double b)
         {
             if (Math.Abs(a) > 1e-7)
@@ -108,6 +36,14 @@ namespace SolverPrototypeTests
             return Math.Abs(b - a);
         }
         const double epsilon = 1e-3f;
+        static void Compare(float a, ref Vector<float> b)
+        {
+            var error = MeasureError(a, b[0]);
+            if (error > epsilon)
+            {
+                throw new Exception("Too much error on wide vs scalar 1x1.");
+            }
+        }
         static void Compare(ref Matrix3x3 m, ref Triangular3x3Wide t)
         {
             var se12 = MeasureError(m.X.Y, m.Y.X);
@@ -161,10 +97,127 @@ namespace SolverPrototypeTests
             }
         }
 
+        struct TriangularWideVectorSandwich : ITest
+        {
+            public Triangular3x3Wide triangular;
+            public Vector3Wide v;
+            public Vector<float> result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Triangular3x3Wide.VectorSandwich(ref v, ref triangular, out result);
+            }
+        }
+        struct SymmetricVectorSandwich : ITest
+        {
+            public Matrix3x3 symmetric;
+            public Vector3 v;
+            public float result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3.Transform(ref v, ref symmetric, out var intermediate);
+                result = Vector3.Dot(v, intermediate);
+            }
+        }
+        struct SymmetricWideVectorSandwich : ITest
+        {
+            public Matrix3x3Wide symmetric;
+            public Vector3Wide v;
+            public Vector<float> result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3Wide.Transform(ref v, ref symmetric, out var intermediate);
+                Vector3Wide.Dot(ref v, ref intermediate, out result);
+            }
+        }
+
+        struct TriangularRotationSandwichWide : ITest
+        {
+            public Triangular3x3Wide triangular;
+            public Matrix3x3Wide rotation;
+            public Triangular3x3Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Triangular3x3Wide.RotationSandwich(ref rotation, ref triangular, out result);
+            }
+        }
+        struct SymmetricRotationSandwich : ITest
+        {
+            public Matrix3x3 symmetric;
+            public Matrix3x3 rotation;
+            public Matrix3x3 result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3.MultiplyTransposed(ref rotation, ref symmetric, out var intermediate);
+                Matrix3x3.Multiply(ref intermediate, ref rotation, out result);
+            }
+        }
+        struct SymmetricRotationSandwichWide : ITest
+        {
+            public Matrix3x3Wide symmetric;
+            public Matrix3x3Wide rotation;
+            public Matrix3x3Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3Wide.MultiplyTransposedWithoutOverlap(ref rotation, ref symmetric, out var intermediateWide);
+                Matrix3x3Wide.MultiplyWithoutOverlap(ref intermediateWide, ref rotation, out result);
+            }
+        }
+        struct TriangularInvertWide : ITest
+        {
+            public Triangular3x3Wide triangular;
+            public Triangular3x3Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Triangular3x3Wide.SymmetricInvert(ref triangular, out result);
+            }
+        }
+        struct SymmetricInvert : ITest
+        {
+            public Matrix3x3 symmetric;
+            public Matrix3x3 result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3.Invert(ref symmetric, out result);
+            }
+        }
+        struct SymmetricInvertWide : ITest
+        {
+            public Matrix3x3Wide symmetric;
+            public Matrix3x3Wide result;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Do()
+            {
+                Matrix3x3Wide.Invert(ref symmetric, out result);
+            }
+        }
+
+
+
+
         public static void Test()
         {
             var random = new Random(4);
             var timer = new Stopwatch();
+            var symmetricVectorSandwichTime = 0.0;
+            var symmetricWideVectorSandwichTime = 0.0;
+            var triangularWideVectorSandwichTime = 0.0;
             var symmetricRotationSandwichTime = 0.0;
             var symmetricWideRotationSandwichTime = 0.0;
             var triangularWideRotationSandwichTime = 0.0;
@@ -174,6 +227,7 @@ namespace SolverPrototypeTests
             for (int i = 0; i < 1000; ++i)
             {
                 var axis = Vector3.Normalize(new Vector3((float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1, (float)random.NextDouble() * 2 - 1));
+                Vector3Wide.CreateFrom(ref axis, out var axisWide);
                 var rotation = Matrix3x3.CreateFromAxisAngle(axis, (float)random.NextDouble());
                 Matrix3x3Wide rotationWide;
                 Vector3Wide.CreateFrom(ref rotation.X, out rotationWide.X);
@@ -208,15 +262,21 @@ namespace SolverPrototypeTests
                 Vector3Wide.CreateFrom(ref symmetric.Y, out symmetricWide.Y);
                 Vector3Wide.CreateFrom(ref symmetric.Z, out symmetricWide.Z);
 
-                var symmetricSandwich = new SymmetricSandwich() { rotation = rotation, symmetric = symmetric };
-                var symmetricWideSandwich = new SymmetricSandwichWide() { rotation = rotationWide, symmetric = symmetricWide };
-                var triangularWideSandwich = new TriangularSandwichWide() { rotation = rotationWide, triangular = triangularWide };
+                var symmetricVectorSandwich = new SymmetricVectorSandwich() { v = axis, symmetric = symmetric };
+                var symmetricWideVectorSandwich = new SymmetricWideVectorSandwich() { v = axisWide, symmetric = symmetricWide };
+                var triangularWideVectorSandwich = new TriangularWideVectorSandwich() { v = axisWide, triangular = triangularWide };
+                var symmetricSandwich = new SymmetricRotationSandwich() { rotation = rotation, symmetric = symmetric };
+                var symmetricWideSandwich = new SymmetricRotationSandwichWide() { rotation = rotationWide, symmetric = symmetricWide };
+                var triangularWideSandwich = new TriangularRotationSandwichWide() { rotation = rotationWide, triangular = triangularWide };
                 var symmetricInvert = new SymmetricInvert() { symmetric = symmetric };
                 var symmetricWideInvert = new SymmetricInvertWide() { symmetric = symmetricWide };
                 var triangularWideInvert = new TriangularInvertWide() { triangular = triangularWide };
 
 
-                const int innerIterations = 10000;
+                const int innerIterations = 100000;
+                symmetricVectorSandwichTime += TimeTest(innerIterations, ref symmetricVectorSandwich);
+                symmetricWideVectorSandwichTime += TimeTest(innerIterations, ref symmetricWideVectorSandwich);
+                triangularWideVectorSandwichTime += TimeTest(innerIterations, ref triangularWideVectorSandwich);
                 symmetricRotationSandwichTime += TimeTest(innerIterations, ref symmetricSandwich);
                 symmetricWideRotationSandwichTime += TimeTest(innerIterations, ref symmetricWideSandwich);
                 triangularWideRotationSandwichTime += TimeTest(innerIterations, ref triangularWideSandwich);
@@ -224,12 +284,17 @@ namespace SolverPrototypeTests
                 symmetricWideInvertTime += TimeTest(innerIterations, ref symmetricWideInvert);
                 triangularWideInvertTime += TimeTest(innerIterations, ref triangularWideInvert);
 
+                Compare(symmetricVectorSandwich.result, ref symmetricWideVectorSandwich.result);
+                Compare(symmetricVectorSandwich.result, ref triangularWideVectorSandwich.result);
                 Compare(ref symmetricSandwich.result, ref symmetricWideSandwich.result);
                 Compare(ref symmetricSandwich.result, ref triangularWideSandwich.result);
                 Compare(ref symmetricInvert.result, ref symmetricWideInvert.result);
                 Compare(ref symmetricInvert.result, ref triangularWideInvert.result);
             }
 
+            Console.WriteLine($"Symmetric vector sandwich:       {symmetricVectorSandwichTime}");
+            Console.WriteLine($"Symmetric wide vector sandwich:  {symmetricWideVectorSandwichTime}");
+            Console.WriteLine($"Triangular wide vector sandwich: {triangularWideVectorSandwichTime}");
             Console.WriteLine($"Symmetric rotation sandwich:       {symmetricRotationSandwichTime}");
             Console.WriteLine($"Symmetric wide rotation sandwich:  {symmetricWideRotationSandwichTime}");
             Console.WriteLine($"Triangular wide rotation sandwich: {triangularWideRotationSandwichTime}");
