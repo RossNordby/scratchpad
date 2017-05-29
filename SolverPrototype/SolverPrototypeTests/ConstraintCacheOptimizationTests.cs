@@ -19,7 +19,10 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.BuildLattice(32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3()), 
+                new ContactManifoldConstraintBuilder(),
+                32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
             SimulationSetup.ScrambleBodies(simulation);
             SimulationSetup.ScrambleConstraints(simulation.Solver);

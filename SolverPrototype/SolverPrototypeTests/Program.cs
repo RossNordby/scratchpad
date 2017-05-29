@@ -14,8 +14,8 @@ namespace SolverPrototypeTests
             //InterlockedOverheadTests.Test();
             //ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
-            AutoTester.Test();
-            //ContactManifoldConvergenceTests.Test();
+            //AutoTester.Test();
+            ContactManifoldConvergenceTests.Test();
             //MemoryResizeTests.Test();
             //ConstraintCacheOptimizationTests.Test();
             //SortTest.Test();

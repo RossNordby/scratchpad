@@ -23,7 +23,10 @@ namespace SolverPrototypeTests
             //const int bodyCount = 8;
             //SimulationSetup.BuildStackOfBodiesOnGround(bodyCount, false, true, out var bodies, out var solver, out var graph, out var bodyHandles, out var constraintHandles);
             GC.Collect(3, GCCollectionMode.Forced, true);
-            SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3()),
+                new ContactManifoldConstraintBuilder(), 
+                width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
             SimulationSetup.ScrambleBodies(simulation);
             SimulationSetup.ScrambleConstraints(simulation.Solver);
@@ -140,11 +143,11 @@ namespace SolverPrototypeTests
             var memoryStream = new MemoryStream();
             var writer = new StreamWriter(memoryStream);
             var initializationThreadPool = new SimpleThreadDispatcher(Environment.ProcessorCount);
-            Subtest(32, 32, 32, 8, initializationThreadPool, writer);
-            Subtest(26, 26, 26, 12, initializationThreadPool, writer);
-            Subtest(20, 20, 20, 20, initializationThreadPool, writer);
-            Subtest(16, 16, 16, 30, initializationThreadPool, writer);
-            Subtest(13, 13, 13, 45, initializationThreadPool, writer);
+            //Subtest(32, 32, 32, 8, initializationThreadPool, writer);
+            //Subtest(26, 26, 26, 12, initializationThreadPool, writer);
+            //Subtest(20, 20, 20, 20, initializationThreadPool, writer);
+            //Subtest(16, 16, 16, 30, initializationThreadPool, writer);
+            //Subtest(13, 13, 13, 45, initializationThreadPool, writer);
             Subtest(10, 10, 10, 70, initializationThreadPool, writer);
             initializationThreadPool.Dispose();
             writer.Flush();

@@ -128,9 +128,13 @@ namespace SolverPrototype.Constraints
             Matrix2x3Wide.TransformByTransposeWithoutOverlap(ref wsvA.AngularVelocity, ref jacobians.AngularA, out var csvaAngular);
             Matrix2x3Wide.TransformByTransposeWithoutOverlap(ref wsvB.LinearVelocity, ref jacobians.LinearA, out var csvbLinear);
             Matrix2x3Wide.TransformByTransposeWithoutOverlap(ref wsvB.AngularVelocity, ref jacobians.AngularB, out var csvbAngular);
-            Vector2Wide.Subtract(ref csvaLinear, ref csvbLinear, out var csvLinear); //Subtract since we shared linearA for both.
+            //Note that the velocity in constraint space is (csvaLinear - csvbLinear + csvaAngular + csvbAngular).
+            //The subtraction there is due to sharing the linear jacobian between both bodies.
+            //In the following, we need to compute the constraint space *violating* velocity- which is the negation of the above velocity in constraint space.
+            //So, (csvbLinear - csvaLinear - (csvaAngular + csvbAngular)).
+            Vector2Wide.Subtract(ref csvbLinear, ref csvaLinear, out var csvLinear);
             Vector2Wide.Add(ref csvaAngular, ref csvbAngular, out var csvAngular);
-            Vector2Wide.Add(ref csvLinear, ref csvAngular, out var csv);
+            Vector2Wide.Subtract(ref csvLinear, ref csvAngular, out var csv);
 
             Triangular2x2Wide.TransformBySymmetricWithoutOverlap(ref csv, ref data.EffectiveMass, out var csi);
 

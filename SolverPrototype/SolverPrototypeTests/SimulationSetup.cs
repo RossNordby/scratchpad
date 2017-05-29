@@ -1,4 +1,4 @@
-﻿using BEPUutilities2;
+﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Constraints;
@@ -12,48 +12,153 @@ using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
-    static class SimulationSetup
+    public interface IBodyBuilder
     {
-        static int CreateManifoldConstraint(int bodyAHandle, int bodyBHandle, Simulation simulation, ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ)
+        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription);
+    }
+    public interface IConstraintBuilder
+    {
+        void RegisterConstraintTypes();
+        void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
+            ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
+    }
+    public struct LatticeBodyGetter
+    {
+        int width, height, length;
+        int[] bodyHandles;
+        Simulation simulation;
+        public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Simulation simulation)
         {
-            var description = new ContactManifold4Constraint
+            this.width = width;
+            this.height = height;
+            this.length = length;
+            this.bodyHandles = bodyHandles;
+            this.simulation = simulation;
+        }
+        public bool TryGetId(int columnIndex, int rowIndex, int sliceIndex, out int id)
+        {
+            if (columnIndex < 0 || columnIndex >= width || rowIndex < 0 || rowIndex >= height || sliceIndex < 0 || sliceIndex >= length)
             {
-                //By convention, normal faces from B to A.
-                SpringSettings = new SpringSettingsAOS
+                id = -1;
+                return false;
+            }
+            id = sliceIndex * (height * width) + rowIndex * width + columnIndex;
+            return true;
+        }
+        public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription bodyDescription)
+        {
+            if (!TryGetId(columnIndex, rowIndex, sliceIndex, out var id))
+            {
+                handle = -1;
+                bodyDescription = new BodyDescription();
+                return false;
+            }
+            handle = bodyHandles[id];
+            simulation.Bodies.GetLocalInertia(handle, out bodyDescription.LocalInertia);
+            simulation.Bodies.GetPose(handle, out bodyDescription.Pose);
+            simulation.Bodies.GetVelocity(handle, out bodyDescription.Velocity);
+            return true;
+        }
+    }
+    public struct ConstraintAdder
+    {
+        public int LocalBodyHandle;
+        Simulation simulation;
+        public List<int> ConstraintHandles;
+        public ConstraintAdder(Simulation simulation, List<int> constraintHandles)
+        {
+            this.simulation = simulation;
+            this.ConstraintHandles = constraintHandles;
+            LocalBodyHandle = 0;
+        }
+
+        public void Add<T>(ref T description, int otherBodyHandle) where T : IConstraintDescription<T>
+        {
+            var constraintHandle = simulation.Add(LocalBodyHandle, otherBodyHandle, ref description);
+            ConstraintHandles.Add(constraintHandle);
+        }
+    }
+
+    static partial class SimulationSetup
+    {
+
+
+        public static void BuildBasis(ref BodyPose a, ref BodyPose b, out Vector3 x, out Vector3 y, out Vector3 z)
+        {
+            y = Vector3.Normalize(a.Position - b.Position);
+            Quaternion.TransformZ(1, ref a.Orientation, out var ax);
+            x = Vector3.Cross(ax, y);
+            var xLength = x.Length();
+            if (xLength > 1e-7)
+            {
+                x /= xLength;
+            }
+            else
+            {
+                Quaternion.TransformX(1, ref a.Orientation, out var az);
+                x = Vector3.Normalize(Vector3.Cross(az, y));
+            }
+            z = Vector3.Cross(x, y);
+        }
+
+        public static void BuildLattice<TBodyBuilder, TConstrainer>(TBodyBuilder bodyBuilder, TConstrainer constrainer, int width, int height, int length, Simulation simulation,
+            out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstrainer : IConstraintBuilder
+        {
+            var bodyCount = width * height * length;
+            bodyHandles = new int[bodyCount];
+
+            var bodyGetter = new LatticeBodyGetter(width, height, length, bodyHandles, simulation);
+
+            for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
+            {
+                for (int rowIndex = 0; rowIndex < height; ++rowIndex)
                 {
-                    NaturalFrequency = (float)(Math.PI * 2 * 60),
-                    DampingRatio = 100f,
-                    MaximumRecoveryVelocity = 1f
-                },
-                FrictionCoefficient = 1,
-            };
-            Matrix3x3 basisMatrix;
-            basisMatrix.X = unitX;
-            basisMatrix.Y = -unitY;
-            basisMatrix.Z = -unitZ;
-            Debug.Assert(basisMatrix.Determinant() == 1);
-            Quaternion.CreateFromRotationMatrix(ref basisMatrix, out description.SurfaceBasis);
-
-            for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
-            {
-                ref var contact = ref Unsafe.Add(ref description.Contact0, contactIndex);
-
-                var x = (contactIndex & 1) - 0.5f;
-                var z = ((contactIndex & 2) >> 1) - 0.5f;
-                var localOffsetA = new Vector3(x, 0.5f, z);
-                var localOffsetB = new Vector3(x, -0.5f, z);
-                var worldOffsetA = localOffsetA.X * unitX + localOffsetA.Y * unitY + localOffsetA.Z * unitZ;
-                var worldOffsetB = localOffsetB.X * unitX + localOffsetB.Y * unitY + localOffsetB.Z * unitZ;
-                contact.OffsetA = worldOffsetA;
-                contact.OffsetB = worldOffsetB;
-                contact.PenetrationDepth = 0.00f;
+                    for (int columnIndex = 0; columnIndex < width; ++columnIndex)
+                    {
+                        bodyBuilder.Build(columnIndex, rowIndex, sliceIndex, out var bodyDescription);
+                        bodyGetter.TryGetId(columnIndex, rowIndex, sliceIndex, out var id);
+                        bodyHandles[id] = simulation.Add(ref bodyDescription);
+                    }
+                }
             }
 
-            var handle = simulation.Add(bodyAHandle, bodyBHandle, ref description);
+            constrainer.RegisterConstraintTypes();
+            var constraintAdder = new ConstraintAdder(simulation, new List<int>(width * height * length * 3));
+            for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
+            {
+                //The bottom rows are all kinematic, so don't create connections between them.
+                for (int rowIndex = 0; rowIndex < height; ++rowIndex)
+                {
+                    for (int columnIndex = 0; columnIndex < width; ++columnIndex)
+                    {
+                        bodyGetter.GetBody(columnIndex, rowIndex, sliceIndex, out constraintAdder.LocalBodyHandle, out var bodyDescription);
+                        constrainer.BuildConstraintsForBody(sliceIndex, rowIndex, columnIndex, ref bodyDescription, ref bodyGetter, ref constraintAdder);
+                    }
+                }
+            }
+            constraintHandles = constraintAdder.ConstraintHandles.ToArray();
 
-            simulation.Solver.GetDescription<ContactManifold4Constraint>(handle, out var testDescription);
-            return handle;
+
         }
+
+
+        public static void BuildLattice<TPoser, TConstrainer>(TPoser poser, TConstrainer constrainer, int width, int height, int length, out Simulation simulation,
+            out int[] bodyHandles, out int[] constraintHandles) where TPoser : IBodyBuilder where TConstrainer : IConstraintBuilder
+        {
+            var bodyCount = width * height * length;
+            simulation = new Simulation(
+                new BufferPool(),
+                new SimulationAllocationSizes
+                {
+                    Bodies = (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
+                    Constraints = bodyCount * 3,
+                    ConstraintsPerTypeBatch = (bodyCount * 3) / 6,
+                    ConstraintCountPerBodyEstimate = 6
+                });
+            BuildLattice(poser, constrainer, width, height, length, simulation, out bodyHandles, out constraintHandles);
+
+        }
+
 
 
         public static void ScrambleBodies(Simulation simulation)
@@ -101,138 +206,6 @@ namespace SolverPrototypeTests
                     otherSlot = currentTemp;
                 }
             }
-        }
-
-        public static void BuildStackOfBodiesOnGround(int bodyCount,
-            out Simulation simulation, out int[] bodyHandles, out int[] constraintHandles)
-        {
-            simulation = new Simulation(
-                new BufferPool(),
-                new SimulationAllocationSizes
-                {
-                    Bodies = bodyCount,
-                    Constraints = bodyCount - 1,
-                    ConstraintsPerTypeBatch = bodyCount / 2,
-                    ConstraintCountPerBodyEstimate = 2
-                });
-            bodyHandles = new int[bodyCount];
-            //Body 0 is a stationary kinematic acting as the ground.
-            {
-                var description = new BodyDescription();
-                var handleIndex = simulation.Add(ref description);
-                bodyHandles[0] = handleIndex;
-            }
-
-            //The remaining bodies form an extremely tall stack. 
-            for (int i = 1; i < bodyCount; ++i)
-            {
-                var description = new BodyDescription
-                {
-                    LocalInertia = new BodyInertia
-                    {
-                        //InverseInertiaTensor = new Matrix3x3
-                        //{
-                        //    X = new Vector3(1, 0, 0),
-                        //    Y = new Vector3(0, 1, 0),
-                        //    Z = new Vector3(0, 0, 1),
-                        //},
-                        InverseMass = 1
-                    },
-                };
-                var handleIndex = simulation.Add(ref description);
-                bodyHandles[i] = handleIndex;
-
-            }
-            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
-
-
-            var right = new Vector3(1, 0, 0);
-            var up = new Vector3(0, 1, 0);
-            var forward = new Vector3(0, 0, -1);
-            constraintHandles = new int[bodyCount - 1];
-
-            for (int bodyIndex = 0; bodyIndex < bodyCount - 1; ++bodyIndex)
-            {
-                constraintHandles[bodyIndex] = CreateManifoldConstraint(bodyHandles[bodyIndex], bodyHandles[bodyIndex + 1], simulation, ref right, ref up, ref forward);
-            }
-
-        }
-        public static void BuildLattice(int width, int height, int length, out Simulation simulation,
-            out int[] bodyHandles, out int[] constraintHandles)
-        {
-            var bodyCount = width * height * length;
-            simulation = new Simulation(
-                new BufferPool(),
-                new SimulationAllocationSizes
-                {
-                    Bodies = (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
-                    Constraints = bodyCount * 3,
-                    ConstraintsPerTypeBatch = (bodyCount * 3) / 6,
-                    ConstraintCountPerBodyEstimate = 6
-                });
-            BuildLattice(width, height, length, simulation, out bodyHandles, out constraintHandles);
-
-        }
-        public static void BuildLattice(int width, int height, int length, Simulation simulation,
-            out int[] bodyHandles, out int[] constraintHandles)
-        {
-            var bodyCount = width * height * length;
-            bodyHandles = new int[bodyCount];
-            int ToId(int columnIndex, int rowIndex, int sliceIndex)
-            {
-                return sliceIndex * (height * width) + rowIndex * width + columnIndex;
-            }
-            for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
-            {
-                for (int rowIndex = 0; rowIndex < height; ++rowIndex)
-                {
-                    for (int columnIndex = 0; columnIndex < width; ++columnIndex)
-                    {
-                        var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 } };
-                        var id = ToId(columnIndex, rowIndex, sliceIndex);
-                        bodyHandles[id] = simulation.Add(ref bodyDescription);
-                    }
-                }
-            }
-            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
-
-
-            var unitX = new Vector3(1, 0, 0);
-            var unitY = new Vector3(0, 1, 0);
-            var unitZ = new Vector3(0, 0, 1);
-            //Note super lazy count initialization. Since we do some wonky stuff with the base we'll just resize later.
-            constraintHandles = new int[width * height * length * 3];
-            int constraintIndex = 0;
-            for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
-            {
-                //The bottom rows are all kinematic, so don't create connections between them.
-                for (int rowIndex = 1; rowIndex < height; ++rowIndex)
-                {
-                    for (int columnIndex = 0; columnIndex < width; ++columnIndex)
-                    {
-                        var bodyAIndex = ToId(columnIndex, rowIndex, sliceIndex);
-                        //For each lower neighbor, create a connection.
-                        if (columnIndex > 0)
-                        {
-                            var previousColumnId = ToId(columnIndex - 1, rowIndex, sliceIndex);
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousColumnId], bodyHandles[bodyAIndex], simulation, ref unitZ, ref unitX, ref unitY);
-                        }
-                        var previousRowId = ToId(columnIndex, rowIndex - 1, sliceIndex);
-                        constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousRowId], bodyHandles[bodyAIndex], simulation, ref unitX, ref unitY, ref unitZ);
-                        if (sliceIndex > 0)
-                        {
-                            var previousSliceId = ToId(columnIndex, rowIndex, sliceIndex - 1);
-                            constraintHandles[constraintIndex++] = CreateManifoldConstraint(bodyHandles[previousSliceId], bodyHandles[bodyAIndex], simulation, ref unitY, ref unitZ, ref unitX);
-                        }
-
-
-                    }
-                }
-            }
-            //Secretly, the constraint handles are just handle[i] = i, and storing them is a little silly.
-            Array.Resize(ref constraintHandles, constraintIndex);
-
-
         }
 
 
@@ -445,7 +418,7 @@ namespace SolverPrototypeTests
                 Validate(simulation, removedConstraints, removedBodies, originalBodyCount, constraintHandles.Length);
             }
         }
-        
+
         public static double AddRemoveChurn(Simulation simulation, int iterations, int[] bodyHandles, int[] constraintHandles)
         {
             //There are three levels of 'index' for each object in this test:

@@ -20,7 +20,9 @@ namespace SolverPrototypeTests
             const int width = 8;
             const int height = 8;
             const int length = 8;
-            SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
+            var bodyBuilder = new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3());
+            var constraintBuilder = new ContactManifoldConstraintBuilder();
+            SimulationSetup.BuildLattice(bodyBuilder, constraintBuilder, width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
             var random = new Random(5);
             for (int i = 0; i < 3000; ++i)
@@ -37,13 +39,13 @@ namespace SolverPrototypeTests
                         ConstraintCountPerBodyEstimate = 8,
                         ConstraintsPerTypeBatch = 128
                     });
-                    SimulationSetup.BuildLattice(width, height, length, simulation, out bodyHandles, out constraintHandles);
+                    SimulationSetup.BuildLattice(bodyBuilder, constraintBuilder, width, height, length, simulation, out bodyHandles, out constraintHandles);
                 }
                 else if (sample < 0.1)
                 {
                     //Clear and recreate.
                     simulation.Clear();
-                    SimulationSetup.BuildLattice(width, height, length, simulation, out bodyHandles, out constraintHandles);
+                    SimulationSetup.BuildLattice(bodyBuilder, constraintBuilder, width, height, length, simulation, out bodyHandles, out constraintHandles);
                 }
                 else
                 {
@@ -79,7 +81,7 @@ namespace SolverPrototypeTests
             SimulationSetup.AddRemoveChurn(simulation, 1000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
-            
+
             const int iterations = 10;
             const int internalCompressionIterations = 10;
             for (int i = 0; i < iterations; ++i)
@@ -117,7 +119,7 @@ namespace SolverPrototypeTests
 
             //If we don't initialize the inertias in a per-frame update, we must do so explicitly.
             simulation.Bodies.LocalInertias.CopyTo(0, ref simulation.Bodies.Inertias, 0, simulation.Bodies.LocalInertias.Length);
-            
+
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();

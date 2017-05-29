@@ -21,7 +21,10 @@ namespace SolverPrototypeTests
             const int width = 17;
             const int height = 18;
             const int length = 17;
-            SimulationSetup.BuildLattice(width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
+            SimulationSetup.BuildLattice(
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3()),
+                new ContactManifoldConstraintBuilder(),
+                width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
 
             //SimulationSetup.ScrambleBodies(simulation);
             //SimulationSetup.ScrambleConstraints(simulation.Solver);
@@ -31,51 +34,51 @@ namespace SolverPrototypeTests
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(1);
 
-            double compressionTimeAccumulator = 0;
-            const int iterations = 100;
-            const int internalCompressionIterations = 100;
-            simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher); //prejit
-            for (int i = 0; i < iterations; ++i)
-            {
-                //SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
-                GC.Collect(3, GCCollectionMode.Forced, true);
-                var start = Stopwatch.GetTimestamp();
-                for (int j = 0; j < internalCompressionIterations; ++j)
-                {
-                    simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher);
-                }
-                compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
-            }
-            Console.WriteLine($"Time per compression: {1e6 * compressionTimeAccumulator / (iterations * internalCompressionIterations)} us");
-            GC.Collect(3, GCCollectionMode.Forced, true);
+            //double compressionTimeAccumulator = 0;
+            //const int iterations = 100;
+            //const int internalCompressionIterations = 100;
+            //simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher); //prejit
+            //for (int i = 0; i < iterations; ++i)
+            //{
+            //    //SimulationSetup.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
+            //    GC.Collect(3, GCCollectionMode.Forced, true);
+            //    var start = Stopwatch.GetTimestamp();
+            //    for (int j = 0; j < internalCompressionIterations; ++j)
+            //    {
+            //        simulation.SolverBatchCompressor.Compress(simulation.BufferPool, threadDispatcher);
+            //    }
+            //    compressionTimeAccumulator += (Stopwatch.GetTimestamp() - start) / (double)Stopwatch.Frequency;
+            //}
+            //Console.WriteLine($"Time per compression: {1e6 * compressionTimeAccumulator / (iterations * internalCompressionIterations)} us");
+            //GC.Collect(3, GCCollectionMode.Forced, true);
 
-            //Attempt cache optimization.
-            int bodyOptimizationIterations = bodyHandles.Length * 1;
-            simulation.BodyLayoutOptimizer.OptimizationFraction = 0.004f;
-            simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, threadDispatcher);//prejit
+            ////Attempt cache optimization.
+            //int bodyOptimizationIterations = bodyHandles.Length * 1;
+            //simulation.BodyLayoutOptimizer.OptimizationFraction = 0.004f;
+            //simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, threadDispatcher);//prejit
             var timer = Stopwatch.StartNew();
-            for (int i = 0; i < bodyOptimizationIterations; ++i)
-            {
-                simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, threadDispatcher);
-            }
-            timer.Stop();
-            var optimizationTime = timer.Elapsed.TotalSeconds;
-            Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
+            //for (int i = 0; i < bodyOptimizationIterations; ++i)
+            //{
+            //    simulation.BodyLayoutOptimizer.IncrementalOptimize(simulation.BufferPool, threadDispatcher);
+            //}
+            //timer.Stop();
+            //var optimizationTime = timer.Elapsed.TotalSeconds;
+            //Console.WriteLine($"Finished {bodyOptimizationIterations} body optimizations, time (ms): {optimizationTime * 1e3}, per iteration (us): {optimizationTime * 1e6 / bodyOptimizationIterations}");
 
-            //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
-            simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.044f;
-            int constraintOptimizationIterations = 8192;
+            ////Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
+            //simulation.ConstraintLayoutOptimizer.OptimizationFraction = 0.044f;
+            //int constraintOptimizationIterations = 8192;
 
-            simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);//prejit
-            timer.Restart();
-            for (int i = 0; i < constraintOptimizationIterations; ++i)
-            {
-                simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);
+            //simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);//prejit
+            //timer.Restart();
+            //for (int i = 0; i < constraintOptimizationIterations; ++i)
+            //{
+            //    simulation.ConstraintLayoutOptimizer.Update(simulation.BufferPool, threadDispatcher);
 
-            }
-            timer.Stop();
-            Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
-                $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
+            //}
+            //timer.Stop();
+            //Console.WriteLine($"Finished constraint optimizations, time (ms): {timer.Elapsed.TotalMilliseconds}" +
+            //    $", per iteration (us): {timer.Elapsed.TotalSeconds * 1e6 / constraintOptimizationIterations}");
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 32;
@@ -133,7 +136,7 @@ namespace SolverPrototypeTests
 
                     if (i == 0)
                         //if (penetrationDepth > 0.2)
-                        Console.WriteLine($"manifold[{i}] penetration: {penetrationDepth}, velocityA: {velocityA}, velocityB: {velocityB}");
+                        Console.WriteLine($"manifold[{i}] penetration: {penetrationDepth}, va: {velocityA}, vb: {velocityB}");
 
                 }
 
