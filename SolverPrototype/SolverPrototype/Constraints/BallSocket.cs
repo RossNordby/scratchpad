@@ -132,7 +132,6 @@ namespace SolverPrototype.Constraints
             Vector3Wide.Add(ref localPositionB, ref projection.OffsetB, out var localB);
             Vector3Wide.Subtract(ref localB, ref projection.OffsetA, out var error);
             Vector3Wide.Scale(ref error, ref positionErrorToVelocity, out projection.BiasVelocity);
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

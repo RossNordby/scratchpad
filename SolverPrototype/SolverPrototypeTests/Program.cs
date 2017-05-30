@@ -9,6 +9,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            //ReinterpretVectorRepro.Test();
             //TriangularTests.Test();
             //LocalsinitCodegen.Test();
             //InterlockedOverheadTests.Test();

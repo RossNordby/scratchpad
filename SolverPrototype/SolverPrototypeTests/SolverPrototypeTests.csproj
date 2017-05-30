@@ -4,11 +4,14 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
-    <RuntimeFrameworkVersion>2.0.0-preview2-25309-07</RuntimeFrameworkVersion>
+    <RuntimeFrameworkVersion>2.0.0-preview2-25319-02</RuntimeFrameworkVersion>
+    <PackagingToolsInsufficientSDKVersion>false</PackagingToolsInsufficientSDKVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Optimize>True</Optimize>
+    <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

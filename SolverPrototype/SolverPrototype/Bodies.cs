@@ -394,7 +394,18 @@ namespace SolverPrototype
             out Vector3Wide localPositionB, out QuaternionWide orientationA, out QuaternionWide orientationB,
             out BodyInertias inertiaA, out BodyInertias inertiaB)
         {
-
+            unsafe
+            {
+                //Note that we're storing data into vectors by reinterpreting the underlying memory.
+                //Unfortunately, there's a compiler bug: https://github.com/dotnet/coreclr/issues/11804
+                //Without intervention, a whole lotta stuff goes sideways when the data stored to registers is loaded from memory, 
+                //resulting in uninitialized data flying around. Best case, constraints using this diverged massively as the localPositionB was whoknowswhat,
+                //worst case the entire process gets torn down by access violations.
+                //The inclusion of this hack convinces the JIT to store the gathered values into stack memory rather than aggressively enregistering it.
+                //(Why? I didn't bother checking too closely. Maybe the JIT's more aggressive about looking for type punning in the presence of unsafe code.)
+                //TODO: remove this once the fix is in.
+                var hiPleaseDontRemoveThisWithoutTestingOrEverythingMightExplode = stackalloc byte[0];
+            }
             ref var targetInertiaBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
             ref var targetInertiaBaseB = ref Unsafe.As<Vector<float>, float>(ref inertiaB.InverseInertiaTensor.M11);
             Vector3Wide positionA, positionB;
@@ -405,7 +416,7 @@ namespace SolverPrototype
 
             //Grab the base references for the body indices. Note that we make use of the references memory layout again.
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
-
+            
             for (int i = 0; i < references.Count; ++i)
             {
                 ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
@@ -415,7 +426,7 @@ namespace SolverPrototype
                 var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
                 var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
                 GatherInertiaForBody(ref targetInertiaBaseB, i, bundleIndexB, innerIndexB);
-                GatherPoseForBody(ref targetPositionBaseB, ref targetOrientationBaseB, i, bundleIndexB, innerIndexB);
+                GatherPoseForBody(ref targetPositionBaseB, ref targetOrientationBaseB, i, bundleIndexB, innerIndexB); 
             }
             Vector3Wide.Subtract(ref positionB, ref positionA, out localPositionB);
         }
