@@ -124,15 +124,15 @@ namespace SolverPrototype
             while (true)
             {
                 var jobIndex = Interlocked.Decrement(ref availableJobCount);
-                if (jobIndex > 0)
-                {
-                    var start = jobIndex * bundlesPerJob;
-                    var exclusiveEnd = start + bundlesPerJob;
-                    if (exclusiveEnd > bodyBundleCount)
-                        exclusiveEnd = bodyBundleCount;
-                    Debug.Assert(exclusiveEnd > start, "Jobs that would involve bundles beyond the body count should not be created.");
-                    IntegrateBundles(start, exclusiveEnd, cachedDt);
-                }
+                if (jobIndex < 0)
+                    return;
+                var start = jobIndex * bundlesPerJob;
+                var exclusiveEnd = start + bundlesPerJob;
+                if (exclusiveEnd > bodyBundleCount)
+                    exclusiveEnd = bodyBundleCount;
+                Debug.Assert(exclusiveEnd > start, "Jobs that would involve bundles beyond the body count should not be created.");
+                IntegrateBundles(start, exclusiveEnd, cachedDt);
+
             }
 
         }

@@ -16,9 +16,9 @@ namespace SolverPrototypeTests
     {
         public static void Test()
         {
-            const int width = 16;
-            const int height = 16;
-            const int length = 16;
+            const int width = 32;
+            const int height = 32;
+            const int length = 32;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3()),
                 new BallSocketConstraintBuilder(),
@@ -30,8 +30,8 @@ namespace SolverPrototypeTests
            
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
-            const int iterationCount = 32;
-            const int frameCount = 2560;
+            const int iterationCount = 8;
+            const int frameCount = 128;
             simulation.Solver.IterationCount = iterationCount;
 
             simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
@@ -48,8 +48,8 @@ namespace SolverPrototypeTests
 
 
                 timer.Start();
-                simulation.Timestep(dt);
-                //simulation.Timestep(dt, threadDispatcher);
+                //simulation.Timestep(dt);
+                simulation.Timestep(dt, threadDispatcher);
                 timer.Stop();
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 int sampledBodyIndex = width;

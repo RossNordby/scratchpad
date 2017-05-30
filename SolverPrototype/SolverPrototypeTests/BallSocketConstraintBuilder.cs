@@ -41,14 +41,14 @@ namespace SolverPrototypeTests
             ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder)
         {
             //For each lesser neighbor along each main axis, create a connection.
-            //TryConnectTo(sliceIndex - 1, rowIndex, columnIndex, ref bodyDescription, ref ids, ref constraintAdder);
+            TryConnectTo(sliceIndex - 1, rowIndex, columnIndex, ref bodyDescription, ref ids, ref constraintAdder);
             TryConnectTo(sliceIndex, rowIndex - 1, columnIndex, ref bodyDescription, ref ids, ref constraintAdder);
-            //TryConnectTo(sliceIndex, rowIndex, columnIndex - 1, ref bodyDescription, ref ids, ref constraintAdder);
-            ////Create the four diagonals downward.
-            //TryConnectTo(sliceIndex - 1, rowIndex - 1, columnIndex - 1, ref bodyDescription, ref ids, ref constraintAdder);
-            //TryConnectTo(sliceIndex + 1, rowIndex - 1, columnIndex - 1, ref bodyDescription, ref ids, ref constraintAdder);
-            //TryConnectTo(sliceIndex - 1, rowIndex - 1, columnIndex + 1, ref bodyDescription, ref ids, ref constraintAdder);
-            //TryConnectTo(sliceIndex + 1, rowIndex - 1, columnIndex + 1, ref bodyDescription, ref ids, ref constraintAdder);
+            TryConnectTo(sliceIndex, rowIndex, columnIndex - 1, ref bodyDescription, ref ids, ref constraintAdder);
+            //Create the four diagonals downward.
+            TryConnectTo(sliceIndex - 1, rowIndex - 1, columnIndex - 1, ref bodyDescription, ref ids, ref constraintAdder);
+            TryConnectTo(sliceIndex + 1, rowIndex - 1, columnIndex - 1, ref bodyDescription, ref ids, ref constraintAdder);
+            TryConnectTo(sliceIndex - 1, rowIndex - 1, columnIndex + 1, ref bodyDescription, ref ids, ref constraintAdder);
+            TryConnectTo(sliceIndex + 1, rowIndex - 1, columnIndex + 1, ref bodyDescription, ref ids, ref constraintAdder);
         }
     }
 
