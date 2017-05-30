@@ -17,11 +17,12 @@ namespace SolverPrototypeTests
         {
             bodyDescription = new BodyDescription
             {
-                LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 },
                 Pose = new BodyPose
                 {
-                    Position = new Vector3(columnIndex, rowIndex, sliceIndex) * Spacing + Origin
-                }
+                    Position = new Vector3(columnIndex, rowIndex, sliceIndex) * Spacing + Origin,
+                    Orientation = BEPUutilities2.Quaternion.Identity
+                },
+                LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 }
             };
 
         }

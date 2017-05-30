@@ -110,6 +110,9 @@ namespace SolverPrototype
 
         unsafe void InternalResize(int targetBodyCapacity)
         {
+            //There's no point in going smaller than the bundle size. That would result in resizes that don't resize any of the bundle structures.
+            if (targetBodyCapacity < Vector<float>.Count)
+                targetBodyCapacity = Vector<float>.Count;
             Debug.Assert(targetBodyCapacity > 0, "Resize is not meant to be used as Dispose. If you want to return everything to the pool, use Dispose instead.");
             //Note that we base the bundle capacities on the body capacity. This simplifies the conditions on allocation
             targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(targetBodyCapacity);
@@ -139,6 +142,7 @@ namespace SolverPrototype
                 var newSize = HandleToIndex.Length << 1;
                 InternalResize(newSize);
             }
+            Debug.Assert(Math.Abs(bodyDescription.Pose.Orientation.Length() - 1) < 1e-6f, "Orientation should be initialized to a unit length quaternion.");
             var handle = IdPool.Take();
             var index = BodyCount++;
             HandleToIndex[handle] = index;

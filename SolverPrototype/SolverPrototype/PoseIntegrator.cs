@@ -42,37 +42,9 @@ namespace SolverPrototype
             ref var baseInertias = ref bodies.Inertias[0];
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
-                //Note that we apply gravity during this phase. That means, if the integrator is put at the end of the frame, the velocity will be nonzero.
-                //For now, we're assuming that the integrator runs at the beginning of the frame. This is a tradeoff, with some pros:
-                //1) Contacts generated in a given frame will match the position. You could draw effects at the contact points without worrying about them being one frame offset.
-                //However, if we detect contacts from a predicted transform, this mostly goes out the window.
-                //2) There is no need for a second 'force application' stage before the AABB update. Realistically, the force application would be bundled into the AABB update.
-                //3) Advanced users are free to trivially intervene in the velocity modifications caused by constraints before they are integrated. (A callback would be just as good.)
-                //And one big con:
-                //If you modify velocity outside of the update, it will be directly used to integrate position during the next frame, ignoring all constraints.
-                //This WILL be a problem, especially since BEPUphysics v1 trained people to use velocity modifications to control motion.
-
-                //This isn't an unsolvable problem- making it easy to handle velocity modifications mid-update by exposing a callback of some sort would work. But that's one step more
-                //than the v1 'just set the velocity' style.
-
-                //TODO:
-                //I suspect that splitting the gravity application from this integrator will be the right choice in the end. Bundling it with AABB calculation would free
-                //up the integrator to be placed on either end of execution without worrying about odd velocities being visible in resting objects, and there is basically no downside. 
-                //You could then provide different update orders. People could use the position-first or position-last variant as desired.
-                //Whatever handles gravity will also probably end up handling drag.
-
-                //Note that we avoid accelerating kinematics. Kinematics are any body with an inverse mass of zero (so a mass of ~infinity). No force can move them.
-                ref var velocity = ref Unsafe.Add(ref baseVelocities, i);
-                Vector3Wide.Add(ref gravityDt, ref velocity.LinearVelocity, out var acceleratedLinearVelocity);
-                var gravityMask = Vector.Equals(baseLocalInertias.InverseMass, Vector<float>.Zero);
-                Vector3Wide.ConditionalSelect(ref gravityMask, ref velocity.LinearVelocity, ref acceleratedLinearVelocity, out velocity.LinearVelocity);
-                //Implementation sidenote: Why aren't kinematics all bundled together separately from dynamics to avoid this condition?
-                //Because kinematics can have a velocity- that is what distinguishes them from a static object. The solver must read velocities of all bodies involved in a constraint.
-                //Under ideal conditions, those bodies will be near in memory to increase the chances of a cache hit. If kinematics are separately bundled, the the number of cache
-                //misses necessarily increases. Slowing down the solver in order to speed up the pose integrator is a really, really bad trade, especially when the benefit is a few ALU ops.
-
-                //Integrate position with the latest linear velocity.
+                //Integrate position with the latest linear velocity. Note that gravity is integrated afterwards.
                 ref var pose = ref Unsafe.Add(ref basePoses, i);
+                ref var velocity = ref Unsafe.Add(ref baseVelocities, i);
                 var vectorDt = new Vector<float>(dt);
                 Vector3Wide.Scale(ref velocity.LinearVelocity, ref vectorDt, out var displacement);
                 Vector3Wide.Add(ref pose.Position, ref displacement, out pose.Position);
@@ -101,6 +73,38 @@ namespace SolverPrototype
                 Matrix3x3Wide.CreateFromQuaternion(ref pose.Orientation, out var orientationMatrix);
                 //I^-1 = RT * Ilocal^-1 * R 
                 Triangular3x3Wide.RotationSandwich(ref orientationMatrix, ref localInertias.InverseInertiaTensor, out inertias.InverseInertiaTensor);
+                //While it's a bit goofy just to copy over the inverse mass every frame even if it doesn't change,
+                //it's virtually always gathered together with the inertia tensor and it really isn't worth a whole extra external system to copy inverse masses only on demand.
+                inertias.InverseMass = localInertias.InverseMass;
+
+                //Note that we apply gravity during this phase. That means, if the integrator is put at the end of the frame, the velocity will be nonzero.
+                //For now, we're assuming that the integrator runs at the beginning of the frame. This is a tradeoff, with some pros:
+                //1) Contacts generated in a given frame will match the position. You could draw effects at the contact points without worrying about them being one frame offset.
+                //However, if we detect contacts from a predicted transform, this mostly goes out the window.
+                //2) There is no need for a second 'force application' stage before the AABB update. Realistically, the force application would be bundled into the AABB update.
+                //3) Advanced users are free to trivially intervene in the velocity modifications caused by constraints before they are integrated. (A callback would be just as good.)
+                //And one big con:
+                //If you modify velocity outside of the update, it will be directly used to integrate position during the next frame, ignoring all constraints.
+                //This WILL be a problem, especially since BEPUphysics v1 trained people to use velocity modifications to control motion.
+
+                //This isn't an unsolvable problem- making it easy to handle velocity modifications mid-update by exposing a callback of some sort would work. But that's one step more
+                //than the v1 'just set the velocity' style.
+
+                //TODO:
+                //I suspect that splitting the gravity application from this integrator will be the right choice in the end. Bundling it with AABB calculation would free
+                //up the integrator to be placed on either end of execution without worrying about odd velocities being visible in resting objects, and there is basically no downside. 
+                //You could then provide different update orders. People could use the position-first or position-last variant as desired.
+                //Whatever handles gravity will also probably end up handling drag.
+
+                //Note that we avoid accelerating kinematics. Kinematics are any body with an inverse mass of zero (so a mass of ~infinity). No force can move them.
+                Vector3Wide.Add(ref gravityDt, ref velocity.LinearVelocity, out var acceleratedLinearVelocity);
+                var gravityMask = Vector.Equals(localInertias.InverseMass, Vector<float>.Zero);
+                Vector3Wide.ConditionalSelect(ref gravityMask, ref velocity.LinearVelocity, ref acceleratedLinearVelocity, out velocity.LinearVelocity);
+                //Implementation sidenote: Why aren't kinematics all bundled together separately from dynamics to avoid this condition?
+                //Because kinematics can have a velocity- that is what distinguishes them from a static object. The solver must read velocities of all bodies involved in a constraint.
+                //Under ideal conditions, those bodies will be near in memory to increase the chances of a cache hit. If kinematics are separately bundled, the the number of cache
+                //misses necessarily increases. Slowing down the solver in order to speed up the pose integrator is a really, really bad trade, especially when the benefit is a few ALU ops.
+
 
             }
         }

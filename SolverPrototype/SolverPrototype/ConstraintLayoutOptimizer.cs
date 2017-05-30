@@ -256,6 +256,28 @@ namespace SolverPrototype
             }
         }
 
+        void CopyToCacheAndSort(BufferPool pool)
+        {
+            LSBRadixSort.Sort<int, Buffer<int>, Buffer<int>>(
+                ref context.SortKeys, ref context.SourceIndices,
+                ref context.ScratchKeys, ref context.ScratchValues, 0, context.ConstraintsInSortRegionCount,
+                context.KeyUpperBound, pool,
+                out context.SortedKeys, out context.SortedSourceIndices);
+            
+            var workerBundleStart = context.SourceStartBundleIndex;
+            var workerBundleCount = 0 < context.CopyBundlesPerWorkerRemainder ? context.CopyBundlesPerWorker + 1 : context.CopyBundlesPerWorker;
+            var workerConstraintStart = workerBundleStart << BundleIndexing.VectorShift;
+            //Note that the number of constraints we can iterate over is clamped by the type batch's constraint count. The last bundle may not be full.
+            var workerConstraintCount = Math.Min(context.TypeBatchConstraintCount - workerConstraintStart, workerBundleCount << BundleIndexing.VectorShift);
+            if (workerConstraintCount <= 0)
+                return; //No work remains.
+
+            typeBatch.CopyToCache(
+                workerBundleStart, 0, workerBundleCount,
+                workerConstraintStart, 0, workerConstraintCount,
+                ref context.IndexToHandleCache, ref context.PrestepDataCache, ref context.AccumulatesImpulsesCache);
+        }
+
         void Regather(int workerIndex)
         {
             var localWorkerBundleStart = context.BundlesPerWorker * workerIndex + Math.Min(workerIndex, context.BundlesPerWorkerRemainder);
@@ -326,7 +348,7 @@ namespace SolverPrototype
             if (threadDispatcher == null)
             {
                 GenerateSortKeys(0);
-                CopyToCacheAndSort(0);
+                CopyToCacheAndSort(rawPool);
                 Regather(0);
             }
             else

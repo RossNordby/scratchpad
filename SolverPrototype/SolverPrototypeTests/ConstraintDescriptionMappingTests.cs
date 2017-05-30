@@ -95,12 +95,14 @@ namespace SolverPrototypeTests
             const int bodyCount = 2048;
             for (int i = 0; i < bodyCount; ++i)
             {
-                var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = 1 } };
+                var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = 1 }, Pose = new BodyPose { Orientation = BEPUutilities2.Quaternion.Identity } };
                 simulation.Add(ref bodyDescription);
             }
             var random = new Random(5);
             ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
+            ConstraintTypeIds.Register<BallSocketTypeBatch>();
             Test<ContactManifold4Constraint>(simulation, random, 2);
+            Test<BallSocket>(simulation, random, 2);
 
             pool.Clear();
         }

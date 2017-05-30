@@ -6,6 +6,51 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Constraints
 {
+
+    public struct BallSocket : IConstraintDescription<BallSocket>
+    {
+        public Vector3 LocalOffsetA;
+        public Vector3 LocalOffsetB;
+        public SpringSettingsAOS SpringSettings;
+
+        public int ConstraintTypeId
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return ConstraintTypeIds.GetId<BallSocketTypeBatch>();
+            }
+        }
+
+        public void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex)
+        {
+            Debug.Assert(batch is BallSocketTypeBatch, "The type batch passed to the description must match the description's expected type.");
+            ref var lane = ref GatherScatter.Get(ref Unsafe.As<BallSocketTypeBatch>(batch).PrestepData[bundleIndex].LocalOffsetA.X, innerIndex);
+            lane = LocalOffsetA.X;
+            Unsafe.Add(ref lane, Vector<float>.Count) = LocalOffsetA.Y;
+            Unsafe.Add(ref lane, 2 * Vector<float>.Count) = LocalOffsetA.Z;
+            Unsafe.Add(ref lane, 3 * Vector<float>.Count) = LocalOffsetB.X;
+            Unsafe.Add(ref lane, 4 * Vector<float>.Count) = LocalOffsetB.Y;
+            Unsafe.Add(ref lane, 5 * Vector<float>.Count) = LocalOffsetB.Z;
+            Unsafe.Add(ref lane, 6 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
+            Unsafe.Add(ref lane, 7 * Vector<float>.Count) = SpringSettings.DampingRatio;
+        }
+
+        public void BuildDescription(TypeBatch batch, int bundleIndex, int innerIndex, out BallSocket description)
+        {
+            Debug.Assert(batch is BallSocketTypeBatch, "The type batch passed to the description must match the description's expected type.");
+            ref var lane = ref GatherScatter.Get(ref Unsafe.As<BallSocketTypeBatch>(batch).PrestepData[bundleIndex].LocalOffsetA.X, innerIndex);
+            description.LocalOffsetA.X = lane;
+            description.LocalOffsetA.Y = Unsafe.Add(ref lane, Vector<float>.Count);
+            description.LocalOffsetA.Z = Unsafe.Add(ref lane, 2 * Vector<float>.Count);
+            description.LocalOffsetB.X = Unsafe.Add(ref lane, 3 * Vector<float>.Count);
+            description.LocalOffsetB.Y = Unsafe.Add(ref lane, 4 * Vector<float>.Count);
+            description.LocalOffsetB.Z = Unsafe.Add(ref lane, 5 * Vector<float>.Count);
+            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 6 * Vector<float>.Count);
+            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 7 * Vector<float>.Count);
+        }
+    }
+
     public struct BallSocketPrestepData
     {
         public Vector3Wide LocalOffsetA;
@@ -83,9 +128,9 @@ namespace SolverPrototype.Constraints
             Springiness.ComputeSpringiness(ref prestep.SpringSettings, dt, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
             Triangular3x3Wide.Scale(ref projection.EffectiveMass, ref effectiveMassCFMScale, out projection.EffectiveMass);
 
-            //Compute the position error and bias velocities.
+            //Compute the position error and bias velocities. Note the order of subtraction when calculating error- we want the bias velocity to counteract the separation.
             Vector3Wide.Add(ref localPositionB, ref projection.OffsetB, out var localB);
-            Vector3Wide.Subtract(ref projection.OffsetA, ref localB, out var error);
+            Vector3Wide.Subtract(ref localB, ref projection.OffsetA, out var error);
             Vector3Wide.Scale(ref error, ref positionErrorToVelocity, out projection.BiasVelocity);
 
         }

@@ -17,7 +17,6 @@ namespace SolverPrototype.Constraints
     {
         public float NaturalFrequency;
         public float DampingRatio;
-        public float MaximumRecoveryVelocity;
     }
 
     public struct ContactManifold4Constraint : IConstraintDescription<ContactManifold4Constraint>
@@ -33,6 +32,7 @@ namespace SolverPrototype.Constraints
         public float FrictionCoefficient;
         public Quaternion SurfaceBasis;
         public SpringSettingsAOS SpringSettings;
+        public float MaximumRecoveryVelocity;
 
         public void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex)
         {
@@ -85,7 +85,7 @@ namespace SolverPrototype.Constraints
 
             Unsafe.Add(ref lane, 29 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
             Unsafe.Add(ref lane, 30 * Vector<float>.Count) = SpringSettings.DampingRatio;
-            Unsafe.Add(ref lane, 31 * Vector<float>.Count) = SpringSettings.MaximumRecoveryVelocity;
+            Unsafe.Add(ref lane, 31 * Vector<float>.Count) = MaximumRecoveryVelocity;
 
             Unsafe.Add(ref lane, 32 * Vector<float>.Count) = Contact0.PenetrationDepth;
             Unsafe.Add(ref lane, 33 * Vector<float>.Count) = Contact1.PenetrationDepth;
@@ -137,7 +137,7 @@ namespace SolverPrototype.Constraints
 
             description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 29 * Vector<float>.Count);
             description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 30 * Vector<float>.Count);
-            description.SpringSettings.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 31 * Vector<float>.Count);
+            description.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 31 * Vector<float>.Count);
 
             description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 32 * Vector<float>.Count);
             description.Contact1.PenetrationDepth = Unsafe.Add(ref lane, 33 * Vector<float>.Count);

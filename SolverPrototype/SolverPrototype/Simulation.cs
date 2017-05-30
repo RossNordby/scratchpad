@@ -49,6 +49,7 @@ namespace SolverPrototype
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
+            PoseIntegrator = new PoseIntegrator(Bodies);
         }
         /// <summary>
         /// Constructs a full featured simulation supporting dynamic movement and constraints. Uses a default preallocation size.

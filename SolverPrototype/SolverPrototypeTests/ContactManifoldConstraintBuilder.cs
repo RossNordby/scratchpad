@@ -25,8 +25,8 @@ namespace SolverPrototypeTests
                 {
                     NaturalFrequency = (float)(Math.PI * 2 * 60),
                     DampingRatio = 100f,
-                    MaximumRecoveryVelocity = 1f
                 },
+                MaximumRecoveryVelocity = 1f,
                 FrictionCoefficient = 1,
             };
             Matrix3x3 basisMatrix;
