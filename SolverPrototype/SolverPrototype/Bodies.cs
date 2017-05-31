@@ -348,6 +348,23 @@ namespace SolverPrototype
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
 
+        public void GetDescription(int handle, out BodyDescription description)
+        {
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
+            GetLane(ref Poses[bundleIndex], innerIndex, out description.Pose);
+            GetLane(ref LocalInertias[bundleIndex], innerIndex, out description.LocalInertia);
+            GetLane(ref Velocities[bundleIndex], innerIndex, out description.Velocity);
+        }
+        public void SetDescription(int handle, ref BodyDescription description)
+        {
+            ValidateExistingHandle(handle);
+            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
+            SetLane(ref Poses[bundleIndex], innerIndex, ref description.Pose);
+            SetLane(ref LocalInertias[bundleIndex], innerIndex, ref description.LocalInertia);
+            SetLane(ref Velocities[bundleIndex], innerIndex, ref description.Velocity);
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherInertiaForBody(ref float targetInertiaBase, int i, int bundleIndex, int innerIndex)
@@ -416,7 +433,7 @@ namespace SolverPrototype
 
             //Grab the base references for the body indices. Note that we make use of the references memory layout again.
             ref var baseBundleA = ref Unsafe.As<Vector<int>, int>(ref references.BundleIndexA);
-            
+
             for (int i = 0; i < references.Count; ++i)
             {
                 ref var bundleIndexA = ref Unsafe.Add(ref baseBundleA, i);
@@ -426,7 +443,7 @@ namespace SolverPrototype
                 var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
                 var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
                 GatherInertiaForBody(ref targetInertiaBaseB, i, bundleIndexB, innerIndexB);
-                GatherPoseForBody(ref targetPositionBaseB, ref targetOrientationBaseB, i, bundleIndexB, innerIndexB); 
+                GatherPoseForBody(ref targetPositionBaseB, ref targetOrientationBaseB, i, bundleIndexB, innerIndexB);
             }
             Vector3Wide.Subtract(ref positionB, ref positionA, out localPositionB);
         }

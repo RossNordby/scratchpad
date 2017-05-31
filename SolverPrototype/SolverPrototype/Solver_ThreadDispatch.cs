@@ -186,7 +186,6 @@ namespace SolverPrototype
         struct MultithreadingParameters
         {
             public float Dt;
-            public float InverseDt;
             public QuickList<WorkBlock, Buffer<WorkBlock>> WorkBlocks;
             public Buffer<int> BlockClaims;
             public QuickList<int, Buffer<int>> BatchBoundaries;
@@ -570,12 +569,11 @@ namespace SolverPrototype
 
         }
 
-        public double MultithreadedUpdate(IThreadDispatcher threadPool, BufferPool bufferPool, float dt, float inverseDt)
+        public double MultithreadedUpdate(IThreadDispatcher threadPool, BufferPool bufferPool, float dt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
             context.WorkerCompletedCount = 0;
             context.Dt = dt;
-            context.InverseDt = inverseDt;
             //First build a set of work blocks.
             //The block size should be relatively small to give the workstealer something to do, but we don't want to go crazy with the number of blocks.
             //These values are found by empirical tuning. The optimal values may vary by architecture.

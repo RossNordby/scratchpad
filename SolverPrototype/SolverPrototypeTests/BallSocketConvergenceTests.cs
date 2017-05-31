@@ -1,14 +1,5 @@
-﻿using BEPUutilities2;
-using BEPUutilities2.Memory;
-using SolverPrototype;
-using SolverPrototype.Constraints;
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Threading;
-using static SolverPrototype.Solver;
-using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
@@ -23,11 +14,9 @@ namespace SolverPrototypeTests
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3()),
                 new BallSocketConstraintBuilder(),
                 width, height, length, out var simulation, out var bodyHandles, out var constraintHandles);
-            
+
             var threadDispatcher = new SimpleThreadDispatcher(8);
-            
-            var timer = Stopwatch.StartNew();
-           
+
             const float inverseDt = 60f;
             const float dt = 1 / inverseDt;
             const int iterationCount = 8;
@@ -35,11 +24,8 @@ namespace SolverPrototypeTests
             simulation.Solver.IterationCount = iterationCount;
 
             simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-
-            //Technically we're not doing any position integration or collision detection yet, so these frames are pretty meaningless.
-            timer.Reset();
-            
-            double solveTime = 0;
+                        
+            var samples = new SimulationTimeSamples(frameCount);
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
@@ -47,10 +33,10 @@ namespace SolverPrototypeTests
                 //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
 
 
-                timer.Start();
-                //simulation.Timestep(dt);
-                simulation.Timestep(dt, threadDispatcher);
-                timer.Stop();
+                simulation.Timestep(dt);
+                //simulation.Timestep(dt, threadDispatcher);
+                samples.RecordFrame(simulation);
+
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 int sampledBodyIndex = width;
                 simulation.Bodies.GetPose(bodyHandles[sampledBodyIndex], out var samplePose);
@@ -66,8 +52,13 @@ namespace SolverPrototypeTests
                 Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
 
-            Console.WriteLine($"Time (ms): {(1e3 * timer.Elapsed.TotalSeconds)}");
-            Console.WriteLine($"Solve time (ms): {1e3 * solveTime}");
+            var multiplier = 1e3 / frameCount;
+            Console.WriteLine($"Simulation time (ms):       {multiplier * samples.Simulation.ComputeStats().Total}");
+            Console.WriteLine($"Constraint opt time (ms):   {multiplier * samples.ConstraintOptimizer.ComputeStats().Total}");
+            Console.WriteLine($"Body opt time (ms):         {multiplier * samples.BodyOptimizer.ComputeStats().Total}");
+            Console.WriteLine($"Batch compress time (ms):   {multiplier * samples.BatchCompressor.ComputeStats().Total}");
+            Console.WriteLine($"Pose integrate time (ms):   {multiplier * samples.PoseIntegrator.ComputeStats().Total}");
+            Console.WriteLine($"Solve time (ms):            {multiplier * samples.Solver.ComputeStats().Total}");
 
 
             threadDispatcher.Dispose();

@@ -14,7 +14,7 @@ namespace SolverPrototype
     /// <summary>
     /// Orchestrates the bookkeeping and execution of a full dynamic simulation.
     /// </summary>
-    public class Simulation : IDisposable
+    public partial class Simulation : IDisposable
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
         public Bodies Bodies { get; private set; }
@@ -150,24 +150,55 @@ namespace SolverPrototype
         /// <param name="dt">Duration of the time step in time.</param>
         public void Timestep(float dt, IThreadDispatcher threadDispatcher = null)
         {
+            ProfilerClear();
+            ProfilerStart(this);
             if (threadDispatcher != null)
             {
                 //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
+
+                ProfilerStart(BodyLayoutOptimizer);
                 BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
+                ProfilerEnd(BodyLayoutOptimizer);
+
+                ProfilerStart(ConstraintLayoutOptimizer);
                 ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
+                ProfilerEnd(ConstraintLayoutOptimizer);
+
+                ProfilerStart(SolverBatchCompressor);
                 SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
+                ProfilerEnd(SolverBatchCompressor);
+
+                ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt, threadDispatcher);
-                var inverseDt = 1f / dt;
-                Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt, inverseDt);
+                ProfilerEnd(PoseIntegrator);
+
+                ProfilerStart(Solver);
+                Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt);
+                ProfilerEnd(Solver);
             }
             else
             {
+                ProfilerStart(BodyLayoutOptimizer);
                 BodyLayoutOptimizer.IncrementalOptimize();
+                ProfilerEnd(BodyLayoutOptimizer);
+
+                ProfilerStart(ConstraintLayoutOptimizer);
                 ConstraintLayoutOptimizer.Update(BufferPool);
+                ProfilerEnd(ConstraintLayoutOptimizer);
+
+                ProfilerStart(SolverBatchCompressor);
                 SolverBatchCompressor.Compress(BufferPool);
+                ProfilerEnd(SolverBatchCompressor);
+
+                ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt);
+                ProfilerEnd(PoseIntegrator);
+
+                ProfilerStart(Solver);
                 Solver.Update(dt);
+                ProfilerEnd(Solver);
             }
+            ProfilerEnd(this);
         }
 
         /// <summary>
@@ -238,32 +269,5 @@ namespace SolverPrototype
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();
         }
-    }
-
-    /// <summary>
-    /// The common set of allocation sizes for a simulation.
-    /// </summary>
-    public struct SimulationAllocationSizes
-    {
-        /// <summary>
-        /// The number of bodies to allocate space for.
-        /// </summary>
-        public int Bodies;
-        /// <summary>
-        /// The number of constraints to allocate bookkeeping space for. This does not affect actual type batch allocation sizes, only the solver-level constraint handle storage.
-        /// </summary>
-        public int Constraints;
-        /// <summary>
-        /// The minimum number of constraints to allocate space for in each individual type batch.
-        /// New type batches will be given enough memory for this number of constraints, and any compaction will not reduce the allocations below it.
-        /// The number of constraints can vary greatly across types- there are usually far more contacts than ragdoll constraints.
-        /// Per type estimates can be assigned within the Solver.TypeBatchAllocation if necessary. This value acts as a lower bound for all types.
-        /// </summary>
-        public int ConstraintsPerTypeBatch;
-        /// <summary>
-        /// The minimum number of constraints to allocate space for in each body's constraint list.
-        /// New bodies will be given enough memory for this number of constraints, and any compaction will not reduce the allocations below it.
-        /// </summary>
-        public int ConstraintCountPerBodyEstimate;
     }
 }

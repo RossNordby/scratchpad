@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 namespace BEPUutilities2.Collections
 {
     /// <summary>
-    /// Provides optimized equality comparison and hashing for primitive types.
+    /// Provides optimized equality testing, comparison, and hashing for primitive types.
     /// </summary>
     /// <typeparam name="T">Type to compare and hash.</typeparam>
     public struct PrimitiveComparer<T> : IEqualityComparerRef<T>, IComparerRef<T>

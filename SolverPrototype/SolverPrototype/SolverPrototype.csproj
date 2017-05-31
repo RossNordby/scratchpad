@@ -16,11 +16,12 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <Optimize>True</Optimize>
+    <DefineConstants>TRACE;RELEASE;NETSTANDARD1_4;PROFILE</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <DefineConstants>TRACE;DEBUG;NETSTANDARD1_4;CHECKMATH</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;NETSTANDARD1_4;CHECKMATH;PROFILE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

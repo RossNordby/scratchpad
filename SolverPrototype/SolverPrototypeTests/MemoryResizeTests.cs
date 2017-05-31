@@ -75,10 +75,10 @@ namespace SolverPrototypeTests
                 }
             }
 
-            SimulationSetup.ScrambleBodies(simulation);
-            SimulationSetup.ScrambleConstraints(simulation.Solver);
-            SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            SimulationSetup.AddRemoveChurn(simulation, 1000, bodyHandles, constraintHandles);
+            SimulationScrambling.ScrambleBodies(simulation);
+            SimulationScrambling.ScrambleConstraints(simulation.Solver);
+            SimulationScrambling.ScrambleBodyConstraintLists(simulation);
+            SimulationScrambling.AddRemoveChurn<ContactManifold4Constraint>(simulation, 1000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
 
@@ -86,7 +86,7 @@ namespace SolverPrototypeTests
             const int internalCompressionIterations = 10;
             for (int i = 0; i < iterations; ++i)
             {
-                SimulationSetup.AddRemoveChurn(simulation, 10, bodyHandles, constraintHandles);
+                SimulationScrambling.AddRemoveChurn<ContactManifold4Constraint>(simulation, 10, bodyHandles, constraintHandles);
                 GC.Collect(3, GCCollectionMode.Forced, true);
                 var start = Stopwatch.GetTimestamp();
                 for (int j = 0; j < internalCompressionIterations; ++j)
@@ -174,7 +174,7 @@ namespace SolverPrototypeTests
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematics.)
                     simulation.Bodies.Velocities[i].LinearVelocity.Y += simulation.Bodies.LocalInertias[i].InverseMass * impulse;
                 }
-                simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt, inverseDt);
+                simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt);
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 //var velocityChange = solver.GetVelocityChangeHeuristic();
                 //Console.WriteLine($"Constraint velocity change after frame {frameIndex}: {velocityChange}");

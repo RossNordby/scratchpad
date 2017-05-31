@@ -24,10 +24,10 @@ namespace SolverPrototypeTests
                 new ContactManifoldConstraintBuilder(),
                 32, 32, 32, out var simulation, out var bodyHandles, out var constraintHandles);
 
-            SimulationSetup.ScrambleBodies(simulation);
-            SimulationSetup.ScrambleConstraints(simulation.Solver);
-            SimulationSetup.ScrambleBodyConstraintLists(simulation);
-            SimulationSetup.AddRemoveChurn(simulation, 100000, bodyHandles, constraintHandles);
+            SimulationScrambling.ScrambleBodies(simulation);
+            SimulationScrambling.ScrambleConstraints(simulation.Solver);
+            SimulationScrambling.ScrambleBodyConstraintLists(simulation);
+            SimulationScrambling.AddRemoveChurn<ContactManifold4Constraint>(simulation, 100000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(8);
