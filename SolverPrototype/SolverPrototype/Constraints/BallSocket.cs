@@ -132,6 +132,20 @@ namespace SolverPrototype.Constraints
             Vector3Wide.Add(ref localPositionB, ref projection.OffsetB, out var localB);
             Vector3Wide.Subtract(ref localB, ref projection.OffsetA, out var error);
             Vector3Wide.Scale(ref error, ref positionErrorToVelocity, out projection.BiasVelocity);
+
+            //NOTE:
+            //It's possible to use local inertia tensors diagonalized to only 3 scalars per body. Given that we load orientations as a part of the prestep and so could reconstruct 
+            //the world inertia tensor, this would save 6 scalar loads. In isolation, that's a likely win. However, there are some other considerations:
+            //1) Some common constraints, notably including the contact constraints, do not load pose. They can either load diagonalized inertia with orientation (7 total scalars per body)
+            //or a symmetric world inertia tensor (6 scalars). Given the relatively high cost of incoherent gathers, the 6 scalar world inertia gather would be used.
+            //2) If constraints are loading from both local and world inertias rather than one or the other, the number of cache misses increases.
+            //3) It requires that the local space of shapes is aligned with the moments of inertia. While this could be done automatically when creating shapes, and while
+            //all primitive shapes are built with diagonal inertia tensors, it is likely that the local 'reorientation' required by diagonalization applied to things like
+            //convex hulls or meshes would be confusing for users. Recentering certainly was in V1.
+            //4) It cannot be used to save space on explicitly stored inertias in constraints, because the warmstart/solve do not load the pose (and, as above, loading orientation and
+            //local inertia is 1 scalar more than just the world inertia).
+            //5) While the local diagonal representation does offer some possibilities for ALU-level optimizations in the prestep, the effective mass matrix will be in world space,
+            //and in general it will not be any smaller than the usual symmetric representation.
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

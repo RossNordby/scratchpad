@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Numerics;
 
 namespace SolverPrototypeTests
@@ -31,9 +32,8 @@ namespace SolverPrototypeTests
                 var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
 
                 //simulation.Timestep(dt);
-                //simulation.Timestep(dt, threadDispatcher);
-                for (int i = 0; i < 1000; ++i)
-                    simulation.PoseIntegrator.Update(dt, threadDispatcher);
+                simulation.Timestep(dt, threadDispatcher);
+
                 samples.RecordFrame(simulation);
 
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
@@ -50,7 +50,7 @@ namespace SolverPrototypeTests
 
                 Console.WriteLine($"Body energy {frameIndex}: {energyAfter}, delta: {energyAfter - energyBefore}");
             }
-
+            
             var multiplier = 1e3 / frameCount;
             Console.WriteLine($"Simulation time (ms):       {multiplier * samples.Simulation.ComputeStats().Total}");
             Console.WriteLine($"Body opt time (ms):         {multiplier * samples.BodyOptimizer.ComputeStats().Total}");

@@ -72,6 +72,9 @@ namespace SolverPrototype
                 ref var inertias = ref Unsafe.Add(ref baseInertias, i);
                 Matrix3x3Wide.CreateFromQuaternion(ref pose.Orientation, out var orientationMatrix);
                 //I^-1 = RT * Ilocal^-1 * R 
+                //NOTE: If you were willing to confuse users a little bit, the local inertia could be required to be diagonal.
+                //This would be totally fine for all the primitive types which happen to have diagonal inertias, but for more complex shapes (convex hulls, meshes), 
+                //there would need to be a reorientation step. That could be confusing, and I'm not sure if it's worth it.
                 Triangular3x3Wide.RotationSandwich(ref orientationMatrix, ref localInertias.InverseInertiaTensor, out inertias.InverseInertiaTensor);
                 //While it's a bit goofy just to copy over the inverse mass every frame even if it doesn't change,
                 //it's virtually always gathered together with the inertia tensor and it really isn't worth a whole extra external system to copy inverse masses only on demand.
@@ -144,6 +147,13 @@ namespace SolverPrototype
             Vector3Wide.CreateFrom(ref scalarGravityDt, out gravityDt);
             if (threadDispatcher != null)
             {
+                //While we do technically support multithreading here, scaling is going to be really, really bad if the simulation gets kicked out of L3 cache in between frames.
+                //The ratio of memory loads to actual compute work in this stage is extremely high, so getting scaling of 1.2x on a quad core is quite possible.
+                //On the upside, it is a very short stage. With any luck, one or more of the following will hold:
+                //1) the system has silly fast RAM,
+                //2) the CPU supports octochannel memory and just brute forces the issue,
+                //3) whatever the application is doing doesn't evict the entire L3 cache between frames.
+
                 cachedDt = dt;
                 const int jobsPerWorker = 4;
                 var targetJobCount = workerCount * jobsPerWorker;
