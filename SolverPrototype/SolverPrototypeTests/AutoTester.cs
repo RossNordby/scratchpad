@@ -132,14 +132,24 @@ namespace SolverPrototypeTests
             var writer = new StreamWriter(memoryStream);
             var initializationThreadPool = new SimpleThreadDispatcher(Environment.ProcessorCount);
 
+
             var bodyBuilder = new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3());
-            var constraintBuilder = new BallSocketConstraintBuilder();
+            var constraintBuilder = new ContactManifoldConstraintBuilder();
+            Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 32, 32, 32, 8, initializationThreadPool, writer);
+            //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 26, 26, 26, 12, initializationThreadPool, writer);
+            //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 20, 20, 20, 20, initializationThreadPool, writer);
+            //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 16, 16, 16, 30, initializationThreadPool, writer);
+            //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 13, 13, 13, 45, initializationThreadPool, writer);
+            //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 10, 10, 10, 70, initializationThreadPool, writer);
+
+            //var bodyBuilder = new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3());
+            //var constraintBuilder = new BallSocketConstraintBuilder();
             //Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 32, 32, 32, 8, initializationThreadPool, writer);
             //Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 26, 26, 26, 12, initializationThreadPool, writer);
             //Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 20, 20, 20, 20, initializationThreadPool, writer);
             //Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 16, 16, 16, 30, initializationThreadPool, writer);
             //Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 13, 13, 13, 45, initializationThreadPool, writer);
-            Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 10, 10, 10, 70, initializationThreadPool, writer);
+            //Subtest<RegularGridWithKinematicBaseBuilder, BallSocketConstraintBuilder, BallSocket>(bodyBuilder, constraintBuilder, 10, 10, 10, 70, initializationThreadPool, writer);
             initializationThreadPool.Dispose();
             writer.Flush();
             var path = "log.txt";

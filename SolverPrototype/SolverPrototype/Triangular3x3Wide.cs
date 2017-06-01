@@ -139,6 +139,7 @@ namespace SolverPrototype
         /// <param name="m">Succulent interior symmetric matrix.</param>
         /// <param name="sandwich">Result of v * m * transpose(v) for a symmetric matrix m.</param>
         /// <remarks>Since I called the other one a skew sandwich, I really don't have a choice in the naming convention anymore.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void VectorSandwich(ref Vector3Wide v, ref Triangular3x3Wide m, out Vector<float> sandwich)
         {
             //This isn't actually fewer flops than the equivalent explicit operation, but it does avoid some struct locals and it's a pretty common operation.

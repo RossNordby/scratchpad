@@ -40,12 +40,13 @@ namespace SolverPrototype
             ref var baseVelocities = ref bodies.Velocities[0];
             ref var baseLocalInertias = ref bodies.LocalInertias[0];
             ref var baseInertias = ref bodies.Inertias[0];
+            var vectorDt = new Vector<float>(dt);
+            var vectorHalfDt = new Vector<float>(dt * 0.5f);
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 //Integrate position with the latest linear velocity. Note that gravity is integrated afterwards.
                 ref var pose = ref Unsafe.Add(ref basePoses, i);
                 ref var velocity = ref Unsafe.Add(ref baseVelocities, i);
-                var vectorDt = new Vector<float>(dt);
                 Vector3Wide.Scale(ref velocity.LinearVelocity, ref vectorDt, out var displacement);
                 Vector3Wide.Add(ref pose.Position, ref displacement, out pose.Position);
 
@@ -53,7 +54,6 @@ namespace SolverPrototype
                 //Note that we don't bother with conservation of angular momentum or the gyroscopic term or anything else- 
                 //it's not exactly correct, but it's stable, fast, and no one really notices. Unless they're trying to spin a multitool in space or something.
                 //(But frankly, that just looks like reality has a bug.)
-                var vectorHalfDt = vectorDt * 0.5f;
                 QuaternionWide multiplier;
                 multiplier.X = vectorHalfDt * velocity.AngularVelocity.X;
                 multiplier.Y = vectorHalfDt * velocity.AngularVelocity.Y;
@@ -93,6 +93,7 @@ namespace SolverPrototype
                 //TODO:
                 //I suspect that splitting the gravity application from this integrator will be the right choice in the end. Bundling it with AABB calculation would free
                 //up the integrator to be placed on either end of execution without worrying about odd velocities being visible in resting objects, and there is basically no downside. 
+                //(Note that the AABB calculation must sample both pose and velocity, so there's no additional bandwidth used.)
                 //You could then provide different update orders. People could use the position-first or position-last variant as desired.
                 //Whatever handles gravity will also probably end up handling drag.
 
@@ -144,7 +145,7 @@ namespace SolverPrototype
             if (threadDispatcher != null)
             {
                 cachedDt = dt;
-                const int jobsPerWorker = 8;
+                const int jobsPerWorker = 4;
                 var targetJobCount = workerCount * jobsPerWorker;
                 var bodyBundleCount = bodies.BodyBundleCount;
                 bundlesPerJob = bodyBundleCount / targetJobCount;

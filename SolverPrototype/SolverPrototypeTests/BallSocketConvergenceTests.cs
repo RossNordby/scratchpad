@@ -24,17 +24,16 @@ namespace SolverPrototypeTests
             simulation.Solver.IterationCount = iterationCount;
 
             simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-                        
+
             var samples = new SimulationTimeSamples(frameCount);
             for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex)
             {
                 var energyBefore = simulation.Bodies.GetBodyEnergyHeuristic();
-                //Update the penetration depths associated with the constraints.
-                //This simulates actual position integration and repeated contact detection, allowing the constraints to properly spring.
 
-
-                simulation.Timestep(dt);
+                //simulation.Timestep(dt);
                 //simulation.Timestep(dt, threadDispatcher);
+                for (int i = 0; i < 1000; ++i)
+                    simulation.PoseIntegrator.Update(dt, threadDispatcher);
                 samples.RecordFrame(simulation);
 
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
@@ -54,8 +53,8 @@ namespace SolverPrototypeTests
 
             var multiplier = 1e3 / frameCount;
             Console.WriteLine($"Simulation time (ms):       {multiplier * samples.Simulation.ComputeStats().Total}");
-            Console.WriteLine($"Constraint opt time (ms):   {multiplier * samples.ConstraintOptimizer.ComputeStats().Total}");
             Console.WriteLine($"Body opt time (ms):         {multiplier * samples.BodyOptimizer.ComputeStats().Total}");
+            Console.WriteLine($"Constraint opt time (ms):   {multiplier * samples.ConstraintOptimizer.ComputeStats().Total}");
             Console.WriteLine($"Batch compress time (ms):   {multiplier * samples.BatchCompressor.ComputeStats().Total}");
             Console.WriteLine($"Pose integrate time (ms):   {multiplier * samples.PoseIntegrator.ComputeStats().Total}");
             Console.WriteLine($"Solve time (ms):            {multiplier * samples.Solver.ComputeStats().Total}");
