@@ -132,6 +132,9 @@ namespace SolverPrototype
 
         public void Update(BufferPool bufferPool, IThreadDispatcher threadDispatcher = null)
         {
+            //TODO: It's possible that the cost associated with setting up multithreading exceeds the cost of the actual optimization for smaller simulations.
+            //You might want to fall back to single threaded based on some empirical testing.
+
             //No point in optimizing if there are no constraints- this is a necessary test since we assume that 0 is a valid batch index later.
             if (solver.Batches.Count == 0)
                 return;

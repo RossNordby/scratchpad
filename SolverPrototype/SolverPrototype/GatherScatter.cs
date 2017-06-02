@@ -110,7 +110,7 @@ namespace SolverPrototype
             {
                 Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset);
             }
-        }
+        } 
 
         /// <summary>
         /// Swaps lanes between two bundles. The bundle type must be a contiguous block of Vector types.

@@ -580,7 +580,7 @@ namespace SolverPrototype
             //The goal here is to have just enough blocks that, in the event that we end up some underpowered threads (due to competition or hyperthreading), 
             //there are enough blocks that workstealing will still generally allow the extra threads to be useful.
             const int targetBlocksPerBatchPerWorker = 16;
-            const int minimumBlockSizeInBundles = 4;
+            const int minimumBlockSizeInBundles = 3;
 
             var targetBlocksPerBatch = workerCount * targetBlocksPerBatchPerWorker;
             BuildWorkBlocks(bufferPool, minimumBlockSizeInBundles, targetBlocksPerBatch);

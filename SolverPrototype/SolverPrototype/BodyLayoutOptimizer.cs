@@ -349,6 +349,9 @@ namespace SolverPrototype
         int workerClaimsBufferSize = 512;
         public void IncrementalOptimize(BufferPool pool, IThreadDispatcher threadPool)
         {
+            //TODO: It's possible that the cost associated with setting up multithreading exceeds the cost of the actual optimization for smaller simulations.
+            //You might want to fall back to single threaded based on some empirical testing.
+
             //Note that, while we COULD aggressively downsize the claims array in response to body count, we'll instead let it stick around unless the bodies allocations change.
             ResizeForBodiesCapacity(pool);
 
