@@ -1,11 +1,11 @@
-﻿using DemosContentLoader;
+﻿using DemoContentLoader;
 using Microsoft.Build.Evaluation;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 
-namespace DemosContentBuilder
+namespace DemoContentBuilder
 {
     static class ProjectBuilder
     {

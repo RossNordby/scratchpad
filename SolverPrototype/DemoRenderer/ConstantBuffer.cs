@@ -3,7 +3,7 @@ using SharpDX;
 using SharpDX.Direct3D11;
 using Buffer = SharpDX.Direct3D11.Buffer;
 
-namespace DemosRenderer
+namespace DemoRenderer
 {
     public class ConstantBuffer<T> : IDisposable where T : struct
     {

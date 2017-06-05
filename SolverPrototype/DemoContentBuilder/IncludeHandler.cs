@@ -5,7 +5,7 @@ using SharpDX;
 using System.Text;
 using SharpDX.D3DCompiler;
 
-namespace DemosContentBuilder
+namespace DemoContentBuilder
 {
     struct MetadataParsingError
     {

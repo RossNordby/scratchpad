@@ -5,7 +5,6 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
     <RuntimeFrameworkVersion>2.0.0-preview2-25319-02</RuntimeFrameworkVersion>
-    <PackagingToolsInsufficientSDKVersion>false</PackagingToolsInsufficientSDKVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -20,7 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj" />
-    <ProjectReference Include="..\DemosRenderer\DemosRenderer.csproj" />
+    <ProjectReference Include="..\DemoRenderer\DemoRenderer.csproj" />
+    <ProjectReference Include="..\DemoUtilities\DemoUtilities.csproj" />
     <ProjectReference Include="..\SolverPrototype\SolverPrototype.csproj" />
   </ItemGroup>
 

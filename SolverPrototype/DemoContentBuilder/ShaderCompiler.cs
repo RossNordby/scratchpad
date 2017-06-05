@@ -9,7 +9,7 @@ using SharpDX.D3DCompiler;
 using SharpDX.Direct3D;
 using System.Threading.Tasks;
 
-namespace DemosContentBuilder
+namespace DemoContentBuilder
 {
     public struct ShaderCompilationResult
     {

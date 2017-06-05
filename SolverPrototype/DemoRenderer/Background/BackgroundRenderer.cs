@@ -1,10 +1,7 @@
-﻿using DemosContentLoader;
+﻿using DemoContentLoader;
 using SharpDX.Direct3D11;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace DemosRenderer.Background
+namespace DemoRenderer.Background
 {
     public class BackgroundRenderer
     {

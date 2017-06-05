@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace DemosContentLoader
+namespace DemoContentLoader
 {
     /// <summary>
     /// A single shader along with any defines it was compiled with.

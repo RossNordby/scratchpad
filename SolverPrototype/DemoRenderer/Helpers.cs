@@ -5,7 +5,7 @@ using SharpDX.Direct3D11;
 using Buffer = SharpDX.Direct3D11.Buffer;
 using System.Runtime.CompilerServices;
 
-namespace DemosRenderer
+namespace DemoRenderer
 {
     public static class Helpers
     {
@@ -75,6 +75,13 @@ namespace DemosRenderer
         public static void CheckForUndisposed(bool disposed, object o)
         {
             Debug.Assert(disposed, "An object of type " + o.GetType() + " was not disposed prior to finalization.");
+        }
+       
+        public static void Dispose<T>(ref T disposable) where T : IDisposable
+        {
+            if (disposable != null)
+                disposable.Dispose();
+            disposable = default(T);
         }
 
     }

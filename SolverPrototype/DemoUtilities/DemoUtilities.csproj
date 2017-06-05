@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp1.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTK.NETCore" Version="1.1.2571.6431" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj" />
+  </ItemGroup>
+
+</Project>

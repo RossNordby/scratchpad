@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace DemosContentBuilder
+namespace DemoContentBuilder
 {
     /// <summary>
     /// Holds already-loaded files in memory to avoid hitting the disk repeatedly.

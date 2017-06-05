@@ -78,7 +78,6 @@
     <Compile Include="MetadataParsing.cs" />
     <Compile Include="ProjectBuilder.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="ShaderCache.cs" />
     <Compile Include="ShaderCompilationCache.cs" />
     <Compile Include="ShaderCompiler.cs" />
     <Compile Include="ShaderFileCache.cs" />
@@ -88,9 +87,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DemosContentLoader\DemosContentLoader.csproj">
+    <ProjectReference Include="..\DemoContentLoader\DemoContentLoader.csproj">
       <Project>{fabd2be3-697b-4b57-85d0-1077a3198c5c}</Project>
-      <Name>DemosContentLoader</Name>
+      <Name>DemoContentLoader</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
