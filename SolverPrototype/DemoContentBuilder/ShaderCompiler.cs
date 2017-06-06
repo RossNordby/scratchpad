@@ -68,12 +68,13 @@ namespace DemoContentBuilder
     /// <summary>
     /// Takes raw shader sources and turns them into bytecode, reporting any errors and warnings encountered.
     /// </summary>
-    /// <remarks>This is pretty super-overkill for the demos, but it's just some old code I pulled out of my graphics engine.
-    /// The error parsing is not entirely robust- some obscure errors will confuse it, and I've never bothered to fix it. But hey if you want to wink wink nudge nudge ;)</remarks>
     public static class ShaderCompiler
     {
         public static bool ParseCompilerResult(string error, out string filePath, out int lineBegin, out int columnBegin, out int lineEnd, out int columnEnd, out string description)
         {
+            //TODO: This error parsing is not particularly robust- quite a few errors will confuse it, 
+            //and I've never bothered to fix it. But hey if you want to wink wink nudge nudge ;)            
+            
             //There are four possible forms for the error to take:
             //(x,y)
             //(x1-x2,y)

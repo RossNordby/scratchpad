@@ -4,7 +4,7 @@ using OpenTK;
 using BEPUutilities2;
 using OpenTK.Graphics;
 
-namespace DemosUtilities
+namespace DemoUtilities
 {
     public enum WindowMode
     {
@@ -17,7 +17,7 @@ namespace DemosUtilities
     /// </summary>
     public class Window : IDisposable
     {
-        NativeWindow window;
+        internal NativeWindow window;
 
         private bool resized;
 

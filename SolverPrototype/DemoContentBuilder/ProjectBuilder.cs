@@ -28,7 +28,7 @@ namespace DemoContentBuilder
             using (var projectCollection = new ProjectCollection())
             {
                 var project = projectCollection.LoadProject(projectPath);
-                workingPath = project.DirectoryPath;
+                workingPath = project.DirectoryPath + Path.DirectorySeparatorChar;
 
                 var contentItems = project.GetItems("Content");
                 shaderPaths = new List<string>();
@@ -90,6 +90,7 @@ namespace DemoContentBuilder
             var targetPaths = new List<string>();
             for (int i = 0; i < args.Length; ++i)
             {
+                Console.WriteLine($"Args[{i}]: {args[i]}");
                 //The argument should be either a compilation flag or a project path.
                 if (args[i][0] == '-')
                 {
