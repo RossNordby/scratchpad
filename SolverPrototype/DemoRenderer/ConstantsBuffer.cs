@@ -2,10 +2,11 @@
 using SharpDX;
 using SharpDX.Direct3D11;
 using Buffer = SharpDX.Direct3D11.Buffer;
+using BEPUutilities2.Memory;
 
 namespace DemoRenderer
 {
-    public class ConstantBuffer<T> : IDisposable where T : struct
+    public class ConstantsBuffer<T> : IDisposable where T : struct
     {
         private Buffer buffer;
         public Buffer Buffer { get { return buffer; } }
@@ -19,22 +20,26 @@ namespace DemoRenderer
 
 
         /// <summary>
-        /// Creates an immutable buffer filled with the given values.
+        /// Creates a constants buffer.
         /// </summary>
         /// <param name="device">Device used to create the buffer.</param>
         /// <param name="debugName">Name to associate with the buffer.</param>
         /// <param name="mappable">If true, the buffer will be mapped with WriteDiscard when updated. If false, UpdateSubresource will be used.</param>
-        public ConstantBuffer(Device device, bool mappable = true, string debugName = "UNNAMED")
+        public ConstantsBuffer(Device device, bool mappable = true, string debugName = "UNNAMED")
         {
             this.mappable = mappable;
 
+            var size = Utilities.SizeOf<T>();
+            var alignedSize = (size >> 4) << 4;
+            if (alignedSize < size)
+                alignedSize += 16;
             buffer = new Buffer(device, new BufferDescription
             {
                 BindFlags = BindFlags.ConstantBuffer,
                 CpuAccessFlags = mappable ? CpuAccessFlags.Write : CpuAccessFlags.None,
                 OptionFlags = ResourceOptionFlags.None,
-                SizeInBytes = Utilities.SizeOf<T>(),
-                StructureByteStride = Utilities.SizeOf<T>(),
+                SizeInBytes = alignedSize,
+                StructureByteStride = alignedSize,
                 Usage = mappable ? ResourceUsage.Dynamic : ResourceUsage.Default
             });
             buffer.DebugName = debugName;
@@ -73,7 +78,7 @@ namespace DemoRenderer
         }
 
 #if DEBUG
-        ~ConstantBuffer()
+        ~ConstantsBuffer()
         {
             Helpers.CheckForUndisposed(disposed, this);
         }

@@ -2,12 +2,7 @@
 vs
 ps
 [META]*/
-
-float2 GetWholeScreenTriangleVertexNDC(uint vertexId)
-{
-	return float2((vertexId << 2) & 4, (vertexId << 1) & 4) - 1;
-} 
-
+#include "WholeScreenTriangle.hlsl"
 cbuffer Constants : register(b0)
 {
 	float4x4 NDCToOffset;

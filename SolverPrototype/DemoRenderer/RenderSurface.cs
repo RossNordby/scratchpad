@@ -19,19 +19,6 @@ namespace DemoRenderer
 
         private SwapChain swapChain;
 
-
-        private bool useVerticalSync;
-        /// <summary>
-        /// Gets or sets whether to wait for vertical sync on this window.
-        /// 
-        /// </summary>
-        public bool UseVerticalSync
-        {
-            get { return useVerticalSync; }
-            set { useVerticalSync = value; }
-        }
-
-
         private Texture2D drawingSurfaceBuffer;
         private RenderTargetView drawingSurfaceRTV;
         /// <summary>
@@ -43,23 +30,23 @@ namespace DemoRenderer
         }
 
         /// <summary>
+        /// Gets the current resolution of the render surface. To change the resolution, use Resize.
+        /// </summary>
+        public Int2 Resolution { get; private set; }
+
+        /// <summary>
         /// Constructs a new swap surface.
         /// </summary> 
         /// <param name="windowHandle">Handle of the window to build a swap chain and drawing surface for.</param>
         /// <param name="resolution">Resolution of the rendering surface.</param>
-        /// <param name="refreshRate">Target refresh rate in frames per second.</param>
-        /// <param name="useVSync">True to enable vertical sync, false otherwise.</param>
         /// <param name="enableDeviceDebugLayer">Whether to use the debug layer for this window's graphics device.</param>
-        public RenderSurface(IntPtr windowHandle, Int2 resolution, bool fullScreen = false, int refreshRate = 60, bool useVSync = true, bool enableDeviceDebugLayer = true)
-        {            
-            UseVerticalSync = useVSync;
-
+        public RenderSurface(IntPtr windowHandle, Int2 resolution, bool fullScreen = false, bool enableDeviceDebugLayer = false)
+        {
             var swapChainDescription = new SwapChainDescription
             {
                 BufferCount = 2,
                 ModeDescription =
-                    new ModeDescription(resolution.X, resolution.Y,
-                                        new Rational(refreshRate, 1), Format.R8G8B8A8_UNorm),
+                    new ModeDescription(resolution.X, resolution.Y, new Rational(), Format.R8G8B8A8_UNorm),
                 IsWindowed = !fullScreen,
                 OutputHandle = windowHandle,
                 SampleDescription = new SampleDescription(1, 0),
@@ -73,6 +60,8 @@ namespace DemoRenderer
 
             Device = device;
             Context = context;
+
+            Resolution = resolution;
 
         }
 
@@ -88,12 +77,13 @@ namespace DemoRenderer
             drawingSurfaceBuffer.DebugName = "Window Backbuffer";
             drawingSurfaceRTV = new RenderTargetView(Device, drawingSurfaceBuffer) { DebugName = "Window Backbuffer RTV" };
 
+            Resolution = resolution;
         }
 
 
         public void Present()
         {
-            swapChain.Present(useVerticalSync ? 1 : 0, PresentFlags.None);
+            swapChain.Present(1, PresentFlags.None);
         }
 
         private bool disposed;

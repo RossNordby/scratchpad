@@ -19,6 +19,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="PostProcessing\CompressToSwap.hlsl" />
+    <Content Include="WholeScreenTriangle.hlsl" />
     <Content Include="Background\RenderBackground.hlsl" />
   </ItemGroup>
 

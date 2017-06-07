@@ -121,12 +121,13 @@ namespace DemoUtilities
             windowUpdateLoopRunning = true;
             while (true)
             {
+                if (disposed)
+                    break;
                 if (tryToClose)
                 {
                     window.Close();
                     break;
                 }
-
                 if (resized)
                 {
                     onResize(new Int2(window.Width, window.Height));
@@ -149,7 +150,6 @@ namespace DemoUtilities
             if (!disposed)
             {
                 window.Dispose();
-
                 disposed = true;
             }
         }
