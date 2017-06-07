@@ -30,7 +30,7 @@ namespace SolverPrototypeTests
             surface = new RenderSurface(window.Handle, window.Resolution, enableDeviceDebugLayer: useDebugLayer);
 
             renderer = new Renderer(surface);
-            Camera = new Camera(window.Resolution.X / window.Resolution.Y, (float)Math.PI / 2);
+            Camera = new Camera(window.Resolution.X / window.Resolution.Y, (float)Math.PI / 2, 0.01f, 100000);
         }
 
         void Update(float dt)
@@ -39,6 +39,7 @@ namespace SolverPrototypeTests
             OnUpdate(dt);
             renderer.Render(Camera);
             surface.Present();
+            Input.Flush();
         }
 
         public void Run(Action<float> onUpdate)

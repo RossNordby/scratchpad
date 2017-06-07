@@ -13,7 +13,9 @@ namespace DemoRenderer.Background
         public BackgroundRenderer(Device device, ShaderCache cache)
         {
             vertexShader = new VertexShader(device, cache.GetShader(@"Background\RenderBackground.hlsl.vshader"));
+            vertexShader.DebugName = "BackgroundVS";
             pixelShader = new PixelShader(device, cache.GetShader(@"Background\RenderBackground.hlsl.pshader"));
+            pixelShader.DebugName = "BackgroundPS";
             constants = new ConstantsBuffer<Matrix4x4>(device, debugName: "BackgroundRenderer Constants");
         }
 

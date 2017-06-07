@@ -45,7 +45,9 @@ namespace DemoRenderer
 
             OnResize();
             var rasterizerStateDescription = RasterizerStateDescription.Default();
+            rasterizerStateDescription.IsFrontCounterClockwise = true;
             rasterizerState = new RasterizerState(Surface.Device, rasterizerStateDescription);
+            rasterizerState.DebugName = "Default Rasterizer State";
 
             var depthStencilDescription = new DepthStencilStateDescription
             {
@@ -127,6 +129,7 @@ namespace DemoRenderer
                 OnResize();
             }
             var context = Surface.Context;
+            context.Rasterizer.SetViewport(0, 0, Surface.Resolution.X, Surface.Resolution.Y, 0.0f, 1.0f);
 
             //Note reversed depth.
             context.ClearDepthStencilView(dsv, DepthStencilClearFlags.Depth, 0, 0);

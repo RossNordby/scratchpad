@@ -62,12 +62,12 @@ namespace DemoRenderer
         /// <summary>
         /// Gets or sets the near plane of the camera.
         /// </summary>
-        public float NearPlane { get; set; }
+        public float NearClip { get; set; }
 
         /// <summary>
         /// Gets or sets the far plane of the camera.
         /// </summary>
-        public float FarPlane { get; set; }
+        public float FarClip { get; set; }
 
         //All of this could be quite a bit faster, but wasting a few thousand cycles per frame isn't exactly a concern.
 
@@ -181,7 +181,30 @@ namespace DemoRenderer
             get
             {
                 //Note the flipped near/far! Reversed depth. Better precision distribution. Unlikely that we'll take advantage of it in the demos, but hey, it's free real estate.
-                return Matrix4x4.CreatePerspectiveFieldOfView(FieldOfView, AspectRatio, FarPlane, NearPlane);
+                //The Matrix4x4 built in perspective function throws an argument exception for flipped near/far, unfortunately.
+                float h = 1f / ((float)Math.Tan(FieldOfView * 0.5f));
+                float w = h / AspectRatio;
+                Matrix4x4 perspective;
+                perspective.M11 = w;
+                perspective.M12 = 0;
+                perspective.M13 = 0;
+                perspective.M14 = 0;
+
+                perspective.M21 = 0;
+                perspective.M22 = h;
+                perspective.M23 = 0;
+                perspective.M24 = 0;
+
+                perspective.M31 = 0;
+                perspective.M32 = 0;
+                perspective.M33 = NearClip / (FarClip - NearClip);
+                perspective.M34 = -1;
+
+                perspective.M41 = 0;
+                perspective.M42 = 0;
+                perspective.M44 = 0;
+                perspective.M43 = FarClip * perspective.M33;
+                return perspective;
             }
         }
 
@@ -197,11 +220,13 @@ namespace DemoRenderer
         }
 
 
-        public Camera(float aspectRatio, float fieldOfView, float maximumPitch = (float)(Math.PI / 2))
+        public Camera(float aspectRatio, float fieldOfView, float nearClip, float farClip, float maximumPitch = (float)(Math.PI / 2))
         {
             AspectRatio = aspectRatio;
             FieldOfView = fieldOfView;
             MaximumPitch = maximumPitch;
+            NearClip = nearClip;
+            FarClip = farClip;
         }
 
 

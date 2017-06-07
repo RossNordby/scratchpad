@@ -1,10 +1,7 @@
 ﻿using DemoRenderer;
 using DemoUtilities;
 using OpenTK.Input;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
-using System.Text;
 
 namespace SolverPrototypeTests
 {
@@ -19,6 +16,9 @@ namespace SolverPrototypeTests
         public float MouseSensitivity;
         public float CameraMoveSpeed;
 
+        public Key LockMouse;
+        public Key Exit;
+
         public static Controls Default
         {
             get
@@ -32,7 +32,10 @@ namespace SolverPrototypeTests
                     MoveDown = Key.ControlLeft,
                     MoveUp = Key.ShiftLeft,
                     MouseSensitivity = 1e-2f,
-                    CameraMoveSpeed = 5
+                    CameraMoveSpeed = 5,
+
+                    LockMouse = Key.Tab,
+                    Exit = Key.Escape
                 };
             }
 
@@ -41,13 +44,15 @@ namespace SolverPrototypeTests
 
     public class BasicDemo
     {
+        Window window;
         Input input;
         Camera camera;
         Controls controls;
-        
 
-        public BasicDemo(Input input, Camera camera, Controls? controls = null)
+
+        public BasicDemo(Window window, Input input, Camera camera, Controls? controls = null)
         {
+            this.window = window;
             this.input = input;
             this.camera = camera;
             if (controls == null)
@@ -56,6 +61,11 @@ namespace SolverPrototypeTests
 
         public void Update(float dt)
         {
+            if(input.WasPushed(controls.Exit))
+            {
+                window.Close();
+                return;
+            }
             var cameraOffset = new Vector3();
             if (input.IsDown(controls.MoveForward))
                 cameraOffset += camera.Forward;
@@ -77,9 +87,14 @@ namespace SolverPrototypeTests
             camera.Position += cameraOffset;
 
             camera.Yaw += input.MouseDelta.X * controls.MouseSensitivity;
-            camera.Yaw += input.MouseDelta.Y * controls.MouseSensitivity;
+            camera.Pitch += input.MouseDelta.Y * controls.MouseSensitivity;
 
+            if (input.WasPushed(controls.LockMouse))
+            {
+                input.MouseLocked = !input.MouseLocked;
+            }
 
+            
 
         }
     }

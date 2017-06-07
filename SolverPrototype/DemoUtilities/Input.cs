@@ -31,6 +31,11 @@ namespace DemoUtilities
                 {
                     previousMousePosition = WindowCenter;
                     MousePosition = previousMousePosition;
+                    window.CursorVisible = false;
+                }
+                else if (mouseLocked && !value)
+                {
+                    window.CursorVisible = true;
                 }
                 mouseLocked = value;
             }

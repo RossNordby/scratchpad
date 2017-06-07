@@ -19,9 +19,7 @@ namespace DemoRenderer.PostProcessing
         ConstantsBuffer<float> constants; //alas, lack of root constants
         VertexShader vertexShader;
         PixelShader pixelShader;
-
-        SamplerState sampler;
-
+        
 
         //At the moment, this is the only form of post processing in the pipeline. We'll isolate the state changes needed in here rather than outside.
         DepthStencilState depthState;
@@ -31,14 +29,13 @@ namespace DemoRenderer.PostProcessing
             Gamma = gamma;
             constants = new ConstantsBuffer<float>(device, debugName: "CompressToSwap Constants");
             vertexShader = new VertexShader(device, cache.GetShader(@"PostProcessing\CompressToSwap.hlsl.vshader"));
+            vertexShader.DebugName = "CompressToSwapVS";
             pixelShader = new PixelShader(device, cache.GetShader(@"PostProcessing\CompressToSwap.hlsl.pshader"));
+            pixelShader.DebugName = "CompressToSwapPS";
             var depthStateDescription = DepthStencilStateDescription.Default();
             depthStateDescription.DepthWriteMask = DepthWriteMask.Zero;
             depthStateDescription.IsDepthEnabled = false;
             depthState = new DepthStencilState(device, depthStateDescription);
-            var samplerDescription = SamplerStateDescription.Default();
-            samplerDescription.Filter = Filter.MinMagMipPoint;
-            sampler = new SamplerState(device, samplerDescription);
         }
 
 
@@ -54,6 +51,7 @@ namespace DemoRenderer.PostProcessing
             context.PixelShader.SetConstantBuffer(0, constants.Buffer);
             context.PixelShader.SetShaderResource(0, source);
             context.Draw(3, 0);
+            context.PixelShader.SetShaderResource(0, null); //Unhook the SRV to allow the underlying resource to be used as an RTV next time around.
         }
 
         bool disposed;
@@ -62,7 +60,6 @@ namespace DemoRenderer.PostProcessing
             if (!disposed)
             {
                 disposed = true;
-                sampler.Dispose();
                 constants.Dispose();
                 vertexShader.Dispose();
                 pixelShader.Dispose();

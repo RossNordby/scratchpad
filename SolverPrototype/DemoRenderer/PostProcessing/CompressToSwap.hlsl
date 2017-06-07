@@ -8,27 +8,22 @@ cbuffer Constants : register(b0)
 	float InverseGamma;
 };
 
-SamplerState ColorSampler : register(s0);
 Texture2D<float3> Color : register(t0);
 
 struct PSInput
 {
 	float4 Position : SV_Position;
-	float2 TextureCoordinates : TEXCOORD;
 };
 
 PSInput VSMain(uint vertexId : SV_VertexId)
 {
 	PSInput output;
-	float2 ndc = GetWholeScreenTriangleVertexNDC(vertexId);
-	output.Position = float4(ndc, 0.5, 1);
-	output.TextureCoordinates = ndc * 0.5 + 0.5;
+	output.Position = float4(GetWholeScreenTriangleVertexNDC(vertexId), 0.5, 1);
 	return output;
 }
 
-float3 PSMain(PSInput input) : SV_Target0
+float4 PSMain(PSInput input) : SV_Target0
 {
-
 	const float ditherWidth = 1.0 / 255.0;
 	//Compute dither amount from screen position. There are more principled ways of doing this, but shrug.
 	float dither = input.Position.x * input.Position.x + input.Position.y;
@@ -41,5 +36,5 @@ float3 PSMain(PSInput input) : SV_Target0
 	float3 adjustedColor = pow(saturate(Color[input.Position.xy]), InverseGamma);
 
 	adjustedColor = saturate(adjustedColor + ditherWidth * (dither - 0.5));
-	return adjustedColor;
+	return float4(adjustedColor, 1);
 }

@@ -16,7 +16,7 @@ namespace SolverPrototypeTests
             Console.ReadKey();
             var window = new Window("pretty cool red window", new Int2(512, 512), WindowMode.Windowed);
             var loop = new GameLoop(window);
-            var demo = new BasicDemo(loop.Input, loop.Camera);
+            var demo = new BasicDemo(window, loop.Input, loop.Camera);
             loop.Run(demo.Update);
             loop.Dispose();
             window.Dispose();
