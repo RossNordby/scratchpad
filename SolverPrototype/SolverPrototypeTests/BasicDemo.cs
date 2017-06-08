@@ -1,7 +1,10 @@
-﻿using DemoRenderer;
+﻿using BEPUutilities2;
+using DemoRenderer;
 using DemoUtilities;
 using OpenTK.Input;
+using System;
 using System.Numerics;
+using System.Threading;
 
 namespace SolverPrototypeTests
 {
@@ -31,7 +34,7 @@ namespace SolverPrototypeTests
                     MoveRight = Key.D,
                     MoveDown = Key.ControlLeft,
                     MoveUp = Key.ShiftLeft,
-                    MouseSensitivity = 1e-2f,
+                    MouseSensitivity = 3e-3f,
                     CameraMoveSpeed = 5,
 
                     LockMouse = Key.Tab,
@@ -61,40 +64,54 @@ namespace SolverPrototypeTests
 
         public void Update(float dt)
         {
-            if(input.WasPushed(controls.Exit))
+            //Don't bother responding to input if the window isn't focused.
+            if (window.Focused)
             {
-                window.Close();
-                return;
+                if (input.WasPushed(controls.Exit))
+                {
+                    window.Close();
+                    return;
+                }
+
+                var cameraOffset = new Vector3();
+                if (input.IsDown(controls.MoveForward))
+                    cameraOffset += camera.Forward;
+                if (input.IsDown(controls.MoveBackward))
+                    cameraOffset += camera.Backward;
+                if (input.IsDown(controls.MoveLeft))
+                    cameraOffset += camera.Left;
+                if (input.IsDown(controls.MoveRight))
+                    cameraOffset += camera.Right;
+                if (input.IsDown(controls.MoveUp))
+                    cameraOffset += camera.Up;
+                if (input.IsDown(controls.MoveDown))
+                    cameraOffset += camera.Down;
+                var length = cameraOffset.Length();
+                if (length > 1e-7f)
+                    cameraOffset *= dt * controls.CameraMoveSpeed / length;
+                else
+                    cameraOffset = new Vector3();
+                camera.Position += cameraOffset;
+                if (input.MouseLocked)
+                {
+                    var delta = input.MouseDelta;
+                    if (delta.X != 0 || delta.Y != 0)
+                    {
+                        camera.Yaw += delta.X * controls.MouseSensitivity;
+                        camera.Pitch += delta.Y * controls.MouseSensitivity;
+                    }
+                }
+                if (input.WasPushed(controls.LockMouse))
+                {
+                    input.MouseLocked = !input.MouseLocked;
+                }
             }
-            var cameraOffset = new Vector3();
-            if (input.IsDown(controls.MoveForward))
-                cameraOffset += camera.Forward;
-            if (input.IsDown(controls.MoveBackward))
-                cameraOffset += camera.Backward;
-            if (input.IsDown(controls.MoveLeft))
-                cameraOffset += camera.Left;
-            if (input.IsDown(controls.MoveRight))
-                cameraOffset += camera.Right;
-            if (input.IsDown(controls.MoveUp))
-                cameraOffset += camera.Up;
-            if (input.IsDown(controls.MoveDown))
-                cameraOffset += camera.Down;
-            var length = cameraOffset.Length();
-            if (length > 1e-7f)
-                cameraOffset *= dt * controls.CameraMoveSpeed / length;
             else
-                cameraOffset = new Vector3();
-            camera.Position += cameraOffset;
-
-            camera.Yaw += input.MouseDelta.X * controls.MouseSensitivity;
-            camera.Pitch += input.MouseDelta.Y * controls.MouseSensitivity;
-
-            if (input.WasPushed(controls.LockMouse))
             {
-                input.MouseLocked = !input.MouseLocked;
+                input.MouseLocked = false;
             }
 
-            
+
 
         }
     }

@@ -75,6 +75,11 @@ namespace DemoUtilities
 
         public IntPtr Handle { get { return window.WindowInfo.Handle; } }
 
+        /// <summary>
+        /// Gets whether the window is currently focused.
+        /// </summary>
+        public bool Focused { get { return window.Focused; } }
+
 
         /// <summary>
         /// Constructs a new rendering-capable window.

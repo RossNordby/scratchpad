@@ -31,12 +31,12 @@ namespace DemoRenderer
         }
         float pitch;
         /// <summary>
-        /// Gets or sets the pitch of the camera, clamped to a value from -MaximumPitch to MaximumPitch. Higher values result in a camera forward direction with a higher y component.
+        /// Gets or sets the pitch of the camera, clamped to a value from -MaximumPitch to MaximumPitch. Higher values look downward, lower values look upward.
         /// </summary>
         public float Pitch
         {
             get { return pitch; }
-            set { pitch = Math.Clamp(-value, -maximumPitch, maximumPitch); }
+            set { pitch = Math.Clamp(value, -maximumPitch, maximumPitch); }
         }
 
         float maximumPitch;

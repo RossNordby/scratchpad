@@ -30,16 +30,17 @@ namespace SolverPrototypeTests
             surface = new RenderSurface(window.Handle, window.Resolution, enableDeviceDebugLayer: useDebugLayer);
 
             renderer = new Renderer(surface);
-            Camera = new Camera(window.Resolution.X / window.Resolution.Y, (float)Math.PI / 2, 0.01f, 100000);
+            Camera = new Camera(window.Resolution.X / (float)window.Resolution.Y, (float)Math.PI / 2, 0.01f, 100000);
         }
 
         void Update(float dt)
         {
+            Input.Start();
             //We'll let the delgate's logic handle the variable time steps.
             OnUpdate(dt);
             renderer.Render(Camera);
             surface.Present();
-            Input.Flush();
+            Input.End();
         }
 
         public void Run(Action<float> onUpdate)
@@ -52,6 +53,7 @@ namespace SolverPrototypeTests
         {
             //We just don't support true fullscreen in the demos. Would be pretty pointless.
             renderer.Surface.Resize(resolution, false);
+            Camera.AspectRatio = resolution.X / (float)resolution.Y;
         }
 
         bool disposed;
