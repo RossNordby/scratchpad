@@ -11,7 +11,7 @@ cbuffer Constants : register(b0)
 struct PSInput
 {
 	float4 Position : SV_Position;
-	float3 Offset : Offfset;
+	float3 Offset : Offset;
 };
 
 PSInput VSMain(uint vertexId : SV_VertexId)

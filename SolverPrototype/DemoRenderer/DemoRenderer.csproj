@@ -19,6 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Font\RenderGlyphs.hlsl" />
     <Content Include="PostProcessing\CompressToSwap.hlsl" />
     <Content Include="WholeScreenTriangle.hlsl" />
     <Content Include="Background\RenderBackground.hlsl" />
