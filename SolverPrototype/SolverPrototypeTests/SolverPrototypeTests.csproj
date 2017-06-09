@@ -18,6 +18,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Content\GenericMonoII-Regular.otf" />
+    <None Remove="Content\linear-by-braydon-fuller.otf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Content\GenericMonoII-Regular.otf" />
+    <Content Include="Content\linear-by-braydon-fuller.otf" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj" />
     <ProjectReference Include="..\DemoRenderer\DemoRenderer.csproj" />
     <ProjectReference Include="..\DemoUtilities\DemoUtilities.csproj" />

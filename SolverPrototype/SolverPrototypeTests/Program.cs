@@ -22,7 +22,7 @@ namespace SolverPrototypeTests
             {
                 content = ContentArchive.Load(stream);
             }
-            var fontContent = content.Load<FontContent>(@"Fonts\linear-by-braydon-fuller.otf");
+            var fontContent = content.Load<FontContent>(@"Content\linear-by-braydon-fuller.otf");
             var font = new Font(loop.Surface.Device, loop.Surface.Context, fontContent);
             var demo = new BasicDemo(window, loop.Input, loop.Camera, font);
             loop.Run(demo.Update, demo.Render);
