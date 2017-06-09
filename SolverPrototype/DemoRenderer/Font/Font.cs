@@ -35,7 +35,7 @@ namespace DemoRenderer.Font
         public unsafe Font(Device device, DeviceContext context, FontContent font)
         {
             this.Content = font;
-            Sources = new StructuredBuffer<GlyphSource>(device, font.GlyphCount, font.Name + " Glyph Sources");
+            Sources = new StructuredBuffer<GlyphSource>(device, font.Characters.Count, font.Name + " Glyph Sources");
             Atlas = new Texture2D(device, new Texture2DDescription
             {
                 ArraySize = 1,

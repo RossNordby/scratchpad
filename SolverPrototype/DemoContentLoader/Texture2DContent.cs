@@ -16,7 +16,7 @@ namespace DemoContentLoader
         }
 
         GCHandle handle;
-        byte[] Data;
+        public byte[] Data { get; private set; }
 
         public Texture2DContent(int width, int height, int mipLevels, int texelSizeInBytes)
         {
@@ -31,7 +31,7 @@ namespace DemoContentLoader
             }
             Data = new byte[dataSize];
         }
-
+        
         public int GetMipStartByteIndex(int mipLevel)
         {
             int start = 0;

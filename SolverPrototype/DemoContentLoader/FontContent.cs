@@ -5,7 +5,6 @@ using System.Numerics;
 
 namespace DemoContentLoader
 {
-
     public struct CharacterData
     {
         /// <summary>
@@ -64,10 +63,10 @@ namespace DemoContentLoader
 
         public ContentType ContentType {  get { return ContentType.Font; } }
         
-        Dictionary<CharacterPair, int> kerning;
+        internal Dictionary<CharacterPair, float> kerning;
 
-        public FontContent(int glyphCount, Texture2DContent atlas, string name, float inverseSizeInTexels,
-            Dictionary<char, CharacterData> characterData, Dictionary<CharacterPair, int> kerningTable)
+        public FontContent(Texture2DContent atlas, string name, float inverseSizeInTexels,
+            Dictionary<char, CharacterData> characterData, Dictionary<CharacterPair, float> kerningTable)
         {
             GlyphCount = GlyphCount;
             Atlas = atlas;
@@ -77,7 +76,7 @@ namespace DemoContentLoader
             kerning = kerningTable;
         }
         
-        public int GetKerningInTexels(char a, char b)
+        public float GetKerningInTexels(char a, char b)
         {
             if (kerning.TryGetValue(new CharacterPair(a, b), out var pairKerning))
             {
