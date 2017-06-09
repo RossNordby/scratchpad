@@ -2,6 +2,7 @@
 using DemoContentLoader;
 using DemoRenderer;
 using DemoRenderer.Background;
+using DemoRenderer.Font;
 using DemoUtilities;
 using OpenTK.Input;
 using System;
@@ -14,10 +15,17 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             Console.ReadKey();
-            var window = new Window("pretty cool red window", new Int2(512, 512), WindowMode.Windowed);
+            var window = new Window("pretty cool multicolored window", new Int2(512, 512), WindowMode.Windowed);
             var loop = new GameLoop(window);
-            var demo = new BasicDemo(window, loop.Input, loop.Camera);
-            loop.Run(demo.Update);
+            ContentArchive content;
+            using (var stream = File.OpenRead("DemoContent.ca"))
+            {
+                content = ContentArchive.Load(stream);
+            }
+            var fontContent = content.Load<FontContent>(@"Fonts\linear-by-braydon-fuller.otf");
+            var font = new Font(loop.Surface.Device, loop.Surface.Context, fontContent);
+            var demo = new BasicDemo(window, loop.Input, loop.Camera, font);
+            loop.Run(demo.Update, demo.Render);
             loop.Dispose();
             window.Dispose();
 

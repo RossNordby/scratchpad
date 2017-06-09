@@ -1,5 +1,6 @@
 ﻿using DemoContentLoader;
 using DemoRenderer.Background;
+using DemoRenderer.Font;
 using DemoRenderer.PostProcessing;
 using DemoRenderer.Properties;
 using SharpDX.Direct3D11;
@@ -16,7 +17,10 @@ namespace DemoRenderer
         public RenderSurface Surface { get; private set; }
         public ShaderCache ShaderCache { get; private set; }
         public BackgroundRenderer Background { get; private set; }
+        public GlyphRenderer GlyphRenderer { get; private set; }
         public CompressToSwap CompressToSwap { get; private set; }
+
+        public TextBatcher TextBatcher { get; private set; }
 
         Texture2D depthBuffer;
         DepthStencilView dsv;
@@ -30,6 +34,8 @@ namespace DemoRenderer
         RasterizerState rasterizerState;
         DepthStencilState opaqueDepthState;
         BlendState opaqueBlendState;
+        DepthStencilState uiDepthState;
+        BlendState uiBlendState;
 
 
         public Renderer(RenderSurface surface)
@@ -49,7 +55,7 @@ namespace DemoRenderer
             rasterizerState = new RasterizerState(Surface.Device, rasterizerStateDescription);
             rasterizerState.DebugName = "Default Rasterizer State";
 
-            var depthStencilDescription = new DepthStencilStateDescription
+            var opaqueDepthStencilDescription = new DepthStencilStateDescription
             {
                 IsDepthEnabled = true,
                 DepthWriteMask = DepthWriteMask.All,
@@ -58,12 +64,37 @@ namespace DemoRenderer
                 IsStencilEnabled = false
             };
 
-            opaqueDepthState = new DepthStencilState(Surface.Device, depthStencilDescription);
+            opaqueDepthState = new DepthStencilState(Surface.Device, opaqueDepthStencilDescription);
             opaqueDepthState.DebugName = "Opaque Depth State";
 
-            var blendStateDescription = BlendStateDescription.Default();
-            opaqueBlendState = new BlendState(Surface.Device, blendStateDescription);
+            var opaqueBlendStateDescription = BlendStateDescription.Default();
+            opaqueBlendState = new BlendState(Surface.Device, opaqueBlendStateDescription);
             opaqueBlendState.DebugName = "Opaque Blend State";
+
+            var uiDepthStateDescription = new DepthStencilStateDescription
+            {
+                IsDepthEnabled = false,
+                DepthWriteMask = DepthWriteMask.Zero,
+                //Note depth reversal.
+                DepthComparison = Comparison.Greater,
+                IsStencilEnabled = false
+            };
+
+            uiDepthState = new DepthStencilState(Surface.Device, uiDepthStateDescription);
+            uiDepthState.DebugName = "UI Depth State";
+
+            //The UI will use premultiplied alpha.
+            var uiBlendStateDescription = BlendStateDescription.Default();
+            uiBlendStateDescription.RenderTarget[0].IsBlendEnabled = true;
+            uiBlendStateDescription.RenderTarget[0].SourceBlend = BlendOption.One;
+            uiBlendStateDescription.RenderTarget[0].SourceAlphaBlend = BlendOption.One;
+            uiBlendStateDescription.RenderTarget[0].DestinationBlend = BlendOption.InverseSourceAlpha;
+            uiBlendStateDescription.RenderTarget[0].DestinationAlphaBlend = BlendOption.InverseSourceAlpha;
+            uiBlendStateDescription.RenderTarget[0].BlendOperation = BlendOperation.Add;
+            uiBlendStateDescription.RenderTarget[0].AlphaBlendOperation = BlendOperation.Add;
+            uiBlendStateDescription.RenderTarget[0].RenderTargetWriteMask = ColorWriteMaskFlags.All;
+            uiBlendState = new BlendState(Surface.Device, uiBlendStateDescription);
+            uiBlendState.DebugName = "UI Blend State";
         }
 
         void OnResize()
@@ -143,6 +174,12 @@ namespace DemoRenderer
             var viewProjection = camera.ViewProjection;
             Background.Render(context, ref viewProjection);
 
+            //Glyph and screenspace line drawing rely on the same premultiplied alpha blending transparency. We'll handle their state out here.
+            context.OutputMerger.SetBlendState(uiBlendState);
+            context.OutputMerger.SetDepthStencilState(uiDepthState);
+            GlyphRenderer.PreparePipeline(context);
+            TextBatcher.Flush(context, Surface.Resolution, GlyphRenderer);
+
             //Note that, for now, the compress to swap handles its own depth state since it's the only post processing stage.
             context.OutputMerger.SetBlendState(opaqueBlendState);
             context.Rasterizer.State = rasterizerState;
@@ -165,6 +202,8 @@ namespace DemoRenderer
                 rasterizerState.Dispose();
                 opaqueDepthState.Dispose();
                 opaqueBlendState.Dispose();
+                uiDepthState.Dispose();
+                uiBlendState.Dispose();
             }
         }
 

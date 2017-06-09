@@ -2,10 +2,20 @@
 using SharpDX;
 using SharpDX.Direct3D11;
 using System;
+using System.Collections.Generic;
+using System.Numerics;
 using System.Text;
 
 namespace DemoRenderer.Font
 {
+    /// <summary>
+    /// Location of a glyph in the atlas.
+    /// </summary>
+    public struct GlyphSource
+    {
+        public Vector2 Minimum;
+        public Vector2 Span;
+    }
     /// <summary>
     /// Runtime type containing GPU-related information necessary to render a specific font type.
     /// </summary>
@@ -16,6 +26,11 @@ namespace DemoRenderer.Font
         public ShaderResourceView AtlasSRV { get; private set; }
 
         public FontContent Content { get; private set; }
+
+        //Technically you could establish the char-source relationship within the font content itself, and that would eliminate one dictionary lookup.
+        //However, source ids don't really exist outside of the runtime type, and establishing a consistent order for them would require a little more complexity.
+        //Just doing it here is a little simpler. You can change this up if glyph setup is somehow ever a performance concern.
+        Dictionary<char, int> sourceIds;
 
         public unsafe Font(Device device, DeviceContext context, FontContent font)
         {
@@ -46,48 +61,26 @@ namespace DemoRenderer.Font
             }
             font.Atlas.Unpin();
 
-            Sources.Update(context, font.GlyphSources);
-        }
-
-        public float MeasureTextLength(float height, StringBuilder characters)
-        {
-            return MeasureTextLength(height, characters, 0, characters.Length);
-        }
-
-        public float MeasureTextLength(float height, StringBuilder characters, int characterCount)
-        {
-            return MeasureTextLength(height, characters, 0, characterCount);
-        }
-
-        public float MeasureTextLength(float height, StringBuilder characters, int start, int characterCount)
-        {
-            //Compute the number of pixels per world space unit to convert pixel dimensions into world half-dimensions.
-            int length = 0;
-            var lastCharacter = characterCount - 1;
-            for (int characterIndex = start; characterIndex < lastCharacter; ++characterIndex)
+            sourceIds = new Dictionary<char, int>();
+            int nextSourceId = 0;
+            var sourcesData = new GlyphSource[font.Characters.Count];
+            foreach (var character in font.Characters)
             {
-                length += MeasureAdvance(characters[characterIndex], characters[characterIndex + 1]);
+                sourceIds.Add(character.Key, nextSourceId);
+                sourcesData[nextSourceId] = new GlyphSource { Minimum = character.Value.SourceMinimum, Span = character.Value.SourceSpan };
+                ++nextSourceId;
             }
-            length += MeasureAdvance(characters[lastCharacter]);
-            return length * (height * Content.InverseSizeInTexels);
+            Sources.Update(context, sourcesData);
         }
 
-        /// <summary>
-        /// Measures the distance from the beginning of the current character to the beginning of the next character in source texels.
-        /// </summary>
-        public int MeasureAdvance(char current, char next)
+        public int GetSourceId(char character)
         {
-            //Move to the next character's starting point.
-            return Content.GetAdvanceInTexels(current) + Content.GetKerningInTexels(current, next);
+            if (sourceIds.TryGetValue(character, out var sourceId))
+            {
+                return sourceId;
+            }
+            return -1;
         }
-        /// <summary>
-        /// Measures the distance from the beginning of the current character to the end of it.
-        /// </summary>
-        public int MeasureAdvance(char current)
-        {
-            return Content.GetAdvanceInTexels(current);
-        }
-
 
         bool disposed;
         public void Dispose()
@@ -99,7 +92,13 @@ namespace DemoRenderer.Font
                 Atlas.Dispose();
                 AtlasSRV.Dispose();
             }
-
         }
+
+#if DEBUG
+        ~Font()
+        {
+            Helpers.CheckForUndisposed(disposed, this);
+        }
+#endif
     }
 }

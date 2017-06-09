@@ -1,9 +1,12 @@
 ﻿using BEPUutilities2;
+using DemoContentLoader;
 using DemoRenderer;
+using DemoRenderer.Font;
 using DemoUtilities;
 using OpenTK.Input;
 using System;
 using System.Numerics;
+using System.Text;
 using System.Threading;
 
 namespace SolverPrototypeTests
@@ -21,6 +24,7 @@ namespace SolverPrototypeTests
 
         public Key LockMouse;
         public Key Exit;
+        public Key ShowControls;
 
         public static Controls Default
         {
@@ -38,7 +42,8 @@ namespace SolverPrototypeTests
                     CameraMoveSpeed = 5,
 
                     LockMouse = Key.Tab,
-                    Exit = Key.Escape
+                    Exit = Key.Escape,
+                    ShowControls = Key.F1
                 };
             }
 
@@ -51,15 +56,18 @@ namespace SolverPrototypeTests
         Input input;
         Camera camera;
         Controls controls;
+        Font font;
 
+        bool showControls;
 
-        public BasicDemo(Window window, Input input, Camera camera, Controls? controls = null)
+        public BasicDemo(Window window, Input input, Camera camera, Font font, Controls? controls = null)
         {
             this.window = window;
             this.input = input;
             this.camera = camera;
             if (controls == null)
                 this.controls = Controls.Default;
+            this.font = font;
         }
 
         public void Update(float dt)
@@ -105,14 +113,81 @@ namespace SolverPrototypeTests
                 {
                     input.MouseLocked = !input.MouseLocked;
                 }
+
+                if (input.WasPushed(controls.ShowControls))
+                {
+                    showControls = !showControls;
+                }
             }
             else
             {
                 input.MouseLocked = false;
             }
+        }
 
+        StringBuilder uiText = new StringBuilder();
+        public void Render(Renderer renderer)
+        {
+            uiText.Clear();
+            float textHeight = 14;
+            float lineSpacing = textHeight * 1.5f;
+            var textColor = new Vector3(1, 1, 1);
+            var controlsStart = new Vector2(window.Resolution.X - 200, window.Resolution.Y - 100);
+            //Conveniently, enum strings are cached. Every (Key).ToString() returns the same reference for the same key, so no garbage worries.
+            if (showControls)
+            {
+                var controlNamePosition = controlsStart;
+                controlNamePosition.Y -= 12 * lineSpacing;
+                uiText.Append("Controls: ");
+                renderer.TextBatcher.Write(uiText, controlNamePosition, textHeight, textColor, font);
+                controlNamePosition.Y += lineSpacing;
 
+                var controlPosition = controlNamePosition;
+                controlPosition.X += 80;
 
+                void WriteName(string controlName)
+                {
+                    uiText.Length = 0;
+                    uiText.Append(controlName);
+                    uiText.Append(":");
+                    renderer.TextBatcher.Write(uiText, controlNamePosition, textHeight, textColor, font);
+                    controlNamePosition.Y += lineSpacing;
+                }
+
+                WriteName(nameof(controls.MoveForward));
+                WriteName(nameof(controls.MoveBackward));
+                WriteName(nameof(controls.MoveLeft));
+                WriteName(nameof(controls.MoveRight));
+                WriteName(nameof(controls.MoveUp));
+                WriteName(nameof(controls.MoveDown));
+                WriteName(nameof(controls.LockMouse));
+                WriteName(nameof(controls.Exit));
+                WriteName(nameof(controls.ShowControls));
+
+                void WriteControl(string control)
+                {
+                    uiText.Length = 0;
+                    uiText.Append(control);
+                    renderer.TextBatcher.Write(uiText, controlPosition, textHeight, textColor, font);
+                    controlPosition.Y += lineSpacing;
+                }
+                WriteControl(controls.MoveForward.ToString());
+                WriteControl(controls.MoveBackward.ToString());
+                WriteControl(controls.MoveLeft.ToString());
+                WriteControl(controls.MoveRight.ToString());
+                WriteControl(controls.MoveUp.ToString());
+                WriteControl(controls.MoveDown.ToString());
+                WriteControl(controls.LockMouse.ToString());
+                WriteControl(controls.Exit.ToString());
+                WriteControl(controls.ShowControls.ToString());
+            }
+            else
+            {
+                uiText.Append("Press ");
+                uiText.Append(controls.ShowControls.ToString());
+                uiText.Append(" for controls.");
+                renderer.TextBatcher.Write(uiText, controlsStart, textHeight, textColor, font);
+            }
         }
     }
 }

@@ -83,30 +83,37 @@ namespace DemoRenderer.Font
             pixelShader = new PixelShader(device, cache.GetShader(@"Font\RenderGlyphs.hlsl.pshader"));
         }
 
-
-        public void Render(DeviceContext context, Font font, Int2 screenResolution, Vector2 horizontalAxis, Vector3 color, GlyphInstance[] glyphs, int start, int count)
+        /// <summary>
+        /// Sets up the rendering pipeline with any glyph rendering specific render state that can be shared across all glyph batches drawn using the GlyphRenderer.Render function.
+        /// </summary>
+        /// <param name="context">Context to configure.</param>
+        public void PreparePipeline(DeviceContext context)
         {
             //This assumes that rasterizer, blend, and depth states have been set appropriately for screenspace transparent rendering.
-            var vertexConstantsData = new VertexConstants
-            {
-                HorizontalAxis = horizontalAxis,
-                InverseHalfScreenResolution = new Vector2(2f / screenResolution.X, 2f / screenResolution.Y),
-                InverseAtlasResolution = new Vector2(1f / font.Content.Atlas.Width, 1f / font.Content.Atlas.Height)
-            };
-            vertexConstants.Update(context, ref vertexConstantsData);          
-            pixelConstants.Update(context, ref color);
-
             context.InputAssembler.InputLayout = null;
             context.InputAssembler.SetIndexBuffer(indices);
             context.InputAssembler.PrimitiveTopology = SharpDX.Direct3D.PrimitiveTopology.TriangleList;
             context.VertexShader.Set(vertexShader);
             context.VertexShader.SetConstantBuffer(0, vertexConstants.Buffer);
             context.VertexShader.SetShaderResource(0, instances.SRV);
-            context.VertexShader.SetShaderResource(1, font.Sources.SRV);
             context.PixelShader.Set(pixelShader);
             context.PixelShader.SetConstantBuffer(0, pixelConstants.Buffer);
             context.PixelShader.SetSampler(0, sampler);
+        }
+
+        public void Render(DeviceContext context, Font font, Int2 screenResolution, Vector2 horizontalAxis, Vector3 color, GlyphInstance[] glyphs, int start, int count)
+        {
+            var vertexConstantsData = new VertexConstants
+            {
+                HorizontalAxis = horizontalAxis,
+                InverseHalfScreenResolution = new Vector2(2f / screenResolution.X, 2f / screenResolution.Y),
+                InverseAtlasResolution = new Vector2(1f / font.Content.Atlas.Width, 1f / font.Content.Atlas.Height)
+            };
+            vertexConstants.Update(context, ref vertexConstantsData);
+            pixelConstants.Update(context, ref color);
+            context.VertexShader.SetShaderResource(1, font.Sources.SRV);
             context.PixelShader.SetShaderResource(0, font.AtlasSRV);
+
             while (count > 0)
             {
                 var batchCount = Math.Min(instances.Capacity, count);

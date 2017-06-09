@@ -13,9 +13,10 @@ namespace SolverPrototypeTests
         public Window Window { get; private set; }
         public Input Input { get; private set; }
         public Camera Camera { get; private set; }
+        public RenderSurface Surface { get; private set; }
+        public Renderer Renderer { get; private set; }
         public Action<float> OnUpdate { get; set; }
-        RenderSurface surface;
-        Renderer renderer;
+        public Action<Renderer> OnRender { get; set; }
 
         public GameLoop(Window window)
         {
@@ -27,9 +28,9 @@ namespace SolverPrototypeTests
 #else
                 false;
 #endif
-            surface = new RenderSurface(window.Handle, window.Resolution, enableDeviceDebugLayer: useDebugLayer);
+            Surface = new RenderSurface(window.Handle, window.Resolution, enableDeviceDebugLayer: useDebugLayer);
 
-            renderer = new Renderer(surface);
+            Renderer = new Renderer(Surface);
             Camera = new Camera(window.Resolution.X / (float)window.Resolution.Y, (float)Math.PI / 2, 0.01f, 100000);
         }
 
@@ -38,21 +39,24 @@ namespace SolverPrototypeTests
             Input.Start();
             //We'll let the delgate's logic handle the variable time steps.
             OnUpdate(dt);
-            renderer.Render(Camera);
-            surface.Present();
+            //At the moment, rendering just follows sequentially. Later on we might want to distinguish it a bit more with fixed time stepping or something. Maybe.
+            OnRender(Renderer);
+            Renderer.Render(Camera);
+            Surface.Present();
             Input.End();
         }
 
-        public void Run(Action<float> onUpdate)
+        public void Run(Action<float> onUpdate, Action<Renderer> onRender)
         {
             OnUpdate = onUpdate;
+            OnRender = onRender;
             Window.Run(Update, OnResize);
         }
 
         private void OnResize(Int2 resolution)
         {
             //We just don't support true fullscreen in the demos. Would be pretty pointless.
-            renderer.Surface.Resize(resolution, false);
+            Renderer.Surface.Resize(resolution, false);
             Camera.AspectRatio = resolution.X / (float)resolution.Y;
         }
 
@@ -63,7 +67,7 @@ namespace SolverPrototypeTests
             {
                 disposed = true;
                 Input.Dispose();
-                renderer.Dispose();
+                Renderer.Dispose();
                 //Note that we do not own the window.
             }
         }

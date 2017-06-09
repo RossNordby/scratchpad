@@ -5,13 +5,26 @@ using System.Numerics;
 
 namespace DemoContentLoader
 {
-    /// <summary>
-    /// Location of a glyph in the atlas.
-    /// </summary>
-    public struct GlyphSource
+
+    public struct CharacterData
     {
-        public Vector2 Minimum;
-        public Vector2 Span;
+        /// <summary>
+        /// Minimum position of a character glyph in the font distance atlas, measured in atlas texels.
+        /// (0,0) corresponds to the upper-left corner of the atlas, not the center of the upper left texel.
+        /// </summary>
+        public Vector2 SourceMinimum;
+        /// <summary>
+        /// Width and height of the glyph in the font distance atlas, measured in atlas texels.
+        /// </summary>
+        public Vector2 SourceSpan;
+        /// <summary>
+        /// Offset from a starting pen position to the upper left corner of a glyph's target render position in atlas texels.
+        /// </summary>
+        public Vector2 Bearing;
+        /// <summary>
+        /// Change in horizontal pen position when moving across this character, measured in atlas texels. Does not include any kerning.
+        /// </summary>
+        public float Advance;
     }
 
     public struct CharacterPair : IEquatable<CharacterPair>
@@ -41,38 +54,29 @@ namespace DemoContentLoader
             return "{" + A + ", " + B + "}";
         }
     }
-    public class FontContent
+    public class FontContent : IContent
     {
         public int GlyphCount { get; private set; }
         public Texture2DContent Atlas { get; private set; }
         public string Name { get; private set; }
-        public GlyphSource[] GlyphSources { get; private set; }
         public float InverseSizeInTexels { get; private set; }
+        public Dictionary<char, CharacterData> Characters { get; private set; }
 
-        Dictionary<char, int> advances;
+        public ContentType ContentType {  get { return ContentType.Font; } }
+        
         Dictionary<CharacterPair, int> kerning;
 
-        public FontContent(int glyphCount, Texture2DContent atlas, string name, GlyphSource[] sources, float inverseSizeInTexels,
-            Dictionary<char, int> advances, Dictionary<CharacterPair, int> kerningTable)
+        public FontContent(int glyphCount, Texture2DContent atlas, string name, float inverseSizeInTexels,
+            Dictionary<char, CharacterData> characterData, Dictionary<CharacterPair, int> kerningTable)
         {
             GlyphCount = GlyphCount;
             Atlas = atlas;
             Name = name;
-            GlyphSources = GlyphSources;
             InverseSizeInTexels = inverseSizeInTexels;
-            this.advances = advances;
-            this.kerning = kerningTable;
+            Characters = characterData;
+            kerning = kerningTable;
         }
-
-        public int GetAdvanceInTexels(char character)
-        {
-            if (advances.TryGetValue(character, out var advance))
-            {
-                return advance;
-            }
-            return 0;
-        }
-
+        
         public int GetKerningInTexels(char a, char b)
         {
             if (kerning.TryGetValue(new CharacterPair(a, b), out var pairKerning))
