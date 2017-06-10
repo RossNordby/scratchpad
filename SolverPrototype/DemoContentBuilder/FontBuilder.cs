@@ -95,7 +95,7 @@ namespace DemoContentBuilder
                     //Now that every glyph has been positioned within the sheet, we can actually rasterize the glyph alphas into a bitmap proto-atlas.
                     //We're building the rasterized set sequentially first so we don't have to worry about threading issues in the underlying library.
                     var atlas = new Texture2DContent(AtlasWidth, packer.Height, MipLevels, 1);
-                    var rasterizedAlphasTexture = new Texture2DContent(AtlasWidth, packer.Height, 1, 1);
+                    var rasterizedAlphas = new Texture2DContent(AtlasWidth, packer.Height, 1, 1);
                     for (int i = 0; i < sortedCharacterSet.Length; ++i)
                     {
                         //Rasterize the glyph.
@@ -115,22 +115,110 @@ namespace DemoContentBuilder
                         for (int glyphRow = 0; glyphRow < glyphHeight; ++glyphRow)
                         {
                             Unsafe.CopyBlockUnaligned(
-                                ref rasterizedAlphasTexture.Data[atlas.GetRowByteOffsetFromMipStart(0, glyphRow + location.Y) + location.X],
+                                ref rasterizedAlphas.Data[atlas.GetRowByteOffsetFromMipStart(0, glyphRow + location.Y) + location.X],
                                 ref glyphBuffer[glyphRow * glyphWidth], (uint)glyphWidth);
                         }
                     }
 
+                    //Initialize the atlas distances to all 255. The BFS only changes values when the new distance is lower than the current distance.
+                    //Note that the mip levels beyond 0 don't need to be initialized; they're fully filled later.
+                    Unsafe.InitBlock(ref atlas.Data[0], 0xFF, (uint)atlas.GetMipStartByteIndex(1));
+
                     //Compute the distances for every character-covered texel in the atlas.
-                    Parallel.For(0, characters.Count, i =>
+                    var atlasData = atlas.Pin();
+                    var alphaData = rasterizedAlphas.Pin();
+                    Parallel.For(0, sortedCharacterData.Length, i =>
                     {
                         //Note that the padding around characters should also have its distances filled in. That way, the less detailed mips can pull from useful data.
+                        ref var charData = ref sortedCharacterData[i];
 
-                        //Interpret partial alphas as distances.
+                        //Note that the conversion from distance to texels involves a normalization by the character's span. That helps ensure a reasonable amount
+                        //of precision. The runtime renderer computes the same normalization factor to move back into texel space.
+                        var decodingMultiplier = Math.Max(charData.SourceSpan.X, charData.SourceSpan.Y);
+                        var encodingMultiplier = 1f / decodingMultiplier;
+                        byte ToEncodedDistance(float distance)
+                        {
+                            return (byte)(255 * Math.Min(1, encodingMultiplier * distance));
+                        }
+                        //For each texel within the allocated region that has a nonzero alpha, use a breadth first traversal to mark every neighbor with a distance.
+                        //If a neighbor already has a distance which is smaller, don't overwrite it.
+                        //Note: this memory allocation could be optimized quite a bit; we recreate a queue for every character. It won't matter that much, though.
+                        var min = new Int2((int)charData.SourceMinimum.X - padding, (int)charData.SourceMinimum.Y - padding);
+                        var max = new Int2((int)(charData.SourceMinimum.X + charData.SourceSpan.X) + padding, (int)(charData.SourceMinimum.Y + charData.SourceSpan.Y) + padding);
+                        var toVisit = new Queue<Int2>((int)((charData.SourceSpan.X + padding * 2) * (charData.SourceSpan.Y + padding * 2)));
+                        void TryEnqueue(ref Int2 neighbor, ref Int2 origin, float baseDistance)
+                        {
+                            if (neighbor.X >= min.X && neighbor.X < max.X &&
+                                neighbor.Y >= min.Y && neighbor.Y < max.Y)
+                            {
+                                //The neighbor is within the character's texel region. Is this origin closer than any previous one for this texel?
+                                var xOffset = neighbor.X - origin.X;
+                                var yOffset = neighbor.Y - origin.Y;
+                                var candidateDistance = (float)Math.Sqrt(xOffset * xOffset + yOffset * yOffset) + baseDistance;
+                                var encodedCandidateDistance = ToEncodedDistance(candidateDistance);
+                                var neighborIndex = atlas.GetByteOffsetForMip0(neighbor.X, neighbor.Y);
+                                //Note that this condition stops cycles. Visiting the same node from the same origin cannot produce a lower distance on later visits.
+                                //It also makes the BFS early out extremely frequently- the number of traversals required for each nonzero alpha texel will decrease significantly
+                                //as more are visited.
+                                if (encodedCandidateDistance < atlasData[neighborIndex]) 
+                                {
+                                    //It's closer. 
+                                    atlasData[neighborIndex] = encodedCandidateDistance;
+                                    //Since this was closer, the neighbor's neighbors might be too.
+                                    toVisit.Enqueue(neighbor);
+                                }
+                            }
+                        }
 
-                        //Convert the distance into a glyph normalized format.
-                        //The glyph renderer will use this same normalization to interpret the distances.
-
+                        for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
+                        {
+                            var rowOffset = atlas.GetRowByteOffsetFromMipStart(0, rowIndex); //The alphas and distances textures have the same dimensions on mip0, so sharing this is safe.
+                            var distancesRow = atlasData + rowOffset;
+                            var alphasRow = alphaData + rowOffset;
+                            for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
+                            {
+                                if (alphasRow[columnIndex] > 0)
+                                {
+                                    //Nonzero alpha.
+                                    //Interpret the partial alpha as a distance. (0, sqrt(2)/2) to (255, 0).
+                                    //Any point that happens to have a shorter path will have this base distance overridden. It will only affect texels whose closest path 
+                                    //goes through this texel.
+                                    var baseDistance = 0.70710678118f - alphasRow[columnIndex] * (0.70710678118f / 255f);
+                                    var encodedBaseDistance = ToEncodedDistance(baseDistance);
+                                    if (distancesRow[columnIndex] > encodedBaseDistance)
+                                    {
+                                        //The existing distance is larger than the base distance, so it's possible to improve.
+                                        distancesRow[columnIndex] = ToEncodedDistance(baseDistance);
+                                        //Begin the BFS. 
+                                        var origin = new Int2 { X = columnIndex, Y = rowIndex };
+                                        toVisit.Enqueue(origin); //Little bit of redundant work. Shrug.
+                                        while(toVisit.Count > 0)
+                                        {
+                                            var visited = toVisit.Dequeue();
+                                            var neighbor00 = new Int2 { X = visited.X - 1, Y = visited.Y - 1 };
+                                            var neighbor01 = new Int2 { X = visited.X - 1, Y = visited.Y };
+                                            var neighbor02 = new Int2 { X = visited.X - 1, Y = visited.Y + 1 };
+                                            var neighbor10 = new Int2 { X = visited.X, Y = visited.Y - 1 };
+                                            var neighbor12 = new Int2 { X = visited.X, Y = visited.Y + 1 };
+                                            var neighbor20 = new Int2 { X = visited.X + 1, Y = visited.Y - 1 };
+                                            var neighbor21 = new Int2 { X = visited.X + 1, Y = visited.Y };
+                                            var neighbor22 = new Int2 { X = visited.X + 1, Y = visited.Y + 1 };
+                                            TryEnqueue(ref neighbor00, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor01, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor02, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor10, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor12, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor20, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor21, ref origin, baseDistance);
+                                            TryEnqueue(ref neighbor22, ref origin, baseDistance);
+                                        }
+                                    }
+                                }
+                            }
+                        }                        
                     });
+                    atlas.Unpin();
+                    rasterizedAlphas.Unpin();
 
                     //Build the mips.
                     //Note that while the padding avoids cross-character contamination, there's no reason to exit the character bounds when creating lower mips; that data

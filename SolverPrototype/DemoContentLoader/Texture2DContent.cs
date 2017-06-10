@@ -31,7 +31,8 @@ namespace DemoContentLoader
             }
             Data = new byte[dataSize];
         }
-        
+
+
         public int GetMipStartByteIndex(int mipLevel)
         {
             int start = 0;
@@ -45,6 +46,15 @@ namespace DemoContentLoader
         public int GetRowByteOffsetFromMipStart(int mipLevel, int rowIndex)
         {
             return GetRowPitch(mipLevel) * rowIndex;
+        }
+
+        public int GetByteOffset(int x, int y, int mipLevel)
+        {
+            return GetMipStartByteIndex(mipLevel) + GetRowPitch(mipLevel) * y + x;
+        }
+        public int GetByteOffsetForMip0(int x, int y)
+        {
+            return TexelSizeInBytes * Width * y + x;
         }
 
         public byte* Pin()
