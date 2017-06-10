@@ -99,6 +99,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="FontBuilder.cs" />
+    <Compile Include="FontPacker.cs" />
     <Compile Include="IncludeHandler.cs" />
     <Compile Include="MetadataParsing.cs" />
     <Compile Include="ProjectBuilder.cs" />
