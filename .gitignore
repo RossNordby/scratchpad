@@ -55,7 +55,10 @@ dlldata.c
 .builds
 *.pidb
 *.svclog
+# Demo content pipeline cache files
 *.scc
+*.cbc
+*.cc
 
 # Chutzpah Test files
 _Chutzpah*

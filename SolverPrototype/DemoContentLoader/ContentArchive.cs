@@ -36,7 +36,7 @@ namespace DemoContentLoader
         }
 
         //We have a very limited set of content types. This isn't a general purpose engine. Rather than having a dictionary of type->loader or something, we can do a quick hack.
-        private static IContent Load(ContentType type, BinaryReader reader)
+        public static IContent Load(ContentType type, BinaryReader reader)
         {
             switch (type)
             {
@@ -46,7 +46,7 @@ namespace DemoContentLoader
             throw new ArgumentException("Given content type cannot be loaded; no loader is specified. Is the archive corrupted?");
         }
 
-        private static void Save(IContent content, BinaryWriter writer)
+        public static void Save(IContent content, BinaryWriter writer)
         {
             switch (content.ContentType)
             {

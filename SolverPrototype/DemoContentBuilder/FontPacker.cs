@@ -24,6 +24,11 @@ namespace DemoContentBuilder
             public int Start;
             public int End; //Technically redundant, but it simplifies the implementation a little. Performance doesn't matter.
             public int Height;
+
+            public override string ToString()
+            {
+                return $"[{Start}, {End}): {Height}";
+            }
         }
         List<Interval> intervals;
 

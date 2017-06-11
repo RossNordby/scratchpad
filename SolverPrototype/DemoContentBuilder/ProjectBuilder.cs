@@ -9,7 +9,7 @@ namespace DemoContentBuilder
 {
     static class ProjectBuilder
     {
-        static string GetRelativePathFromDirectory(string path, string baseDirectory)
+        public static string GetRelativePathFromDirectory(string path, string baseDirectory)
         {
             //(Borrowed this from a ye olde Marc Gravell post on SO.)
             var pathUri = new Uri(path);
@@ -23,7 +23,9 @@ namespace DemoContentBuilder
         }
 
 
-        static void CollectContentPaths(string projectPath, out string workingPath, out List<string> shaderPaths)
+        static void CollectContentPaths(string projectPath, out string workingPath,
+            out List<string> shaderPaths,
+            out List<string> fontPaths)
         {
             using (var projectCollection = new ProjectCollection())
             {
@@ -32,52 +34,22 @@ namespace DemoContentBuilder
 
                 var contentItems = project.GetItems("Content");
                 shaderPaths = new List<string>();
+                fontPaths = new List<string>();
 
                 foreach (var item in contentItems)
                 {
                     var extension = Path.GetExtension(item.EvaluatedInclude);
+                    var path = workingPath + item.EvaluatedInclude;
                     switch (extension)
                     {
                         case ".hlsl":
-                            {
-                                shaderPaths.Add(workingPath + item.EvaluatedInclude);
-                            }
+                            shaderPaths.Add(path);
+                            break;
+                        case ".ttf":
+                        case ".otf":
+                            fontPaths.Add(path);
                             break;
                     }
-                }
-            }
-        }
-
-        public static void BuildShaders(string workingPath, string projectName, List<string> shaderPaths, bool debug, int optimizationLevel, out List<ShaderCompilationResult> warnings, out List<ShaderCompilationResult> errors)
-        {
-
-            var updatedCache = ShaderCompiler.Compile(workingPath, shaderPaths.ToArray(), workingPath + projectName + "ShaderCompilationCache.scc", out warnings, out errors, debug: debug, optimizationLevel: optimizationLevel);
-
-            var prunedShaders = new Dictionary<SourceShader, byte[]>();
-            foreach (var pathShaderPair in updatedCache.CompiledShaders)
-            {
-                //Prune out all of the extra path bits and save it.
-                var relativePath = GetRelativePathFromDirectory(pathShaderPair.Key.Name, workingPath);
-                prunedShaders.Add(new SourceShader { Name = relativePath, Defines = pathShaderPair.Key.Defines }, pathShaderPair.Value.Data);
-            }
-
-            const int retryCount = 10;
-            const int retryDelay = 200;
-            var runtimeCachePath = workingPath + projectName + "Shaders.sc";
-            for (int i = 0; i < retryCount; ++i)
-            {
-                try
-                {
-                    using (var stream = File.OpenWrite(runtimeCachePath))
-                    {
-                        ShaderCache.Save(prunedShaders, workingPath, stream);
-                    }
-                    break;
-                }
-                catch (IOException e)
-                {
-                    Console.WriteLine($"Failed to write shader cache (attempt {i}): {e.Message}, retrying...");
-                    Thread.Sleep(retryDelay);
                 }
             }
         }
@@ -119,18 +91,33 @@ namespace DemoContentBuilder
             }
             foreach (var targetPath in targetPaths)
             {
-                CollectContentPaths(targetPath, out var workingPath, out var shaderPaths);
+                CollectContentPaths(targetPath, out var workingPath, out var shaderPaths, out var fontPaths);
+                var cachePathStart = workingPath + Path.GetFileNameWithoutExtension(targetPath);
+                //Shaders are stored a little differently than the rest of content. This is partially for legacy reasons.
+                //You could make the argument for bundling them together, but shaders do have some unique macro and dependency management that other kinds of content lack.
 
-                BuildShaders(workingPath, Path.GetFileNameWithoutExtension(targetPath), shaderPaths, debug, debug ? 0 : optimizationLevel, out var warnings, out var errors);
-                foreach (var error in errors)
+                ShaderCompiler.Compile(workingPath,
+                    cachePathStart + "ShaderCompilationCache.scc",
+                    cachePathStart + "Shaders.sc", shaderPaths.ToArray(), out var shaderWarnings, out var shaderErrors, debug: debug, optimizationLevel: optimizationLevel);
+                foreach (var error in shaderErrors)
                 {
                     Console.WriteLine($"{error.File} ({error.LineNumber},{error.ColumnNumber}): error {error.Code}: {error.Message}");
                 }
-                foreach (var warning in warnings)
+                foreach (var warning in shaderWarnings)
                 {
                     Console.WriteLine($"{warning.File} ({warning.LineNumber},{warning.ColumnNumber}): warning {warning.Code}: {warning.Message}");
                 }
-
+                ContentBuilder.BuildContent(workingPath,
+                    cachePathStart + "ContentBuildCache.cbc",
+                    cachePathStart + "Content.cc", fontPaths, out var contentWarnings, out var contentErrors);
+                foreach (var error in contentErrors)
+                {
+                    Console.WriteLine($"{error.File}: error: {error.Message}");
+                }
+                foreach (var warning in contentWarnings)
+                {
+                    Console.WriteLine($"{warning.File}: warning: {warning.Message}");
+                }
             }
         }
     }

@@ -12,8 +12,28 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Release\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj"</PostBuildEvent>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Release\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj"</PostBuildEvent>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <!-- TODO: Update these references once the macros are actually working again. This won't run on anyone else's computer! -->
+    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PostBuildEvent>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PostBuildEvent>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PostBuildEvent>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -21,7 +41,6 @@
   <ItemGroup>
     <Content Include="Font\RenderGlyphs.hlsl" />
     <Content Include="PostProcessing\CompressToSwap.hlsl" />
-    <Content Include="WholeScreenTriangle.hlsl" />
     <Content Include="Background\RenderBackground.hlsl" />
   </ItemGroup>
 

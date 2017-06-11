@@ -13,17 +13,38 @@
     <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Optimize>True</Optimize>
+    <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Optimize>True</Optimize>
+    <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
   <ItemGroup>
+    <None Remove="Content\Courier Prime Sans.ttf" />
     <None Remove="Content\GenericMonoII-Regular.otf" />
     <None Remove="Content\linear-by-braydon-fuller.otf" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Content\GenericMonoII-Regular.otf" />
+    <Content Include="Content\Courier Prime Sans.ttf" />
     <Content Include="Content\linear-by-braydon-fuller.otf" />
   </ItemGroup>
 

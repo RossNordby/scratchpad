@@ -8,6 +8,8 @@ using SharpDX;
 using SharpDX.D3DCompiler;
 using SharpDX.Direct3D;
 using System.Threading.Tasks;
+using DemoContentLoader;
+using System.Threading;
 
 namespace DemoContentBuilder
 {
@@ -74,7 +76,7 @@ namespace DemoContentBuilder
         {
             //TODO: This error parsing is not particularly robust- quite a few errors will confuse it, 
             //and I've never bothered to fix it. But hey if you want to wink wink nudge nudge ;)            
-            
+
             //There are four possible forms for the error to take:
             //(x,y)
             //(x1-x2,y)
@@ -447,7 +449,8 @@ namespace DemoContentBuilder
             long shaderCompileEndTime = Stopwatch.GetTimestamp();
         }
 
-        public static ShaderCompilationCache Compile(string workingPath, string[] sources, string cachePath, out List<ShaderCompilationResult> outWarnings, out List<ShaderCompilationResult> outErrors,
+        public static void Compile(string workingPath, string compilationCachePath, string runtimeCachePath, string[] sources,
+            out List<ShaderCompilationResult> outWarnings, out List<ShaderCompilationResult> outErrors,
             bool debug = false, bool packMatrixRowMajor = false, int optimizationLevel = 3)
         {
             var shaderFlags = new ShaderFlags();
@@ -476,7 +479,7 @@ namespace DemoContentBuilder
             long totalStartTime = Stopwatch.GetTimestamp();
 
             //Load any preexisting compilation cache to compare against.
-            if (!ShaderCompilationCache.TryLoad(cachePath, out ShaderCompilationCache loadedCache))
+            if (!ShaderCompilationCache.TryLoad(compilationCachePath, out ShaderCompilationCache loadedCache))
             {
                 loadedCache = new ShaderCompilationCache(shaderFlags);
             }
@@ -500,13 +503,35 @@ namespace DemoContentBuilder
 
             if (compilationTargets.Count > 0)
             {
-                //Updating only parts of the file would be a pain.
-                //Instead, just replace the whole file.
-                ShaderCompilationCache.Save(cache, cachePath);
+                //Something was compiled; prepare to save stuff.   
+                var prunedShaders = new Dictionary<SourceShader, byte[]>();
+                foreach (var pathShaderPair in cache.CompiledShaders)
+                {
+                    //Prune out all of the extra path bits and save it.
+                    var relativePath = ProjectBuilder.GetRelativePathFromDirectory(pathShaderPair.Key.Name, workingPath);
+                    prunedShaders.Add(new SourceShader { Name = relativePath, Defines = pathShaderPair.Key.Defines }, pathShaderPair.Value.Data);
+                }
 
+                const int retryCount = 10;
+                const int retryDelay = 200;
+                for (int i = 0; i < retryCount; ++i)
+                {
+                    try
+                    {
+                        ShaderCompilationCache.Save(cache, compilationCachePath);
+                        using (var stream = File.OpenWrite(runtimeCachePath))
+                        {
+                            ShaderCache.Save(prunedShaders, stream);
+                        }
+                        break;
+                    }
+                    catch (IOException e)
+                    {
+                        Console.WriteLine($"Failed to write shader cache (attempt {i}): {e.Message}, retrying...");
+                        Thread.Sleep(retryDelay);
+                    }
+                }
             }
-
-            return cache;
 
         }
 

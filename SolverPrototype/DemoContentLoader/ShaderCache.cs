@@ -47,7 +47,7 @@ namespace DemoContentLoader
         //{Characters}
 
 
-        public static void Save(Dictionary<SourceShader, byte[]> archive, string projectDirectory, Stream stream)
+        public static void Save(Dictionary<SourceShader, byte[]> archive, Stream stream)
         {
             //Save the number of elements.
             using (var writer = new BinaryWriter(stream))
@@ -58,7 +58,6 @@ namespace DemoContentLoader
                 foreach (var pathShaderPair in archive)
                 {
                     SourceShader.Write(writer, pathShaderPair.Key);
-
 
                     //Write the size of the element.
                     var size = pathShaderPair.Value.Length;

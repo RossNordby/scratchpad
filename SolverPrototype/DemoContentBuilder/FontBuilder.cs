@@ -35,6 +35,9 @@ namespace DemoContentBuilder
         private const string characterSet = @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890`-=[]\;',./~!@#$%^&*()_+{}|:""<>? ";
 
         //Text below 128 / 2^(5-1) = 8 pixels is not going to be terribly common, so generating more mips for it has pretty low value.
+        //Technically, by outputting at a really high resolution and mipping it down, we miss out on low resolution hinting.
+        //This could be addressed by actually rasterizing glyphs at each mip resolution and redoing the distance calculation.
+        //But in practice, we'll probably just be using larger glyphs.
         private const int FontSizeInPixels = 128;
         private const int MipLevels = 5;
         private const int AtlasWidth = 2048;
