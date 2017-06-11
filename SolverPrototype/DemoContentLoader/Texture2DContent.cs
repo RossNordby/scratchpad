@@ -10,10 +10,6 @@ namespace DemoContentLoader
         public int Height { get; private set; }
         public int MipLevels { get; private set; }
         public int TexelSizeInBytes { get; private set; }
-        public int GetRowPitch(int mipLevel)
-        {
-            return TexelSizeInBytes * (Width >> mipLevel);
-        }
 
         GCHandle handle;
         public byte[] Data { get; private set; }
@@ -32,29 +28,34 @@ namespace DemoContentLoader
             Data = new byte[dataSize];
         }
 
+        //Note that all of these operate in units of texels, not bytes.
+        public int GetRowPitch(int mipLevel)
+        {
+            return (Width >> mipLevel);
+        }
 
-        public int GetMipStartByteIndex(int mipLevel)
+        public int GetMipStartIndex(int mipLevel)
         {
             int start = 0;
             for (int i = 0; i < mipLevel; ++i)
             {
-                start += TexelSizeInBytes * (Width >> i) * (Height >> i);
+                start += (Width >> i) * (Height >> i);
             }
             return start;
         }
 
-        public int GetRowByteOffsetFromMipStart(int mipLevel, int rowIndex)
+        public int GetRowOffsetFromMipStart(int mipLevel, int rowIndex)
         {
             return GetRowPitch(mipLevel) * rowIndex;
         }
 
-        public int GetByteOffset(int x, int y, int mipLevel)
+        public int GetOffset(int x, int y, int mipLevel)
         {
-            return GetMipStartByteIndex(mipLevel) + GetRowPitch(mipLevel) * y + x;
+            return GetMipStartIndex(mipLevel) + GetRowPitch(mipLevel) * y + x;
         }
-        public int GetByteOffsetForMip0(int x, int y)
+        public int GetOffsetForMip0(int x, int y)
         {
-            return TexelSizeInBytes * Width * y + x;
+            return Width * y + x;
         }
 
         public byte* Pin()

@@ -56,7 +56,7 @@ namespace DemoRenderer.Font
             var data = font.Atlas.Pin();
             for (int mipLevel = 0; mipLevel < font.Atlas.MipLevels; ++mipLevel)
             {
-                var databox = new DataBox(new IntPtr(data + font.Atlas.GetMipStartByteIndex(mipLevel)), font.Atlas.GetRowPitch(mipLevel), 0);
+                var databox = new DataBox(new IntPtr(data + font.Atlas.GetMipStartIndex(mipLevel)), font.Atlas.GetRowPitch(mipLevel), 0);
                 context.UpdateSubresource(databox, Atlas, mipLevel);
             }
             font.Atlas.Unpin();

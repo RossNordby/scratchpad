@@ -11,6 +11,7 @@ namespace DemoContentBuilder
     public class FontPacker
     {
         int atlasWidth;
+        int alignmentMask;
         int padding;
         int paddingx2;
 
@@ -26,9 +27,10 @@ namespace DemoContentBuilder
         }
         List<Interval> intervals;
 
-        public FontPacker(int width, int padding, int characterCount)
+        public FontPacker(int width, int mipLevels, int padding, int characterCount)
         {
             this.atlasWidth = width;
+            this.alignmentMask = (1 << mipLevels) - 1;
             this.padding = padding;
             this.paddingx2 = padding * 2;
 
@@ -68,6 +70,9 @@ namespace DemoContentBuilder
                     baseHeight = interval.Height;
             }
 
+            //Align and round up base height.
+            baseHeight = (baseHeight + alignmentMask) & (~alignmentMask);
+
             //We know that the new glyph will be the highest point, so we can replace the interval section with it.
             //Change the endpoint of the first overlapped interval to be the beginning of the new interval.
             //Note that the constructor guarantees that there will always be at least one overlapped interval.
@@ -81,7 +86,7 @@ namespace DemoContentBuilder
                 modifiedEndInterval.Start = queryEnd;
                 intervals[endIntervalIndex - 1] = modifiedEndInterval;
             }
-            var newInterval = new Interval { Start = queryStart, End = queryEnd, Height = Height + baseHeight };
+            var newInterval = new Interval { Start = queryStart, End = queryEnd, Height = newGlyphHeight + baseHeight };
             if (overlappedIntervalCount > 2)
             {
                 //Remove all intervals which are fully contained within the new character's interval, indices [startIntervalIndex + 1, endIntervalIndex - 2].
@@ -98,11 +103,13 @@ namespace DemoContentBuilder
             return baseHeight;
         }
 
-        private void FillCharacterMinimum(ref CharacterData characterData, int end)
+        private void FillCharacterMinimumAndMove(ref CharacterData characterData, int end)
         {
             characterData.SourceMinimum.X = padding + start;
             characterData.SourceMinimum.Y = padding + AddAndGetBaseHeight(start, end, (int)characterData.SourceSpan.Y + paddingx2);
+            start = end;
         }
+        
 
         public void Add(ref CharacterData characterData)
         {
@@ -115,11 +122,12 @@ namespace DemoContentBuilder
             if ((rowIndex & 1) == 0)
             {
                 //Place glyphs from left to right.
+                start = (start + alignmentMask) & (~alignmentMask);
                 var end = start + allocationWidth;
 
                 if (end <= atlasWidth)
                 {
-                    FillCharacterMinimum(ref characterData, end);
+                    FillCharacterMinimumAndMove(ref characterData, end);
                 }
                 else
                 {
@@ -132,11 +140,13 @@ namespace DemoContentBuilder
             else
             {
                 //Place glyphs from right to left.
-                var end = start;
                 start -= allocationWidth;
                 if (start >= 0)
                 {
-                    FillCharacterMinimum(ref characterData, end);
+                    //Delayed alignment; alignment will never make this negative.
+                    start = start & (~alignmentMask);
+                    var end = start + allocationWidth;
+                    FillCharacterMinimumAndMove(ref characterData, end);
                 }
                 else
                 {

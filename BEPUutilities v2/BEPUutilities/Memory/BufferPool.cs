@@ -32,7 +32,7 @@ namespace BEPUutilities2.Memory
                 Handle = GCHandle.Alloc(Array, GCHandleType.Pinned);
                 Pointer = (byte*)Handle.AddrOfPinnedObject();
                 var mask = alignment - 1;
-                var offset = (int)Pointer & mask;
+                var offset = (uint)Pointer & mask;
                 Pointer += alignment - offset;
             }
 

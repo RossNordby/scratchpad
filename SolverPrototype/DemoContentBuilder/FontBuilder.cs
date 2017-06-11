@@ -34,8 +34,9 @@ namespace DemoContentBuilder
 
         private const string characterSet = @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890`-=[]\;',./~!@#$%^&*()_+{}|:""<>? ";
 
+        //Text below 128 / 2^(5-1) = 8 pixels is not going to be terribly common, so generating more mips for it has pretty low value.
         private const int FontSizeInPixels = 128;
-        private const int MipLevels = 4;
+        private const int MipLevels = 5;
         private const int AtlasWidth = 2048;
 
         class CharacterHeightComparer : IComparer<CharacterData>
@@ -81,7 +82,7 @@ namespace DemoContentBuilder
 
                     const int padding = 1 << MipLevels;
                     var characters = new Dictionary<char, CharacterData>();
-                    var packer = new FontPacker(AtlasWidth, padding, characterSet.Length);
+                    var packer = new FontPacker(AtlasWidth, MipLevels, padding, characterSet.Length);
                     for (int i = 0; i < sortedCharacterSet.Length; ++i)
                     {
                         //The packer class handles the placement logic and sets the SourceMinimum in the character data.
@@ -90,11 +91,8 @@ namespace DemoContentBuilder
                         characters.Add(sortedCharacterSet[i], sortedCharacterData[i]);
                     }
 
-
-
                     //Now that every glyph has been positioned within the sheet, we can actually rasterize the glyph alphas into a bitmap proto-atlas.
                     //We're building the rasterized set sequentially first so we don't have to worry about threading issues in the underlying library.
-                    var atlas = new Texture2DContent(AtlasWidth, packer.Height, MipLevels, 1);
                     var rasterizedAlphas = new Texture2DContent(AtlasWidth, packer.Height, 1, 1);
                     for (int i = 0; i < sortedCharacterSet.Length; ++i)
                     {
@@ -115,36 +113,41 @@ namespace DemoContentBuilder
                         for (int glyphRow = 0; glyphRow < glyphHeight; ++glyphRow)
                         {
                             Unsafe.CopyBlockUnaligned(
-                                ref rasterizedAlphas.Data[atlas.GetRowByteOffsetFromMipStart(0, glyphRow + location.Y) + location.X],
+                                ref rasterizedAlphas.Data[rasterizedAlphas.GetRowOffsetFromMipStart(0, glyphRow + location.Y) + location.X],
                                 ref glyphBuffer[glyphRow * glyphWidth], (uint)glyphWidth);
                         }
                     }
 
-                    //Initialize the atlas distances to all 255. The BFS only changes values when the new distance is lower than the current distance.
-                    //Note that the mip levels beyond 0 don't need to be initialized; they're fully filled later.
-                    Unsafe.InitBlock(ref atlas.Data[0], 0xFF, (uint)atlas.GetMipStartByteIndex(1));
-
+                    //Preallocate memory for full single precision float version of the atlas. This will be used as scratch memory (admittedly, more than is necessary)
+                    //which will be encoded into the final single byte representation after the mips are calculated. The full precision stage makes the mips a little more accurate.
+                    var preciseAtlas = new Texture2DContent(AtlasWidth, packer.Height, MipLevels, 4);
+                    var atlas = new Texture2DContent(AtlasWidth, packer.Height, MipLevels, 1);
                     //Compute the distances for every character-covered texel in the atlas.
                     var atlasData = atlas.Pin();
+                    var preciseData = (float*)preciseAtlas.Pin();
                     var alphaData = rasterizedAlphas.Pin();
                     Parallel.For(0, sortedCharacterData.Length, i =>
                     {
                         //Note that the padding around characters should also have its distances filled in. That way, the less detailed mips can pull from useful data.
                         ref var charData = ref sortedCharacterData[i];
 
-                        //Note that the conversion from distance to texels involves a normalization by the character's span. That helps ensure a reasonable amount
-                        //of precision. The runtime renderer computes the same normalization factor to move back into texel space.
-                        var decodingMultiplier = Math.Max(charData.SourceSpan.X, charData.SourceSpan.Y);
-                        var encodingMultiplier = 1f / decodingMultiplier;
-                        byte ToEncodedDistance(float distance)
+                        var min = new Int2((int)charData.SourceMinimum.X - padding, (int)charData.SourceMinimum.Y - padding);
+                        var max = new Int2((int)(charData.SourceMinimum.X + charData.SourceSpan.X) + padding, (int)(charData.SourceMinimum.Y + charData.SourceSpan.Y) + padding);
+                        //Initialize every character texel to max distance. The following BFS only ever reduces distances, so it has to start high.
+                        var maxDistance = Math.Max(AtlasWidth, packer.Height);
+                        for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
                         {
-                            return (byte)(255 * Math.Min(1, encodingMultiplier * distance));
+                            var rowOffset = preciseAtlas.GetRowOffsetFromMipStart(0, rowIndex);
+                            var distancesRow = preciseData + rowOffset;
+                            for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
+                            {
+                                distancesRow[columnIndex] = maxDistance;
+                            }
                         }
+
                         //For each texel within the allocated region that has a nonzero alpha, use a breadth first traversal to mark every neighbor with a distance.
                         //If a neighbor already has a distance which is smaller, don't overwrite it.
                         //Note: this memory allocation could be optimized quite a bit; we recreate a queue for every character. It won't matter that much, though.
-                        var min = new Int2((int)charData.SourceMinimum.X - padding, (int)charData.SourceMinimum.Y - padding);
-                        var max = new Int2((int)(charData.SourceMinimum.X + charData.SourceSpan.X) + padding, (int)(charData.SourceMinimum.Y + charData.SourceSpan.Y) + padding);
                         var toVisit = new Queue<Int2>((int)((charData.SourceSpan.X + padding * 2) * (charData.SourceSpan.Y + padding * 2)));
                         void TryEnqueue(ref Int2 neighbor, ref Int2 origin, float baseDistance)
                         {
@@ -155,15 +158,14 @@ namespace DemoContentBuilder
                                 var xOffset = neighbor.X - origin.X;
                                 var yOffset = neighbor.Y - origin.Y;
                                 var candidateDistance = (float)Math.Sqrt(xOffset * xOffset + yOffset * yOffset) + baseDistance;
-                                var encodedCandidateDistance = ToEncodedDistance(candidateDistance);
-                                var neighborIndex = atlas.GetByteOffsetForMip0(neighbor.X, neighbor.Y);
+                                var neighborIndex = preciseAtlas.GetOffsetForMip0(neighbor.X, neighbor.Y);
                                 //Note that this condition stops cycles. Visiting the same node from the same origin cannot produce a lower distance on later visits.
                                 //It also makes the BFS early out extremely frequently- the number of traversals required for each nonzero alpha texel will decrease significantly
                                 //as more are visited.
-                                if (encodedCandidateDistance < atlasData[neighborIndex]) 
+                                if (candidateDistance < preciseData[neighborIndex])
                                 {
                                     //It's closer. 
-                                    atlasData[neighborIndex] = encodedCandidateDistance;
+                                    preciseData[neighborIndex] = candidateDistance;
                                     //Since this was closer, the neighbor's neighbors might be too.
                                     toVisit.Enqueue(neighbor);
                                 }
@@ -172,8 +174,8 @@ namespace DemoContentBuilder
 
                         for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
                         {
-                            var rowOffset = atlas.GetRowByteOffsetFromMipStart(0, rowIndex); //The alphas and distances textures have the same dimensions on mip0, so sharing this is safe.
-                            var distancesRow = atlasData + rowOffset;
+                            var rowOffset = preciseAtlas.GetRowOffsetFromMipStart(0, rowIndex); //The alphas and distances textures have the same dimensions on mip0, so sharing this is safe.
+                            var distancesRow = preciseData + rowOffset;
                             var alphasRow = alphaData + rowOffset;
                             for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
                             {
@@ -184,15 +186,14 @@ namespace DemoContentBuilder
                                     //Any point that happens to have a shorter path will have this base distance overridden. It will only affect texels whose closest path 
                                     //goes through this texel.
                                     var baseDistance = 0.70710678118f - alphasRow[columnIndex] * (0.70710678118f / 255f);
-                                    var encodedBaseDistance = ToEncodedDistance(baseDistance);
-                                    if (distancesRow[columnIndex] > encodedBaseDistance)
+                                    if (distancesRow[columnIndex] > baseDistance)
                                     {
                                         //The existing distance is larger than the base distance, so it's possible to improve.
-                                        distancesRow[columnIndex] = ToEncodedDistance(baseDistance);
+                                        distancesRow[columnIndex] = baseDistance;
                                         //Begin the BFS. 
                                         var origin = new Int2 { X = columnIndex, Y = rowIndex };
                                         toVisit.Enqueue(origin); //Little bit of redundant work. Shrug.
-                                        while(toVisit.Count > 0)
+                                        while (toVisit.Count > 0)
                                         {
                                             var visited = toVisit.Dequeue();
                                             var neighbor00 = new Int2 { X = visited.X - 1, Y = visited.Y - 1 };
@@ -215,14 +216,66 @@ namespace DemoContentBuilder
                                     }
                                 }
                             }
-                        }                        
+                        }
+                        //Build the mips. We already have all the data in cache on this core; 256KiB L2 can easily hold the processing context of a 128x128 glyph.
+                        //(Though worrying about performance in the content builder too much is pretty silly. We aren't going to be building fonts often.)
+                        //Note that we aligned and padded each glyph during packing. For a given texel in mip(n), the four parent texels in mip(n-1) can be safely sampled.
+                        for (int mipLevel = 1; mipLevel < preciseAtlas.MipLevels; ++mipLevel)
+                        {
+                            var mipMin = new Int2(min.X >> mipLevel, min.Y >> mipLevel);
+                            var mipMax = new Int2(max.X >> mipLevel, max.Y >> mipLevel);
+
+                            //Yes, these do some redundant calculations, but no it doesn't matter.
+                            var parentMipStart = preciseData + preciseAtlas.GetMipStartIndex(mipLevel - 1);
+                            var parentMipRowPitch = preciseAtlas.GetRowPitch(mipLevel - 1);
+                            var mipStart = preciseData + preciseAtlas.GetMipStartIndex(mipLevel);
+                            var mipRowPitch = preciseAtlas.GetRowPitch(mipLevel);
+                            for (int mipRowIndex = mipMin.Y; mipRowIndex < mipMax.Y; ++mipRowIndex)
+                            {
+                                var mipRow = mipStart + mipRowIndex * mipRowPitch;
+                                var parentRowIndex = mipRowIndex << 1;
+                                var parentMipRow0 = parentMipStart + parentRowIndex * parentMipRowPitch;
+                                var parentMipRow1 = parentMipStart + (parentRowIndex + 1) * parentMipRowPitch;
+                                for (int mipColumnIndex = mipMin.X; mipColumnIndex < mipMax.X; ++mipColumnIndex)
+                                {
+                                    var parentMipColumnIndex0 = mipColumnIndex << 1;
+                                    var parentMipColumnIndex1 = parentMipColumnIndex0 + 1;
+                                    mipRow[mipColumnIndex] = 0.25f * (
+                                        parentMipRow0[parentMipColumnIndex0] + parentMipRow0[parentMipColumnIndex1] +
+                                        parentMipRow1[parentMipColumnIndex0] + parentMipRow1[parentMipColumnIndex1]);
+                                }
+
+                            }
+                        }
+
+                        //Now that all mips have been filled, bake the data into the final single byte encoding.
+                        //Note that the conversion from distance to texels involves a normalization by the character's span. That helps ensure a reasonable amount
+                        //of precision. The runtime renderer computes the same normalization factor to move back into texel space.
+                        var encodingMultiplier = 1f / Math.Max(charData.SourceSpan.X, charData.SourceSpan.Y);
+                        for (int mipLevel = 0; mipLevel < atlas.MipLevels; ++mipLevel)
+                        {
+                            var mipMin = new Int2(min.X >> mipLevel, min.Y >> mipLevel);
+                            var mipMax = new Int2(max.X >> mipLevel, max.Y >> mipLevel);
+
+                            var encodedStart = atlasData + atlas.GetMipStartIndex(mipLevel);
+                            var preciseStart = preciseData + preciseAtlas.GetMipStartIndex(mipLevel);
+                            var rowPitch = atlas.GetRowPitch(mipLevel);
+                            for (int rowIndex = mipMin.Y; rowIndex < mipMax.Y; ++rowIndex)
+                            {
+                                var preciseRow = preciseStart + rowIndex * rowPitch;
+                                var encodedRow = encodedStart + rowIndex * rowPitch;
+                                for (int columnIndex = mipMin.X; columnIndex < mipMax.X; ++columnIndex)
+                                {
+                                    encodedRow[columnIndex] = (byte)(255 * Math.Min(1, encodingMultiplier * preciseRow[columnIndex]));
+                                }
+
+                            }
+                        }
                     });
                     atlas.Unpin();
+                    preciseAtlas.Unpin();
                     rasterizedAlphas.Unpin();
 
-                    //Build the mips.
-                    //Note that while the padding avoids cross-character contamination, there's no reason to exit the character bounds when creating lower mips; that data
-                    //might as well be at maximum distance.
 
                     //Build the kerning table.
                     var kerning = ComputeKerningTable(face, characterSet);
