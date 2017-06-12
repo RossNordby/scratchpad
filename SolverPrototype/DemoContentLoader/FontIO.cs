@@ -24,6 +24,7 @@ namespace DemoContentLoader
                 data.Bearing.X = reader.ReadSingle();
                 data.Bearing.Y = reader.ReadSingle();
                 data.Advance = reader.ReadSingle();
+                characterData.Add(character, data);
             }
             var kerningRelationshipCount = reader.ReadInt32();
             var kerningTable = new Dictionary<CharacterPair, float>();

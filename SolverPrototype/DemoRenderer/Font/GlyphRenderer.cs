@@ -33,7 +33,7 @@ namespace DemoRenderer.Font
         struct VertexConstants
         {
             public Vector2 HorizontalAxis;
-            public Vector2 InverseHalfScreenResolution;
+            public Vector2 ScreenToNDCScale;
             public Vector2 InverseAtlasResolution;
         }
         ConstantsBuffer<VertexConstants> vertexConstants;
@@ -106,7 +106,7 @@ namespace DemoRenderer.Font
             var vertexConstantsData = new VertexConstants
             {
                 HorizontalAxis = horizontalAxis,
-                InverseHalfScreenResolution = new Vector2(2f / screenResolution.X, 2f / screenResolution.Y),
+                ScreenToNDCScale = new Vector2(2f / screenResolution.X, -2f / screenResolution.Y),
                 InverseAtlasResolution = new Vector2(1f / font.Content.Atlas.Width, 1f / font.Content.Atlas.Height)
             };
             vertexConstants.Update(context, ref vertexConstantsData);

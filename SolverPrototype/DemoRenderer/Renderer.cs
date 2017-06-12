@@ -48,6 +48,10 @@ namespace DemoRenderer
             Background = new BackgroundRenderer(surface.Device, ShaderCache);
             CompressToSwap = new CompressToSwap(surface.Device, ShaderCache);
 
+            GlyphRenderer = new GlyphRenderer(surface.Device, surface.Context, ShaderCache);
+            TextBatcher = new TextBatcher();
+
+
 
             OnResize();
             var rasterizerStateDescription = RasterizerStateDescription.Default();

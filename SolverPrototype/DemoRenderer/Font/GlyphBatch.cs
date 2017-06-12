@@ -7,7 +7,7 @@ namespace DemoRenderer.Font
     /// <summary>
     /// Helper class to build renderable sets of glyphs.
     /// </summary>
-    public class GlyphsBatch
+    public class GlyphBatch
     {
         GlyphInstance[] glyphs;
         public GlyphInstance[] Glyphs
@@ -20,7 +20,7 @@ namespace DemoRenderer.Font
 
         public int GlyphCount { get; private set; }
 
-        public GlyphsBatch(int initialCapacity = 128)
+        public GlyphBatch(int initialCapacity = 128)
         {
             glyphs = new GlyphInstance[initialCapacity];
         }
@@ -45,9 +45,11 @@ namespace DemoRenderer.Font
             var penPosition = startingPosition;
             var verticalAxis = new Vector2(-horizontalAxis.Y, horizontalAxis.X);
             var nextCharacterIndex = start;
-            int glyphIndex = GlyphCount;
+            var characterEnd = start + count;
             while (true)
             {
+                if (nextCharacterIndex >= characterEnd)
+                    break;
                 var character = characters[nextCharacterIndex++];
                 //Only create a glyph for characters that our font actually has entries for. Others will just be skipped without advancing.
                 if (font.Content.Characters.TryGetValue(character, out var characterData))
@@ -55,7 +57,7 @@ namespace DemoRenderer.Font
                     //No point wasting time rendering a glyph with nothing in it. At least for any normal-ish font.
                     if (character != ' ')
                     {
-                        ref var glyph = ref glyphs[glyphIndex];
+                        ref var glyph = ref glyphs[GlyphCount++];
                         //Note subtraction on y component. In texture space, +1 is down, -1 is up.
                         var localOffsetToCharacter = new Vector2(characterData.Bearing.X * scale, characterData.Bearing.Y * scale); 
                         var offsetToCharacter = localOffsetToCharacter.X * horizontalAxis - localOffsetToCharacter.Y * verticalAxis;
@@ -66,7 +68,7 @@ namespace DemoRenderer.Font
                     }
                     //Move the pen to the next character.
                     float advance = characterData.Advance;
-                    if (nextCharacterIndex < GlyphCount)
+                    if (nextCharacterIndex < characterEnd)
                         advance += font.Content.GetKerningInTexels(character, characters[nextCharacterIndex]);
                     penPosition += horizontalAxis * (scale * advance);
                 }

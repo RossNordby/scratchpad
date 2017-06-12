@@ -6,6 +6,8 @@ using SharpFont;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -132,10 +134,9 @@ namespace DemoContentBuilder
                     var preciseData = (float*)preciseAtlas.Pin();
                     var alphaData = rasterizedAlphas.Pin();
                     var pool = new PassthroughArrayPool<Int2>();
-                    for (int i = 0; i < sortedCharacterData.Length; ++i)
-                    //Parallel.For(0, sortedCharacterData.Length, i =>
+                    //for (int i = 0; i < sortedCharacterData.Length; ++i)
+                    Parallel.For(0, sortedCharacterData.Length, i =>
                     {
-                        var charStartTime = Stopwatch.GetTimestamp();
                         //Note that the padding around characters should also have its distances filled in. That way, the less detailed mips can pull from useful data.
                         ref var charData = ref sortedCharacterData[i];
 
@@ -222,8 +223,6 @@ namespace DemoContentBuilder
                             }
                         }
 
-                        
-                        var bfsTimeEnd = Stopwatch.GetTimestamp();
                         //Build the mips. We already have all the data in cache on this core; 256KiB L2 can easily hold the processing context of a 128x128 glyph.
                         //(Though worrying about performance in the content builder too much is pretty silly. We aren't going to be building fonts often.)
                         //Note that we aligned and padded each glyph during packing. For a given texel in mip(n), the four parent texels in mip(n-1) can be safely sampled.
@@ -278,12 +277,27 @@ namespace DemoContentBuilder
 
                             }
                         }
-                        var charEndTime = Stopwatch.GetTimestamp();
-                        var time = (charEndTime - charStartTime) / (double)Stopwatch.Frequency;
-                        var bfsTime = (bfsTimeEnd - bfsTimeStart) / (double)Stopwatch.Frequency;
-                        Console.WriteLine($"Char {sortedCharacterSet[i]}, {sortedCharacterData[i].SourceSpan}: {1e3 * time}, BFS %: {100.0 * (bfsTime / time)}");
-                        //});
-                    }
+                    });
+
+                    //const int savedMip = MipLevels - 1;
+                    //var bitmap = new Bitmap(atlas.Width >> savedMip, atlas.Height >> savedMip);
+                    //var bitmapData = bitmap.LockBits(new Rectangle(new Point(), new Size(bitmap.Width, bitmap.Height)),
+                    //    ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
+
+                    //var scan0 = (byte*)bitmapData.Scan0;
+                    //var sourceStart = atlasData + atlas.GetMipStartIndex(savedMip);
+                    //for (int rowIndex = 0; rowIndex < bitmapData.Height; ++rowIndex)
+                    //{
+                    //    var row = (int*)(scan0 + bitmapData.Stride * rowIndex);
+                    //    var sourceRow = sourceStart + atlas.GetRowOffsetFromMipStart(savedMip, rowIndex);
+                    //    for (int columnIndex = 0; columnIndex < bitmapData.Width; ++columnIndex)
+                    //    {
+                    //        row[columnIndex] = sourceRow[columnIndex] | (sourceRow[columnIndex] << 8) | (sourceRow[columnIndex] << 16) | (sourceRow[columnIndex] << 24);
+                    //    }
+                    //}
+                    //bitmap.UnlockBits(bitmapData);
+                    //bitmap.Save($"{face.FamilyName}Test.bmp", ImageFormat.Bmp);
+
                     atlas.Unpin();
                     preciseAtlas.Unpin();
                     rasterizedAlphas.Unpin();
@@ -291,6 +305,7 @@ namespace DemoContentBuilder
 
                     //Build the kerning table.
                     var kerning = ComputeKerningTable(face, characterSet);
+
 
 
                     return new FontContent(atlas, face.FamilyName, 1f / FontSizeInPixels, characters, kerning);

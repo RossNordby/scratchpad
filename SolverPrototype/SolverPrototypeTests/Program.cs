@@ -19,11 +19,11 @@ namespace SolverPrototypeTests
             var window = new Window("pretty cool multicolored window", new Int2(512, 512), WindowMode.Windowed);
             var loop = new GameLoop(window);
             ContentArchive content;
-            using (var stream = File.OpenRead("DemoContent.ca"))
+            using (var stream = File.OpenRead("SolverPrototypeTestsContent.ca"))
             {
                 content = ContentArchive.Load(stream);
             }
-            var fontContent = content.Load<FontContent>(@"Content\linear-by-braydon-fuller.otf");
+            var fontContent = content.Load<FontContent>(@"Content\Courier Prime Sans.ttf");
             var font = new Font(loop.Surface.Device, loop.Surface.Context, fontContent);
             var demo = new BasicDemo(window, loop.Input, loop.Camera, font);
             loop.Run(demo.Update, demo.Render);

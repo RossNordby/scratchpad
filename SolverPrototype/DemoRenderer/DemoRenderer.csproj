@@ -4,10 +4,11 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
     <RuntimeFrameworkVersion>2.0.0-preview2-25319-02</RuntimeFrameworkVersion>
+    <PreBuildEvent>"C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PreBuildEvent>
   </PropertyGroup>
 
+  <!-- TODO: Update these references once the macros are actually working again. This won't run on anyone else's computer! -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <!-- TODO: Update these references once the macros are actually working again. This won't run on anyone else's computer! -->
     <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Release\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj"</PostBuildEvent>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -23,8 +24,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <!-- TODO: Update these references once the macros are actually working again. This won't run on anyone else's computer! -->
-    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PostBuildEvent>
+    <PostBuildEvent></PostBuildEvent>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 

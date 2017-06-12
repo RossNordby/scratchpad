@@ -57,6 +57,7 @@ dlldata.c
 *.svclog
 # Demo content pipeline cache files
 *.scc
+*.sc
 *.cbc
 *.ca
 
@@ -204,4 +205,3 @@ ModelManifest.xml
 /SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.opendb
 /SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
 /SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
-*.ca

@@ -5,7 +5,7 @@ ps
 cbuffer VertexConstants : register(b0)
 {
 	float2 HorizontalAxis;
-	float2 InverseHalfScreenResolution;
+	float2 ScreenToNDCScale;
 	float2 InverseAtlasResolution;
 };
 
@@ -53,11 +53,10 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	float2 verticalAxis = float2(-HorizontalAxis.y, HorizontalAxis.x);
 	float2 screenPosition = instance.TargetPosition +
 		localOffset.x * HorizontalAxis + localOffset.y * verticalAxis;
-	//Bring the screen position into NDC for use as the SV_Position.
-	//NDC = screenPosition * inverseResolution * 2 - 1
-	//(1 / resolution) * 2 = 1 / (resolution * 0.5)
+	//Bring the screen position into NDC for use as the SV_Position. Note the negation along Y;
+	//NDC +1 is up, while in screenspace/texture space +1 is down.
 	output.Position = float4(
-		screenPosition * InverseHalfScreenResolution - 1.0, 0.5, 1);
+		screenPosition * ScreenToNDCScale + float2(-1.0, 1.0), 0.5, 1);
 	output.AtlasUV = (source.Minimum + source.Span * quadCoordinates) * InverseAtlasResolution;
 	output.DistanceScale = max(scaledSpan.x, scaledSpan.y);
 	return output;
@@ -82,5 +81,6 @@ float4 PSMain(PSInput input) : SV_Target0
 	//At 0 distance, it becomes opaque. Intermediate distances imply partial coverage.
 	const float sampleWidth = .707;
 	float alpha = saturate(1 - screenDistance / sampleWidth);
+	return float4(1, 0, 0, 1);
 	return float4(Color * alpha, alpha);
-}
+}//d

@@ -39,9 +39,9 @@ namespace DemoRenderer.Font
                 return Equals((BatchDescription)obj);
             }
         }
-        Pool<GlyphsBatch> batchPool = new Pool<GlyphsBatch>(() => new GlyphsBatch(), cleaner: batch => batch.Clear());
+        Pool<GlyphBatch> batchPool = new Pool<GlyphBatch>(() => new GlyphBatch(), cleaner: batch => batch.Clear());
 
-        Dictionary<BatchDescription, GlyphsBatch> batches = new Dictionary<BatchDescription, GlyphsBatch>();
+        Dictionary<BatchDescription, GlyphBatch> batches = new Dictionary<BatchDescription, GlyphBatch>();
 
         public void Write(StringBuilder characters, int start, int count, Vector2 targetPosition, float height,
             Vector2 horizontalAxis, Vector3 color, Font font)
