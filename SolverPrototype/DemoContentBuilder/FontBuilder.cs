@@ -1,4 +1,6 @@
 ﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using DemoContentLoader;
 using SharpFont;
 using System;
@@ -129,6 +131,7 @@ namespace DemoContentBuilder
                     var atlasData = atlas.Pin();
                     var preciseData = (float*)preciseAtlas.Pin();
                     var alphaData = rasterizedAlphas.Pin();
+                    var pool = new PassthroughArrayPool<Int2>();
                     for (int i = 0; i < sortedCharacterData.Length; ++i)
                     //Parallel.For(0, sortedCharacterData.Length, i =>
                     {
@@ -136,98 +139,98 @@ namespace DemoContentBuilder
                         //Note that the padding around characters should also have its distances filled in. That way, the less detailed mips can pull from useful data.
                         ref var charData = ref sortedCharacterData[i];
 
-                        var min = new Int2((int)charData.SourceMinimum.X - padding, (int)charData.SourceMinimum.Y - padding);
-                        var max = new Int2((int)(charData.SourceMinimum.X + charData.SourceSpan.X) + padding, (int)(charData.SourceMinimum.Y + charData.SourceSpan.Y) + padding);
+                        var min = new Int2((int)charData.SourceMinimum.X, (int)charData.SourceMinimum.Y);
+                        var max = new Int2((int)(charData.SourceMinimum.X + charData.SourceSpan.X), (int)(charData.SourceMinimum.Y + charData.SourceSpan.Y));
+                        var paddedMin = new Int2(min.X - padding, min.Y - padding);
+                        var paddedMax = new Int2(max.X + padding, max.Y + padding);
                         //Initialize every character texel to max distance. The following BFS only ever reduces distances, so it has to start high.
                         var maxDistance = Math.Max(AtlasWidth, packer.Height);
-                        for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
+                        for (int rowIndex = paddedMin.Y; rowIndex < paddedMax.Y; ++rowIndex)
                         {
                             var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex);
                             var distancesRow = preciseData + rowOffset;
-                            for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
+                            for (int columnIndex = paddedMin.X; columnIndex < paddedMax.X; ++columnIndex)
                             {
                                 distancesRow[columnIndex] = maxDistance;
                             }
                         }
 
-                        //For each texel within the allocated region that has a nonzero alpha, use a breadth first traversal to mark every neighbor with a distance.
-                        //If a neighbor already has a distance which is smaller, don't overwrite it.
-                        //Note: this memory allocation could be optimized quite a bit; we recreate a queue for every character. It won't matter that much, though.
-                        var toVisit = new Queue<Int2>((int)((charData.SourceSpan.X + padding * 2) * (charData.SourceSpan.Y + padding * 2)));
 
+                        //Scan the alphas. Add border texels of the glyph to the point set.
+                        QuickList<Int2, Array<Int2>>.Create(pool, (max.X - min.X) * (max.Y - min.Y), out var glyphPoints);
                         for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
                         {
-                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex); //The alphas and distances textures have the same dimensions on mip0, so sharing this is safe.
+                            //Alphas and atlas have same dimensions, so sharing row offset is safe.
+                            Debug.Assert(padding > 0, "This assumes at least one padding; no boundary checking is performed on the alpha accesses.");
+                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex);
                             var distancesRow = preciseData + rowOffset;
-                            var alphasRow = alphaData + rowOffset;
+                            var alphasRow0 = alphaData + rowOffset - preciseAtlas.Width;
+                            var alphasRow1 = alphaData + rowOffset;
+                            var alphasRow2 = alphaData + rowOffset + preciseAtlas.Width;
                             for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
                             {
-                                if (alphasRow[columnIndex] > 0)
+                                if (alphasRow1[columnIndex] > 0)
                                 {
                                     //Nonzero alpha.
                                     //Interpret the partial alpha as a distance. (0, sqrt(2)/2) to (255, 0).
-                                    //Any point that happens to have a shorter path will have this base distance overridden. It will only affect texels whose closest path 
-                                    //goes through this texel.
-                                    var baseDistance = 0.70710678118f - alphasRow[columnIndex] * (0.70710678118f / 255f);
-                                    if (distancesRow[columnIndex] > baseDistance)
+                                    distancesRow[columnIndex] = 0.70710678118f - alphasRow1[columnIndex] * (0.70710678118f / 255f);
+                                    //Only add this to the point set if there is at least one texel in the 3x3 neighborhood with an alpha equal to zero.
+                                    //If there isn't a zero alpha texel next to this one, there's no way for it to provide the lowest distance to an external texel.
+                                    if (alphasRow0[columnIndex - 1] == 0 ||
+                                        alphasRow0[columnIndex + 0] == 0 ||
+                                        alphasRow0[columnIndex + 1] == 0 ||
+                                        alphasRow1[columnIndex - 1] == 0 ||
+                                        alphasRow1[columnIndex + 1] == 0 ||
+                                        alphasRow2[columnIndex - 1] == 0 ||
+                                        alphasRow2[columnIndex + 0] == 0 ||
+                                        alphasRow2[columnIndex + 1] == 0)
                                     {
-                                        //The existing distance is larger than the base distance, so it's possible to improve.
-                                        distancesRow[columnIndex] = baseDistance;
-                                        //Begin the BFS. 
-                                        var origin = new Int2 { X = columnIndex, Y = rowIndex };
-                                        toVisit.Enqueue(origin); //Little bit of redundant work. Shrug.
-                                        while (toVisit.Count > 0)
-                                        {
-                                            var visited = toVisit.Dequeue();
-
-                                            for (int neighborX = visited.X - 1; neighborX <= visited.X + 1; ++neighborX)
-                                            {
-                                                var increment = neighborX == 0 ? 2 : 1;
-                                                for (int neighborY = visited.Y - 1; neighborY <= visited.Y + 1; neighborY += increment)
-                                                {
-                                                    if (neighborX >= min.X && neighborX < max.X &&
-                                                        neighborY >= min.Y && neighborY < max.Y)
-                                                    {
-                                                        //WARNING NOTE: Be very, very careful about changing things here. With the x86 JIT, which this project uses due to 
-                                                        //being a full framework application with x86 dependencies, small changes to codeflow here can cause infinite loops and other fun.
-                                                        //For example, you might be tempted to extract this body into a function and unroll the neighbor loop, but
-                                                        //that will likely cause an infinite loop.
-                                                        //I didn't report this bug- I'm pretty sure this is a problem in the old JIT, and it'll hopefully get replaced by ryujit eventually.
-                                                        //(Desktop framework doesn't yet have plans to use ryujit for x86, but if I can move the content builder to x64
-                                                        //or .NET Core eventually, it should no longer be an issue.)
-
-                                                        //The neighbor is within the character's texel region. Is this origin closer than any previous one for this texel?
-                                                        var xOffset = neighborX - origin.X;
-                                                        var yOffset = neighborY - origin.Y;
-                                                        var candidateDistance = (float)Math.Sqrt(xOffset * xOffset + yOffset * yOffset) + baseDistance;
-                                                        var neighborIndex = preciseAtlas.GetOffsetForMip0(neighborX, neighborY);
-                                                        //var neighborIndex = neighborY * preciseAtlas.Width + neighborX;
-                                                        //Note that this condition stops cycles. Visiting the same node from the same origin cannot produce a lower distance on later visits.
-                                                        //It also makes the BFS early out extremely frequently- the number of traversals required for each nonzero alpha texel will decrease significantly
-                                                        //as more are visited.
-                                                        if (candidateDistance < preciseData[neighborIndex])
-                                                        {
-                                                            //It's closer. 
-                                                            preciseData[neighborIndex] = candidateDistance;
-                                                            //Since this was closer, the neighbor's neighbors might be too.
-                                                            toVisit.Enqueue(new Int2 { X = neighborX, Y = neighborY });
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                        }
+                                        Int2 texelCoordinates;
+                                        texelCoordinates.X = columnIndex;
+                                        texelCoordinates.Y = rowIndex;
+                                        glyphPoints.AddUnsafely(ref texelCoordinates);
                                     }
                                 }
                             }
                         }
+                        var bfsTimeStart = Stopwatch.GetTimestamp();
+
+                        //For every texel in the character's region, scan the glyph point set for the nearest texel.
+                        for (int rowIndex = paddedMin.Y; rowIndex < paddedMax.Y; ++rowIndex)
+                        {
+                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex);
+                            var distancesRow = preciseData + rowOffset;
+                            for (int columnIndex = paddedMin.X; columnIndex < paddedMax.X; ++columnIndex)
+                            {
+                                //Don't bother scanning the point set if this texel had its distance set by the earlier glyph point set gather.
+                                if (distancesRow[columnIndex] == maxDistance)
+                                {
+                                    float lowestDistance = float.MaxValue;
+                                    for (int pointIndex = 0; pointIndex < glyphPoints.Count; ++pointIndex)
+                                    {
+                                        ref var point = ref glyphPoints[pointIndex];
+                                        var offsetX = point.X - columnIndex;
+                                        var offsetY = point.Y - rowIndex;
+                                        //Note the inclusion of the glyph point's own distance.
+                                        //For interior points, that'll be zero, but it's useful for taking into account partial coverage.
+                                        var candidateDistance = (float)Math.Sqrt(offsetX * offsetX + offsetY * offsetY) + preciseData[preciseAtlas.GetOffsetForMip0(point.X, point.Y)];
+                                        if (candidateDistance < lowestDistance)
+                                            lowestDistance = candidateDistance;
+                                    }
+                                    distancesRow[columnIndex] = lowestDistance;
+                                }
+                            }
+                        }
+
+                        
+                        var bfsTimeEnd = Stopwatch.GetTimestamp();
                         //Build the mips. We already have all the data in cache on this core; 256KiB L2 can easily hold the processing context of a 128x128 glyph.
                         //(Though worrying about performance in the content builder too much is pretty silly. We aren't going to be building fonts often.)
                         //Note that we aligned and padded each glyph during packing. For a given texel in mip(n), the four parent texels in mip(n-1) can be safely sampled.
                         for (int mipLevel = 1; mipLevel < preciseAtlas.MipLevels; ++mipLevel)
                         {
-                            var mipMin = new Int2(min.X >> mipLevel, min.Y >> mipLevel);
-                            var mipMax = new Int2(max.X >> mipLevel, max.Y >> mipLevel);
+                            var mipMin = new Int2(paddedMin.X >> mipLevel, paddedMin.Y >> mipLevel);
+                            var mipMax = new Int2(paddedMax.X >> mipLevel, paddedMax.Y >> mipLevel);
 
                             //Yes, these do some redundant calculations, but no it doesn't matter.
                             var parentMipStart = preciseData + preciseAtlas.GetMipStartIndex(mipLevel - 1);
@@ -258,8 +261,8 @@ namespace DemoContentBuilder
                         var encodingMultiplier = 1f / Math.Max(charData.SourceSpan.X, charData.SourceSpan.Y);
                         for (int mipLevel = 0; mipLevel < atlas.MipLevels; ++mipLevel)
                         {
-                            var mipMin = new Int2(min.X >> mipLevel, min.Y >> mipLevel);
-                            var mipMax = new Int2(max.X >> mipLevel, max.Y >> mipLevel);
+                            var mipMin = new Int2(paddedMin.X >> mipLevel, paddedMin.Y >> mipLevel);
+                            var mipMax = new Int2(paddedMax.X >> mipLevel, paddedMax.Y >> mipLevel);
 
                             var encodedStart = atlasData + atlas.GetMipStartIndex(mipLevel);
                             var preciseStart = preciseData + preciseAtlas.GetMipStartIndex(mipLevel);
@@ -276,7 +279,9 @@ namespace DemoContentBuilder
                             }
                         }
                         var charEndTime = Stopwatch.GetTimestamp();
-                        Console.WriteLine($"Char {sortedCharacterSet[i]}, {sortedCharacterData[i].SourceSpan}: {1e3 * (charEndTime - charStartTime) / Stopwatch.Frequency}");
+                        var time = (charEndTime - charStartTime) / (double)Stopwatch.Frequency;
+                        var bfsTime = (bfsTimeEnd - bfsTimeStart) / (double)Stopwatch.Frequency;
+                        Console.WriteLine($"Char {sortedCharacterSet[i]}, {sortedCharacterData[i].SourceSpan}: {1e3 * time}, BFS %: {100.0 * (bfsTime / time)}");
                         //});
                     }
                     atlas.Unpin();

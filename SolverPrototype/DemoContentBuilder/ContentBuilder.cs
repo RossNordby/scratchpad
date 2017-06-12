@@ -24,6 +24,7 @@ namespace DemoContentBuilder
             warnings = new List<ContentBuildResult>();
             bool newContentBuilt = false;
             ContentBuildCacheIO.Load(buildCachePath, out var loadedBuildCache);
+            loadedBuildCache = new Dictionary<string, ContentElement>();
             var newBuildCache = new Dictionary<string, ContentElement>();
             foreach (var path in fontPaths)
             {
