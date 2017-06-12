@@ -43,7 +43,7 @@ namespace DemoContentLoader
                 case ContentType.Font:
                     return FontIO.Load(reader);
             }
-            throw new ArgumentException("Given content type cannot be loaded; no loader is specified. Is the archive corrupted?");
+            throw new ArgumentException($"Given content type {type} cannot be loaded; no loader is specified. Is the archive corrupted?");
         }
 
         public static void Save(IContent content, BinaryWriter writer)
@@ -52,7 +52,7 @@ namespace DemoContentLoader
             {
                 case ContentType.Font:
                     FontIO.Save((FontContent)content, writer);
-                    break;
+                    return;
             }
             throw new ArgumentException("Given content type cannot be saved; no archiver is specified.");
         }

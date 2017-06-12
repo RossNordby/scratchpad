@@ -58,7 +58,7 @@ dlldata.c
 # Demo content pipeline cache files
 *.scc
 *.cbc
-*.cc
+*.ca
 
 # Chutzpah Test files
 _Chutzpah*
@@ -204,3 +204,4 @@ ModelManifest.xml
 /SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.opendb
 /SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
 /SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
+*.ca

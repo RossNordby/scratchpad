@@ -47,74 +47,115 @@ namespace DemoContentBuilder
         int AddAndGetBaseHeight(int queryStart, int queryEnd, int newGlyphHeight)
         {
             Debug.Assert(queryStart >= 0 && queryStart < atlasWidth && queryEnd > 0 && queryEnd <= atlasWidth);
-            //Performance doesn't matter here. Just scan through the interval set until the first interval that overlaps the query interval.
-            int startIntervalIndex = -1;
+            //Performance doesn't matter here. Just scan through the interval set until the first interval that is fully overlapped by the query interval.
+            int firstOverlappedIndex = intervals.Count;
             int baseHeight = 0;
             for (int i = 0; i < intervals.Count; ++i)
             {
                 var interval = intervals[i];
-                if (interval.Start < queryEnd && interval.End > queryStart)
+                if (interval.End > queryStart)
                 {
+                    firstOverlappedIndex = i;
                     baseHeight = interval.Height;
-                    startIntervalIndex = i;
                     break;
                 }
             }
-            Debug.Assert(startIntervalIndex >= 0);
-            //Continue until we find the first interval that doesn't overlap the query interval.
-            int endIntervalIndex = intervals.Count; //Exclusive bound.
-            for (int i = startIntervalIndex + 1; i < intervals.Count; ++i)
+            //Now scan until the first interval after that that doesn't overlap.
+            int lastOverlappedIndex = firstOverlappedIndex;
+            for (int i = firstOverlappedIndex + 1; i < intervals.Count; ++i)
             {
                 var interval = intervals[i];
-                if (interval.Start >= queryEnd || interval.End <= queryStart)
+                if (interval.Start < queryEnd)
                 {
-                    endIntervalIndex = i;
-                    break;
+                    if (interval.Height > baseHeight)
+                        baseHeight = interval.Height;
+                    lastOverlappedIndex = i;
                 }
-                if (interval.Height > baseHeight)
-                    baseHeight = interval.Height;
+                else
+                    break;
             }
-
             //Align and round up base height.
             baseHeight = (baseHeight + alignmentMask) & (~alignmentMask);
+            
+            var firstInterval = intervals[firstOverlappedIndex];
+            Interval queryInterval;
+            queryInterval.Start = queryStart;
+            queryInterval.End = queryEnd;
+            queryInterval.Height = baseHeight + newGlyphHeight;
+            if (queryInterval.Height > Height)
+                Height = queryInterval.Height;
+            Debug.Assert(queryInterval.End > queryInterval.Start);
 
-            //We know that the new glyph will be the highest point, so we can replace the interval section with it.
-            //Change the endpoint of the first overlapped interval to be the beginning of the new interval.
-            //Note that the constructor guarantees that there will always be at least one overlapped interval.
-            var modifiedStartInterval = intervals[startIntervalIndex];
-            modifiedStartInterval.End = queryStart;
-            intervals[startIntervalIndex] = modifiedStartInterval;
-            var overlappedIntervalCount = endIntervalIndex - startIntervalIndex;
-            if (overlappedIntervalCount > 1)
+            if (firstOverlappedIndex == lastOverlappedIndex && firstInterval.Start < queryStart && firstInterval.End > queryEnd)
             {
-                var modifiedEndInterval = intervals[endIntervalIndex - 1];
-                modifiedEndInterval.Start = queryEnd;
-                intervals[endIntervalIndex - 1] = modifiedEndInterval;
-            }
-            var newInterval = new Interval { Start = queryStart, End = queryEnd, Height = newGlyphHeight + baseHeight };
-            if (overlappedIntervalCount > 2)
-            {
-                //Remove all intervals which are fully contained within the new character's interval, indices [startIntervalIndex + 1, endIntervalIndex - 2].
-                //Leave one in place so that we can replace it without another memory-bumping insertion.
-                intervals.RemoveRange(startIntervalIndex + 1, overlappedIntervalCount - 2);
-                intervals[startIntervalIndex + 1] = newInterval;
+                //The query interval is inside of an interval, with space available on either side.
+                //Add two more intervals- the query interval, and the interval on the other side.
+                //We treat the existing interval as the left side.
+                var otherSideInterval = firstInterval;
+                otherSideInterval.Start = queryEnd;
+                firstInterval.End = queryStart;
+                Debug.Assert(firstInterval.End > firstInterval.Start);
+                intervals[firstOverlappedIndex] = firstInterval;
+
+                intervals.Insert(firstOverlappedIndex + 1, queryInterval);
+                Debug.Assert(otherSideInterval.End > otherSideInterval.Start);
+                intervals.Insert(firstOverlappedIndex + 2, otherSideInterval);
             }
             else
             {
-                //The overlapped interval count is 2 or 1. We've already adjusted the first overlapped interval and, if it exists, the last overlapped interval.
-                //All that's left is to insert a new interval for the new object.
-                intervals.Insert(startIntervalIndex + 1, newInterval);
+                //The query covers more than one interval.
+                int removalStartIndex;
+                if (firstInterval.Start == queryStart)
+                {
+                    //The first overlapped index is contained by the query interval. It should be removed.
+                    removalStartIndex = firstOverlappedIndex;
+                }
+                else
+                {
+                    //The first overlapped index isn't contained; modify its end to match the query start.
+                    removalStartIndex = firstOverlappedIndex + 1;
+                    firstInterval.End = queryStart;
+                    Debug.Assert(firstInterval.End > firstInterval.Start);
+                    intervals[firstOverlappedIndex] = firstInterval;
+                }
+       
+                var lastInterval = intervals[lastOverlappedIndex];
+                int removalEndIndex;
+                if (lastInterval.End == queryEnd)
+                {
+                    //The last overlapped interval is contained by the query interval. It should be removed.
+                    removalEndIndex = lastOverlappedIndex;
+                }
+                else
+                {
+                    //The last overlapped interval isn't contained; modify its start to match the query end.
+                    removalEndIndex = lastOverlappedIndex - 1;
+                    lastInterval.Start = queryEnd;
+                    Debug.Assert(lastInterval.End > lastInterval.Start);
+                    intervals[lastOverlappedIndex] = lastInterval;
+                }
+                //Note that the end is an inclusive bound. The total number of contained intervals is removalEndIndex - removalStartIndex + 1,
+                //but reusing one of them avoids an unnecessary insert.
+                var removedCount = removalEndIndex - removalStartIndex;
+                if (removedCount >= 0)
+                {
+                    intervals.RemoveRange(removalStartIndex, removalEndIndex - removalStartIndex);
+                    intervals[removalStartIndex] = queryInterval;
+                }
+                else
+                {
+                    intervals.Insert(removalStartIndex, queryInterval);
+                }
             }
             return baseHeight;
         }
 
-        private void FillCharacterMinimumAndMove(ref CharacterData characterData, int end)
+        private void FillCharacterMinimum(ref CharacterData characterData, int end)
         {
             characterData.SourceMinimum.X = padding + start;
             characterData.SourceMinimum.Y = padding + AddAndGetBaseHeight(start, end, (int)characterData.SourceSpan.Y + paddingx2);
-            start = end;
         }
-        
+
 
         public void Add(ref CharacterData characterData)
         {
@@ -132,7 +173,8 @@ namespace DemoContentBuilder
 
                 if (end <= atlasWidth)
                 {
-                    FillCharacterMinimumAndMove(ref characterData, end);
+                    FillCharacterMinimum(ref characterData, end);
+                    start = end;
                 }
                 else
                 {
@@ -151,7 +193,7 @@ namespace DemoContentBuilder
                     //Delayed alignment; alignment will never make this negative.
                     start = start & (~alignmentMask);
                     var end = start + allocationWidth;
-                    FillCharacterMinimumAndMove(ref characterData, end);
+                    FillCharacterMinimum(ref characterData, end);
                 }
                 else
                 {

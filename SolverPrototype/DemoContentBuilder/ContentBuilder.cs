@@ -32,6 +32,7 @@ namespace DemoContentBuilder
                 {
                     //We can just used the cached version of this content.
                     newBuildCache.Add(path, cachedContent);
+                    Console.WriteLine($"Content up to date: {path}");
                 }
                 else
                 {
@@ -46,6 +47,7 @@ namespace DemoContentBuilder
                             newElement.Content = FontBuilder.Build(stream);
                             newBuildCache.Add(path, newElement);
                             newContentBuilt = true;
+                            Console.WriteLine($"Content built: {path}");
                         }
                         catch (Exception e)
                         {
@@ -56,7 +58,7 @@ namespace DemoContentBuilder
             }
 
             //If we have new OR less content, the files should be rewritten.
-            if (newContentBuilt || newBuildCache.Count < loadedBuildCache.Count) 
+            if (newContentBuilt || newBuildCache.Count < loadedBuildCache.Count)
             {
                 var archive = new Dictionary<string, IContent>();
                 foreach (var pair in newBuildCache)

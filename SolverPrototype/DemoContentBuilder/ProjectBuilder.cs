@@ -109,7 +109,7 @@ namespace DemoContentBuilder
                 }
                 ContentBuilder.BuildContent(workingPath,
                     cachePathStart + "ContentBuildCache.cbc",
-                    cachePathStart + "Content.cc", fontPaths, out var contentWarnings, out var contentErrors);
+                    cachePathStart + "Content.ca", fontPaths, out var contentWarnings, out var contentErrors);
                 foreach (var error in contentErrors)
                 {
                     Console.WriteLine($"{error.File}: error: {error.Message}");

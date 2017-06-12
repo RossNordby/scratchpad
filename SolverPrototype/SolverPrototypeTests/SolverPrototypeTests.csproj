@@ -40,12 +40,10 @@
   <ItemGroup>
     <None Remove="Content\Courier Prime Sans.ttf" />
     <None Remove="Content\GenericMonoII-Regular.otf" />
-    <None Remove="Content\linear-by-braydon-fuller.otf" />
   </ItemGroup>
 
   <ItemGroup>
     <Content Include="Content\Courier Prime Sans.ttf" />
-    <Content Include="Content\linear-by-braydon-fuller.otf" />
   </ItemGroup>
 
   <ItemGroup>

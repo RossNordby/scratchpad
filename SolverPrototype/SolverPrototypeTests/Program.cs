@@ -6,6 +6,7 @@ using DemoRenderer.Font;
 using DemoUtilities;
 using OpenTK.Input;
 using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace SolverPrototypeTests

@@ -46,7 +46,7 @@ namespace DemoContentBuilder
         {
             public int Compare(CharacterData a, CharacterData b)
             {
-                return a.SourceSpan.Y > b.SourceSpan.Y ? 1 : a.SourceSpan.Y < b.SourceSpan.Y ? -1 : 0;
+                return a.SourceSpan.Y < b.SourceSpan.Y ? 1 : a.SourceSpan.Y > b.SourceSpan.Y ? -1 : 0;
             }
         }
 
@@ -116,7 +116,7 @@ namespace DemoContentBuilder
                         for (int glyphRow = 0; glyphRow < glyphHeight; ++glyphRow)
                         {
                             Unsafe.CopyBlockUnaligned(
-                                ref rasterizedAlphas.Data[rasterizedAlphas.GetRowOffsetFromMipStart(0, glyphRow + location.Y) + location.X],
+                                ref rasterizedAlphas.Data[rasterizedAlphas.GetRowOffsetForMip0(glyphRow + location.Y) + location.X],
                                 ref glyphBuffer[glyphRow * glyphWidth], (uint)glyphWidth);
                         }
                     }
@@ -129,8 +129,10 @@ namespace DemoContentBuilder
                     var atlasData = atlas.Pin();
                     var preciseData = (float*)preciseAtlas.Pin();
                     var alphaData = rasterizedAlphas.Pin();
-                    Parallel.For(0, sortedCharacterData.Length, i =>
+                    for (int i = 0; i < sortedCharacterData.Length; ++i)
+                    //Parallel.For(0, sortedCharacterData.Length, i =>
                     {
+                        var charStartTime = Stopwatch.GetTimestamp();
                         //Note that the padding around characters should also have its distances filled in. That way, the less detailed mips can pull from useful data.
                         ref var charData = ref sortedCharacterData[i];
 
@@ -140,7 +142,7 @@ namespace DemoContentBuilder
                         var maxDistance = Math.Max(AtlasWidth, packer.Height);
                         for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
                         {
-                            var rowOffset = preciseAtlas.GetRowOffsetFromMipStart(0, rowIndex);
+                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex);
                             var distancesRow = preciseData + rowOffset;
                             for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
                             {
@@ -152,32 +154,10 @@ namespace DemoContentBuilder
                         //If a neighbor already has a distance which is smaller, don't overwrite it.
                         //Note: this memory allocation could be optimized quite a bit; we recreate a queue for every character. It won't matter that much, though.
                         var toVisit = new Queue<Int2>((int)((charData.SourceSpan.X + padding * 2) * (charData.SourceSpan.Y + padding * 2)));
-                        void TryEnqueue(ref Int2 neighbor, ref Int2 origin, float baseDistance)
-                        {
-                            if (neighbor.X >= min.X && neighbor.X < max.X &&
-                                neighbor.Y >= min.Y && neighbor.Y < max.Y)
-                            {
-                                //The neighbor is within the character's texel region. Is this origin closer than any previous one for this texel?
-                                var xOffset = neighbor.X - origin.X;
-                                var yOffset = neighbor.Y - origin.Y;
-                                var candidateDistance = (float)Math.Sqrt(xOffset * xOffset + yOffset * yOffset) + baseDistance;
-                                var neighborIndex = preciseAtlas.GetOffsetForMip0(neighbor.X, neighbor.Y);
-                                //Note that this condition stops cycles. Visiting the same node from the same origin cannot produce a lower distance on later visits.
-                                //It also makes the BFS early out extremely frequently- the number of traversals required for each nonzero alpha texel will decrease significantly
-                                //as more are visited.
-                                if (candidateDistance < preciseData[neighborIndex])
-                                {
-                                    //It's closer. 
-                                    preciseData[neighborIndex] = candidateDistance;
-                                    //Since this was closer, the neighbor's neighbors might be too.
-                                    toVisit.Enqueue(neighbor);
-                                }
-                            }
-                        }
 
                         for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
                         {
-                            var rowOffset = preciseAtlas.GetRowOffsetFromMipStart(0, rowIndex); //The alphas and distances textures have the same dimensions on mip0, so sharing this is safe.
+                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex); //The alphas and distances textures have the same dimensions on mip0, so sharing this is safe.
                             var distancesRow = preciseData + rowOffset;
                             var alphasRow = alphaData + rowOffset;
                             for (int columnIndex = min.X; columnIndex < max.X; ++columnIndex)
@@ -199,22 +179,43 @@ namespace DemoContentBuilder
                                         while (toVisit.Count > 0)
                                         {
                                             var visited = toVisit.Dequeue();
-                                            var neighbor00 = new Int2 { X = visited.X - 1, Y = visited.Y - 1 };
-                                            var neighbor01 = new Int2 { X = visited.X - 1, Y = visited.Y };
-                                            var neighbor02 = new Int2 { X = visited.X - 1, Y = visited.Y + 1 };
-                                            var neighbor10 = new Int2 { X = visited.X, Y = visited.Y - 1 };
-                                            var neighbor12 = new Int2 { X = visited.X, Y = visited.Y + 1 };
-                                            var neighbor20 = new Int2 { X = visited.X + 1, Y = visited.Y - 1 };
-                                            var neighbor21 = new Int2 { X = visited.X + 1, Y = visited.Y };
-                                            var neighbor22 = new Int2 { X = visited.X + 1, Y = visited.Y + 1 };
-                                            TryEnqueue(ref neighbor00, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor01, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor02, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor10, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor12, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor20, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor21, ref origin, baseDistance);
-                                            TryEnqueue(ref neighbor22, ref origin, baseDistance);
+
+                                            for (int neighborX = visited.X - 1; neighborX <= visited.X + 1; ++neighborX)
+                                            {
+                                                var increment = neighborX == 0 ? 2 : 1;
+                                                for (int neighborY = visited.Y - 1; neighborY <= visited.Y + 1; neighborY += increment)
+                                                {
+                                                    if (neighborX >= min.X && neighborX < max.X &&
+                                                        neighborY >= min.Y && neighborY < max.Y)
+                                                    {
+                                                        //WARNING NOTE: Be very, very careful about changing things here. With the x86 JIT, which this project uses due to 
+                                                        //being a full framework application with x86 dependencies, small changes to codeflow here can cause infinite loops and other fun.
+                                                        //For example, you might be tempted to extract this body into a function and unroll the neighbor loop, but
+                                                        //that will likely cause an infinite loop.
+                                                        //I didn't report this bug- I'm pretty sure this is a problem in the old JIT, and it'll hopefully get replaced by ryujit eventually.
+                                                        //(Desktop framework doesn't yet have plans to use ryujit for x86, but if I can move the content builder to x64
+                                                        //or .NET Core eventually, it should no longer be an issue.)
+
+                                                        //The neighbor is within the character's texel region. Is this origin closer than any previous one for this texel?
+                                                        var xOffset = neighborX - origin.X;
+                                                        var yOffset = neighborY - origin.Y;
+                                                        var candidateDistance = (float)Math.Sqrt(xOffset * xOffset + yOffset * yOffset) + baseDistance;
+                                                        var neighborIndex = preciseAtlas.GetOffsetForMip0(neighborX, neighborY);
+                                                        //var neighborIndex = neighborY * preciseAtlas.Width + neighborX;
+                                                        //Note that this condition stops cycles. Visiting the same node from the same origin cannot produce a lower distance on later visits.
+                                                        //It also makes the BFS early out extremely frequently- the number of traversals required for each nonzero alpha texel will decrease significantly
+                                                        //as more are visited.
+                                                        if (candidateDistance < preciseData[neighborIndex])
+                                                        {
+                                                            //It's closer. 
+                                                            preciseData[neighborIndex] = candidateDistance;
+                                                            //Since this was closer, the neighbor's neighbors might be too.
+                                                            toVisit.Enqueue(new Int2 { X = neighborX, Y = neighborY });
+                                                        }
+                                                    }
+                                                }
+                                            }
+
                                         }
                                     }
                                 }
@@ -274,7 +275,10 @@ namespace DemoContentBuilder
 
                             }
                         }
-                    });
+                        var charEndTime = Stopwatch.GetTimestamp();
+                        Console.WriteLine($"Char {sortedCharacterSet[i]}, {sortedCharacterData[i].SourceSpan}: {1e3 * (charEndTime - charStartTime) / Stopwatch.Frequency}");
+                        //});
+                    }
                     atlas.Unpin();
                     preciseAtlas.Unpin();
                     rasterizedAlphas.Unpin();
@@ -283,13 +287,10 @@ namespace DemoContentBuilder
                     //Build the kerning table.
                     var kerning = ComputeKerningTable(face, characterSet);
 
+
                     return new FontContent(atlas, face.FamilyName, 1f / FontSizeInPixels, characters, kerning);
                 }
             }
         }
-
-
-
-
     }
 }

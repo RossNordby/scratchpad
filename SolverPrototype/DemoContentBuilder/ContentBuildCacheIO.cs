@@ -64,18 +64,27 @@ namespace DemoContentBuilder
         {
             using (var reader = new BinaryReader(stream))
             {
-                var cache = new Dictionary<string, ContentElement>();
-                var contentCount = reader.ReadInt32();
-
-                for (int i = 0; i < contentCount; ++i)
+                try
                 {
-                    var path = reader.ReadString();
-                    var lastModifiedTimestamp = reader.ReadInt32();
-                    var contentType = (ContentType)reader.ReadInt32();
-                    var content = ContentArchive.Load(contentType, reader);
-                    cache.Add(path, new ContentElement { LastModifiedTimestamp = lastModifiedTimestamp, Content = content });
+                    var cache = new Dictionary<string, ContentElement>();
+                    var contentCount = reader.ReadInt32();
+
+                    for (int i = 0; i < contentCount; ++i)
+                    {
+                        var path = reader.ReadString();
+                        var lastModifiedTimestamp = reader.ReadInt64();
+                        var contentType = (ContentType)reader.ReadInt32();
+                        var content = ContentArchive.Load(contentType, reader);
+                        cache.Add(path, new ContentElement { LastModifiedTimestamp = lastModifiedTimestamp, Content = content });
+                    }
+                    return cache;
                 }
-                return cache;
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Content build cache load failed; may be corrupted. Assuming fresh build. Message:");
+                    Console.WriteLine(e.Message);
+                    return new Dictionary<string, ContentElement>();
+                }
             }
         }
     }
