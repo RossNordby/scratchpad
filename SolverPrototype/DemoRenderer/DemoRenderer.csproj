@@ -1,42 +1,23 @@
-﻿<Project Sdk="Microsoft.NET.Sdk"> 
-  
+﻿<Project>
+  <!--Note workaround for macro evaluation issue.-->
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
     <RuntimeFrameworkVersion>2.0.0-preview2-25319-02</RuntimeFrameworkVersion>
-    <PreBuildEvent>"C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PreBuildEvent>
-  </PropertyGroup>
-
-  <!-- TODO: Update these references once the macros are actually working again. This won't run on anyone else's computer! -->
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Release\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj"</PostBuildEvent>
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
-    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Release\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj"</PostBuildEvent>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+
+  <PropertyGroup>
+    <PreBuildEvent Condition="'$(Configuration)'=='Debug'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)" -debug</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='Release'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)"</PreBuildEvent>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Release\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj"</PostBuildEvent>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <PostBuildEvent></PostBuildEvent>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
-    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PostBuildEvent>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PostBuildEvent>"$(SolutionDir)DemoContentBuilder\bin\Debug\DemoContentBuilder.exe" "C:\Users\Norbo\Documents\Visual Studio 2017\Projects\scratchpad\SolverPrototype\DemoRenderer\DemoRenderer.csproj" -debug</PostBuildEvent>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" />
 
   <ItemGroup>
     <Content Include="Font\RenderGlyphs.hlsl" />
@@ -62,7 +43,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
   </ItemGroup>
-  
+
   <ItemGroup>
     <EmbeddedResource Update="Properties\Resources.resx">
       <Generator>ResXFileCodeGenerator</Generator>
