@@ -30,7 +30,7 @@ struct PSInput
 {
 	float4 Position : SV_Position;
 	float2 AtlasUV : TextureCoordinates;
-	float DistanceScale : DistanceScale;
+	float DistanceScale : DistanceScale; 
 };
 
 PSInput VSMain(uint vertexId : SV_VertexId)
@@ -67,7 +67,7 @@ cbuffer PixelConstants : register(b0)
 	float3 Color;
 };
 SamplerState Sampler : register(s0);
-Texture2D<float> Atlas : register(t0);
+Texture2D<unorm float> Atlas : register(t0);
 
 float4 PSMain(PSInput input) : SV_Target0
 {
@@ -81,6 +81,7 @@ float4 PSMain(PSInput input) : SV_Target0
 	//At 0 distance, it becomes opaque. Intermediate distances imply partial coverage.
 	const float sampleWidth = .707;
 	float alpha = saturate(1 - screenDistance / sampleWidth);
-	return float4(1, 0, 0, 1);
+	//return float4(1, 0, 0, 1);
+	//return float4(screenDistance, screenDistance, screenDistance, 1);
 	return float4(Color * alpha, alpha);
-}//d
+}

@@ -76,7 +76,7 @@ namespace DemoContentBuilder
             }
             //Align and round up base height.
             baseHeight = (baseHeight + alignmentMask) & (~alignmentMask);
-            
+
             var firstInterval = intervals[firstOverlappedIndex];
             Interval queryInterval;
             queryInterval.Start = queryStart;
@@ -86,20 +86,44 @@ namespace DemoContentBuilder
                 Height = queryInterval.Height;
             Debug.Assert(queryInterval.End > queryInterval.Start);
 
-            if (firstOverlappedIndex == lastOverlappedIndex && firstInterval.Start < queryStart && firstInterval.End > queryEnd)
+            if (firstOverlappedIndex == lastOverlappedIndex && firstInterval.Start <= queryStart && firstInterval.End >= queryEnd)
             {
-                //The query interval is inside of an interval, with space available on either side.
-                //Add two more intervals- the query interval, and the interval on the other side.
-                //We treat the existing interval as the left side.
-                var otherSideInterval = firstInterval;
-                otherSideInterval.Start = queryEnd;
-                firstInterval.End = queryStart;
-                Debug.Assert(firstInterval.End > firstInterval.Start);
-                intervals[firstOverlappedIndex] = firstInterval;
+                if(firstInterval.Start == queryStart && firstInterval.End == queryEnd)
+                {
+                    //Perfect replacement.
+                    intervals[firstOverlappedIndex] = queryInterval;
+                }
+                else if (firstInterval.Start == queryStart)
+                {
+                    //The new interval should be inserted before the firstInterval. Modify the first interval.
+                    firstInterval.Start = queryEnd;
+                    Debug.Assert(firstInterval.End > firstInterval.Start);
+                    intervals[firstOverlappedIndex] = firstInterval;
+                    intervals.Insert(firstOverlappedIndex , queryInterval);
+                }
+                else if (firstInterval.End == queryEnd)
+                {
+                    //The new interval should be inserted after the firstInterval. Modify the first interval.
+                    firstInterval.End = queryStart;
+                    Debug.Assert(firstInterval.End > firstInterval.Start);
+                    intervals[firstOverlappedIndex] = firstInterval;
+                    intervals.Insert(firstOverlappedIndex + 1, queryInterval);
+                }
+                else
+                {
+                    //The query interval is inside of an interval, with space available on either side.
+                    //Add two more intervals- the query interval, and the interval on the other side.
+                    //We treat the existing interval as the left side.
+                    var otherSideInterval = firstInterval;
+                    otherSideInterval.Start = queryEnd;
+                    firstInterval.End = queryStart;
+                    Debug.Assert(firstInterval.End > firstInterval.Start);
+                    intervals[firstOverlappedIndex] = firstInterval;
 
-                intervals.Insert(firstOverlappedIndex + 1, queryInterval);
-                Debug.Assert(otherSideInterval.End > otherSideInterval.Start);
-                intervals.Insert(firstOverlappedIndex + 2, otherSideInterval);
+                    intervals.Insert(firstOverlappedIndex + 1, queryInterval);
+                    Debug.Assert(otherSideInterval.End > otherSideInterval.Start);
+                    intervals.Insert(firstOverlappedIndex + 2, otherSideInterval);
+                }
             }
             else
             {
@@ -118,7 +142,7 @@ namespace DemoContentBuilder
                     Debug.Assert(firstInterval.End > firstInterval.Start);
                     intervals[firstOverlappedIndex] = firstInterval;
                 }
-       
+
                 var lastInterval = intervals[lastOverlappedIndex];
                 int removalEndIndex;
                 if (lastInterval.End == queryEnd)

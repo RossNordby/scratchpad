@@ -125,14 +125,16 @@ namespace SolverPrototypeTests
             }
         }
 
+        float t = 0;
         StringBuilder uiText = new StringBuilder();
         public void Render(Renderer renderer)
         {
             uiText.Clear();
-            float textHeight = 14;
+            float textHeight = 32;
             float lineSpacing = textHeight * 1.5f;
             var textColor = new Vector3(1, 1, 1);
-            var controlsStart = new Vector2(window.Resolution.X - 200, window.Resolution.Y - 100);
+            t += 0.01f;
+            var controlsStart = new Vector2(window.Resolution.X - 400 + 100 * (float)Math.Sin(t), window.Resolution.Y - 100 - 100 * (float)Math.Cos(t));
             //Conveniently, enum strings are cached. Every (Key).ToString() returns the same reference for the same key, so no garbage worries.
             if (showControls)
             {

@@ -41,7 +41,7 @@ namespace DemoRenderer.Font
                 ArraySize = 1,
                 BindFlags = BindFlags.ShaderResource,
                 CpuAccessFlags = CpuAccessFlags.None,
-                Format = SharpDX.DXGI.Format.A8_UNorm,
+                Format = SharpDX.DXGI.Format.R8_UNorm,
                 Height = font.Atlas.Height,
                 Width = font.Atlas.Width,
                 MipLevels = font.Atlas.MipLevels,
