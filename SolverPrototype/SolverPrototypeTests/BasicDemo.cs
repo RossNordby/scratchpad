@@ -130,10 +130,10 @@ namespace SolverPrototypeTests
         public void Render(Renderer renderer)
         {
             uiText.Clear();
-            float textHeight = 32;
+            t += 0.01f;
+            float textHeight = 24;
             float lineSpacing = textHeight * 1.5f;
             var textColor = new Vector3(1, 1, 1);
-            t += 0.01f;
             var controlsStart = new Vector2(window.Resolution.X - 400 + 100 * (float)Math.Sin(t), window.Resolution.Y - 100 - 100 * (float)Math.Cos(t));
             //Conveniently, enum strings are cached. Every (Key).ToString() returns the same reference for the same key, so no garbage worries.
             if (showControls)
@@ -188,7 +188,6 @@ namespace SolverPrototypeTests
                 uiText.Append("Press ");
                 uiText.Append(controls.ShowControls.ToString());
                 uiText.Append(" for controls.");
-                //uiText.Append("@");
                 renderer.TextBatcher.Write(uiText, controlsStart, textHeight, textColor, font);
             }
         }

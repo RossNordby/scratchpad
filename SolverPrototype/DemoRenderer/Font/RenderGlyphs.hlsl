@@ -72,10 +72,6 @@ Texture2D<snorm float> Atlas : register(t0);
 
 float4 PSMain(PSInput input) : SV_Target0
 {
-	//The distances stored in the atlas are encoded such that:
-	//1 atlas-loaded unit = max(glyphSource.Span.x, glyphSource.Span.y) texels.
-	//The VS gives us a scaling factor of instance.Scale * max(glyphSource.Span.x, glyphSource.Span.y)
-	//to get it into units of screen texels.
 	float screenDistance = Atlas.Sample(Sampler, input.AtlasUV) * input.DistanceScale;
 	//This distance is measured in screen pixels. Treat every pixel as having a set radius.
 	//If the glyph's distance is beyond the sample radius, then there is zero coverage.
@@ -83,9 +79,5 @@ float4 PSMain(PSInput input) : SV_Target0
 	//If the distance is less than -sampleRadius, then it's fully covered.
 	const float sampleRadius = 0.70710678118;
 	float alpha = saturate(0.5 - screenDistance / (sampleRadius * 2));
-	//return float4(1, 0, 0, 1);
-	//return float4(screenDistance, screenDistance, screenDistance, 1);
-	//return float4(saturate(-Atlas.Sample(Sampler, input.AtlasUV) * input.DistanceScale) * 1, 0, 0, 1);
-	//return float4((1 + Atlas.Sample(Sampler, input.AtlasUV)) * 1, 0, 0, 1);
 	return float4(Color * alpha, alpha);
 }
