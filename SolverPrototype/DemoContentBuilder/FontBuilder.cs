@@ -17,9 +17,9 @@ namespace DemoContentBuilder
 {
     public static class FontBuilder
     {
-        private static Dictionary<CharacterPair, float> ComputeKerningTable(Face face, string characterSet)
+        private static Dictionary<CharacterPair, int> ComputeKerningTable(Face face, string characterSet)
         {
-            var kerningTable = new Dictionary<CharacterPair, float>();
+            var kerningTable = new Dictionary<CharacterPair, int>();
             for (int i = 0; i < characterSet.Length; ++i)
             {
                 var glyphIndex = face.GetCharIndex(characterSet[i]);
@@ -28,7 +28,7 @@ namespace DemoContentBuilder
                     var kerning = face.GetKerning(glyphIndex, face.GetCharIndex(characterSet[i]), KerningMode.Default);
                     if (kerning.X != 0)
                     {
-                        kerningTable.Add(new CharacterPair(characterSet[i], characterSet[j]), kerning.X.ToSingle());
+                        kerningTable.Add(new CharacterPair(characterSet[i], characterSet[j]), kerning.X.ToInt32());
                     }
                 }
             }
@@ -54,6 +54,17 @@ namespace DemoContentBuilder
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static float GetBaseDistanceFromAlpha(byte alpha)
+        {
+            //Interpret the partial alpha as a distance. We invert the runtime coverage calculation: 
+            //coverage = 0.5 - distance / (sampleRadius * 2)
+            //distance = (0.5 - coverage) * sampleRadius * 2 
+            //where coverage is alpha / 255.
+            const float texelCoverageRadius = 0.70710678118f;
+            return (2 * texelCoverageRadius * 0.5f) - (2 * texelCoverageRadius / 255f) * alpha;
+        }
+
         public unsafe static FontContent Build(Stream fontDataStream)
         {
             var faceBytes = new byte[fontDataStream.Length];
@@ -73,13 +84,13 @@ namespace DemoContentBuilder
                         sortedCharacterSet[i] = characterSet[i];
                         face.LoadGlyph(face.GetCharIndex(characterSet[i]), LoadFlags.Default, LoadTarget.Normal);
                         ref var characterData = ref sortedCharacterData[i];
-                        characterData.SourceSpan.X = face.Glyph.Metrics.Width.ToSingle();
-                        characterData.SourceSpan.Y = face.Glyph.Metrics.Height.ToSingle();
+                        characterData.SourceSpan.X = face.Glyph.Metrics.Width.ToInt32();
+                        characterData.SourceSpan.Y = face.Glyph.Metrics.Height.ToInt32();
 
-                        characterData.Bearing.X = face.Glyph.Metrics.HorizontalBearingX.ToSingle();
-                        characterData.Bearing.Y = face.Glyph.Metrics.HorizontalBearingY.ToSingle();
+                        characterData.Bearing.X = face.Glyph.Metrics.HorizontalBearingX.ToInt32();
+                        characterData.Bearing.Y = face.Glyph.Metrics.HorizontalBearingY.ToInt32();
 
-                        characterData.Advance = face.Glyph.Metrics.HorizontalAdvance.ToSingle();
+                        characterData.Advance = face.Glyph.Metrics.HorizontalAdvance.ToInt32();
                     }
 
                     //Next, allocate space in the atlas for each character.
@@ -92,10 +103,8 @@ namespace DemoContentBuilder
                     var packer = new FontPacker(AtlasWidth, MipLevels, padding, characterSet.Length);
                     for (int i = 0; i < sortedCharacterSet.Length; ++i)
                     {
-                        //The packer class handles the placement logic and sets the SourceMinimum in the character data.
-                        //So, after it is added to the intervals set, we can add the character-data pair to the font's dictionary.
+                        //The packer class handles the placement logic and sets the SourceMinimum in the character data, too.
                         packer.Add(ref sortedCharacterData[i]);
-                        characters.Add(sortedCharacterSet[i], sortedCharacterData[i]);
                     }
 
                     //Now that every glyph has been positioned within the sheet, we can actually rasterize the glyph alphas into a bitmap proto-atlas.
@@ -157,14 +166,16 @@ namespace DemoContentBuilder
                         }
 
 
-                        //Scan the alphas. Add border texels of the glyph to the point set.
-                        QuickList<Int2, Array<Int2>>.Create(pool, (max.X - min.X) * (max.Y - min.Y), out var glyphPoints);
+                        //Scan the alphas. Add border texels of the glyph to the point set. We collect both the nonzero alpha outline and the 'negative space' zero alpha outline.
+                        //While scanning distances, nonzero alpha texels will look for the shortest distance to a zero alpha texel, while zero alpha texels will look for the shortest
+                        //distance to a nonzero alpha texel.
+                        QuickList<Int2, Array<Int2>>.Create(pool, (max.X - min.X) * (max.Y - min.Y), out var glyphOutline);
+                        QuickList<Int2, Array<Int2>>.Create(pool, (max.X - min.X) * (max.Y - min.Y), out var emptyOutline);
                         for (int rowIndex = min.Y; rowIndex < max.Y; ++rowIndex)
                         {
                             //Alphas and atlas have same dimensions, so sharing row offset is safe.
                             Debug.Assert(padding > 0, "This assumes at least one padding; no boundary checking is performed on the alpha accesses.");
                             var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex);
-                            var distancesRow = preciseData + rowOffset;
                             var alphasRow0 = alphaData + rowOffset - preciseAtlas.Width;
                             var alphasRow1 = alphaData + rowOffset;
                             var alphasRow2 = alphaData + rowOffset + preciseAtlas.Width;
@@ -173,8 +184,6 @@ namespace DemoContentBuilder
                                 if (alphasRow1[columnIndex] > 0)
                                 {
                                     //Nonzero alpha.
-                                    //Interpret the partial alpha as a distance. (0, sqrt(2)/2) to (255, 0).
-                                    distancesRow[columnIndex] = 0.70710678118f - alphasRow1[columnIndex] * (0.70710678118f / 255f);
                                     //Only add this to the point set if there is at least one texel in the 3x3 neighborhood with an alpha equal to zero.
                                     //If there isn't a zero alpha texel next to this one, there's no way for it to provide the lowest distance to an external texel.
                                     if (alphasRow0[columnIndex - 1] == 0 ||
@@ -189,36 +198,98 @@ namespace DemoContentBuilder
                                         Int2 texelCoordinates;
                                         texelCoordinates.X = columnIndex;
                                         texelCoordinates.Y = rowIndex;
-                                        glyphPoints.AddUnsafely(ref texelCoordinates);
+                                        glyphOutline.AddUnsafely(ref texelCoordinates);
+                                    }
+                                }
+                                if (alphasRow1[columnIndex] < 255)
+                                {
+                                    //Zero alpha or partially covered.
+                                    //Is it a negative space outline? 
+                                    //If it's a partial coverage texel, then yes. Otherwise, if it has zero coverage, then it's only an outline texel if a neighbor has full coverage.
+                                    //We require full coverage rather than partial coverage because any neighboring partial coverage cells will themselves be members of the empty outline.
+                                    //(Note that partial coverage texels exist in both the glyph outline and the empty outline.
+                                    //Both internal and external texels can use them as a source of minimum distance.)
+                                    if (alphasRow1[columnIndex] > 0 ||
+                                        alphasRow0[columnIndex - 1] == 255 ||
+                                        alphasRow0[columnIndex + 0] == 255 ||
+                                        alphasRow0[columnIndex + 1] == 255 ||
+                                        alphasRow1[columnIndex - 1] == 255 ||
+                                        alphasRow1[columnIndex + 1] == 255 ||
+                                        alphasRow2[columnIndex - 1] == 255 ||
+                                        alphasRow2[columnIndex + 0] == 255 ||
+                                        alphasRow2[columnIndex + 1] == 255)
+                                    {
+                                        Int2 texelCoordinates;
+                                        texelCoordinates.X = columnIndex;
+                                        texelCoordinates.Y = rowIndex;
+                                        emptyOutline.AddUnsafely(ref texelCoordinates);
                                     }
                                 }
                             }
                         }
-                        var bfsTimeStart = Stopwatch.GetTimestamp();
 
                         //For every texel in the character's region, scan the glyph point set for the nearest texel.
+                        //Cache the largest distance as we go so that we can maximize precision within this character.
+                        float largestDistanceMagnitude = 0;
                         for (int rowIndex = paddedMin.Y; rowIndex < paddedMax.Y; ++rowIndex)
                         {
-                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex);
+                            var rowOffset = preciseAtlas.GetRowOffsetForMip0(rowIndex); //Same dimensions; can be shared.
                             var distancesRow = preciseData + rowOffset;
+                            var alphasRow = alphaData + rowOffset;
                             for (int columnIndex = paddedMin.X; columnIndex < paddedMax.X; ++columnIndex)
                             {
-                                //Don't bother scanning the point set if this texel had its distance set by the earlier glyph point set gather.
-                                if (distancesRow[columnIndex] == maxDistance)
+                                if (alphasRow[columnIndex] == 0)
                                 {
+                                    //This is a zero alpha texel. Look for a glyph outline.
                                     float lowestDistance = float.MaxValue;
-                                    for (int pointIndex = 0; pointIndex < glyphPoints.Count; ++pointIndex)
+                                    for (int pointIndex = 0; pointIndex < glyphOutline.Count; ++pointIndex)
                                     {
-                                        ref var point = ref glyphPoints[pointIndex];
+                                        ref var point = ref glyphOutline[pointIndex];
                                         var offsetX = point.X - columnIndex;
                                         var offsetY = point.Y - rowIndex;
-                                        //Note the inclusion of the glyph point's own distance.
+                                        //Note the inclusion of the outline point's own distance.
                                         //For interior points, that'll be zero, but it's useful for taking into account partial coverage.
-                                        var candidateDistance = (float)Math.Sqrt(offsetX * offsetX + offsetY * offsetY) + preciseData[preciseAtlas.GetOffsetForMip0(point.X, point.Y)];
+                                        var candidateDistance = (float)Math.Sqrt(offsetX * offsetX + offsetY * offsetY) +
+                                            GetBaseDistanceFromAlpha(alphaData[rasterizedAlphas.GetOffsetForMip0(point.X, point.Y)]);
                                         if (candidateDistance < lowestDistance)
                                             lowestDistance = candidateDistance;
                                     }
                                     distancesRow[columnIndex] = lowestDistance;
+                                    if (lowestDistance > largestDistanceMagnitude)
+                                        largestDistanceMagnitude = lowestDistance;
+                                }
+                                else if (alphasRow[columnIndex] == 255)
+                                {
+                                    //This is a fully opaque texel. Look for the nearest non-255 alpha texel.
+                                    float lowestDistance = float.MinValue;
+                                    for (int pointIndex = 0; pointIndex < emptyOutline.Count; ++pointIndex)
+                                    {
+                                        ref var point = ref emptyOutline[pointIndex];
+                                        var offsetX = point.X - columnIndex;
+                                        var offsetY = point.Y - rowIndex;
+
+                                        var candidateDistance = -(float)Math.Sqrt(offsetX * offsetX + offsetY * offsetY);
+                                        //Include the outline's base distance if it was a partial coverage texel.
+                                        var outlineBaseDistance = GetBaseDistanceFromAlpha(alphaData[rasterizedAlphas.GetOffsetForMip0(point.X, point.Y)]);
+                                        if (outlineBaseDistance < maxDistance)
+                                        {
+                                            //The distance from texel to texel isn't the best approximation of the actual distance when the outline texel has partial coverage.
+                                            //The 'base' distance, which can be negative, is assumed to be along the same direction as this texel to the target texel. 
+                                            candidateDistance += outlineBaseDistance;
+                                        }
+                                        if (candidateDistance > lowestDistance)
+                                            lowestDistance = candidateDistance;
+                                    }
+                                    distancesRow[columnIndex] = lowestDistance;
+                                    //The distance for internal points is negative; the normalization factor should be based on the absolute value.
+                                    if (-lowestDistance > largestDistanceMagnitude)
+                                        largestDistanceMagnitude = -lowestDistance;
+                                }
+                                else
+                                {
+                                    //For partial coverage texels with alphas ranging from 1 to 254, just use the base distance.
+                                    //The distance to adjacent texels is guaranteed to be longer than the base distance, so there's no need to look at other texels.
+                                    distancesRow[columnIndex] = GetBaseDistanceFromAlpha(alphasRow[columnIndex]);
                                 }
                             }
                         }
@@ -255,15 +326,16 @@ namespace DemoContentBuilder
                         }
 
                         //Now that all mips have been filled, bake the data into the final single byte encoding.
-                        //Note that the conversion from distance to texels involves a normalization by the character's span. That helps ensure a reasonable amount
-                        //of precision. The runtime renderer computes the same normalization factor to move back into texel space.
-                        var encodingMultiplier = 1f / Math.Max(charData.SourceSpan.X, charData.SourceSpan.Y);
+                        //Use the largest absolute distance as the encoding multiplier to maximize precision.
+                        charData.DistanceScale = largestDistanceMagnitude;
+                        var encodingMultiplier = 1f / largestDistanceMagnitude;
                         for (int mipLevel = 0; mipLevel < atlas.MipLevels; ++mipLevel)
                         {
                             var mipMin = new Int2(paddedMin.X >> mipLevel, paddedMin.Y >> mipLevel);
                             var mipMax = new Int2(paddedMax.X >> mipLevel, paddedMax.Y >> mipLevel);
 
-                            var encodedStart = atlasData + atlas.GetMipStartIndex(mipLevel);
+                            //Note signed bytes. We're building an R8_SNORM texture, not UNORM.
+                            var encodedStart = (sbyte*)atlasData + atlas.GetMipStartIndex(mipLevel);
                             var preciseStart = preciseData + preciseAtlas.GetMipStartIndex(mipLevel);
                             var rowPitch = atlas.GetRowPitch(mipLevel);
                             for (int rowIndex = mipMin.Y; rowIndex < mipMax.Y; ++rowIndex)
@@ -272,31 +344,31 @@ namespace DemoContentBuilder
                                 var encodedRow = encodedStart + rowIndex * rowPitch;
                                 for (int columnIndex = mipMin.X; columnIndex < mipMax.X; ++columnIndex)
                                 {
-                                    encodedRow[columnIndex] = (byte)(255 * Math.Min(1, encodingMultiplier * preciseRow[columnIndex]));
+                                    encodedRow[columnIndex] = (sbyte)(127 * Math.Max(-1, Math.Min(1, encodingMultiplier * preciseRow[columnIndex])));
                                 }
 
                             }
                         }
                     });
 
-                    //const int savedMip = MipLevels - 1;
-                    //var bitmap = new Bitmap(atlas.Width >> savedMip, atlas.Height >> savedMip);
-                    //var bitmapData = bitmap.LockBits(new Rectangle(new Point(), new Size(bitmap.Width, bitmap.Height)),
-                    //    ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
+                    const int savedMip = 0;// MipLevels - 1;
+                    var bitmap = new Bitmap(atlas.Width >> savedMip, atlas.Height >> savedMip);
+                    var bitmapData = bitmap.LockBits(new Rectangle(new Point(), new Size(bitmap.Width, bitmap.Height)),
+                        ImageLockMode.WriteOnly, PixelFormat.Format32bppRgb);
 
-                    //var scan0 = (byte*)bitmapData.Scan0;
-                    //var sourceStart = atlasData + atlas.GetMipStartIndex(savedMip);
-                    //for (int rowIndex = 0; rowIndex < bitmapData.Height; ++rowIndex)
-                    //{
-                    //    var row = (int*)(scan0 + bitmapData.Stride * rowIndex);
-                    //    var sourceRow = sourceStart + atlas.GetRowOffsetFromMipStart(savedMip, rowIndex);
-                    //    for (int columnIndex = 0; columnIndex < bitmapData.Width; ++columnIndex)
-                    //    {
-                    //        row[columnIndex] = sourceRow[columnIndex] | (sourceRow[columnIndex] << 8) | (sourceRow[columnIndex] << 16) | (sourceRow[columnIndex] << 24);
-                    //    }
-                    //}
-                    //bitmap.UnlockBits(bitmapData);
-                    //bitmap.Save($"{face.FamilyName}Test.bmp", ImageFormat.Bmp);
+                    var scan0 = (byte*)bitmapData.Scan0;
+                    var sourceStart = atlasData + atlas.GetMipStartIndex(savedMip);
+                    for (int rowIndex = 0; rowIndex < bitmapData.Height; ++rowIndex)
+                    {
+                        var row = (int*)(scan0 + bitmapData.Stride * rowIndex);
+                        var sourceRow = sourceStart + atlas.GetRowOffsetFromMipStart(savedMip, rowIndex);
+                        for (int columnIndex = 0; columnIndex < bitmapData.Width; ++columnIndex)
+                        {
+                            row[columnIndex] = sourceRow[columnIndex] | (sourceRow[columnIndex] << 8) | (sourceRow[columnIndex] << 16) | (sourceRow[columnIndex] << 24);
+                        }
+                    }
+                    bitmap.UnlockBits(bitmapData);
+                    bitmap.Save($"{face.FamilyName}Test.bmp", ImageFormat.Bmp);
 
                     atlas.Unpin();
                     preciseAtlas.Unpin();
@@ -306,6 +378,11 @@ namespace DemoContentBuilder
                     //Build the kerning table.
                     var kerning = ComputeKerningTable(face, characterSet);
 
+                    //Now that the character data contains the normalization factor, we can add it to the final dictionary.
+                    for (int i = 0; i < sortedCharacterData.Length; ++i)
+                    {
+                        characters.Add(sortedCharacterSet[i], sortedCharacterData[i]);
+                    }
 
 
                     return new FontContent(atlas, face.FamilyName, 1f / FontSizeInPixels, characters, kerning);

@@ -188,6 +188,7 @@ namespace SolverPrototypeTests
                 uiText.Append("Press ");
                 uiText.Append(controls.ShowControls.ToString());
                 uiText.Append(" for controls.");
+                //uiText.Append("@");
                 renderer.TextBatcher.Write(uiText, controlsStart, textHeight, textColor, font);
             }
         }

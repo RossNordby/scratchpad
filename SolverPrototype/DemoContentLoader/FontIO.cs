@@ -17,22 +17,23 @@ namespace DemoContentLoader
             {
                 var character = reader.ReadChar();
                 CharacterData data;
-                data.SourceMinimum.X = reader.ReadSingle();
-                data.SourceMinimum.Y = reader.ReadSingle();
-                data.SourceSpan.X = reader.ReadSingle();
-                data.SourceSpan.Y = reader.ReadSingle();
-                data.Bearing.X = reader.ReadSingle();
-                data.Bearing.Y = reader.ReadSingle();
-                data.Advance = reader.ReadSingle();
+                data.SourceMinimum.X = reader.ReadInt32();
+                data.SourceMinimum.Y = reader.ReadInt32();
+                data.SourceSpan.X = reader.ReadInt32();
+                data.SourceSpan.Y = reader.ReadInt32();
+                data.Bearing.X = reader.ReadInt32();
+                data.Bearing.Y = reader.ReadInt32();
+                data.Advance = reader.ReadInt32();
+                data.DistanceScale = reader.ReadSingle();
                 characterData.Add(character, data);
             }
             var kerningRelationshipCount = reader.ReadInt32();
-            var kerningTable = new Dictionary<CharacterPair, float>();
+            var kerningTable = new Dictionary<CharacterPair, int>();
             for (int i = 0; i < kerningRelationshipCount; ++i)
             {
                 var a = reader.ReadChar();
                 var b = reader.ReadChar();
-                var amount = reader.ReadSingle();
+                var amount = reader.ReadInt32();
                 kerningTable.Add(new CharacterPair(a, b), amount);
             }
             var atlas = Texture2DIO.Load(reader);
@@ -54,6 +55,7 @@ namespace DemoContentLoader
                 writer.Write(pair.Value.Bearing.X);
                 writer.Write(pair.Value.Bearing.Y);
                 writer.Write(pair.Value.Advance);
+                writer.Write(pair.Value.DistanceScale);
             }
             writer.Write(content.kerning.Count);
             foreach (var pair in content.kerning)

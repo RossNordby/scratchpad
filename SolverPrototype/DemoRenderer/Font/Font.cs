@@ -14,7 +14,8 @@ namespace DemoRenderer.Font
     public struct GlyphSource
     {
         public Vector2 Minimum;
-        public Vector2 Span;
+        public int PackedSpan;  //Lower 16 bits X, upper 16 bits Y. In texels.
+        public float DistanceScale;
     }
     /// <summary>
     /// Runtime type containing GPU-related information necessary to render a specific font type.
@@ -34,14 +35,14 @@ namespace DemoRenderer.Font
 
         public unsafe Font(Device device, DeviceContext context, FontContent font)
         {
-            this.Content = font;
+            Content = font;
             Sources = new StructuredBuffer<GlyphSource>(device, font.Characters.Count, font.Name + " Glyph Sources");
             Atlas = new Texture2D(device, new Texture2DDescription
             {
                 ArraySize = 1,
                 BindFlags = BindFlags.ShaderResource,
                 CpuAccessFlags = CpuAccessFlags.None,
-                Format = SharpDX.DXGI.Format.R8_UNorm,
+                Format = SharpDX.DXGI.Format.R8_SNorm,
                 Height = font.Atlas.Height,
                 Width = font.Atlas.Width,
                 MipLevels = font.Atlas.MipLevels,
@@ -67,7 +68,12 @@ namespace DemoRenderer.Font
             foreach (var character in font.Characters)
             {
                 sourceIds.Add(character.Key, nextSourceId);
-                sourcesData[nextSourceId] = new GlyphSource { Minimum = character.Value.SourceMinimum, Span = character.Value.SourceSpan };
+                sourcesData[nextSourceId] = new GlyphSource
+                {
+                    Minimum = new Vector2(character.Value.SourceMinimum.X, character.Value.SourceMinimum.Y),
+                    PackedSpan = character.Value.SourceSpan.X | (character.Value.SourceSpan.Y << 16),
+                    DistanceScale = character.Value.DistanceScale
+                };
                 ++nextSourceId;
             }
             Sources.Update(context, sourcesData);
