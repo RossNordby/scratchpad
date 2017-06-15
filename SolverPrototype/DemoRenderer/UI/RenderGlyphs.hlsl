@@ -43,6 +43,8 @@ struct PSInput
 	nointerpolation float3 Color : Color; //Could leave this packed; might be faster than passing it up. Shrug.
 };
 
+#define SampleRadius 0.5
+
 PSInput VSMain(uint vertexId : SV_VertexId)
 {
 	//The vertex id is used to position each vertex. 
@@ -62,14 +64,16 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	//this is just added overhead. For the purposes of the demo, eh, whatever, it'll be fine.
 	GlyphSource source = Sources[sourceId];
 	float2 span = float2(source.PackedSpan & 0xFFFF, source.PackedSpan >> 16);
+	//Including a little bit of padding on the quad's (with consistent UVs) helps avoid geometry clipping
+	//which would otherwise cause visible aliasing.
+	const float screenPadding = SampleRadius;
+	const float atlasPadding = screenPadding / instanceScale;
+	float2 paddedSpan = span + 2 * atlasPadding;
+
 
 	PSInput output;
-	//Note that we generate vertices such that they tightly bound the glyph.
-	//This can cause clipping and visible aliasing on some glyphs.
-	//For the purposes of the demos, this is insignificant enough to ignore for now.
-	//If you'd like to later improve it, adding a 1 screenspace pixel padding on all sides would help.
 	float2 quadCoordinates = float2(vertexId & 1, (vertexId >> 1) & 1);
-	float2 localOffset = instanceScale * span * quadCoordinates;
+	float2 localOffset = instanceScale * paddedSpan * quadCoordinates - screenPadding;
 	float2 verticalAxis = float2(-horizontalAxis.y, horizontalAxis.x);
 	float2 screenPosition = minimum +
 		localOffset.x * horizontalAxis + localOffset.y * verticalAxis;
@@ -77,7 +81,7 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	//NDC +1 is up, while in screenspace/texture space +1 is down.
 	output.Position = float4(
 		screenPosition * ScreenToNDCScale + float2(-1.0, 1.0), 0.5, 1);
-	output.AtlasUV = (source.Minimum + span * quadCoordinates) * InverseAtlasResolution;
+	output.AtlasUV = (source.Minimum - atlasPadding + paddedSpan * quadCoordinates) * InverseAtlasResolution;
 	output.DistanceScale = source.DistanceScale * instanceScale;
 	output.Color = UnpackR11G11B10_UNorm(instance.PackedColor);
 	return output;
@@ -93,8 +97,6 @@ float4 PSMain(PSInput input) : SV_Target0
 	//If the glyph's distance is beyond the sample radius, then there is zero coverage.
 	//If the distance is 0, then the sample is half covered.
 	//If the distance is less than -sampleRadius, then it's fully covered.
-	const float sampleRadius = 0.70710678118;
-	float alpha = saturate(0.5 - screenDistance / (sampleRadius * 2));
-	//return float4(1, 0, 0, 1);
+	float alpha = saturate(0.5 - screenDistance / (SampleRadius * 2));
 	return float4(input.Color * alpha, alpha);
 }

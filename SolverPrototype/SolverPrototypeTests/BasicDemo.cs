@@ -132,7 +132,9 @@ namespace SolverPrototypeTests
             t += 0.01f;
             var lineCenter = new Vector2(256, 256);
             var lineOffset = 100 * new Vector2((float)Math.Sin(t), (float)Math.Cos(t));
-            renderer.UILineBatcher.Draw(lineCenter + lineOffset, lineCenter - lineOffset, 4, new Vector3(1, 0, 0));
+            renderer.UILineBatcher.Draw(lineCenter + lineOffset, lineCenter - lineOffset, 
+                0.5f,//20 * Math.Max(0, 1f + (float)Math.Cos(t)), 
+                new Vector3(1, 0, 0));
 
             uiText.Clear();
             float textHeight = 24;

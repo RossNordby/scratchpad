@@ -34,7 +34,7 @@ struct PSInput
 	nointerpolation float Radius : Radius;
 	nointerpolation float3 Color : Color;
 };
-
+#define SampleRadius 0.70710678118
 PSInput VSMain(uint vertexId : SV_VertexId)
 {
 	//The vertex id is used to position each vertex. 
@@ -54,7 +54,7 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	float2 verticalAxis = float2(-output.LineDirection.y, output.LineDirection.x);
 
 	//Pad a little bit to avoid clipping.
-	float geometryRadius = instance.Radius + .708;
+	float geometryRadius = instance.Radius + SampleRadius;
 	float radiusTimesTwo = geometryRadius * 2;
 	float2 localSpan = float2(output.LineLength + radiusTimesTwo, radiusTimesTwo);
 	float2 localOffset = localSpan * quadCoordinates;
@@ -79,7 +79,6 @@ float4 PSMain(PSInput input) : SV_Target0
 	//If the line's distance is beyond the sample radius, then there is zero coverage.
 	//If the distance is 0, then the sample is half covered.
 	//If the distance is less than -sampleRadius, then it's fully covered.
-	const float sampleRadius = 0.70710678118;
-	float alpha = saturate(0.5 - distance / (sampleRadius * 2));
+	float alpha = saturate(0.5 - distance / (SampleRadius * 2));
 	return float4(input.Color * alpha, alpha);
 }
