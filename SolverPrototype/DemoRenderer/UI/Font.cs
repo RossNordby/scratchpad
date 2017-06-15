@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
 
-namespace DemoRenderer.Font
+namespace DemoRenderer.UI
 {
     /// <summary>
     /// Location of a glyph in the atlas.

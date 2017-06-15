@@ -5,39 +5,64 @@ using SharpDX.Direct3D11;
 using System;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
-namespace DemoRenderer.Font
+namespace DemoRenderer.UI
 {
     /// <summary>
     /// GPU-relevant information for the rendering of a single character glyph instance.
     /// </summary>
     public struct GlyphInstance
     {
-        //Don't really need full precision on the glyphs or their descriptions, but it's easy.
         /// <summary>
-        /// Desired location of the minimum corner of the glyph.
+        /// Packed location of the minimum corner of the glyph. Lower 16 bits is X, upper 16 bits is Y. Should be scaled by PackedToScreen.
         /// </summary>
-        public Vector2 TargetPosition;
+        public uint PackedMinimum;
         /// <summary>
-        /// Scale to apply to the source glyph.
+        /// Packed horizontal axis used by the glyph. Lower 16 bits is X, upper 16 bits is Y. UNORM packed across a range from -1.0 at 0 to 1.0 at 65534.
         /// </summary>
-        public float Scale;
+        public uint PackedHorizontalAxis;
         /// <summary>
-        /// Index of the source character description in the description set.
+        /// The combination of two properties: scale to apply to the source glyph. UNORM packed across a range of 0.0 at 0 to 16.0 at 65535, stored in the lower 16 bits,
+        /// and the id of the glyph type in the font stored in the upper 16 bits.
         /// </summary>
-        public int SourceId;
+        public uint PackedScaleAndSourceId;
+        /// <summary>
+        /// Color, packed in a UNORM manner such that bits 0 through 10 are R, bits 11 through 21 are G, and bits 22 through 31 are B.
+        /// </summary>
+        public uint PackedColor;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public GlyphInstance(ref Vector2 start, ref Vector2 horizontalAxis, float scale, int sourceId, ref Vector3 color, ref Vector2 screenToPackedScale)
+        {
+            //Note that this can do some weird stuff if the position is outside of the target range. For the sake of the demos, we just assume everything's in frame.
+            //If you want to use this for a game where you can't guarantee that everything's in frame, this packing range would need to be modified.
+            //One simple option is to just set the mapped region to extend beyond the rendered target. It reduces the precision density a bit, but that's not too important.
+            PackedMinimum = (uint)(start.X * screenToPackedScale.X) | ((uint)(start.Y * screenToPackedScale.Y) << 16);
+            var scaledAxisX = (uint)(horizontalAxis.X * 32767f + 32767f);
+            var scaledAxisY = (uint)(horizontalAxis.Y * 32767f + 32767f);
+            Debug.Assert(scaledAxisX <= 65534);
+            Debug.Assert(scaledAxisY <= 65534);
+            PackedHorizontalAxis = scaledAxisX | (scaledAxisY << 16);
+            var packScaledScale = scale * (65535f / 16f);
+            Debug.Assert(packScaledScale >= 0);
+            if (packScaledScale > 65535f)
+                packScaledScale = 65535f;
+            Debug.Assert(sourceId >= 0 && sourceId < 65536);
+            PackedScaleAndSourceId = (uint)packScaledScale | (uint)(sourceId << 16);
+            PackedColor = Helpers.PackColor(ref color);
+        }
     }
 
     public class GlyphRenderer : IDisposable
     {
         struct VertexConstants
         {
-            public Vector2 HorizontalAxis;
+            public Vector2 PackedToScreenScale;
             public Vector2 ScreenToNDCScale;
             public Vector2 InverseAtlasResolution;
         }
         ConstantsBuffer<VertexConstants> vertexConstants;
-        ConstantsBuffer<Vector3> pixelConstants;
 
         StructuredBuffer<GlyphInstance> instances;
         IndexBuffer indices;
@@ -48,39 +73,16 @@ namespace DemoRenderer.Font
         public GlyphRenderer(Device device, DeviceContext context, ShaderCache cache, int maximumGlyphsPerDraw = 2048)
         {
             instances = new StructuredBuffer<GlyphInstance>(device, maximumGlyphsPerDraw, "Glyph Instances");
-            //Every glyph uses two triangles.
-            //Using redundant indices avoids a slow path for low triangle count instancing.
-            var indexData = new uint[maximumGlyphsPerDraw * 6];
-            uint baseVertex = 0;
-            for (int glyphIndexStart = 0; glyphIndexStart < indexData.Length; glyphIndexStart += 6)
-            {
-                //Front facing triangles are counter clockwise.
-                //Quad layout: 
-                // 0____1
-                // |  / |
-                // | /  |
-                // 2____3
-                //0 2 1
-                //1 2 3 
-                indexData[glyphIndexStart + 0] = baseVertex + 0;
-                indexData[glyphIndexStart + 1] = baseVertex + 2;
-                indexData[glyphIndexStart + 2] = baseVertex + 1;
-                indexData[glyphIndexStart + 3] = baseVertex + 1;
-                indexData[glyphIndexStart + 4] = baseVertex + 2;
-                indexData[glyphIndexStart + 5] = baseVertex + 3;
-                baseVertex += 4;
-            }
-            indices = new IndexBuffer(indexData, device, "Glyph Indices");
+            indices = new IndexBuffer(Helpers.GetScreenQuadIndices(maximumGlyphsPerDraw), device, "Glyph Indices");
 
             var samplerDescription = SamplerStateDescription.Default();
             samplerDescription.Filter = Filter.MinMagMipLinear;
             sampler = new SamplerState(device, samplerDescription);
 
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "Glyph Renderer Vertex Constants");
-            pixelConstants = new ConstantsBuffer<Vector3>(device, debugName: "Glyph Renderer Pixel Constants");
 
-            vertexShader = new VertexShader(device, cache.GetShader(@"Font\RenderGlyphs.hlsl.vshader"));
-            pixelShader = new PixelShader(device, cache.GetShader(@"Font\RenderGlyphs.hlsl.pshader"));
+            vertexShader = new VertexShader(device, cache.GetShader(@"UI\RenderGlyphs.hlsl.vshader"));
+            pixelShader = new PixelShader(device, cache.GetShader(@"UI\RenderGlyphs.hlsl.pshader"));
         }
 
         /// <summary>
@@ -97,20 +99,20 @@ namespace DemoRenderer.Font
             context.VertexShader.SetConstantBuffer(0, vertexConstants.Buffer);
             context.VertexShader.SetShaderResource(0, instances.SRV);
             context.PixelShader.Set(pixelShader);
-            context.PixelShader.SetConstantBuffer(0, pixelConstants.Buffer);
             context.PixelShader.SetSampler(0, sampler);
         }
 
-        public void Render(DeviceContext context, Font font, Int2 screenResolution, Vector2 horizontalAxis, Vector3 color, GlyphInstance[] glyphs, int start, int count)
+        public void Render(DeviceContext context, Font font, Int2 screenResolution, GlyphInstance[] glyphs, int start, int count)
         {
             var vertexConstantsData = new VertexConstants
             {
-                HorizontalAxis = horizontalAxis,
+                //These first two scales could be uploaded once, but it would require another buffer. Not important enough.
+                //The packed minimum must permit subpixel locations. So, distribute the range 0 to 65535 over the pixel range 0 to resolution.
+                PackedToScreenScale = new Vector2(screenResolution.X / 65535f, screenResolution.Y / 65535f),
                 ScreenToNDCScale = new Vector2(2f / screenResolution.X, -2f / screenResolution.Y),
                 InverseAtlasResolution = new Vector2(1f / font.Content.Atlas.Width, 1f / font.Content.Atlas.Height)
             };
             vertexConstants.Update(context, ref vertexConstantsData);
-            pixelConstants.Update(context, ref color);
             context.VertexShader.SetShaderResource(1, font.Sources.SRV);
             context.PixelShader.SetShaderResource(0, font.AtlasSRV);
 
@@ -135,8 +137,14 @@ namespace DemoRenderer.Font
                 indices.Dispose();
                 sampler.Dispose();
                 vertexConstants.Dispose();
-                pixelConstants.Dispose();
             }
         }
+
+#if DEBUG
+        ~GlyphRenderer()
+        {
+            Helpers.CheckForUndisposed(disposed, this);
+        }
+#endif
     }
 }

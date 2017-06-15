@@ -1,8 +1,9 @@
-﻿using System;
+﻿using BEPUutilities2;
+using System;
 using System.Numerics;
 using System.Text;
 
-namespace DemoRenderer.Font
+namespace DemoRenderer.UI
 {
     /// <summary>
     /// Helper class to build renderable sets of glyphs.
@@ -32,7 +33,8 @@ namespace DemoRenderer.Font
         }
 
 
-        public void Add(StringBuilder characters, int start, int count, Vector2 startingPosition, Vector2 horizontalAxis, float height, Font font)
+        public void Add(StringBuilder characters, int start, int count, Vector2 screenToPackedScale,
+            Vector2 startingPosition, Vector2 horizontalAxis, Vector3 color, float height, Font font)
         {
             var scale = height * font.Content.InverseSizeInTexels;
             //Note that we don't actually include glyphs for spaces, so this could result in an oversized allocation. Not very concerning; no effect on correctness.
@@ -61,10 +63,8 @@ namespace DemoRenderer.Font
                         //Note subtraction on y component. In texture space, +1 is down, -1 is up.
                         var localOffsetToCharacter = new Vector2(characterData.Bearing.X * scale, characterData.Bearing.Y * scale); 
                         var offsetToCharacter = localOffsetToCharacter.X * horizontalAxis - localOffsetToCharacter.Y * verticalAxis;
-                        glyph.TargetPosition = penPosition + offsetToCharacter;
-                        glyph.SourceId = font.GetSourceId(character);
-                        glyph.Scale = scale;
-
+                        var minimum = penPosition + offsetToCharacter;
+                        glyph = new GlyphInstance(ref minimum, ref horizontalAxis, scale, font.GetSourceId(character), ref color, ref screenToPackedScale);
                     }
                     //Move the pen to the next character.
                     float advance = characterData.Advance;

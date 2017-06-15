@@ -1,6 +1,6 @@
 ﻿using DemoContentLoader;
 using DemoRenderer.Background;
-using DemoRenderer.Font;
+using DemoRenderer.UI;
 using DemoRenderer.PostProcessing;
 using DemoRenderer.Properties;
 using SharpDX.Direct3D11;
@@ -18,9 +18,11 @@ namespace DemoRenderer
         public ShaderCache ShaderCache { get; private set; }
         public BackgroundRenderer Background { get; private set; }
         public GlyphRenderer GlyphRenderer { get; private set; }
+        public UILineRenderer UILineRenderer { get; private set; }
         public CompressToSwap CompressToSwap { get; private set; }
 
         public TextBatcher TextBatcher { get; private set; }
+        public UILineBatcher UILineBatcher { get; private set; }
 
         Texture2D depthBuffer;
         DepthStencilView dsv;
@@ -50,8 +52,8 @@ namespace DemoRenderer
 
             GlyphRenderer = new GlyphRenderer(surface.Device, surface.Context, ShaderCache);
             TextBatcher = new TextBatcher();
-
-
+            UILineRenderer = new UILineRenderer(surface.Device, surface.Context, ShaderCache);
+            UILineBatcher = new UILineBatcher();
 
             OnResize();
             var rasterizerStateDescription = RasterizerStateDescription.Default();
@@ -109,6 +111,10 @@ namespace DemoRenderer
             Helpers.Dispose(ref rtv);
 
             var resolution = Surface.Resolution;
+
+            TextBatcher.Resolution = resolution;
+            UILineBatcher.Resolution = resolution;
+
             depthBuffer = new Texture2D(Surface.Device, new Texture2DDescription
             {
                 Format = Format.R32_Typeless,
@@ -181,6 +187,7 @@ namespace DemoRenderer
             //Glyph and screenspace line drawing rely on the same premultiplied alpha blending transparency. We'll handle their state out here.
             context.OutputMerger.SetBlendState(uiBlendState);
             context.OutputMerger.SetDepthStencilState(uiDepthState);
+            UILineBatcher.Flush(context, Surface.Resolution, UILineRenderer);
             GlyphRenderer.PreparePipeline(context);
             TextBatcher.Flush(context, Surface.Resolution, GlyphRenderer);
 
@@ -198,6 +205,9 @@ namespace DemoRenderer
                 disposed = true;
                 Background.Dispose();
                 CompressToSwap.Dispose();
+
+                UILineRenderer.Dispose();
+                GlyphRenderer.Dispose();
 
                 depthBuffer.Dispose();
                 dsv.Dispose();

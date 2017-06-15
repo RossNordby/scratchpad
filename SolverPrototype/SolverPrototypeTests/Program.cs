@@ -2,7 +2,7 @@
 using DemoContentLoader;
 using DemoRenderer;
 using DemoRenderer.Background;
-using DemoRenderer.Font;
+using DemoRenderer.UI;
 using DemoUtilities;
 using OpenTK.Input;
 using SolverPrototypeTests.Properties;
