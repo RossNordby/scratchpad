@@ -60,6 +60,30 @@ namespace SolverPrototypeTests
 
         bool showControls;
 
+        Graph graph;
+
+        class TestSeries : IDataSeries
+        {
+            public float Value;
+            public float Scale;
+            public float Width;
+            public TestSeries(float baseValue, float scale, float width)
+            {
+                Scale = scale;
+                Value = baseValue;
+                Width = width;
+            }
+            public float this[int index] => Scale * (1f + (float)Math.Sin(Value + index / Width));
+
+            public int Start => 0;
+
+            public int End => 256;
+        }
+
+        TestSeries testSeries0 = new TestSeries(0f, 1f, 200);
+        TestSeries testSeries1 = new TestSeries(1f, 0.8f, 100);
+        TestSeries testSeries2 = new TestSeries(2f, 1.2f, 400);
+
         public BasicDemo(Window window, Input input, Camera camera, Font font, Controls? controls = null)
         {
             this.window = window;
@@ -68,6 +92,38 @@ namespace SolverPrototypeTests
             if (controls == null)
                 this.controls = Controls.Default;
             this.font = font;
+
+            graph = new Graph(new GraphDescription
+            {
+                BodyMinimum = new Vector2(150, 100),
+                BodySpan = new Vector2(200, 200),
+                BodyLineColor = new Vector3(1, 1, 1),
+                AxisLabelHeight = 16,
+                AxisLineRadius = 0.5f,
+                HorizontalAxisLabel = "Frames",
+                VerticalAxisLabel = "Time (ms)",
+                VerticalIntervalLabelRounding = 1,
+                BackgroundLineRadius = 0.125f,
+                IntervalTextHeight = 12,
+                IntervalTickRadius = 0.25f,
+                IntervalTickLength = 6f,
+                HorizontalTickCount = 5,
+                VerticalTickCount = 5,
+                HorizontalTickTextPadding = 0,
+                VerticalTickTextPadding = 3,
+
+                LegendMinimum = new Vector2(20, 200),
+                LegendNameHeight = 14,
+                LegendLineLength = 10,
+
+                TextColor = new Vector3(1, 1, 1),
+                Font = font,
+                
+                LineSpacingMultiplier = 1f
+            });
+            graph.AddSeries("yee", new Vector3(0, 0, 1), 0.25f, testSeries0);
+            graph.AddSeries("laryngitis", new Vector3(0, 1, 1), 0.5f, testSeries1);
+            graph.AddSeries("torb", new Vector3(1, 0, 1), 0.75f, testSeries2);
         }
 
         public void Update(float dt)
@@ -129,13 +185,26 @@ namespace SolverPrototypeTests
         StringBuilder uiText = new StringBuilder();
         public void Render(Renderer renderer)
         {
+            graph.Description.Font = font;
+            graph.Draw(uiText, renderer.UILineBatcher, renderer.TextBatcher);
+            testSeries0.Value += 0.02f;
+            testSeries1.Value += 0.03f;
+            testSeries2.Value += 0.04f;
+            testSeries0.Scale = 1 + 0.5f * (float)Math.Sin(t);
+            testSeries1.Scale = 1 + 0.3f * (float)Math.Sin(t);
+            testSeries2.Scale = 1 + 0.1f * (float)Math.Sin(t);
             t += 0.01f;
-            var lineCenter = new Vector2(256, 256);
-            var lineOffset = 100 * new Vector2((float)Math.Sin(t), (float)Math.Cos(t));
-            renderer.UILineBatcher.Draw(lineCenter + lineOffset, lineCenter - lineOffset, 
-                0.5f,//20 * Math.Max(0, 1f + (float)Math.Cos(t)), 
-                new Vector3(1, 0, 0));
+            for (int i = 0; i < 128; ++i)
+            {
 
+                var lineCenter = new Vector2(384 + i * 3f, 256);
+                var angle = t + i * 0.05f;
+                var lineOffset = 100 * new Vector2((float)Math.Sin(angle), (float)Math.Cos(angle));
+                renderer.UILineBatcher.Draw(lineCenter + lineOffset, lineCenter - lineOffset,
+                    0.5f,//20 * Math.Max(0, 1f + (float)Math.Cos(t)), 
+                    new Vector3(1, i * (1f / 127f), 0));
+
+            }
             uiText.Clear();
             float textHeight = 24;
             float lineSpacing = textHeight * 1.5f;

@@ -25,13 +25,34 @@ namespace DemoRenderer.UI
         {
             glyphs = new GlyphInstance[initialCapacity];
         }
-            
+
 
         public void Clear()
         {
             GlyphCount = 0;
         }
 
+        public static float MeasureLength(StringBuilder characters, Font font, float height)
+        {
+            if (characters.Length > 0)
+            {
+                var previousCharacter = characters[0];
+                var scale = height * font.Content.InverseSizeInTexels;
+                float length = 0;
+                if (font.Content.Characters.TryGetValue(previousCharacter, out var firstCharacterData))
+                    length += firstCharacterData.Advance;
+                for (int i = 1; i < characters.Length; ++i)
+                {
+                    var character = characters[i];
+                    if (font.Content.Characters.TryGetValue(character, out var characterData))
+                    {
+                        length += characterData.Advance + font.Content.GetKerningInTexels(previousCharacter, character);
+                    }
+                }
+                return length * scale;
+            }
+            return 0;
+        }
 
         public void Add(StringBuilder characters, int start, int count, Vector2 screenToPackedScale,
             Vector2 startingPosition, Vector2 horizontalAxis, Vector3 color, float height, Font font)
@@ -61,7 +82,7 @@ namespace DemoRenderer.UI
                     {
                         ref var glyph = ref glyphs[GlyphCount++];
                         //Note subtraction on y component. In texture space, +1 is down, -1 is up.
-                        var localOffsetToCharacter = new Vector2(characterData.Bearing.X * scale, characterData.Bearing.Y * scale); 
+                        var localOffsetToCharacter = new Vector2(characterData.Bearing.X * scale, characterData.Bearing.Y * scale);
                         var offsetToCharacter = localOffsetToCharacter.X * horizontalAxis - localOffsetToCharacter.Y * verticalAxis;
                         var minimum = penPosition + offsetToCharacter;
                         glyph = new GlyphInstance(ref minimum, ref horizontalAxis, scale, font.GetSourceId(character), ref color, ref screenToPackedScale);

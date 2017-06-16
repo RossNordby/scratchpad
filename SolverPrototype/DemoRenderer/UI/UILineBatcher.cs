@@ -3,6 +3,7 @@ using BEPUutilities2.Memory;
 using SharpDX.Direct3D11;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -31,6 +32,11 @@ namespace DemoRenderer.UI
 
         public void Draw(Vector2 start, Vector2 end, float radius, Vector3 color)
         {
+            if (LineCount == lines.Length)
+            {
+                Debug.Assert(lines.Length > 0);
+                Array.Resize(ref lines, LineCount * 2);
+            }
             lines[LineCount++] = new UILineInstance(ref start, ref end, radius, ref color, ref screenToPackedScale);
         }
 

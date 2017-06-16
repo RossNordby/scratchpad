@@ -50,7 +50,7 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	float2 quadCoordinates = float2(vertexId & 1, (vertexId >> 1) & 1);
 	float2 offset = end - output.Start;
 	output.LineLength = length(offset);
-	output.LineDirection = offset / output.LineLength;
+	output.LineDirection = output.LineLength > 1e-5 ? offset / output.LineLength : float2(1,0);
 	float2 verticalAxis = float2(-output.LineDirection.y, output.LineDirection.x);
 
 	//Pad a little bit to avoid clipping.

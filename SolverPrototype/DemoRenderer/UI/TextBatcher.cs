@@ -59,5 +59,6 @@ namespace DemoRenderer.UI
             batches.Clear();
 
         }
+
     }
 }
