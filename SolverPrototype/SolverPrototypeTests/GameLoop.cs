@@ -15,8 +15,7 @@ namespace SolverPrototypeTests
         public Camera Camera { get; private set; }
         public RenderSurface Surface { get; private set; }
         public Renderer Renderer { get; private set; }
-        public Action<float> OnUpdate { get; set; }
-        public Action<Renderer> OnRender { get; set; }
+        public DemoHarness DemoHarness { get; set; }
 
         public GameLoop(Window window)
         {
@@ -29,27 +28,28 @@ namespace SolverPrototypeTests
                 false;
 #endif
             Surface = new RenderSurface(window.Handle, window.Resolution, enableDeviceDebugLayer: useDebugLayer);
-
             Renderer = new Renderer(Surface);
-            Camera = new Camera(window.Resolution.X / (float)window.Resolution.Y, (float)Math.PI / 2, 0.01f, 100000);
+            Camera = new Camera(window.Resolution.X / (float)window.Resolution.Y, (float)Math.PI / 2, 0.01f, 100000);            
         }
 
         void Update(float dt)
         {
             Input.Start();
-            //We'll let the delgate's logic handle the variable time steps.
-            OnUpdate(dt);
-            //At the moment, rendering just follows sequentially. Later on we might want to distinguish it a bit more with fixed time stepping or something. Maybe.
-            OnRender(Renderer);
+            if (DemoHarness != null)
+            {
+                //We'll let the delgate's logic handle the variable time steps.
+                DemoHarness.Update(dt);
+                //At the moment, rendering just follows sequentially. Later on we might want to distinguish it a bit more with fixed time stepping or something. Maybe.
+                DemoHarness.Render(Renderer);
+            }
             Renderer.Render(Camera);
             Surface.Present();
             Input.End();
         }
 
-        public void Run(Action<float> onUpdate, Action<Renderer> onRender)
+        public void Run(DemoHarness harness)
         {
-            OnUpdate = onUpdate;
-            OnRender = onRender;
+            DemoHarness = harness;
             Window.Run(Update, OnResize);
         }
 
@@ -58,6 +58,7 @@ namespace SolverPrototypeTests
             //We just don't support true fullscreen in the demos. Would be pretty pointless.
             Renderer.Surface.Resize(resolution, false);
             Camera.AspectRatio = resolution.X / (float)resolution.Y;
+            DemoHarness?.OnResize(resolution);
         }
 
         bool disposed;

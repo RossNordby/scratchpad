@@ -231,7 +231,7 @@ namespace SolverPrototype
 
 
             //Since the constraint set could have changed arbitrarily since the previous execution, validate from batch down.
-            Debug.Assert(Solver.Batches.Count >= 0);
+            Debug.Assert(Solver.Batches.Count > 0);
             if (nextBatchIndex >= Solver.Batches.Count)
             {
                 //Invalid batch; wrap to the first one.
@@ -336,6 +336,9 @@ namespace SolverPrototype
         {
             var workerCount = threadDispatcher != null ? threadDispatcher.ThreadCount : 1;
             var constraintCount = Solver.ConstraintCount;
+            //Early out if there are no constraints to compress. The existence of constraints is assumed in some of the subsequent stages, so this is not merely an optimization.
+            if (constraintCount == 0)
+                return;
             maximumCompressionCount = (int)Math.Max(1, Math.Round(MaximumCompressionFraction * constraintCount));
             targetCandidateCount = (int)Math.Max(1, Math.Round(TargetCandidateFraction * constraintCount));
             ScheduleAnalysisRegions(workerCount, rawPool);

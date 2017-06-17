@@ -13,7 +13,7 @@ namespace DemoRenderer.UI
     {
         int Start { get; }
         int End { get; }
-        float this[int index] { get; }
+        double this[int index] { get; }
     }
 
     public struct GraphDescription
@@ -32,6 +32,7 @@ namespace DemoRenderer.UI
         public string HorizontalAxisLabel;
         public string VerticalAxisLabel;
         public int VerticalIntervalLabelRounding;
+        public float VerticalIntervalValueScale;
         public float BackgroundLineRadius;
         public float IntervalTextHeight;
         public float IntervalTickRadius;
@@ -166,8 +167,8 @@ namespace DemoRenderer.UI
             //Collect information to define data window ranges.
             int minX = int.MaxValue;
             int maxX = int.MinValue;
-            float minY = float.MaxValue;
-            float maxY = float.MinValue;
+            var minY = double.MaxValue;
+            var maxY = double.MinValue;
             for (int i = 0; i < graphSeries.Count; ++i)
             {
                 var data = graphSeries[i].Data;
@@ -263,7 +264,7 @@ namespace DemoRenderer.UI
                         var backgroundEnd = penPosition + new Vector2(description.BodySpan.X, 0);
                         lines.Draw(penPosition, tickEnd, description.IntervalTickRadius, description.BodyLineColor);
                         lines.Draw(penPosition, backgroundEnd, description.BackgroundLineRadius, description.BodyLineColor);
-                        characters.Clear().Append(Math.Round(minY + yDataIntervalSize * i, description.VerticalIntervalLabelRounding));
+                        characters.Clear().Append(Math.Round((minY + yDataIntervalSize * i) * description.VerticalIntervalValueScale, description.VerticalIntervalLabelRounding));
                         text.Write(characters,
                             tickEnd + new Vector2(-description.VerticalTickTextPadding, 0.5f * GlyphBatch.MeasureLength(characters, description.Font, description.IntervalTextHeight)),
                             description.IntervalTextHeight, new Vector2(0, -1), description.TextColor, description.Font);
@@ -274,10 +275,10 @@ namespace DemoRenderer.UI
 
             //Draw the line graphs on top of the body.
             {
-                var dataToPixelsScale = new Vector2(description.BodySpan.X / (maxX - minX), description.BodySpan.Y / (maxY - minY));
-                Vector2 DataToScreenspace(int x, float y)
+                var dataToPixelsScale = new Vector2(description.BodySpan.X / (maxX - minX), (float)(description.BodySpan.Y / (maxY - minY)));
+                Vector2 DataToScreenspace(int x, double y)
                 {
-                    var graphCoordinates = new Vector2(x - minX, y - minY) * dataToPixelsScale;
+                    var graphCoordinates = new Vector2(x - minX, (float)(y - minY)) * dataToPixelsScale;
                     var screenCoordinates = graphCoordinates;
                     screenCoordinates.Y = description.BodySpan.Y - screenCoordinates.Y;
                     screenCoordinates += description.BodyMinimum;

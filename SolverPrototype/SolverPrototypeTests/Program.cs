@@ -27,8 +27,8 @@ namespace SolverPrototypeTests
             //var fontContent = content.Load<FontContent>(@"Content\Courier Prime Sans.ttf");
             var fontContent = content.Load<FontContent>(@"Content\Carlito-Regular.ttf");
             var font = new Font(loop.Surface.Device, loop.Surface.Context, fontContent);
-            var demo = new BasicDemo(window, loop.Input, loop.Camera, font);
-            loop.Run(demo.Update, demo.Render);
+            var demo = new DemoHarness(window, loop.Renderer, loop.Input, loop.Camera, font);
+            loop.Run(demo);
             loop.Dispose();
             window.Dispose();
 

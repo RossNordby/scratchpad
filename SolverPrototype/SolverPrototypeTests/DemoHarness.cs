@@ -25,6 +25,7 @@ namespace SolverPrototypeTests
         public Key LockMouse;
         public Key Exit;
         public Key ShowControls;
+        public Key ChangeTimingDisplayMode;
 
         public static Controls Default
         {
@@ -43,16 +44,18 @@ namespace SolverPrototypeTests
 
                     LockMouse = Key.Tab,
                     Exit = Key.Escape,
-                    ShowControls = Key.F1
+                    ShowControls = Key.F1,
+                    ChangeTimingDisplayMode = Key.F2
                 };
             }
 
         }
     }
 
-    public class BasicDemo
+    public class DemoHarness : IDisposable
     {
         Window window;
+        Renderer renderer;
         Input input;
         Camera camera;
         Controls controls;
@@ -60,40 +63,38 @@ namespace SolverPrototypeTests
 
         bool showControls;
 
-        Graph graph;
-
-        class TestSeries : IDataSeries
+        enum TimingDisplayMode
         {
-            public float Value;
-            public float Scale;
-            public float Width;
-            public TestSeries(float baseValue, float scale, float width)
-            {
-                Scale = scale;
-                Value = baseValue;
-                Width = width;
-            }
-            public float this[int index] => Scale * (1f + (float)Math.Sin(Value + index / Width));
-
-            public int Start => 0;
-
-            public int End => 256;
+            FullScreen,
+            Regular,
+            Minimized
         }
 
-        TestSeries testSeries0 = new TestSeries(0f, 1f, 200);
-        TestSeries testSeries1 = new TestSeries(1f, 0.8f, 100);
-        TestSeries testSeries2 = new TestSeries(2f, 1.2f, 400);
+        TimingDisplayMode timingDisplayMode;
+        Graph timingGraph;
 
-        public BasicDemo(Window window, Input input, Camera camera, Font font, Controls? controls = null)
+        DemoSet demoSet;
+        Demo demo;
+        void ChangeToDemo(int demoIndex)
+        {
+            demo.Dispose();
+            demo = demoSet.Build(demoIndex);
+        }
+
+        SimulationTimeSamples timeSamples = new SimulationTimeSamples(512);
+
+        public DemoHarness(Window window, Renderer renderer, Input input, Camera camera, Font font,
+            Controls? controls = null)
         {
             this.window = window;
+            this.renderer = renderer;
             this.input = input;
             this.camera = camera;
             if (controls == null)
                 this.controls = Controls.Default;
             this.font = font;
 
-            graph = new Graph(new GraphDescription
+            timingGraph = new Graph(new GraphDescription
             {
                 BodyMinimum = new Vector2(150, 100),
                 BodySpan = new Vector2(200, 200),
@@ -102,7 +103,8 @@ namespace SolverPrototypeTests
                 AxisLineRadius = 0.5f,
                 HorizontalAxisLabel = "Frames",
                 VerticalAxisLabel = "Time (ms)",
-                VerticalIntervalLabelRounding = 1,
+                VerticalIntervalLabelRounding = 2,
+                VerticalIntervalValueScale = 1e3f,
                 BackgroundLineRadius = 0.125f,
                 IntervalTextHeight = 12,
                 IntervalTickRadius = 0.25f,
@@ -118,12 +120,31 @@ namespace SolverPrototypeTests
 
                 TextColor = new Vector3(1, 1, 1),
                 Font = font,
-                
+
                 LineSpacingMultiplier = 1f
             });
-            graph.AddSeries("yee", new Vector3(0, 0, 1), 0.25f, testSeries0);
-            graph.AddSeries("laryngitis", new Vector3(0, 1, 1), 0.5f, testSeries1);
-            graph.AddSeries("torb", new Vector3(1, 0, 1), 0.75f, testSeries2);
+            timingGraph.AddSeries("Total", new Vector3(0, 0, 0), 0.75f, timeSamples.Simulation);
+            timingGraph.AddSeries("Body Opt", new Vector3(1, 0, 0), 0.125f, timeSamples.BodyOptimizer);
+            timingGraph.AddSeries("Constraint Opt", new Vector3(0, 0, 1), 0.125f, timeSamples.ConstraintOptimizer);
+            timingGraph.AddSeries("Batch Compress", new Vector3(0, 1, 0), 0.125f, timeSamples.BatchCompressor);
+            timingGraph.AddSeries("Pose Integrator", new Vector3(1, 1, 0), 0.25f, timeSamples.PoseIntegrator);
+            timingGraph.AddSeries("Solver", new Vector3(1, 0, 1), 0.5f, timeSamples.Solver);
+
+            demoSet = new DemoSet();
+            demo = demoSet.Build(0);
+        }
+
+        public void OnResize(Int2 resolution)
+        {
+            switch (timingDisplayMode)
+            {
+                case TimingDisplayMode.FullScreen:
+
+                    break;
+                case TimingDisplayMode.Regular:
+                    break;
+            }
+
         }
 
         public void Update(float dt)
@@ -179,20 +200,21 @@ namespace SolverPrototypeTests
             {
                 input.MouseLocked = false;
             }
+
+            demo.Update(dt);
+            timeSamples.RecordFrame(demo.Simulation);
         }
 
         float t = 0;
         StringBuilder uiText = new StringBuilder();
         public void Render(Renderer renderer)
         {
-            graph.Description.Font = font;
-            graph.Draw(uiText, renderer.UILineBatcher, renderer.TextBatcher);
-            testSeries0.Value += 0.02f;
-            testSeries1.Value += 0.03f;
-            testSeries2.Value += 0.04f;
-            testSeries0.Scale = 1 + 0.5f * (float)Math.Sin(t);
-            testSeries1.Scale = 1 + 0.3f * (float)Math.Sin(t);
-            testSeries2.Scale = 1 + 0.1f * (float)Math.Sin(t);
+            //Perform any demo-specific rendering first.
+            demo.Render(renderer);
+
+            timingGraph.Description.Font = font;
+            timingGraph.Draw(uiText, renderer.UILineBatcher, renderer.TextBatcher);
+            
             t += 0.01f;
             for (int i = 0; i < 128; ++i)
             {
@@ -269,5 +291,24 @@ namespace SolverPrototypeTests
 
 
         }
+
+        bool disposed;
+        public void Dispose()
+        {
+            if (!disposed)
+            {
+                disposed = true;
+                demo?.Dispose();
+            }
+        }
+
+#if DEBUG
+        ~DemoHarness()
+        {
+            Helpers.CheckForUndisposed(disposed, this);
+        }
+#endif
+
+
     }
 }
