@@ -43,11 +43,11 @@ namespace DemoRenderer.UI
         /// <summary>
         /// Number of interval ticks along the horizontal axis, not including the start and end ticks.
         /// </summary>
-        public int HorizontalTickCount;
+        public int TargetHorizontalTickCount;
         /// <summary>
         /// Number of interval ticks along the vertical axis, not including the min and max ticks.
         /// </summary>
-        public int VerticalTickCount;
+        public int TargetVerticalTickCount;
         public float HorizontalTickTextPadding;
         public float VerticalTickTextPadding;
 
@@ -207,6 +207,15 @@ namespace DemoRenderer.UI
                     maxY = 1;
             }
 
+            //Calculate the data span that takes into account rounding. We want intervals to be evenly spaced, but also to match nicely rounded numbers. 
+            //That means the span must be equal to some rounded number multiplied by the number of intervals.
+            var yDataSpan = maxY - minY;
+            var yIntervalCount = description.TargetVerticalTickCount + 1;
+            var rawIntervalLength = yDataSpan / yIntervalCount;
+            var roundingOffset = 0.5 * Math.Pow(0.1, description.VerticalIntervalLabelRounding);
+            yDataSpan =  Math.Round(rawIntervalLength * description.VerticalIntervalValueScale + roundingOffset, description.VerticalIntervalLabelRounding) * 
+                (yIntervalCount / description.VerticalIntervalValueScale);
+
             //Draw the graph body axes.
             var lowerLeft = description.BodyMinimum + new Vector2(0, description.BodySpan.Y);
             var upperRight = description.BodyMinimum + new Vector2(description.BodySpan.X, 0);
@@ -231,51 +240,64 @@ namespace DemoRenderer.UI
 
             //Position tickmarks, tick labels, and background lines along the axes.
             {
-                var xDataIntervalSize = (maxX - minX) / (description.HorizontalTickCount + 1f);
-                var yDataIntervalSize = (maxY - minY) / (description.VerticalTickCount + 1f);
-                var xIntervalSizeInPixels = description.BodySpan.X / (description.HorizontalTickCount + 1f);
-                var yIntervalSizeInPixels = description.BodySpan.Y / (description.VerticalTickCount + 1f);
-
-                float penOffset = 0;
-                for (int i = 0; i < description.HorizontalTickCount + 2; ++i)
+                var xDataIntervalSize = (maxX - minX) / (description.TargetHorizontalTickCount + 1f);
+                var previousTickValue = int.MinValue;
+                float valueToPixels = description.BodySpan.X / (maxX - minX);
+                for (int i = 0; i < description.TargetHorizontalTickCount + 2; ++i)
                 {
                     //Round pen offset such that the data tick lands on an integer.
                     var valueAtTick = i * xDataIntervalSize;
-                    var roundedValue = (int)Math.Round(valueAtTick);
-                    var roundedPenOffset = roundedValue * (description.BodySpan.X / (maxX - minX));
+                    var tickValue = (int)Math.Round(valueAtTick);
+                    if (tickValue == previousTickValue)
+                    {
+                        //Don't bother creating redundant ticks.
+                        continue;
+                    }
+                    previousTickValue = tickValue;
 
-                    var penPosition = lowerLeft + new Vector2(roundedPenOffset, 0);
+                    var penPosition = lowerLeft + new Vector2(tickValue * valueToPixels, 0);
                     var tickEnd = penPosition + new Vector2(0, description.IntervalTickLength);
                     var backgroundEnd = penPosition - new Vector2(0, description.BodySpan.Y);
                     lines.Draw(penPosition, tickEnd, description.IntervalTickRadius, description.BodyLineColor);
                     lines.Draw(penPosition, backgroundEnd, description.BackgroundLineRadius, description.BodyLineColor);
-                    characters.Clear().Append(roundedValue);
-                    text.Write(characters, tickEnd + 
+                    characters.Clear().Append(tickValue);
+                    text.Write(characters, tickEnd +
                         new Vector2(GlyphBatch.MeasureLength(characters, description.Font, description.IntervalTextHeight) * -0.5f,
                         description.HorizontalTickTextPadding + description.IntervalTextHeight * description.LineSpacingMultiplier),
                         description.IntervalTextHeight, description.TextColor, description.Font);
-                    penOffset += xIntervalSizeInPixels;
                 }
+            }
+            {
+                var yDataIntervalSize = yDataSpan / (description.TargetVerticalTickCount + 1f);
+                var previousTickValue = double.MinValue;
+                //Note the inclusion of the scale. Rounding occurs post-scale; moving back to pixels requires undoing the scale.
+                var valueToPixels = description.BodySpan.Y / (yDataSpan * description.VerticalIntervalValueScale);
+                for (int i = 0; i < description.TargetVerticalTickCount + 2; ++i)
                 {
-                    var penPosition = lowerLeft;
-                    for (int i = 0; i < description.VerticalTickCount + 2; ++i)
+                    var tickValue = Math.Round((minY + yDataIntervalSize * i) * description.VerticalIntervalValueScale, description.VerticalIntervalLabelRounding);
+                    if (tickValue == previousTickValue)
                     {
-                        var tickEnd = penPosition - new Vector2(description.IntervalTickLength, 0);
-                        var backgroundEnd = penPosition + new Vector2(description.BodySpan.X, 0);
-                        lines.Draw(penPosition, tickEnd, description.IntervalTickRadius, description.BodyLineColor);
-                        lines.Draw(penPosition, backgroundEnd, description.BackgroundLineRadius, description.BodyLineColor);
-                        characters.Clear().Append(Math.Round((minY + yDataIntervalSize * i) * description.VerticalIntervalValueScale, description.VerticalIntervalLabelRounding));
-                        text.Write(characters,
-                            tickEnd + new Vector2(-description.VerticalTickTextPadding, 0.5f * GlyphBatch.MeasureLength(characters, description.Font, description.IntervalTextHeight)),
-                            description.IntervalTextHeight, new Vector2(0, -1), description.TextColor, description.Font);
-                        penPosition.Y -= yIntervalSizeInPixels;
+                        //Don't bother creating redundant ticks.
+                        continue;
                     }
+                    previousTickValue = tickValue;
+
+                    var penPosition = lowerLeft - new Vector2(0, (float)(tickValue * valueToPixels));
+
+                    var tickEnd = penPosition - new Vector2(description.IntervalTickLength, 0);
+                    var backgroundEnd = penPosition + new Vector2(description.BodySpan.X, 0);
+                    lines.Draw(penPosition, tickEnd, description.IntervalTickRadius, description.BodyLineColor);
+                    lines.Draw(penPosition, backgroundEnd, description.BackgroundLineRadius, description.BodyLineColor);
+                    characters.Clear().Append(tickValue);
+                    text.Write(characters,
+                        tickEnd + new Vector2(-description.VerticalTickTextPadding, 0.5f * GlyphBatch.MeasureLength(characters, description.Font, description.IntervalTextHeight)),
+                        description.IntervalTextHeight, new Vector2(0, -1), description.TextColor, description.Font);
                 }
             }
 
             //Draw the line graphs on top of the body.
             {
-                var dataToPixelsScale = new Vector2(description.BodySpan.X / (maxX - minX), (float)(description.BodySpan.Y / (maxY - minY)));
+                var dataToPixelsScale = new Vector2(description.BodySpan.X / (maxX - minX), (float)(description.BodySpan.Y / yDataSpan));
                 Vector2 DataToScreenspace(int x, double y)
                 {
                     var graphCoordinates = new Vector2(x - minX, (float)(y - minY)) * dataToPixelsScale;

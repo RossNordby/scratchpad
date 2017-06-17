@@ -4,6 +4,7 @@ using DemoRenderer;
 using DemoRenderer.Background;
 using DemoRenderer.UI;
 using DemoUtilities;
+using OpenTK;
 using OpenTK.Input;
 using SolverPrototypeTests.Properties;
 using System;
@@ -17,7 +18,8 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             Console.ReadKey();
-            var window = new Window("pretty cool multicolored window", new Int2(1024, 512), WindowMode.Windowed);
+            var window = new Window("pretty cool multicolored window", 
+                new Int2((int)(DisplayDevice.Default.Width * 0.75f), (int)(DisplayDevice.Default.Height * 0.75f)), WindowMode.Windowed);
             var loop = new GameLoop(window);
             ContentArchive content;
             using (var stream = new MemoryStream(Resources.SolverPrototypeTestsContent))

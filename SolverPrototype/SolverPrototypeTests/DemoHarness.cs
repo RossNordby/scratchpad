@@ -65,8 +65,8 @@ namespace SolverPrototypeTests
 
         enum TimingDisplayMode
         {
-            FullScreen,
             Regular,
+            Big,
             Minimized
         }
 
@@ -96,27 +96,24 @@ namespace SolverPrototypeTests
 
             timingGraph = new Graph(new GraphDescription
             {
-                BodyMinimum = new Vector2(150, 100),
-                BodySpan = new Vector2(200, 200),
                 BodyLineColor = new Vector3(1, 1, 1),
                 AxisLabelHeight = 16,
                 AxisLineRadius = 0.5f,
                 HorizontalAxisLabel = "Frames",
                 VerticalAxisLabel = "Time (ms)",
-                VerticalIntervalLabelRounding = 2,
                 VerticalIntervalValueScale = 1e3f,
+                VerticalIntervalLabelRounding = 2,
                 BackgroundLineRadius = 0.125f,
                 IntervalTextHeight = 12,
                 IntervalTickRadius = 0.25f,
                 IntervalTickLength = 6f,
-                HorizontalTickCount = 5,
-                VerticalTickCount = 5,
+                TargetHorizontalTickCount = 5,
                 HorizontalTickTextPadding = 0,
                 VerticalTickTextPadding = 3,
 
                 LegendMinimum = new Vector2(20, 200),
-                LegendNameHeight = 14,
-                LegendLineLength = 10,
+                LegendNameHeight = 12,
+                LegendLineLength = 7,
 
                 TextColor = new Vector3(1, 1, 1),
                 Font = font,
@@ -132,19 +129,43 @@ namespace SolverPrototypeTests
 
             demoSet = new DemoSet();
             demo = demoSet.Build(0);
+
+            OnResize(window.Resolution);
+        }
+
+        private void UpdateTimingGraphForMode(TimingDisplayMode newDisplayMode)
+        {
+            timingDisplayMode = newDisplayMode;
+            ref var description = ref timingGraph.Description;
+            var resolution = window.Resolution;
+            switch (timingDisplayMode)
+            {
+                case TimingDisplayMode.Big:
+                    {
+                        const float inset = 150;
+                        description.BodyMinimum = new Vector2(inset);
+                        description.BodySpan = new Vector2(resolution.X, resolution.Y) - description.BodyMinimum - new Vector2(inset);
+                        description.LegendMinimum = description.BodyMinimum - new Vector2(110, 0);
+                        description.TargetVerticalTickCount = 5;
+                    }
+                    break;
+                case TimingDisplayMode.Regular:
+                    {
+                        const float inset = 50;
+                        var targetSpan = new Vector2(400, 150);
+                        description.BodyMinimum = new Vector2(resolution.X - targetSpan.X - inset, inset);
+                        description.BodySpan = targetSpan;
+                        description.LegendMinimum = description.BodyMinimum - new Vector2(130, 0);
+                        description.TargetVerticalTickCount = 3;
+                    }
+                    break;
+            }
+            //In a minimized state, the graph is just not drawn.
         }
 
         public void OnResize(Int2 resolution)
         {
-            switch (timingDisplayMode)
-            {
-                case TimingDisplayMode.FullScreen:
-
-                    break;
-                case TimingDisplayMode.Regular:
-                    break;
-            }
-
+            UpdateTimingGraphForMode(timingDisplayMode);
         }
 
         public void Update(float dt)
@@ -195,6 +216,14 @@ namespace SolverPrototypeTests
                 {
                     showControls = !showControls;
                 }
+
+                if (input.WasPushed(controls.ChangeTimingDisplayMode))
+                {
+                    var newDisplayMode = (int)timingDisplayMode + 1;
+                    if (newDisplayMode > 2)
+                        newDisplayMode = 0;
+                    UpdateTimingGraphForMode((TimingDisplayMode)newDisplayMode);
+                }
             }
             else
             {
@@ -205,6 +234,7 @@ namespace SolverPrototypeTests
             timeSamples.RecordFrame(demo.Simulation);
         }
 
+
         float t = 0;
         StringBuilder uiText = new StringBuilder();
         public void Render(Renderer renderer)
@@ -212,9 +242,13 @@ namespace SolverPrototypeTests
             //Perform any demo-specific rendering first.
             demo.Render(renderer);
 
-            timingGraph.Description.Font = font;
-            timingGraph.Draw(uiText, renderer.UILineBatcher, renderer.TextBatcher);
-            
+
+#if DEBUG
+            float warningHeight = 15f;
+            renderer.TextBatcher.Write(uiText.Clear().Append("Running in Debug configuration. Compile in Release configuration for performance testing."),
+                new Vector2((window.Resolution.X - GlyphBatch.MeasureLength(uiText, font, warningHeight)) * 0.5f, warningHeight), warningHeight, new Vector3(1, 0, 0), font);
+#endif
+
             t += 0.01f;
             for (int i = 0; i < 128; ++i)
             {
@@ -263,6 +297,7 @@ namespace SolverPrototypeTests
                 WriteName(nameof(controls.LockMouse));
                 WriteName(nameof(controls.Exit));
                 WriteName(nameof(controls.ShowControls));
+                WriteName(nameof(controls.ChangeTimingDisplayMode));
 
                 void WriteControl(string control)
                 {
@@ -280,6 +315,7 @@ namespace SolverPrototypeTests
                 WriteControl(controls.LockMouse.ToString());
                 WriteControl(controls.Exit.ToString());
                 WriteControl(controls.ShowControls.ToString());
+                WriteControl(controls.ChangeTimingDisplayMode.ToString());
             }
             else
             {
@@ -289,6 +325,18 @@ namespace SolverPrototypeTests
                 renderer.TextBatcher.Write(uiText, controlsStart, textHeight, horizontalAxis, textColor, font);
             }
 
+            if (timingDisplayMode != TimingDisplayMode.Minimized)
+            {
+                timingGraph.Draw(uiText, renderer.UILineBatcher, renderer.TextBatcher);
+            }
+            else
+            {
+                const float timingTextSize = 14;
+                const float inset = 25;
+                renderer.TextBatcher.Write(
+                    uiText.Clear().Append(Math.Round(1e3 * timeSamples.Simulation[timeSamples.Simulation.End - 1], timingGraph.Description.VerticalIntervalLabelRounding)).Append(" ms/step"),
+                    new Vector2(window.Resolution.X - inset - GlyphBatch.MeasureLength(uiText, font, timingTextSize), inset), timingTextSize, timingGraph.Description.TextColor, font);
+            }
 
         }
 
