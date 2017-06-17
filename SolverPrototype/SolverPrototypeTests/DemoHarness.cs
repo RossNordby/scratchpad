@@ -24,8 +24,8 @@ namespace SolverPrototypeTests
 
         public Key LockMouse;
         public Key Exit;
-        public Key ShowControls;
         public Key ChangeTimingDisplayMode;
+        public Key ShowControls;
 
         public static Controls Default
         {
@@ -44,8 +44,8 @@ namespace SolverPrototypeTests
 
                     LockMouse = Key.Tab,
                     Exit = Key.Escape,
+                    ChangeTimingDisplayMode = Key.F2,
                     ShowControls = Key.F1,
-                    ChangeTimingDisplayMode = Key.F2
                 };
             }
 
@@ -234,58 +234,36 @@ namespace SolverPrototypeTests
             timeSamples.RecordFrame(demo.Simulation);
         }
 
-
-        float t = 0;
-        StringBuilder uiText = new StringBuilder();
+        StringBuilder uiText = new StringBuilder(128);
         public void Render(Renderer renderer)
         {
             //Perform any demo-specific rendering first.
             demo.Render(renderer);
-
-
 #if DEBUG
             float warningHeight = 15f;
             renderer.TextBatcher.Write(uiText.Clear().Append("Running in Debug configuration. Compile in Release configuration for performance testing."),
                 new Vector2((window.Resolution.X - GlyphBatch.MeasureLength(uiText, font, warningHeight)) * 0.5f, warningHeight), warningHeight, new Vector3(1, 0, 0), font);
-#endif
-
-            t += 0.01f;
-            for (int i = 0; i < 128; ++i)
-            {
-
-                var lineCenter = new Vector2(384 + i * 3f, 256);
-                var angle = t + i * 0.05f;
-                var lineOffset = 100 * new Vector2((float)Math.Sin(angle), (float)Math.Cos(angle));
-                renderer.UILineBatcher.Draw(lineCenter + lineOffset, lineCenter - lineOffset,
-                    0.5f,//20 * Math.Max(0, 1f + (float)Math.Cos(t)), 
-                    new Vector3(1, i * (1f / 127f), 0));
-
-            }
-            uiText.Clear();
-            float textHeight = 24;
-            float lineSpacing = textHeight * 1.5f;
+#endif            
+            float textHeight = 16;
+            float lineSpacing = textHeight * 1.0f;
             var textColor = new Vector3(1, 1, 1);
-            var horizontalAxis = new Vector2((float)Math.Sin(t), (float)Math.Cos(t));
-            var controlsStart = new Vector2(window.Resolution.X - 400 + 100 * (float)Math.Sin(t), window.Resolution.Y - 100 - 100 * (float)Math.Cos(t));
-            //Conveniently, enum strings are cached. Every (Key).ToString() returns the same reference for the same key, so no garbage worries.
             if (showControls)
             {
-                var controlNamePosition = controlsStart;
-                controlNamePosition.Y -= 12 * lineSpacing;
-                uiText.Append("Controls: ");
-                renderer.TextBatcher.Write(uiText, controlNamePosition, textHeight, textColor, font);
-                controlNamePosition.Y += lineSpacing;
+                var penPosition = new Vector2(window.Resolution.X - textHeight * 6 - 25, window.Resolution.Y - 25);
+                penPosition.Y -= 10 * lineSpacing;
+                uiText.Clear().Append("Controls: ");
+                var headerHeight = textHeight * 1.2f;
+                renderer.TextBatcher.Write(uiText, penPosition - new Vector2(0.5f * GlyphBatch.MeasureLength(uiText, font, headerHeight), 0), headerHeight, textColor, font);
+                penPosition.Y += lineSpacing;
 
-                var controlPosition = controlNamePosition;
-                controlPosition.X += 80;
+                var controlPosition = penPosition;
+                controlPosition.X += textHeight * 0.5f;
 
                 void WriteName(string controlName)
                 {
-                    uiText.Length = 0;
-                    uiText.Append(controlName);
-                    uiText.Append(":");
-                    renderer.TextBatcher.Write(uiText, controlNamePosition, textHeight, textColor, font);
-                    controlNamePosition.Y += lineSpacing;
+                    uiText.Clear().Append(controlName).Append(":");
+                    renderer.TextBatcher.Write(uiText, penPosition - new Vector2(GlyphBatch.MeasureLength(uiText, font, textHeight), 0), textHeight, textColor, font);
+                    penPosition.Y += lineSpacing;
                 }
 
                 WriteName(nameof(controls.MoveForward));
@@ -296,16 +274,16 @@ namespace SolverPrototypeTests
                 WriteName(nameof(controls.MoveDown));
                 WriteName(nameof(controls.LockMouse));
                 WriteName(nameof(controls.Exit));
-                WriteName(nameof(controls.ShowControls));
                 WriteName(nameof(controls.ChangeTimingDisplayMode));
+                WriteName(nameof(controls.ShowControls));
 
                 void WriteControl(string control)
                 {
-                    uiText.Length = 0;
-                    uiText.Append(control);
+                    uiText.Clear().Append(control);
                     renderer.TextBatcher.Write(uiText, controlPosition, textHeight, textColor, font);
                     controlPosition.Y += lineSpacing;
                 }
+                //Conveniently, enum strings are cached. Every (Key).ToString() returns the same reference for the same key, so no garbage worries.
                 WriteControl(controls.MoveForward.ToString());
                 WriteControl(controls.MoveBackward.ToString());
                 WriteControl(controls.MoveLeft.ToString());
@@ -314,15 +292,16 @@ namespace SolverPrototypeTests
                 WriteControl(controls.MoveDown.ToString());
                 WriteControl(controls.LockMouse.ToString());
                 WriteControl(controls.Exit.ToString());
-                WriteControl(controls.ShowControls.ToString());
                 WriteControl(controls.ChangeTimingDisplayMode.ToString());
+                WriteControl(controls.ShowControls.ToString());
             }
             else
             {
-                uiText.Append("Press ");
-                uiText.Append(controls.ShowControls.ToString());
-                uiText.Append(" for controls.");
-                renderer.TextBatcher.Write(uiText, controlsStart, textHeight, horizontalAxis, textColor, font);
+                uiText.Clear().Append("Press ").Append(controls.ShowControls.ToString()).Append(" for controls.");
+                const float inset = 25;
+                renderer.TextBatcher.Write(uiText,
+                    new Vector2(window.Resolution.X - inset - GlyphBatch.MeasureLength(uiText, font, textHeight), window.Resolution.Y - inset),
+                    textHeight, textColor, font);
             }
 
             if (timingDisplayMode != TimingDisplayMode.Minimized)
