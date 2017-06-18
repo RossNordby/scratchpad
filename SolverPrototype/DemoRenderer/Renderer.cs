@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using DemoRenderer.Bodies;
 
 namespace DemoRenderer
 {
@@ -17,6 +18,9 @@ namespace DemoRenderer
         public RenderSurface Surface { get; private set; }
         public ShaderCache ShaderCache { get; private set; }
         public BackgroundRenderer Background { get; private set; }
+        //TODO: Down the road, the sphere renderer will be joined by a bunch of other types. 
+        //They'll likely be stored in an array indexed by a shape type rather than just being a swarm of properties.
+        public SphereRenderer SphereRenderer { get; private set; }
         public GlyphRenderer GlyphRenderer { get; private set; }
         public UILineRenderer UILineRenderer { get; private set; }
         public CompressToSwap CompressToSwap { get; private set; }
@@ -52,7 +56,7 @@ namespace DemoRenderer
 
             GlyphRenderer = new GlyphRenderer(surface.Device, surface.Context, ShaderCache);
             TextBatcher = new TextBatcher();
-            UILineRenderer = new UILineRenderer(surface.Device, surface.Context, ShaderCache);
+            UILineRenderer = new UILineRenderer(surface.Device, ShaderCache);
             UILineBatcher = new UILineBatcher();
 
             OnResize();
@@ -181,8 +185,7 @@ namespace DemoRenderer
             context.Rasterizer.State = rasterizerState;
             context.OutputMerger.SetBlendState(opaqueBlendState);
             context.OutputMerger.SetDepthStencilState(opaqueDepthState);
-            var viewProjection = camera.ViewProjection;
-            Background.Render(context, ref viewProjection);
+            Background.Render(context, camera);
 
             //Glyph and screenspace line drawing rely on the same premultiplied alpha blending transparency. We'll handle their state out here.
             context.OutputMerger.SetBlendState(uiBlendState);

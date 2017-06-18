@@ -1,4 +1,5 @@
-﻿using DemoContentLoader;
+﻿using BEPUutilities2;
+using DemoContentLoader;
 using SharpDX.Direct3D11;
 using System;
 using System.Numerics;
@@ -9,21 +10,20 @@ namespace DemoRenderer.Background
     {
         VertexShader vertexShader;
         PixelShader pixelShader;
-        ConstantsBuffer<Matrix4x4> constants;
+        ConstantsBuffer<Matrix> constants;
         public BackgroundRenderer(Device device, ShaderCache cache)
         {
             vertexShader = new VertexShader(device, cache.GetShader(@"Background\RenderBackground.hlsl.vshader"));
             vertexShader.DebugName = "BackgroundVS";
             pixelShader = new PixelShader(device, cache.GetShader(@"Background\RenderBackground.hlsl.pshader"));
             pixelShader.DebugName = "BackgroundPS";
-            constants = new ConstantsBuffer<Matrix4x4>(device, debugName: "BackgroundRenderer Constants");
+            constants = new ConstantsBuffer<Matrix>(device, debugName: "BackgroundRenderer Constants");
         }
 
 
-        public void Render(DeviceContext context, ref Matrix4x4 viewProjection)
+        public void Render(DeviceContext context, Camera camera)
         {
-            Matrix4x4.Invert(viewProjection, out var constantsData);
-            constantsData = Matrix4x4.Transpose(constantsData); //Compensate for the shader packing we use.
+            var constantsData = Matrix.Transpose(Matrix.Invert(camera.ViewProjection)); //Compensate for the shader packing we use.
             constants.Update(context, ref constantsData);
 
             context.InputAssembler.InputLayout = null;

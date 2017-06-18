@@ -1,7 +1,9 @@
-﻿using System;
+﻿using BEPUutilities2;
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text;
+using Quaternion = BEPUutilities2.Quaternion;
 
 namespace DemoRenderer
 {
@@ -70,18 +72,28 @@ namespace DemoRenderer
         public float FarClip { get; set; }
 
         //All of this could be quite a bit faster, but wasting a few thousand cycles per frame isn't exactly a concern.
+        /// <summary>
+        /// Gets the orientation quaternion of the camera.
+        /// </summary>
+        public Quaternion OrientationQuaternion
+        {
+            get
+            {
+                Quaternion.CreateFromYawPitchRoll(-yaw, -pitch, 0, out var orientationQuaternion);
+                return orientationQuaternion;
+            }
+        }
 
         /// <summary>
         /// Gets the orientation transform of the camera.
         /// </summary>
-        public Matrix4x4 Orientation
+        public Matrix Orientation
         {
             get
             {
-                return Matrix4x4.CreateFromYawPitchRoll(-yaw, -pitch, 0);
+                return Matrix.CreateFromQuaternion(OrientationQuaternion);
             }
         }
-
 
         /// <summary>
         /// Gets the right direction of the camera. Equivalent to transforming (1,0,0) by Orientation.
@@ -90,8 +102,9 @@ namespace DemoRenderer
         {
             get
             {
-                var orientation = Orientation;
-                return new Vector3(orientation.M11, orientation.M12, orientation.M13);
+                var orientation = OrientationQuaternion;
+                Quaternion.TransformX(1, ref orientation, out var right);
+                return right;
             }
         }
         /// <summary>
@@ -111,8 +124,9 @@ namespace DemoRenderer
         {
             get
             {
-                var orientation = Orientation;
-                return new Vector3(orientation.M21, orientation.M22, orientation.M23);
+                var orientation = OrientationQuaternion;
+                Quaternion.TransformY(1, ref orientation, out var up);
+                return up;
             }
         }
         /// <summary>
@@ -132,8 +146,9 @@ namespace DemoRenderer
         {
             get
             {
-                var orientation = Orientation;
-                return new Vector3(orientation.M31, orientation.M32, orientation.M33);
+                var orientation = OrientationQuaternion;
+                Quaternion.TransformZ(1, ref orientation, out var backward);
+                return backward;
             }
         }
         /// <summary>
@@ -150,7 +165,7 @@ namespace DemoRenderer
         /// <summary>
         /// Gets the world transform of the camera.
         /// </summary>
-        public Matrix4x4 World
+        public Matrix World
         {
             get
             {
@@ -163,55 +178,30 @@ namespace DemoRenderer
         /// <summary>
         /// Gets the view transform of the camera.
         /// </summary>
-        public Matrix4x4 View
+        public Matrix View
         {
             get
             {
-                Matrix4x4.Invert(World, out var result);
-                return result;
+                return Matrix.Invert(World);
             }
         }
-
 
         /// <summary>
         /// Gets the projection transform of the camera using reversed depth.
         /// </summary>
-        public Matrix4x4 Projection
+        public Matrix Projection
         {
             get
             {
                 //Note the flipped near/far! Reversed depth. Better precision distribution. Unlikely that we'll take advantage of it in the demos, but hey, it's free real estate.
-                //The Matrix4x4 built in perspective function throws an argument exception for flipped near/far, unfortunately.
-                float h = 1f / ((float)Math.Tan(FieldOfView * 0.5f));
-                float w = h / AspectRatio;
-                Matrix4x4 perspective;
-                perspective.M11 = w;
-                perspective.M12 = 0;
-                perspective.M13 = 0;
-                perspective.M14 = 0;
-
-                perspective.M21 = 0;
-                perspective.M22 = h;
-                perspective.M23 = 0;
-                perspective.M24 = 0;
-
-                perspective.M31 = 0;
-                perspective.M32 = 0;
-                perspective.M33 = NearClip / (FarClip - NearClip);
-                perspective.M34 = -1;
-
-                perspective.M41 = 0;
-                perspective.M42 = 0;
-                perspective.M44 = 0;
-                perspective.M43 = FarClip * perspective.M33;
-                return perspective;
+                return Matrix.CreatePerspectiveFieldOfView(FieldOfView, AspectRatio, FarClip, NearClip);
             }
         }
 
         /// <summary>
         /// Gets the combined view * projection of the camera.
         /// </summary>
-        public Matrix4x4 ViewProjection
+        public Matrix ViewProjection
         {
             get
             {

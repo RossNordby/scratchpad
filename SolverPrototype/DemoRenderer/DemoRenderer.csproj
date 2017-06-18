@@ -16,6 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Bodies\RenderSpheres.hlsl" />
     <Content Include="UI\RenderUILines.hlsl" />
     <Content Include="UI\RenderGlyphs.hlsl" />
     <Content Include="PostProcessing\CompressToSwap.hlsl" />
