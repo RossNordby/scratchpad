@@ -92,8 +92,7 @@ namespace DemoRenderer.UI
             Description = description;
             if (initialSeriesCapacity <= 0)
                 throw new ArgumentException("Capacity must be positive.");
-            var initialSpan = new Array<Series>(new Series[initialSeriesCapacity]);
-            graphSeries = new QuickList<Series, Array<Series>>(ref initialSpan);
+            QuickList<Series, Array<Series>>.Create(new PassthroughArrayPool<Series>(), initialSeriesCapacity, out graphSeries);
         }
 
         int IndexOf(string name)
@@ -131,13 +130,7 @@ namespace DemoRenderer.UI
 
         public void AddSeries(string name, Vector3 lineColor, float lineRadius, IDataSeries series)
         {
-            if (graphSeries.Count == graphSeries.Span.Length)
-            {
-                Debug.Assert(graphSeries.Count > 0);
-                var newSpan = new Array<Series>(new Series[graphSeries.Count * 2]);
-                graphSeries.Resize(ref newSpan, out var oldSpan);
-            }
-            graphSeries.AddUnsafely(new Series { Name = name, Data = series, LineRadius = lineRadius, LineColor = lineColor });
+            graphSeries.Add(new Series { Name = name, Data = series, LineRadius = lineRadius, LineColor = lineColor }, new PassthroughArrayPool<Series>());
         }
 
         public void RemoveSeries(string name)

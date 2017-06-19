@@ -11,7 +11,7 @@ namespace BEPUutilities2.Memory
     /// are based on pinned managed arrays. An unmanaged span could be created that uses a reference type's finalizer to return the resource, but a big part
     /// of the point of unmanaged spans is referenceless storage. Given the common use cases, there's not much point in offering a third 'self-returning' type.</remarks>
     /// <typeparam name="T">Type of the arrays returned by the pool.</typeparam>
-    public class PassthroughArrayPool<T> : IMemoryPool<T, Array<T>>
+    public struct PassthroughArrayPool<T> : IMemoryPool<T, Array<T>>
     {
         public void Return(ref Array<T> span)
         {

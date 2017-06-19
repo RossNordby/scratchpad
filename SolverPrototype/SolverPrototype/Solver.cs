@@ -31,7 +31,6 @@ namespace SolverPrototype
 
     public partial class Solver
     {
-        PassthroughArrayPool<ConstraintBatch> batchArrayPool;
         public QuickList<ConstraintBatch, Array<ConstraintBatch>> Batches;
 
         int iterationCount;
@@ -112,8 +111,7 @@ namespace SolverPrototype
             //that would make a variety of things more annoying to handle. We can make use of just a tiny amount of idiomatic C#-ness. This won't be many references anyway.
             //We also don't bother pooling this stuff, and we don't have an API for preallocating it- because we're talking about a very, very small amount of data.
             //It's not worth the introduced API complexity.
-            batchArrayPool = new PassthroughArrayPool<ConstraintBatch>();
-            QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
+            QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(new PassthroughArrayPool<ConstraintBatch>(), BatchCountEstimate, out Batches);
             bufferPool.SpecializeFor<ConstraintLocation>().Take(initialCapacity, out HandleToConstraint);
             TypeBatchAllocation = new TypeBatchAllocation(TypeCountEstimate, minimumCapacityPerTypeBatch, bufferPool);
         }
@@ -173,7 +171,7 @@ namespace SolverPrototype
                 {
                     //No reusable batch found. Create a new one.
                     targetBatch = new ConstraintBatch(bufferPool, bodies.BodyCount, TypeCountEstimate);
-                    Batches.Add(targetBatch, batchArrayPool);
+                    Batches.Add(targetBatch, new PassthroughArrayPool<ConstraintBatch>());
                 }
             }
             else
@@ -412,7 +410,7 @@ namespace SolverPrototype
             if (!Batches.Span.Allocated)
             {
                 //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
-                QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
+                QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(new PassthroughArrayPool<ConstraintBatch>(), BatchCountEstimate, out Batches);
             }
             if (HandleToConstraint.Length < constraintCount)
             {
@@ -458,7 +456,7 @@ namespace SolverPrototype
             if (!Batches.Span.Allocated)
             {
                 //This solver instance was disposed, so we need to explicitly reconstruct the batches array.
-                QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(batchArrayPool, BatchCountEstimate, out Batches);
+                QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(new PassthroughArrayPool<ConstraintBatch>(), BatchCountEstimate, out Batches);
             }
             var targetConstraintCount = BufferPool<ConstraintLocation>.GetLowestContainingElementCount(Math.Max(constraintCount, handlePool.HighestPossiblyClaimedId + 1));
             if (HandleToConstraint.Length != targetConstraintCount)
@@ -486,7 +484,7 @@ namespace SolverPrototype
             bufferPool.SpecializeFor<ConstraintLocation>().Return(ref HandleToConstraint);
             HandleToConstraint = new Buffer<ConstraintLocation>();
             handlePool.Dispose();
-            Batches.Dispose(batchArrayPool);
+            Batches.Dispose(new PassthroughArrayPool<ConstraintBatch>());
             Batches = new QuickList<ConstraintBatch, Array<ConstraintBatch>>();
             TypeBatchAllocation.ResetPools();
         }

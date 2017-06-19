@@ -55,7 +55,6 @@ namespace SolverPrototypeTests
     public class DemoHarness : IDisposable
     {
         Window window;
-        Renderer renderer;
         Input input;
         Camera camera;
         Controls controls;
@@ -83,11 +82,10 @@ namespace SolverPrototypeTests
 
         SimulationTimeSamples timeSamples = new SimulationTimeSamples(512);
 
-        public DemoHarness(Window window, Renderer renderer, Input input, Camera camera, Font font,
+        public DemoHarness(Window window, Input input, Camera camera, Font font,
             Controls? controls = null)
         {
             this.window = window;
-            this.renderer = renderer;
             this.input = input;
             this.camera = camera;
             if (controls == null)
@@ -316,7 +314,8 @@ namespace SolverPrototypeTests
                     uiText.Clear().Append(Math.Round(1e3 * timeSamples.Simulation[timeSamples.Simulation.End - 1], timingGraph.Description.VerticalIntervalLabelRounding)).Append(" ms/step"),
                     new Vector2(window.Resolution.X - inset - GlyphBatch.MeasureLength(uiText, font, timingTextSize), inset), timingTextSize, timingGraph.Description.TextColor, font);
             }
-
+            renderer.Bodies.ClearInstances();
+            renderer.Bodies.AddInstances(demo.Simulation);
         }
 
         bool disposed;

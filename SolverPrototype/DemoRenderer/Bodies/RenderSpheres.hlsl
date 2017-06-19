@@ -42,7 +42,7 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	output.Sphere.Orientation = instance.Orientation;
 
 	//Convert the vertex id to local AABB coordinates, and then into view space.
-	float3 aabbCoordinates = float3((vertexId & 1) << 1, vertexId & 2, (vertexId & 4) >> 1);
+	float3 aabbCoordinates = float3((vertexId & 1) << 1, vertexId & 2, (vertexId & 4) >> 1) - 1;
 
 	float3 offset = instance.Position - CameraPosition;
 	float3 sphereViewPosition = float3(dot(CameraRight, offset), dot(CameraUp, offset), dot(CameraForward, offset));
@@ -90,6 +90,7 @@ PSOutput PSMain(PSInput input)
 	float c = sphereDistanceSquared - input.Sphere.Radius * input.Sphere.Radius;
 	float discriminant = sphereDistanceSquared - c;
 
+	//This isn't exactly an ideal GPU implementation by any means, but ehh we can worry about it if it is ever actually too slow.
 	if (c > 0 || discriminant < 0)
 	{
 		output.Color = 0;

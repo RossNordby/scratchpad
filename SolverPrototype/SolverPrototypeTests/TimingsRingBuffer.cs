@@ -22,7 +22,7 @@ namespace SolverPrototypeTests
                 if (Capacity != value)
                 {
                     var newSpan = new Array<double>(new double[value]);
-                    queue.Resize(ref newSpan, out var oldSpan);
+                    queue.Resize(value, new PassthroughArrayPool<double>());
                 }
             }
         }
@@ -30,8 +30,7 @@ namespace SolverPrototypeTests
         {
             if(maximumCapacity <= 0)
                 throw new ArgumentException("Capacity must be positive.");
-            var initialSpan = new Array<double>(new double[maximumCapacity]);
-            queue = new QuickQueue<double, Array<double>>(ref initialSpan);
+            QuickQueue<double, Array<double>>.Create(new PassthroughArrayPool<double>(), maximumCapacity, out queue);
         }
 
         public void Add(double time)

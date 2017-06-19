@@ -26,9 +26,6 @@ namespace BEPUutilities2.Memory
             public ulong Next;
         }
 
-        PassthroughArrayPool<ulong> keyPool = new PassthroughArrayPool<ulong>();
-        PassthroughArrayPool<Allocation> valuePool = new PassthroughArrayPool<Allocation>();
-        PassthroughArrayPool<int> tablePool = new PassthroughArrayPool<int>();
         private QuickDictionary<ulong, Allocation, Array<ulong>, Array<Allocation>, Array<int>, PrimitiveComparer<ulong>> allocations;
 
         /// <summary>
@@ -39,7 +36,8 @@ namespace BEPUutilities2.Memory
         {
             this.memoryPoolSize = memoryPoolSize;
             QuickDictionary<ulong, Allocation, Array<ulong>, Array<Allocation>, Array<int>, PrimitiveComparer<ulong>>.Create(
-                keyPool, valuePool, tablePool, SpanHelper.GetContainingPowerOf2(allocationCountEstimate), 3, out allocations);
+                new PassthroughArrayPool<ulong>(), new PassthroughArrayPool<Allocation>(), new PassthroughArrayPool<int>(),
+                SpanHelper.GetContainingPowerOf2(allocationCountEstimate), 3, out allocations);
         }
 
         /// <summary>
@@ -148,7 +146,7 @@ namespace BEPUutilities2.Memory
             nextAllocation.Previous = id;
             //About to add a new allocation. We had space here this time, so there's a high chance we'll have some more space next time. Point the search to this index.
             searchStartIndex = allocations.Count;
-            allocations.Add(id, newAllocation, keyPool, valuePool, tablePool);
+            allocations.Add(id, newAllocation, new PassthroughArrayPool<ulong>(), new PassthroughArrayPool<Allocation>(), new PassthroughArrayPool<int>());
         }
         /// <summary>
         /// Attempts to allocate a range of memory.
@@ -166,7 +164,8 @@ namespace BEPUutilities2.Memory
                 if (size <= memoryPoolSize)
                 {
                     outputStart = 0;
-                    allocations.Add(id, new Allocation { Start = 0, End = size, Next = id, Previous = id }, keyPool, valuePool, tablePool);
+                    allocations.Add(id, new Allocation { Start = 0, End = size, Next = id, Previous = id },
+                        new PassthroughArrayPool<ulong>(), new PassthroughArrayPool<Allocation>(), new PassthroughArrayPool<int>());
                     searchStartIndex = 0;
                     return true;
                 }

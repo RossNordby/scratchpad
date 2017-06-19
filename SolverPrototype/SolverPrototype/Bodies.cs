@@ -311,6 +311,14 @@ namespace SolverPrototype
                 Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count));
         }
 
+        //TODO: Filling this out would likely be helpful.
+        public void GetPoseByIndex(int index, out BodyPose pose)
+        {
+            Debug.Assert(index >= 0 && index < BodyCount);
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            GetLane(ref Poses[bundleIndex], innerIndex, out pose);
+        }
+
         public void SetPose(int handle, ref BodyPose pose)
         {
             ValidateExistingHandle(handle);

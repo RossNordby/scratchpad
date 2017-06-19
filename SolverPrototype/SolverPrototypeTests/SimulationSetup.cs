@@ -54,9 +54,7 @@ namespace SolverPrototypeTests
                 return false;
             }
             handle = bodyHandles[id];
-            simulation.Bodies.GetLocalInertia(handle, out bodyDescription.LocalInertia);
-            simulation.Bodies.GetPose(handle, out bodyDescription.Pose);
-            simulation.Bodies.GetVelocity(handle, out bodyDescription.Velocity);
+            simulation.Bodies.GetDescription(handle, out bodyDescription);
             return true;
         }
     }

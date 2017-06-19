@@ -37,6 +37,12 @@ namespace DemoRenderer.Bodies
             public Vector3 CameraForward;
         }
         ConstantsBuffer<VertexConstants> vertexConstants;
+        struct PixelConstants
+        {
+            public float NearClip;
+            public float FarClip;
+        }
+        ConstantsBuffer<PixelConstants> pixelConstants;
 
         StructuredBuffer<SphereInstance> instances;
         IndexBuffer indices;
@@ -48,9 +54,9 @@ namespace DemoRenderer.Bodies
         {
             instances = new StructuredBuffer<SphereInstance>(device, maximumInstancesPerDraw, "Sphere Instances");
             //Build a AABB mesh's index buffer, repeated. A redundant index buffer tends to be faster than instancing tiny models. Impact varies between hardware.
-            var indexData = new uint[maximumInstancesPerDraw * 6 * 6];
+            var indexData = new uint[maximumInstancesPerDraw * 36];
             uint baseVertex = 0;
-            for (int glyphIndexStart = 0; glyphIndexStart < indexData.Length; glyphIndexStart += 6)
+            for (int glyphIndexStart = 0; glyphIndexStart < indexData.Length; glyphIndexStart += 36)
             {
                 //+X
                 indexData[glyphIndexStart + 0] = baseVertex + 1;
@@ -99,6 +105,7 @@ namespace DemoRenderer.Bodies
             indices = new IndexBuffer(Helpers.GetScreenQuadIndices(maximumInstancesPerDraw), device, "Sphere AABB Indices");
 
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "Sphere Renderer Vertex Constants");
+            pixelConstants = new ConstantsBuffer<PixelConstants>(device, debugName: "Sphere Renderer Pixel Constants");
 
             vertexShader = new VertexShader(device, cache.GetShader(@"Bodies\RenderSpheres.hlsl.vshader"));
             pixelShader = new PixelShader(device, cache.GetShader(@"Bodies\RenderSpheres.hlsl.pshader"));
@@ -106,13 +113,6 @@ namespace DemoRenderer.Bodies
 
         public void Render(DeviceContext context, Camera camera, SphereInstance[] instances, int start, int count)
         {
-            //This assumes that render states have been set appropriately for opaque rendering.
-            context.InputAssembler.InputLayout = null;
-            context.InputAssembler.SetIndexBuffer(indices);
-            context.InputAssembler.PrimitiveTopology = SharpDX.Direct3D.PrimitiveTopology.TriangleList;
-            context.VertexShader.Set(vertexShader);
-            context.VertexShader.SetConstantBuffer(0, vertexConstants.Buffer);
-            context.VertexShader.SetShaderResource(0, this.instances.SRV);
             var vertexConstantsData = new VertexConstants
             {
                 Projection = Matrix.Transpose(camera.Projection), //compensate for the shader packing.
@@ -123,13 +123,28 @@ namespace DemoRenderer.Bodies
                 CameraForward = camera.Forward,
             };
             vertexConstants.Update(context, ref vertexConstantsData);
+            var pixelConstantsData = new PixelConstants
+            {
+                NearClip = camera.NearClip,
+                FarClip = camera.FarClip
+            };
+            pixelConstants.Update(context, ref pixelConstantsData);
+
+            //This assumes that render states have been set appropriately for opaque rendering.
+            context.InputAssembler.InputLayout = null;
+            context.InputAssembler.SetIndexBuffer(indices);
+            context.InputAssembler.PrimitiveTopology = SharpDX.Direct3D.PrimitiveTopology.TriangleList;
+            context.VertexShader.Set(vertexShader);
+            context.VertexShader.SetConstantBuffer(0, vertexConstants.Buffer);
+            context.VertexShader.SetShaderResource(0, this.instances.SRV);
             context.PixelShader.Set(pixelShader);
+            context.PixelShader.SetConstantBuffer(0, pixelConstants.Buffer);
 
             while (count > 0)
             {
                 var batchCount = Math.Min(this.instances.Capacity, count);
                 this.instances.Update(context, instances, batchCount, start);
-                context.DrawIndexed(batchCount * 6, 0, 0);
+                context.DrawIndexed(batchCount * 36, 0, 0);
                 count -= batchCount;
                 start += batchCount;
             }
@@ -150,7 +165,7 @@ namespace DemoRenderer.Bodies
         }
 
 #if DEBUG
-        ~UILineRenderer()
+        ~SphereRenderer()
         {
             Helpers.CheckForUndisposed(disposed, this);
         }

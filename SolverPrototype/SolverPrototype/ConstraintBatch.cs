@@ -15,15 +15,13 @@ namespace SolverPrototype
         internal BatchReferencedHandles BodyHandles;
         //Pooling the type index to type batch index is a bit pointless, but we can do it easily, so we do.
         public Buffer<int> TypeIndexToTypeBatchIndex;
-        PassthroughArrayPool<TypeBatch> typeBatchArrayPool;
         public QuickList<TypeBatch, Array<TypeBatch>> TypeBatches;
 
         public ConstraintBatch(BufferPool pool, int initialReferencedHandlesEstimate = 128 * 64, int initialTypeCountEstimate = 32)
         {
             BodyHandles = new BatchReferencedHandles(pool, initialReferencedHandlesEstimate);
             ResizeTypeMap(pool, initialTypeCountEstimate);
-            typeBatchArrayPool = new PassthroughArrayPool<TypeBatch>();
-            QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, initialTypeCountEstimate, out TypeBatches);
+            QuickList<TypeBatch, Array<TypeBatch>>.Create(new PassthroughArrayPool<TypeBatch>(), initialTypeCountEstimate, out TypeBatches);
         }
 
         void ResizeTypeMap(BufferPool pool, int newSize)
@@ -66,7 +64,7 @@ namespace SolverPrototype
         TypeBatch CreateNewTypeBatch(int typeId, TypeBatchAllocation typeBatchAllocation)
         {
             var batch = typeBatchAllocation.Take(typeId);
-            TypeBatches.Add(batch, typeBatchArrayPool);
+            TypeBatches.Add(batch, new PassthroughArrayPool<TypeBatch>());
             return batch;
         }
 
@@ -221,9 +219,9 @@ namespace SolverPrototype
             {
                 ResizeTypeMap(typeBatchAllocation.BufferPool, constraintTypeCount);
                 if (!TypeBatches.Span.Allocated)
-                    QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, constraintTypeCount, out TypeBatches);
+                    QuickList<TypeBatch, Array<TypeBatch>>.Create(new PassthroughArrayPool<TypeBatch>(), constraintTypeCount, out TypeBatches);
                 else
-                    TypeBatches.Resize(constraintTypeCount, typeBatchArrayPool);
+                    TypeBatches.Resize(constraintTypeCount, new PassthroughArrayPool<TypeBatch>());
             }
         }
         public void Compact(TypeBatchAllocation typeBatchAllocation, Bodies bodies, int bodiesCount)
@@ -249,9 +247,9 @@ namespace SolverPrototype
             {
                 ResizeTypeMap(typeBatchAllocation.BufferPool, constraintTypeCount);
                 if (!TypeBatches.Span.Allocated)
-                    QuickList<TypeBatch, Array<TypeBatch>>.Create(typeBatchArrayPool, constraintTypeCount, out TypeBatches);
+                    QuickList<TypeBatch, Array<TypeBatch>>.Create(new PassthroughArrayPool<TypeBatch>(), constraintTypeCount, out TypeBatches);
                 else
-                    TypeBatches.Resize(constraintTypeCount, typeBatchArrayPool);
+                    TypeBatches.Resize(constraintTypeCount, new PassthroughArrayPool<TypeBatch>());
             }
         }
         /// <summary>
@@ -269,7 +267,7 @@ namespace SolverPrototype
             BodyHandles.Dispose(typeBatchAllocation.BufferPool);
             typeBatchAllocation.BufferPool.SpecializeFor<int>().Return(ref TypeIndexToTypeBatchIndex);
             TypeIndexToTypeBatchIndex = new Buffer<int>();
-            TypeBatches.Dispose(typeBatchArrayPool);
+            TypeBatches.Dispose(new PassthroughArrayPool<TypeBatch>());
             TypeBatches = new QuickList<TypeBatch, Array<TypeBatch>>();
         }
     }
