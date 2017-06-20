@@ -72,6 +72,8 @@ struct PSOutput
 
 cbuffer PixelConstants : register(b0)
 {
+	float3 CameraForward;
+	float Padding;
 	float Near;
 	float Far;
 };
@@ -84,6 +86,7 @@ float GetProjectedDepth(float linearDepth, float near, float far)
 	float dn = linearDepth * near;
 	return (far * near - dn) / (linearDepth * far - dn);
 }
+
 bool RayCastSphere(float3 rayDirection, float3 spherePosition, float radius,
 	out float t, out float3 hitLocation, out float3 hitNormal)
 {
@@ -117,11 +120,31 @@ bool RayCastSphere(float3 rayDirection, float3 spherePosition, float radius,
 		hitNormal = 0;
 		return false;
 	}
-	t /= directionLength;
 	hitLocation = normalizedDirection * t;
 	hitNormal = normalize(hitLocation - spherePosition);
 	return true;
 }
+
+float3 TransformByConjugate(float3 v, float4 rotation)
+{
+	float x2 = rotation.x + rotation.x;
+	float y2 = rotation.y + rotation.y;
+	float z2 = rotation.z + rotation.z;
+	float xx2 = rotation.x * x2;
+	float xy2 = rotation.x * y2;
+	float xz2 = rotation.x * z2;
+	float yy2 = rotation.y * y2;
+	float yz2 = rotation.y * z2;
+	float zz2 = rotation.z * z2;
+	float wx2 = rotation.w * -x2;
+	float wy2 = rotation.w * -y2;
+	float wz2 = rotation.w * -z2;
+	return float3(
+		v.x * (1.0 - yy2 - zz2) + v.y * (xy2 - wz2) + v.z * (xz2 + wy2),
+		v.x * (xy2 + wz2) + v.y * (1.0 - xx2 - zz2) + v.z * (yz2 - wx2),
+		v.x * (xz2 - wy2) + v.y * (yz2 + wx2) + v.z * (1.0 - xx2 - yy2));
+}
+
 PSOutput PSMain(PSInput input)
 {
 	PSOutput output;
@@ -129,8 +152,8 @@ PSOutput PSMain(PSInput input)
 	float3 hitLocation, hitNormal;
 	if (RayCastSphere(input.ToAABB, input.Sphere.Position, input.Sphere.Radius, t, hitLocation, hitNormal))
 	{
-		output.Color = normalize(abs(hitNormal));
-		output.Depth = GetProjectedDepth(-hitLocation.z, Near, Far);
+		output.Color = normalize(abs(TransformByConjugate(hitNormal, input.Sphere.Orientation)));
+		output.Depth = GetProjectedDepth(-dot(CameraForward, hitLocation), -Near, -Far);
 	}
 	else
 	{

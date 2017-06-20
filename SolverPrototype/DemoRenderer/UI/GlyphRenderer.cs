@@ -73,7 +73,7 @@ namespace DemoRenderer.UI
         public GlyphRenderer(Device device, DeviceContext context, ShaderCache cache, int maximumGlyphsPerDraw = 2048)
         {
             instances = new StructuredBuffer<GlyphInstance>(device, maximumGlyphsPerDraw, "Glyph Instances");
-            indices = new IndexBuffer(Helpers.GetScreenQuadIndices(maximumGlyphsPerDraw), device, "Glyph Indices");
+            indices = new IndexBuffer(Helpers.GetQuadIndices(maximumGlyphsPerDraw), device, "Glyph Indices");
 
             var samplerDescription = SamplerStateDescription.Default();
             samplerDescription.Filter = Filter.MinMagMipLinear;

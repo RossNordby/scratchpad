@@ -116,7 +116,9 @@ namespace SolverPrototypeTests
                 TextColor = new Vector3(1, 1, 1),
                 Font = font,
 
-                LineSpacingMultiplier = 1f
+                LineSpacingMultiplier = 1f,
+
+                ForceVerticalAxisMinimumToZero = true
             });
             timingGraph.AddSeries("Total", new Vector3(0, 0, 0), 0.75f, timeSamples.Simulation);
             timingGraph.AddSeries("Body Opt", new Vector3(1, 0, 0), 0.125f, timeSamples.BodyOptimizer);

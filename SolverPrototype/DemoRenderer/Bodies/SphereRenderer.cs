@@ -37,9 +37,14 @@ namespace DemoRenderer.Bodies
             public Vector3 CameraBackward;
         }
         ConstantsBuffer<VertexConstants> vertexConstants;
+        [StructLayout(LayoutKind.Explicit)]
         struct PixelConstants
         {
+            [FieldOffset(0)]
+            public Vector3 CameraForward;
+            [FieldOffset(16)]
             public float NearClip;
+            [FieldOffset(20)]
             public float FarClip;
         }
         ConstantsBuffer<PixelConstants> pixelConstants;
@@ -128,6 +133,7 @@ namespace DemoRenderer.Bodies
             vertexConstants.Update(context, ref vertexConstantsData);
             var pixelConstantsData = new PixelConstants
             {
+                CameraForward = camera.Forward,
                 NearClip = camera.NearClip,
                 FarClip = camera.FarClip
             };

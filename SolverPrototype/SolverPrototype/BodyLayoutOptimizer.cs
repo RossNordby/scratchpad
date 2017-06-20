@@ -352,6 +352,9 @@ namespace SolverPrototype
             //TODO: It's possible that the cost associated with setting up multithreading exceeds the cost of the actual optimization for smaller simulations.
             //You might want to fall back to single threaded based on some empirical testing.
 
+            //Don't bother optimizing if no optimizations can be performed. This condition is assumed during worker execution.
+            if (bodies.BodyCount <= 2)
+                return;
             //Note that, while we COULD aggressively downsize the claims array in response to body count, we'll instead let it stick around unless the bodies allocations change.
             ResizeForBodiesCapacity(pool);
 

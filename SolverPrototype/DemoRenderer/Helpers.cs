@@ -78,7 +78,7 @@ namespace DemoRenderer
         /// <param name="quadCount">Number of quads to create indices for.</param>
         /// <returns>Index buffer for screenspace quads.</returns> 
         /// <remarks>Using redundant indices for batches avoids a slow path for low triangle count instancing. This is hardware/driver specific; it may change on newer cards.</remarks>
-        public static uint[] GetScreenQuadIndices(int quadCount)
+        public static uint[] GetQuadIndices(int quadCount)
         {
             var indexData = new uint[quadCount * 6];
             uint baseVertex = 0;

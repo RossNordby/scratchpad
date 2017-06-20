@@ -59,7 +59,7 @@ namespace DemoRenderer.UI
         public UILineRenderer(Device device, ShaderCache cache, int maximumLinesPerDraw = 2048)
         {
             instances = new StructuredBuffer<UILineInstance>(device, maximumLinesPerDraw, "UI Line Instances");
-            indices = new IndexBuffer(Helpers.GetScreenQuadIndices(maximumLinesPerDraw), device, "UI Line Indices");
+            indices = new IndexBuffer(Helpers.GetQuadIndices(maximumLinesPerDraw), device, "UI Line Indices");
 
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "UI Line Renderer Vertex Constants");
 
