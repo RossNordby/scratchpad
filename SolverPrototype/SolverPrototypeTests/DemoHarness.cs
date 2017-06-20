@@ -77,7 +77,7 @@ namespace SolverPrototypeTests
         void ChangeToDemo(int demoIndex)
         {
             demo.Dispose();
-            demo = demoSet.Build(demoIndex);
+            demo = demoSet.Build(demoIndex, camera);
         }
 
         SimulationTimeSamples timeSamples = new SimulationTimeSamples(512);
@@ -126,7 +126,7 @@ namespace SolverPrototypeTests
             timingGraph.AddSeries("Solver", new Vector3(1, 0, 1), 0.5f, timeSamples.Solver);
 
             demoSet = new DemoSet();
-            demo = demoSet.Build(0);
+            demo = demoSet.Build(0, camera);
 
             OnResize(window.Resolution);
         }

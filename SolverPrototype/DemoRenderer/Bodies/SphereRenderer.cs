@@ -34,7 +34,7 @@ namespace DemoRenderer.Bodies
             [FieldOffset(96)]
             public Vector3 CameraUp;
             [FieldOffset(112)]
-            public Vector3 CameraForward;
+            public Vector3 CameraBackward;
         }
         ConstantsBuffer<VertexConstants> vertexConstants;
         struct PixelConstants
@@ -58,51 +58,54 @@ namespace DemoRenderer.Bodies
             uint baseVertex = 0;
             for (int glyphIndexStart = 0; glyphIndexStart < indexData.Length; glyphIndexStart += 36)
             {
-                //+X
-                indexData[glyphIndexStart + 0] = baseVertex + 1;
-                indexData[glyphIndexStart + 1] = baseVertex + 3;
-                indexData[glyphIndexStart + 2] = baseVertex + 7;
-                indexData[glyphIndexStart + 3] = baseVertex + 7;
-                indexData[glyphIndexStart + 4] = baseVertex + 5;
-                indexData[glyphIndexStart + 5] = baseVertex + 1;
+                //Note that the order and winding is important and must be consistent with the RenderSpheres.hlsl VS usage.
+                //It assumes that an unset bit in the 3-bit string of the vertex id corresponds to the minimum position: 
+                //vertex id 0 becomes (-1, -1, -1), while vertex id 7 becomes (1, 1, 1).
                 //-X
-                indexData[glyphIndexStart + 6] = baseVertex + 4;
-                indexData[glyphIndexStart + 7] = baseVertex + 6;
-                indexData[glyphIndexStart + 8] = baseVertex + 2;
-                indexData[glyphIndexStart + 9] = baseVertex + 2;
-                indexData[glyphIndexStart + 10] = baseVertex + 0;
-                indexData[glyphIndexStart + 11] = baseVertex + 4;
-                //+Y
-                indexData[glyphIndexStart + 12] = baseVertex + 4;
-                indexData[glyphIndexStart + 13] = baseVertex + 0;
-                indexData[glyphIndexStart + 14] = baseVertex + 1;
-                indexData[glyphIndexStart + 15] = baseVertex + 1;
-                indexData[glyphIndexStart + 16] = baseVertex + 5;
-                indexData[glyphIndexStart + 17] = baseVertex + 4;
+                indexData[glyphIndexStart + 0] = baseVertex + 0;
+                indexData[glyphIndexStart + 1] = baseVertex + 4;
+                indexData[glyphIndexStart + 2] = baseVertex + 6;
+                indexData[glyphIndexStart + 3] = baseVertex + 6;
+                indexData[glyphIndexStart + 4] = baseVertex + 2;
+                indexData[glyphIndexStart + 5] = baseVertex + 0;
+                //+X
+                indexData[glyphIndexStart + 6] = baseVertex + 5;
+                indexData[glyphIndexStart + 7] = baseVertex + 1;
+                indexData[glyphIndexStart + 8] = baseVertex + 3;
+                indexData[glyphIndexStart + 9] = baseVertex + 3;
+                indexData[glyphIndexStart + 10] = baseVertex + 7;
+                indexData[glyphIndexStart + 11] = baseVertex + 5;
                 //-Y
-                indexData[glyphIndexStart + 18] = baseVertex + 7;
-                indexData[glyphIndexStart + 19] = baseVertex + 3;
-                indexData[glyphIndexStart + 20] = baseVertex + 2;
-                indexData[glyphIndexStart + 21] = baseVertex + 2;
-                indexData[glyphIndexStart + 22] = baseVertex + 6;
-                indexData[glyphIndexStart + 23] = baseVertex + 7;
-                //+Z
-                indexData[glyphIndexStart + 24] = baseVertex + 0;
-                indexData[glyphIndexStart + 25] = baseVertex + 2;
-                indexData[glyphIndexStart + 26] = baseVertex + 3;
-                indexData[glyphIndexStart + 27] = baseVertex + 3;
-                indexData[glyphIndexStart + 28] = baseVertex + 1;
-                indexData[glyphIndexStart + 29] = baseVertex + 0;
+                indexData[glyphIndexStart + 12] = baseVertex + 0;
+                indexData[glyphIndexStart + 13] = baseVertex + 1;
+                indexData[glyphIndexStart + 14] = baseVertex + 5;
+                indexData[glyphIndexStart + 15] = baseVertex + 5;
+                indexData[glyphIndexStart + 16] = baseVertex + 4;
+                indexData[glyphIndexStart + 17] = baseVertex + 0;
+                //+Y
+                indexData[glyphIndexStart + 18] = baseVertex + 2;
+                indexData[glyphIndexStart + 19] = baseVertex + 6;
+                indexData[glyphIndexStart + 20] = baseVertex + 7;
+                indexData[glyphIndexStart + 21] = baseVertex + 7;
+                indexData[glyphIndexStart + 22] = baseVertex + 3;
+                indexData[glyphIndexStart + 23] = baseVertex + 2;
                 //-Z
-                indexData[glyphIndexStart + 30] = baseVertex + 5;
-                indexData[glyphIndexStart + 31] = baseVertex + 7;
-                indexData[glyphIndexStart + 32] = baseVertex + 6;
-                indexData[glyphIndexStart + 33] = baseVertex + 6;
-                indexData[glyphIndexStart + 34] = baseVertex + 4;
-                indexData[glyphIndexStart + 35] = baseVertex + 5;
-                baseVertex += 4;
+                indexData[glyphIndexStart + 24] = baseVertex + 1;
+                indexData[glyphIndexStart + 25] = baseVertex + 0;
+                indexData[glyphIndexStart + 26] = baseVertex + 2;
+                indexData[glyphIndexStart + 27] = baseVertex + 2;
+                indexData[glyphIndexStart + 28] = baseVertex + 3;
+                indexData[glyphIndexStart + 29] = baseVertex + 1;
+                //+Z
+                indexData[glyphIndexStart + 30] = baseVertex + 4;
+                indexData[glyphIndexStart + 31] = baseVertex + 5;
+                indexData[glyphIndexStart + 32] = baseVertex + 7;
+                indexData[glyphIndexStart + 33] = baseVertex + 7;
+                indexData[glyphIndexStart + 34] = baseVertex + 6;
+                indexData[glyphIndexStart + 35] = baseVertex + 4;
+                baseVertex += 8;
             }
-            indices = new IndexBuffer(Helpers.GetScreenQuadIndices(maximumInstancesPerDraw), device, "Sphere AABB Indices");
+            indices = new IndexBuffer(indexData, device, "Sphere AABB Indices");
 
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "Sphere Renderer Vertex Constants");
             pixelConstants = new ConstantsBuffer<PixelConstants>(device, debugName: "Sphere Renderer Pixel Constants");
@@ -120,7 +123,7 @@ namespace DemoRenderer.Bodies
                 CameraRight = camera.Right,
                 NearClip = camera.NearClip,
                 CameraUp = camera.Up,
-                CameraForward = camera.Forward,
+                CameraBackward = camera.Backward,
             };
             vertexConstants.Update(context, ref vertexConstantsData);
             var pixelConstantsData = new PixelConstants

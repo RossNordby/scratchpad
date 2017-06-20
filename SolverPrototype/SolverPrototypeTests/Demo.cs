@@ -32,7 +32,7 @@ namespace SolverPrototypeTests
             ThreadDispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
         }
 
-        public abstract void Initialize();
+        public abstract void Initialize(Camera camera);
 
         public virtual void Update(float dt)
         {

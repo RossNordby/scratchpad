@@ -11,7 +11,7 @@ cbuffer VertexConstants : register(b0)
 	float Padding0;
 	float3 CameraUp;
 	float Padding1;
-	float3 CameraForward;
+	float3 CameraBackward;
 };
 
 struct SphereInstance
@@ -42,19 +42,24 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	output.Sphere.Orientation = instance.Orientation;
 
 	//Convert the vertex id to local AABB coordinates, and then into view space.
+	//Note that this id->coordinate transformation requires consistency with the index buffer
+	//to ensure proper triangle winding. A set bit in a given position makes it higher along the axis.
+	//So vertexId&1 == 1 => +x, vertexId&2 == 2 => +y, and vertexId&4 == 4 => +z.
 	float3 aabbCoordinates = float3((vertexId & 1) << 1, vertexId & 2, (vertexId & 4) >> 1) - 1;
 
 	float3 offset = instance.Position - CameraPosition;
-	float3 sphereViewPosition = float3(dot(CameraRight, offset), dot(CameraUp, offset), dot(CameraForward, offset));
+	//Note that in view space, -z moves away along the camera's forward axis by convention.
+	float3 sphereViewPosition = float3(dot(CameraRight, offset), dot(CameraUp, offset), dot(CameraBackward, offset));
 
 	float3 vertexViewPosition = sphereViewPosition + instance.Radius * aabbCoordinates;
-	if (aabbCoordinates.z < 0)
+	if (aabbCoordinates.z > 0)
 	{
 		//Clamp the near side of the AABB to the camera nearclip plane (unless the far side of the AABB passes the near plane).
 		//This keeps the raytraced sphere visible even during camera overlap.
-		vertexViewPosition.z = min(max(NearClip + 1e-5, vertexViewPosition.z), sphereViewPosition.z + instance.Radius);
+		//Note the consequences of -z being forward.
+		vertexViewPosition.z = max(min(-NearClip - 1e-5, vertexViewPosition.z), sphereViewPosition.z - instance.Radius);
 	}
-	output.ToAABB = vertexViewPosition.x * CameraRight + vertexViewPosition.y * CameraUp + vertexViewPosition.z * CameraForward;
+	output.ToAABB = vertexViewPosition.x * CameraRight + vertexViewPosition.y * CameraUp + vertexViewPosition.z * CameraBackward;
 	output.Position = mul(float4(vertexViewPosition, 1), Projection);
 	return output;
 }
@@ -79,38 +84,58 @@ float GetProjectedDepth(float linearDepth, float near, float far)
 	float dn = linearDepth * near;
 	return (far * near - dn) / (linearDepth * far - dn);
 }
+bool RayCastSphere(float3 rayDirection, float3 spherePosition, float radius,
+	out float t, out float3 hitLocation, out float3 hitNormal)
+{
+	float directionLength = length(rayDirection);
+	float3 normalizedDirection = rayDirection / directionLength;
+	float3 m = -spherePosition;
+	float b = dot(m, normalizedDirection);
+	float c = dot(m, m) - radius * radius;
 
+	if (c > 0 && b > 0)
+	{
+		t = 0;
+		hitLocation = 0;
+		hitNormal = 0;
+		return false;
+	}
+	float discriminant = b * b - c;
+	if (discriminant < 0)
+	{
+		t = 0;
+		hitLocation = 0;
+		hitNormal = 0;
+		return false;
+	}
+
+	t = -b - sqrt(discriminant);
+	if (t < 0)
+	{
+		t = 0;
+		hitLocation = 0;
+		hitNormal = 0;
+		return false;
+	}
+	t /= directionLength;
+	hitLocation = normalizedDirection * t;
+	hitNormal = normalize(hitLocation - spherePosition);
+	return true;
+}
 PSOutput PSMain(PSInput input)
 {
 	PSOutput output;
-	float sphereDistanceSquared = dot(input.ToAABB, input.ToAABB);
-	float sphereDistance = sqrt(sphereDistanceSquared);
-	float3 direction = input.ToAABB / sphereDistance;
-	float3 m = -input.ToAABB;
-	float c = sphereDistanceSquared - input.Sphere.Radius * input.Sphere.Radius;
-	float discriminant = sphereDistanceSquared - c;
-
-	//This isn't exactly an ideal GPU implementation by any means, but ehh we can worry about it if it is ever actually too slow.
-	if (c > 0 || discriminant < 0)
+	float t;
+	float3 hitLocation, hitNormal;
+	if (RayCastSphere(input.ToAABB, input.Sphere.Position, input.Sphere.Radius, t, hitLocation, hitNormal))
 	{
-		output.Color = 0;
-		output.Depth = 0;
+		output.Color = normalize(abs(hitNormal));
+		output.Depth = GetProjectedDepth(-hitLocation.z, Near, Far);
 	}
 	else
 	{
-		float t = sphereDistance - sqrt(discriminant);
-		if (t < 0)
-		{
-			output.Color = 0;
-			output.Depth = 0;
-		}
-		else
-		{
-			float3 hitLocation = direction * t;
-			float3 hitNormal = normalize(hitLocation - input.Sphere.Position);
-			output.Color = abs(direction);
-			output.Depth = GetProjectedDepth(hitLocation.z, Near, Far);
-		}
+		output.Color = 0;
+		output.Depth = 0;
 	}
 	return output;
 }

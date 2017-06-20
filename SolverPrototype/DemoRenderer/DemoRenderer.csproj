@@ -15,6 +15,10 @@
     <PreBuildEvent Condition="'$(Configuration)'=='Release'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)"</PreBuildEvent>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" />
+
   <ItemGroup>
     <Content Include="Bodies\RenderSpheres.hlsl" />
     <Content Include="UI\RenderUILines.hlsl" />

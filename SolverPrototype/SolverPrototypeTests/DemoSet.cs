@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DemoRenderer;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -12,7 +13,7 @@ namespace SolverPrototypeTests
         struct Option
         {
             public string Name;
-            public Func<Demo> Builder;
+            public Func<Camera, Demo> Builder;
         }
 
         List<Option> options = new List<Option>();
@@ -20,13 +21,13 @@ namespace SolverPrototypeTests
         {
             options.Add(new Option
             {
-                Builder = () =>
+                Builder = (camera) =>
                 {
                     //Note that the actual work is done in the Initialize function rather than a constructor.
                     //The 'new T()' syntax actually uses reflection and repackages exceptions in an inconvenient way.
                     //By using Initialize instead, the stack trace and debugger will go right to the source.
                     var demo = new T();
-                    demo.Initialize();
+                    demo.Initialize(camera);
                     return demo;
                 },
                 Name = name
@@ -44,9 +45,9 @@ namespace SolverPrototypeTests
             return options[index].Name;
         }
 
-        public Demo Build(int index)
+        public Demo Build(int index, Camera camera)
         {
-            return options[index].Builder();
+            return options[index].Builder(camera);
         }
     }
 }

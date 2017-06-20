@@ -166,6 +166,20 @@ namespace BEPUutilities2
             result = m.X * x + m.Y * y + m.Z * z + m.W * w;
         }
 
+        /// <summary>
+        /// Transforms a vector with a matrix. Implicitly uses 1 as the fourth component of the input vector.
+        /// </summary>
+        /// <param name="v">Row vector to transform.</param>
+        /// <param name="m">Matrix to apply to the vector.</param>
+        /// <param name="result">Transformed vector.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Transform(ref Vector3 v, ref Matrix m, out Vector4 result)
+        {
+            var x = new Vector4(v.X);
+            var y = new Vector4(v.Y);
+            var z = new Vector4(v.Z);
+            result = m.X * x + m.Y * y + m.Z * z + m.W;
+        }
 
 
         /// <summary>
