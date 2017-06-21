@@ -57,7 +57,7 @@ namespace DemoRenderer
         public float AspectRatio { get; set; }
 
         /// <summary>
-        /// Gets or sets the field of view of the camera.
+        /// Gets or sets the vertical field of view of the camera.
         /// </summary>
         public float FieldOfView { get; set; }
 
@@ -209,7 +209,14 @@ namespace DemoRenderer
             }
         }
 
-
+        /// <summary>
+        /// Creates a new camera.
+        /// </summary>
+        /// <param name="aspectRatio">Aspect ratio of the camera's projection.</param>
+        /// <param name="fieldOfView">Vertical field of view of the camera's projection.</param>
+        /// <param name="nearClip">Near clip plane of the camera's projection.</param>
+        /// <param name="farClip">Far clip plane of the camera's projection.</param>
+        /// <param name="maximumPitch">Maximum angle that the camera can look up or down.</param>
         public Camera(float aspectRatio, float fieldOfView, float nearClip, float farClip, float maximumPitch = (float)(Math.PI / 2))
         {
             AspectRatio = aspectRatio;

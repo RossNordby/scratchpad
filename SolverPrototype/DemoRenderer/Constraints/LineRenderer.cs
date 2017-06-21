@@ -37,11 +37,17 @@ namespace DemoRenderer.Constraints
             public Matrix ViewProjection;
             [FieldOffset(64)]
             public Vector2 NDCToScreenScale;
-            [FieldOffset(72)]
-            public Vector2 ScreenToNDCScale;
+            [FieldOffset(80)]
+            public Vector3 CameraForward;
+            [FieldOffset(92)]
+            public float TanAnglePerPixel;
+            [FieldOffset(96)]
+            public Vector3 CameraRight;
+            [FieldOffset(112)]
+            public Vector3 CameraPosition;
         }
         ConstantsBuffer<VertexConstants> vertexConstants;
-       
+
         StructuredBuffer<LineInstance> instances;
         IndexBuffer indices;
 
@@ -54,7 +60,7 @@ namespace DemoRenderer.Constraints
             indices = new IndexBuffer(Helpers.GetQuadIndices(maximumInstancesPerDraw), device, "Line Quad Indices");
 
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "Line Renderer Vertex Constants");
- 
+
             vertexShader = new VertexShader(device, cache.GetShader(@"Constraints\RenderLines.hlsl.vshader"));
             pixelShader = new PixelShader(device, cache.GetShader(@"Constraints\RenderLines.hlsl.pshader"));
         }
@@ -65,7 +71,10 @@ namespace DemoRenderer.Constraints
             {
                 ViewProjection = Matrix.Transpose(camera.ViewProjection), //compensate for the shader packing.
                 NDCToScreenScale = new Vector2(resolution.X / 2f, resolution.Y / 2f),
-                ScreenToNDCScale = new Vector2(2f / resolution.X, 2f / resolution.Y)
+                CameraForward = camera.Forward,
+                TanAnglePerPixel = (float)Math.Tan(camera.FieldOfView / resolution.Y),
+                CameraRight = camera.Right,
+                CameraPosition = camera.Position,
             };
             vertexConstants.Update(context, ref vertexConstantsData);
 

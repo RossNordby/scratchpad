@@ -6,7 +6,12 @@ cbuffer VertexConstants : register(b0)
 {
 	float4x4 ViewProjection;
 	float2 NDCToScreenScale; //0 to 2 => 0 to resolution
-	float2 ScreenToNDCScale; //0 to resolution => 0 to 2
+	float2 Padding0;
+	float3 CameraForward;
+	float TanAnglePerPixel;
+	float3 CameraRight;
+	float Padding1;
+	float3 CameraPosition;
 };
 
 #include "ColorUnpacking.hlsl"
@@ -53,28 +58,39 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 		NDCToScreenScale.y - end.y * NDCToScreenScale.y);
 	output.LineDirection = screenEnd - output.Start;
 	output.Length = length(output.LineDirection);
-	output.LineDirection = output.Length > 1e-7 ? output.LineDirection / output.Length : float2(1, 0);
+	output.LineDirection = output.Length > 1e-5 ? output.LineDirection / output.Length : float2(1, 0);
 	output.Color = UnpackR11G11B10_UNorm(instance.PackedColor);
 
 	//Build the quad vertices in screenspace, padded by 1 pixel on each side. 
 	float2 quadCoordinates = float2(vertexId & 1, (vertexId & 2) >> 1);
+	float3 worldLineX = instance.End - instance.Start;
+	worldLineX -= CameraForward * dot(CameraForward, worldLineX);
+	float worldLineXLength = length(worldLineX);
+	worldLineX = worldLineXLength > 1e-5 ? worldLineX / worldLineXLength : CameraRight;
+	//How wide is a pixel at this vertex, approximately?
+	float3 endpoint = quadCoordinates.x > 0 ? instance.End : instance.Start;
+	//Note that distance is used instead of z. Resizing lines based on camera orientation is a bit odd.
+	float distance = length(endpoint - CameraPosition);
+	float pixelSize = distance * TanAnglePerPixel;
+	//Use the pixel size in world space to pad the quad.
 	const float paddingInPixels = OuterRadius + SampleRadius;
-	output.Position.zw = quadCoordinates.x > 0 ? end.zw : start.zw;
-	float2 localVertexPixelCoordinates = float2(paddingInPixels * 2 + output.Length, paddingInPixels * 2) * quadCoordinates - paddingInPixels;
-	float2 vertexPixelCoordinates = output.Start + 
-		localVertexPixelCoordinates.x * output.LineDirection +
-		localVertexPixelCoordinates.y * float2(-output.LineDirection.y, output.LineDirection.x);
-	//Note that w is used to rescale the screenspace->ndc positions to be consistent.
-	output.Position.xy = float2(
-		vertexPixelCoordinates.x * ScreenToNDCScale.x - 1, 
-		1 - vertexPixelCoordinates.y * ScreenToNDCScale.y) * output.Position.w;
+	//Points down in screenspace by convention to match UI line stuff.
+	float3 worldLineY = cross(CameraForward, worldLineX);
+
+	float worldPadding = paddingInPixels * pixelSize;
+	float3 horizontalPadding = worldPadding * worldLineX;
+	float3 position = quadCoordinates.x > 0 ? 
+		instance.End + horizontalPadding :
+		instance.Start - horizontalPadding;
+	position += (quadCoordinates.y * 2 - 1) * (worldPadding * worldLineY);
+	output.Position = mul(float4(position, 1), ViewProjection);
 	return output;
 	//A couple of notes:
 	//1) More accurate depths could be calculated for the vertices rather than simply assuming that they have the same depth as the endpoint.
 	//That assumption overestimates the depth of the vertices associated with the near point and underestimates the depth of the far point.
 	//Only bother if actually matters.
-	//2) The Z coordinate could be unprojected to get linear depth, which the pixel shader could then interpolate and offset with conservative depth output.
-	//That would allow smoother transitions between overlap.
+	//2) The pixel shader could interpolate linear depth and offset it with conservative depth output.
+	//That would allow smoother transitions between lines during overlap.
 }
 
 struct PSOutput
