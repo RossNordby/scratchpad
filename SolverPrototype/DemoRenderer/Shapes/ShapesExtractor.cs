@@ -5,16 +5,16 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace DemoRenderer.Bodies
+namespace DemoRenderer.Shapes
 {
-    public class BodiesExtractor
+    public class ShapesExtractor
     {
         //For now, we only have spheres. Later, once other shapes exist, this will be responsible for bucketing the different shape types and when necessary caching shape models.
         internal QuickList<SphereInstance, Array<SphereInstance>> spheres;
 
-        public BodiesExtractor(int initialSizePerShape)
+        public ShapesExtractor(int initialCapacityPerShapeType = 1024)
         {
-            var initialSpheresSpan = new Array<SphereInstance>(new SphereInstance[initialSizePerShape]);
+            var initialSpheresSpan = new Array<SphereInstance>(new SphereInstance[initialCapacityPerShapeType]);
             spheres = new QuickList<SphereInstance, Array<SphereInstance>>(ref initialSpheresSpan);
         }
 

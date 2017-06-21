@@ -40,6 +40,7 @@ namespace SolverPrototype
         /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
         public Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
+            ConstraintTypeIds.RegisterDefaults();
             BufferPool = bufferPool;
             Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
             Solver = new Solver(Bodies, BufferPool,

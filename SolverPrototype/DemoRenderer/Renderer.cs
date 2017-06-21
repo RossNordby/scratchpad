@@ -9,8 +9,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using DemoRenderer.Bodies;
+using DemoRenderer.Shapes;
 using SolverPrototype;
+using DemoRenderer.Constraints;
 
 namespace DemoRenderer
 {
@@ -22,7 +23,9 @@ namespace DemoRenderer
         //TODO: Down the road, the sphere renderer will be joined by a bunch of other types. 
         //They'll likely be stored in an array indexed by a shape type rather than just being a swarm of properties.
         public SphereRenderer SphereRenderer { get; private set; }
-        public BodiesExtractor Bodies { get; private set; }
+        public ShapesExtractor Shapes { get; private set; }
+        public LineRenderer LineRenderer { get; private set; }
+        public LineExtractor Lines { get; private set; }
         public GlyphRenderer GlyphRenderer { get; private set; }
         public UILineRenderer UILineRenderer { get; private set; }
         public CompressToSwap CompressToSwap { get; private set; }
@@ -53,8 +56,10 @@ namespace DemoRenderer
             {
                 ShaderCache = ShaderCache.Load(stream);
             }
-            Bodies = new BodiesExtractor(1024);
+            Shapes = new ShapesExtractor();
             SphereRenderer = new SphereRenderer(surface.Device, ShaderCache);
+            Lines = new LineExtractor();
+            LineRenderer = new LineRenderer(surface.Device, ShaderCache);
             Background = new BackgroundRenderer(surface.Device, ShaderCache);
             CompressToSwap = new CompressToSwap(surface.Device, ShaderCache);
 
@@ -190,7 +195,7 @@ namespace DemoRenderer
             context.OutputMerger.SetBlendState(opaqueBlendState);
             context.OutputMerger.SetDepthStencilState(opaqueDepthState);
 
-            SphereRenderer.Render(context, camera, Bodies.spheres.Span.Memory, 0, Bodies.spheres.Count);
+            SphereRenderer.Render(context, camera, Shapes.spheres.Span.Memory, 0, Shapes.spheres.Count);
 
             Background.Render(context, camera);
 

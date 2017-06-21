@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Quaternion = BEPUutilities2.Quaternion;
 
-namespace DemoRenderer.Bodies
+namespace DemoRenderer.Shapes
 {
     /// <summary>
     /// GPU-relevant information for the rendering of a single sphere instance.
@@ -115,8 +115,8 @@ namespace DemoRenderer.Bodies
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "Sphere Renderer Vertex Constants");
             pixelConstants = new ConstantsBuffer<PixelConstants>(device, debugName: "Sphere Renderer Pixel Constants");
 
-            vertexShader = new VertexShader(device, cache.GetShader(@"Bodies\RenderSpheres.hlsl.vshader"));
-            pixelShader = new PixelShader(device, cache.GetShader(@"Bodies\RenderSpheres.hlsl.pshader"));
+            vertexShader = new VertexShader(device, cache.GetShader(@"Shapes\RenderSpheres.hlsl.vshader"));
+            pixelShader = new PixelShader(device, cache.GetShader(@"Shapes\RenderSpheres.hlsl.pshader"));
         }
 
         public void Render(DeviceContext context, Camera camera, SphereInstance[] instances, int start, int count)

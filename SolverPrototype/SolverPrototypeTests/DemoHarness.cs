@@ -316,8 +316,10 @@ namespace SolverPrototypeTests
                     uiText.Clear().Append(Math.Round(1e3 * timeSamples.Simulation[timeSamples.Simulation.End - 1], timingGraph.Description.VerticalIntervalLabelRounding)).Append(" ms/step"),
                     new Vector2(window.Resolution.X - inset - GlyphBatch.MeasureLength(uiText, font, timingTextSize), inset), timingTextSize, timingGraph.Description.TextColor, font);
             }
-            renderer.Bodies.ClearInstances();
-            renderer.Bodies.AddInstances(demo.Simulation);
+            renderer.Shapes.ClearInstances();
+            renderer.Shapes.AddInstances(demo.Simulation);
+            renderer.Lines.ClearInstances();
+            renderer.Lines.AddInstances(demo.Simulation);
         }
 
         bool disposed;

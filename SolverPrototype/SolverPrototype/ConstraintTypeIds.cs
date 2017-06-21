@@ -21,6 +21,20 @@ namespace SolverPrototype
 
         static List<Type> registeredBatchTypes = new List<Type>();
 
+        /// <summary>
+        /// Registers the set of constraints that are packaged in the engine.
+        /// </summary>
+        public static void RegisterDefaults()
+        {
+            Register<BallSocketTypeBatch>();
+            Register<ContactManifold4TypeBatch>();
+        }
+
+        /// <summary>
+        /// Gets the number of constraint type batch types that have been registered.
+        /// </summary>
+        public static int RegisteredTypeCount { get { return registeredBatchTypes.Count; } }
+
         [Conditional("DEBUG")]
         static void ValidateType<T>()
         {

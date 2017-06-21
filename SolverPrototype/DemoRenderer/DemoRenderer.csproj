@@ -20,7 +20,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" />
 
   <ItemGroup>
-    <Content Include="Bodies\RenderSpheres.hlsl" />
+    <Content Include="Shapes\RenderSpheres.hlsl" />
     <Content Include="Constraints\RenderLines.hlsl" />
     <Content Include="UI\RenderUILines.hlsl" />
     <Content Include="UI\RenderGlyphs.hlsl" />
