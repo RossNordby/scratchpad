@@ -196,6 +196,7 @@ namespace DemoRenderer
             context.OutputMerger.SetDepthStencilState(opaqueDepthState);
 
             SphereRenderer.Render(context, camera, Shapes.spheres.Span.Memory, 0, Shapes.spheres.Count);
+            LineRenderer.Render(context, camera, Surface.Resolution, Lines.lines.Span.Memory, 0, Lines.lines.Count);
 
             Background.Render(context, camera);
 

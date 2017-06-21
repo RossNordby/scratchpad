@@ -122,5 +122,20 @@ namespace SolverPrototype
             result.Y = Vector.ConditionalSelect(condition, left.Y, right.Y);
             result.Z = Vector.ConditionalSelect(condition, left.Z, right.Z);
         }
+
+        /// <summary>
+        /// Pulls one lane out of the wide representation.
+        /// </summary>
+        /// <param name="wide">Source of the lane.</param>
+        /// <param name="laneIndex">Index of the lane within the wide representation to read.</param>
+        /// <param name="narrow">Non-SIMD type to store the lane in.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetLane(ref Vector3Wide wide, int laneIndex, out Vector3 narrow)
+        {
+            ref var start = ref Unsafe.Add(ref Unsafe.As<Vector<float>, float>(ref wide.X), laneIndex);
+            narrow.X = start;
+            narrow.Y = Unsafe.Add(ref start, Vector<float>.Count);
+            narrow.Z = Unsafe.Add(ref start, 2 * Vector<float>.Count);
+        }
     }
 }

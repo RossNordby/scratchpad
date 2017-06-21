@@ -4,6 +4,8 @@ using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Constraints;
 using System.Runtime.CompilerServices;
+using System.Numerics;
+using Quaternion = BEPUutilities2.Quaternion;
 
 namespace DemoRenderer.Constraints
 {
@@ -11,7 +13,7 @@ namespace DemoRenderer.Constraints
     {
         int LinesPerConstraint { get; }
 
-        void ExtractLines(ref TPrestep prestepBundle, ref TBodyReferences referencesBundle, SolverPrototype.Bodies bodies, ref QuickList<LineInstance, Array<LineInstance>> lines);
+        void ExtractLines(ref TPrestep prestepBundle, ref TBodyReferences referencesBundle, int innerIndex, Bodies bodies, ref QuickList<LineInstance, Array<LineInstance>> lines);
     }
     abstract class TypeLineExtractor
     {
@@ -19,7 +21,7 @@ namespace DemoRenderer.Constraints
         public abstract void ExtractLines(Simulation simulation, TypeBatch typeBatch, ref QuickList<LineInstance, Array<LineInstance>> lines);
     }
 
-    class TypeLineExtractor<T, TTypeBatch, TBodyReferences, TPrestep,  TProjection, TAccumulatedImpulses> : TypeLineExtractor
+    class TypeLineExtractor<T, TTypeBatch, TBodyReferences, TPrestep, TProjection, TAccumulatedImpulses> : TypeLineExtractor
         where T : struct, IConstraintLineExtractor<TBodyReferences, TPrestep>
         where TTypeBatch : TypeBatch<TBodyReferences, TPrestep, TProjection, TAccumulatedImpulses>
     {
@@ -35,7 +37,7 @@ namespace DemoRenderer.Constraints
                 BundleIndexing.GetBundleIndices(i, out var bundleIndex, out var innerIndex);
                 ref var prestepBundle = ref Unsafe.Add(ref prestepStart, bundleIndex);
                 ref var referencesBundle = ref Unsafe.Add(ref referencesStart, bundleIndex);
-                extractor.ExtractLines(ref prestepBundle, ref referencesBundle, simulation.Bodies, ref lines);
+                extractor.ExtractLines(ref prestepBundle, ref referencesBundle, innerIndex, simulation.Bodies, ref lines);
             }
         }
     }
@@ -44,9 +46,27 @@ namespace DemoRenderer.Constraints
     {
         public int LinesPerConstraint => 3;
 
-        public void ExtractLines(ref BallSocketPrestepData prestepBundle, ref TwoBodyReferences referencesBundle, Bodies bodies, ref QuickList<LineInstance, Array<LineInstance>> lines)
+        public void ExtractLines(ref BallSocketPrestepData prestepBundle, ref TwoBodyReferences referencesBundle, int innerIndex,
+            Bodies bodies, ref QuickList<LineInstance, Array<LineInstance>> lines)
         {
-            bodies.GetPoseByIndex(references.)
+            var indexA = GatherScatter.Get(ref referencesBundle.IndexA, innerIndex);
+            var indexB = GatherScatter.Get(ref referencesBundle.IndexB, innerIndex);
+            bodies.GetPoseByIndex(indexA, out var poseA);
+            bodies.GetPoseByIndex(indexB, out var poseB);
+            Vector3Wide.GetLane(ref prestepBundle.LocalOffsetA, innerIndex, out var localOffsetA);
+            Vector3Wide.GetLane(ref prestepBundle.LocalOffsetB, innerIndex, out var localOffsetB);
+            Quaternion.Transform(ref localOffsetA, ref poseA.Orientation, out var worldOffsetA);
+            Quaternion.Transform(ref localOffsetB, ref poseB.Orientation, out var worldOffsetB);
+            var endA = poseA.Position + worldOffsetA;
+            var endB = poseB.Position + worldOffsetB;
+            var color = new Vector3(0.2f, 0.2f, 1f);
+            var lineA = new LineInstance(ref poseA.Position, ref endA, ref color);
+            var lineB = new LineInstance(ref poseB.Position, ref endB, ref color);
+            lines.AddUnsafely(ref lineA);
+            lines.AddUnsafely(ref lineB);
+            var errorColor = new Vector3(1, 0, 0);
+            var errorLine = new LineInstance(ref endA, ref endB, ref errorColor);
+            lines.AddUnsafely(ref errorLine);
         }
     }
 

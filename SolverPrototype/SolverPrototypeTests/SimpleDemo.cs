@@ -12,9 +12,9 @@ namespace SolverPrototypeTests
         public override void Initialize(Camera camera)
         {
             Simulation = new Simulation(BufferPool);
-            const int width = 32;
-            const int height = 32;
-            const int length = 32;
+            const int width = 4;
+            const int height = 4;
+            const int length = 4;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(3), new Vector3()),
                 new BallSocketConstraintBuilder(),

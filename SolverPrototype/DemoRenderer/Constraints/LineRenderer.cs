@@ -64,8 +64,8 @@ namespace DemoRenderer.Constraints
             var vertexConstantsData = new VertexConstants
             {
                 ViewProjection = Matrix.Transpose(camera.ViewProjection), //compensate for the shader packing.
-                NDCToScreenScale = new Vector2(resolution.X / 2f, -resolution.Y / 2f),
-                ScreenToNDCScale = new Vector2(2f / resolution.X, -2f / resolution.Y)
+                NDCToScreenScale = new Vector2(resolution.X / 2f, resolution.Y / 2f),
+                ScreenToNDCScale = new Vector2(2f / resolution.X, 2f / resolution.Y)
             };
             vertexConstants.Update(context, ref vertexConstantsData);
 

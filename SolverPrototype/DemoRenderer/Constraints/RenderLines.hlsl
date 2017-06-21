@@ -28,8 +28,8 @@ struct PSInput
 	nointerpolation float Length : ScreenLineLength;
 	nointerpolation float3 Color : ScreenLineColor;
 };
-#define InnerRadius 0.5
-#define OuterRadius 1.0
+#define InnerRadius 1
+#define OuterRadius 1.5
 #define SampleRadius 0.70710678118
 PSInput VSMain(uint vertexId : SV_VertexId)
 {
@@ -45,8 +45,12 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	start.xy /= start.w;
 	end.xy /= end.w;
 	//Now in NDC. Scale x and y to screenspace.
-	output.Start = start.xy * NDCToScreenScale + NDCToScreenScale;
-	float2 screenEnd = end.xy * NDCToScreenScale + NDCToScreenScale;
+	output.Start = float2(
+		start.x * NDCToScreenScale.x + NDCToScreenScale.x,
+		NDCToScreenScale.y - start.y * NDCToScreenScale.y);
+	float2 screenEnd = float2(
+		end.x * NDCToScreenScale.x + NDCToScreenScale.x,
+		NDCToScreenScale.y - end.y * NDCToScreenScale.y);
 	output.LineDirection = screenEnd - output.Start;
 	output.Length = length(output.LineDirection);
 	output.LineDirection = output.Length > 1e-7 ? output.LineDirection / output.Length : float2(1, 0);
@@ -56,9 +60,14 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	float2 quadCoordinates = float2(vertexId & 1, (vertexId & 2) >> 1);
 	const float paddingInPixels = OuterRadius + SampleRadius;
 	output.Position.zw = quadCoordinates.x > 0 ? end.zw : start.zw;
+	float2 localVertexPixelCoordinates = float2(paddingInPixels * 2 + output.Length, paddingInPixels * 2) * quadCoordinates - paddingInPixels;
+	float2 vertexPixelCoordinates = output.Start + 
+		localVertexPixelCoordinates.x * output.LineDirection +
+		localVertexPixelCoordinates.y * float2(-output.LineDirection.y, output.LineDirection.x);
 	//Note that w is used to rescale the screenspace->ndc positions to be consistent.
-	float2 vertexPixelCoordinates = (paddingInPixels * 2 + output.Length, paddingInPixels * 2) * quadCoordinates - paddingInPixels;
-	output.Position.xy = (vertexPixelCoordinates * ScreenToNDCScale - 1) * output.Position.w;
+	output.Position.xy = float2(
+		vertexPixelCoordinates.x * ScreenToNDCScale.x - 1, 
+		1 - vertexPixelCoordinates.y * ScreenToNDCScale.y) * output.Position.w;
 	return output;
 	//A couple of notes:
 	//1) More accurate depths could be calculated for the vertices rather than simply assuming that they have the same depth as the endpoint.
