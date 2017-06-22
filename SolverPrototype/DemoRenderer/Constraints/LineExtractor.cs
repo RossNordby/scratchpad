@@ -4,8 +4,8 @@ using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Constraints;
 using System.Runtime.CompilerServices;
-using System.Numerics;
-using Quaternion = BEPUutilities2.Quaternion;
+using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace DemoRenderer.Constraints
 {
@@ -18,7 +18,7 @@ namespace DemoRenderer.Constraints
     abstract class TypeLineExtractor
     {
         public abstract int LinesPerConstraint { get; }
-        public abstract void ExtractLines(Simulation simulation, TypeBatch typeBatch, ref QuickList<LineInstance, Array<LineInstance>> lines);
+        public abstract void ExtractLines(Simulation simulation, TypeBatch typeBatch, int constraintStart, int constraintCount, ref QuickList<LineInstance, Array<LineInstance>> lines);
     }
 
     class TypeLineExtractor<T, TTypeBatch, TBodyReferences, TPrestep, TProjection, TAccumulatedImpulses> : TypeLineExtractor
@@ -26,13 +26,16 @@ namespace DemoRenderer.Constraints
         where TTypeBatch : TypeBatch<TBodyReferences, TPrestep, TProjection, TAccumulatedImpulses>
     {
         public override int LinesPerConstraint => default(T).LinesPerConstraint;
-        public override void ExtractLines(Simulation simulation, TypeBatch typeBatch, ref QuickList<LineInstance, Array<LineInstance>> lines)
+        public override void ExtractLines(Simulation simulation, TypeBatch typeBatch, int constraintStart, int constraintCount,
+            ref QuickList<LineInstance, Array<LineInstance>> lines)
         {
             var batch = (TTypeBatch)typeBatch;
             ref var prestepStart = ref batch.PrestepData[0];
             ref var referencesStart = ref batch.BodyReferences[0];
             var extractor = default(T);
-            for (int i = 0; i < batch.ConstraintCount; ++i)
+
+            var constraintEnd = constraintStart + constraintCount;
+            for (int i = constraintStart; i < constraintEnd; ++i)
             {
                 BundleIndexing.GetBundleIndices(i, out var bundleIndex, out var innerIndex);
                 ref var prestepBundle = ref Unsafe.Add(ref prestepStart, bundleIndex);
@@ -42,39 +45,23 @@ namespace DemoRenderer.Constraints
         }
     }
 
-    struct BallSocketLineExtractor : IConstraintLineExtractor<TwoBodyReferences, BallSocketPrestepData>
-    {
-        public int LinesPerConstraint => 3;
-
-        public void ExtractLines(ref BallSocketPrestepData prestepBundle, ref TwoBodyReferences referencesBundle, int innerIndex,
-            Bodies bodies, ref QuickList<LineInstance, Array<LineInstance>> lines)
-        {
-            var indexA = GatherScatter.Get(ref referencesBundle.IndexA, innerIndex);
-            var indexB = GatherScatter.Get(ref referencesBundle.IndexB, innerIndex);
-            bodies.GetPoseByIndex(indexA, out var poseA);
-            bodies.GetPoseByIndex(indexB, out var poseB);
-            Vector3Wide.GetLane(ref prestepBundle.LocalOffsetA, innerIndex, out var localOffsetA);
-            Vector3Wide.GetLane(ref prestepBundle.LocalOffsetB, innerIndex, out var localOffsetB);
-            Quaternion.Transform(ref localOffsetA, ref poseA.Orientation, out var worldOffsetA);
-            Quaternion.Transform(ref localOffsetB, ref poseB.Orientation, out var worldOffsetB);
-            var endA = poseA.Position + worldOffsetA;
-            var endB = poseB.Position + worldOffsetB;
-            var color = new Vector3(0.2f, 0.2f, 1f);
-            var lineA = new LineInstance(ref poseA.Position, ref endA, ref color);
-            var lineB = new LineInstance(ref poseB.Position, ref endB, ref color);
-            lines.AddUnsafely(ref lineA);
-            lines.AddUnsafely(ref lineB);
-            var errorColor = new Vector3(1, 0, 0);
-            var errorLine = new LineInstance(ref endA, ref endB, ref errorColor);
-            lines.AddUnsafely(ref errorLine);
-        }
-    }
-
-
     public class LineExtractor
     {
         TypeLineExtractor[] lineExtractors;
         internal QuickList<LineInstance, Array<LineInstance>> lines;
+        const int jobsPerThread = 4;
+        QuickList<ThreadJob, Array<ThreadJob>> jobs;
+
+        struct ThreadJob
+        {
+            public int BatchIndex;
+            public int TypeBatchIndex;
+            public int ConstraintStart;
+            public int ConstraintCount;
+            public int LineStart;
+            public int LinesPerConstraint;
+        }
+
 
         public LineExtractor(int initialLineCapacity = 8192)
         {
@@ -82,6 +69,7 @@ namespace DemoRenderer.Constraints
             lineExtractors = new TypeLineExtractor[ConstraintTypeIds.RegisteredTypeCount];
             lineExtractors[ConstraintTypeIds.GetId<BallSocketTypeBatch>()] =
                 new TypeLineExtractor<BallSocketLineExtractor, BallSocketTypeBatch, TwoBodyReferences, BallSocketPrestepData, BallSocketProjection, Vector3Wide>();
+            QuickList<ThreadJob, Array<ThreadJob>>.Create(new PassthroughArrayPool<ThreadJob>(), Environment.ProcessorCount * (jobsPerThread + 1), out jobs);
         }
 
         public void ClearInstances()
@@ -89,9 +77,24 @@ namespace DemoRenderer.Constraints
             lines.Count = 0;
         }
 
+        Simulation simulation;
+        private void ExecuteJob(int jobIndex)
+        {
+            ref var job = ref jobs[jobIndex];
+            var typeBatch = simulation.Solver.Batches[job.BatchIndex].TypeBatches[job.TypeBatchIndex];
+            Debug.Assert(lineExtractors[typeBatch.TypeId] != null, "Jobs should only be created for types which are available and active.");
+            //Creating a local copy of the list reference and count allows additions to proceed in parallel. 
+            var jobLineList = new QuickList<LineInstance, Array<LineInstance>>(ref lines.Span);
+            //By setting the count, we work around the fact that Array<T> doesn't support slicing.
+            jobLineList.Count = job.LineStart;
+            lineExtractors[typeBatch.TypeId].ExtractLines(simulation, typeBatch, job.ConstraintStart, job.ConstraintCount, ref jobLineList);
+        }
+
         public void AddInstances(Simulation simulation)
         {
             int neededLineCapacity = 0;
+            jobs.Count = 0;
+            var jobPool = new PassthroughArrayPool<ThreadJob>();
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
             {
                 var batch = simulation.Solver.Batches[batchIndex];
@@ -101,20 +104,55 @@ namespace DemoRenderer.Constraints
                     var extractor = lineExtractors[typeBatch.TypeId];
                     if (extractor != null)
                     {
+                        jobs.Add(new ThreadJob
+                        {
+                            BatchIndex = batchIndex,
+                            TypeBatchIndex = typeBatchIndex,
+                            ConstraintStart = 0,
+                            ConstraintCount = typeBatch.ConstraintCount,
+                            LineStart = neededLineCapacity,
+                            LinesPerConstraint = extractor.LinesPerConstraint
+                        }, jobPool);
                         neededLineCapacity += extractor.LinesPerConstraint * typeBatch.ConstraintCount;
                     }
                 }
             }
-            lines.EnsureCapacity(neededLineCapacity, new PassthroughArrayPool<LineInstance>());
-            for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
+            var maximumJobSize = Math.Max(1, neededLineCapacity / (jobsPerThread * Environment.ProcessorCount));
+            var originalJobCount = jobs.Count;
+            //Split jobs if they're larger than desired to help load balancing a little bit. This isn't terribly important, but it's pretty easy.
+            for (int i = 0; i < originalJobCount; ++i)
             {
-                var batch = simulation.Solver.Batches[batchIndex];
-                for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
+                ref var job = ref jobs[i];
+                if (job.ConstraintCount > maximumJobSize)
                 {
-                    var typeBatch = batch.TypeBatches[typeBatchIndex];
-                    lineExtractors[typeBatch.TypeId]?.ExtractLines(simulation, typeBatch, ref lines);
+                    var subjobCount = (int)Math.Round(0.5 + job.ConstraintCount / (double)maximumJobSize);
+                    var constraintsPerSubjob = job.ConstraintCount / subjobCount;
+                    var remainder = job.ConstraintCount - constraintsPerSubjob * subjobCount;
+                    //Modify the first job in place.
+                    job.ConstraintCount = constraintsPerSubjob;
+                    if (remainder > 0)
+                        ++job.ConstraintCount;
+                    //Append the remaining jobs.
+                    var previousJob = job;
+                    for (int j = 1; j < subjobCount; ++j)
+                    {
+                        var newJob = previousJob;
+                        newJob.LineStart += previousJob.ConstraintCount * newJob.LinesPerConstraint;
+                        newJob.ConstraintStart += previousJob.ConstraintCount;
+                        newJob.ConstraintCount = constraintsPerSubjob;
+                        if (remainder > j)
+                            ++newJob.ConstraintCount;
+                        jobs.Add(newJob, jobPool);
+                        previousJob = newJob;
+                    }
                 }
             }
+            lines.EnsureCapacity(neededLineCapacity, new PassthroughArrayPool<LineInstance>());
+            lines.Count = neededLineCapacity; //Line additions will be performed on suballocated lists. This count will be used by the renderer when reading line data.
+            this.simulation = simulation;
+            Parallel.For(0, jobs.Count, ExecuteJob);
+            this.simulation = null;
         }
+
     }
 }
