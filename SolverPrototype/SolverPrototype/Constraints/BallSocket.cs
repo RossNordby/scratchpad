@@ -176,16 +176,19 @@ namespace SolverPrototype.Constraints
         public void Solve(ref BodyVelocities velocityA, ref BodyVelocities velocityB, ref BallSocketProjection projection, ref Vector3Wide accumulatedImpulse)
         {
             //csi = projection.BiasImpulse - accumulatedImpulse * projection.SoftnessImpulseScale - (csiaLinear + csiaAngular + csibLinear + csibAngular);
-            Vector3Wide.Subtract(ref velocityA.LinearVelocity, ref velocityA.AngularVelocity, out var csv);
+            //Note subtraction; jLinearB = -I.
+            Vector3Wide.Subtract(ref velocityA.LinearVelocity, ref velocityB.LinearVelocity, out var csv);
             Vector3Wide.CrossWithoutOverlap(ref velocityA.AngularVelocity, ref projection.OffsetA, out var angularCSV);
             Vector3Wide.Add(ref csv, ref angularCSV, out csv);
+            //Note reversed cross order; matches the jacobian -CrossMatrix(offsetB).
             Vector3Wide.CrossWithoutOverlap(ref projection.OffsetB, ref velocityB.AngularVelocity, out angularCSV);
             Vector3Wide.Add(ref csv, ref angularCSV, out csv);
             Vector3Wide.Subtract(ref projection.BiasVelocity, ref csv, out csv);
-
+            
             Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref csv, ref projection.EffectiveMass, out var csi);
             Vector3Wide.Scale(ref accumulatedImpulse, ref projection.SoftnessImpulseScale, out var softness);
             Vector3Wide.Subtract(ref csi, ref softness, out csi);
+            Vector3Wide.Add(ref accumulatedImpulse, ref csi, out accumulatedImpulse);
 
             ApplyImpulse(ref velocityA, ref velocityB, ref projection, ref csi);
 

@@ -96,6 +96,7 @@ bool RayCastSphere(float3 rayDirection, float3 spherePosition, float radius,
 	float b = dot(m, normalizedDirection);
 	float c = dot(m, m) - radius * radius;
 
+	//This isn't a very good GPU implementation, but only worry about that if it becomes an issue.
 	if (c > 0 && b > 0)
 	{
 		t = 0;
@@ -103,26 +104,34 @@ bool RayCastSphere(float3 rayDirection, float3 spherePosition, float radius,
 		hitNormal = 0;
 		return false;
 	}
-	float discriminant = b * b - c;
-	if (discriminant < 0)
+	else
 	{
-		t = 0;
-		hitLocation = 0;
-		hitNormal = 0;
-		return false;
+		float discriminant = b * b - c;
+		if (discriminant < 0)
+		{
+			t = 0;
+			hitLocation = 0;
+			hitNormal = 0;
+			return false;
+		}
+		else
+		{
+			t = -b - sqrt(discriminant);
+			if (t < 0)
+			{
+				t = 0;
+				hitLocation = 0;
+				hitNormal = 0;
+				return false;
+			}
+			else
+			{
+				hitLocation = normalizedDirection * t;
+				hitNormal = normalize(hitLocation - spherePosition);
+				return true;
+			}
+		}
 	}
-
-	t = -b - sqrt(discriminant);
-	if (t < 0)
-	{
-		t = 0;
-		hitLocation = 0;
-		hitNormal = 0;
-		return false;
-	}
-	hitLocation = normalizedDirection * t;
-	hitNormal = normalize(hitLocation - spherePosition);
-	return true;
 }
 
 float3 TransformByConjugate(float3 v, float4 rotation)

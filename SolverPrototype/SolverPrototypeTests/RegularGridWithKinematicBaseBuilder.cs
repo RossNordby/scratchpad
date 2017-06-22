@@ -8,7 +8,7 @@ namespace SolverPrototypeTests
         public Vector3 Spacing;
         public Vector3 Origin;
         public float InverseInertiaMultiplier;
-        public RegularGridWithKinematicBaseBuilder(Vector3 spacing, Vector3 origin, int inverseInertiaMultiplier = 0)
+        public RegularGridWithKinematicBaseBuilder(Vector3 spacing, Vector3 origin, float inverseInertiaMultiplier = 0)
         {
             Spacing = spacing;
             Origin = origin;

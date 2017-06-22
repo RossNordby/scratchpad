@@ -23,8 +23,8 @@ namespace SolverPrototypeTests
             description.LocalOffsetB = Quaternion.Transform(midpoint - b.Position, Quaternion.Conjugate(b.Orientation));
             description.SpringSettings = new SpringSettingsAOS
             {
-                NaturalFrequency = (float)(Math.PI * 2 * 60),
-                DampingRatio = 100f
+                NaturalFrequency = (float)(Math.PI * .5f * 60),
+                DampingRatio = 0.25f
             };
         }
         static void TryConnectTo(int sliceIndex, int rowIndex, int columnIndex,
