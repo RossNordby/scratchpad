@@ -54,7 +54,7 @@ namespace DemoRenderer.Constraints
         VertexShader vertexShader;
         PixelShader pixelShader;
 
-        public LineRenderer(Device device, ShaderCache cache, int maximumInstancesPerDraw = 8192)
+        public LineRenderer(Device device, ShaderCache cache, int maximumInstancesPerDraw = 16384)
         {
             instances = new StructuredBuffer<LineInstance>(device, maximumInstancesPerDraw, "Line Instances");
             indices = new IndexBuffer(Helpers.GetBoxIndices(maximumInstancesPerDraw), device, "Line Quad Indices");

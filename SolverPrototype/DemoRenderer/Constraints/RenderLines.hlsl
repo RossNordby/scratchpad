@@ -28,13 +28,15 @@ StructuredBuffer<LineInstance> Instances : register(t0);
 struct PSInput
 {
 	float4 Position : SV_Position;
-	nointerpolation float2 Start : ScreenLineStart;
-	nointerpolation float2 LineDirection : ScreenLineDirection;
-	nointerpolation float Length : ScreenLineLength;
+	float3 ToBox : ToBoxOffset;
+	nointerpolation float3 Start : LineStart;
+	nointerpolation float3 Direction : LineDirection;
+	nointerpolation float Length : LineLength;
 	nointerpolation float3 Color : ScreenLineColor;
+	float PixelSize : WorldPixelSize;
 };
-#define InnerRadius 1
-#define OuterRadius 1.5
+#define InnerRadius 0.5
+#define OuterRadius 0.75
 #define SampleRadius 0.70710678118
 PSInput VSMain(uint vertexId : SV_VertexId)
 {
@@ -44,31 +46,26 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 
 	//Project the start and end points into NDC.
 	//Output the line start, direction, and length in screenspace for use by the pixel shader. This is similar to the UI line renderer.
-	float4 start = mul(float4(instance.Start, 1), ViewProjection);
-	float4 end = mul(float4(instance.End, 1), ViewProjection);
-	//Keep the z and w components unmodified. They'll be brought back to compute the vertex position.
-	start.xy /= start.w * sign(start.z);
-	end.xy /= end.w * sign(end.z);
-	//Now in NDC. Scale x and y to screenspace.
-	output.Start = float2(
-		start.x * NDCToScreenScale.x + NDCToScreenScale.x,
-		NDCToScreenScale.y - start.y * NDCToScreenScale.y);
-	float2 screenEnd = float2(
-		end.x * NDCToScreenScale.x + NDCToScreenScale.x,
-		NDCToScreenScale.y - end.y * NDCToScreenScale.y);
-	output.LineDirection = screenEnd - output.Start;
-	output.Length = length(output.LineDirection);
-	output.LineDirection = output.Length > 1e-5 ? output.LineDirection / output.Length : float2(1, 0);
+	float3 worldLine = instance.End - instance.Start;
+	float worldLineLength = length(worldLine);
+	worldLine = worldLineLength > 1e-7 ? worldLine / worldLineLength : float3(1, 0, 0);
+	output.Start = instance.Start - CameraPosition;
+	output.Direction = worldLine;
+	output.Length = worldLineLength;
 	output.Color = UnpackR11G11B10_UNorm(instance.PackedColor);
-
+	//How wide is a pixel at this vertex, approximately?
 	//Convert the vertex id to local box coordinates.
 	//Note that this id->coordinate transformation requires consistency with the index buffer
 	//to ensure proper triangle winding. A set bit in a given position makes it higher along the axis.
 	//So vertexId&1 == 1 => +x, vertexId&2 == 2 => +y, and vertexId&4 == 4 => +z.
 	float3 boxCoordinates = float3(vertexId & 1, (vertexId & 2) >> 1, (vertexId & 4) >> 2);
-	float3 worldLine = instance.End - instance.Start;
-	float worldLineLength = length(worldLine);
-	worldLine = worldLineLength > 1e-7 ? worldLine / worldLineLength : float3(1, 0, 0);
+	float3 endpoint = boxCoordinates.z > 0 ? instance.End : instance.Start;
+	//Note that distance is used instead of z. Resizing lines based on camera orientation is a bit odd.
+	float distance = length(endpoint - CameraPosition);
+	float pixelSize = distance * TanAnglePerPixel;
+	output.PixelSize = pixelSize;
+
+
 	float3 worldLineX = cross(CameraForward, worldLine);
 	float worldLineXLength = length(worldLineX);
 	if (worldLineXLength < 1e-7)
@@ -78,11 +75,6 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	}
 	worldLineX /= worldLineXLength;
 	float3 worldLineY = cross(worldLine, worldLineX);
-	//How wide is a pixel at this vertex, approximately?
-	float3 endpoint = boxCoordinates.z > 0 ? instance.End : instance.Start;
-	//Note that distance is used instead of z. Resizing lines based on camera orientation is a bit odd.
-	float distance = length(endpoint - CameraPosition);
-	float pixelSize = distance * TanAnglePerPixel;
 	//Use the pixel size in world space to pad out the bounding box.
 	const float paddingInPixels = OuterRadius + SampleRadius;
 
@@ -95,6 +87,7 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 		instance.Start - paddingZ;
 	position += (boxCoordinates.x * 2 - 1) * paddingX;
 	position += (boxCoordinates.y * 2 - 1) * paddingY;
+	output.ToBox = position - CameraPosition;
 	output.Position = mul(float4(position, 1), ViewProjection);
 	return output;
 	//A couple of notes:
@@ -110,19 +103,34 @@ struct PSOutput
 	float3 Color : SV_Target0;
 };
 
-
-
 PSOutput PSMain(PSInput input)
 {
 	PSOutput output;
-	//Measure the distance from the line in screen pixels. First, compute the closest point.
-	float2 perp = float2(-input.LineDirection.y, input.LineDirection.x);
-	float2 offset = input.Position.xy - input.Start;
-	float alongLine = clamp(dot(offset, input.LineDirection), 0, input.Length);
-	float lineDistance = length(offset - alongLine * input.LineDirection);
+	//Treat the view ray as a plane. Construct the plane's normal from the rayDirection and vector of closest approach between the two lines (lineDirection x rayDirection).
+	//The plane normal is:
+	//N = rayDirection x (lineDirection x rayDirection) / ||lineDirection x rayDirection||
+	//(The vector triple product has some identities, but bleh.)
+	//tLine = dot(lineStart - origin, N) / -dot(N, lineDirection)
+	//Doing some algebra and noting that the origin is 0 here, that becomes:
+	//tLine = dot(lineStart, rayDirection x (lineDirection x rayDirection)) / -||lineDirection x rayDirection||^2
 
-	float innerDistance = lineDistance - InnerRadius;
-	float outerDistance = lineDistance - OuterRadius;
+	float3 rayDirection = input.ToBox;
+	float3 lineCrossRay = cross(input.Direction, rayDirection);
+	float3 numer = cross(rayDirection, lineCrossRay);
+	float denom = -dot(lineCrossRay, lineCrossRay);
+	//If the lines are parallel, just use the line start.
+	float tLine = denom > -1e-7f ? 0 : dot(input.Start, numer) / denom;
+
+	//The true tLine must be from 0 to lineLength.
+	tLine = clamp(tLine, 0, input.Length);
+
+	float3 closestOnLine = input.Start + tLine * input.Direction;
+	float3 closestOnRay = rayDirection * (dot(closestOnLine, rayDirection) / dot(rayDirection, rayDirection));
+	float lineDistance = distance(closestOnRay, closestOnLine);
+	float lineScreenDistance = lineDistance / input.PixelSize;
+
+	float innerDistance = lineScreenDistance - InnerRadius;
+	float outerDistance = lineScreenDistance - OuterRadius;
 	//This distance is measured in screen pixels. Treat every pixel as having a set radius.
 	//If the line's distance is beyond the sample radius, then there is zero coverage.
 	//If the distance is 0, then the sample is half covered.
@@ -131,5 +139,6 @@ PSOutput PSMain(PSInput input)
 	float outerColorScale = saturate(0.5 - outerDistance / (SampleRadius * 2));
 	//TODO: For now, don't bother using a falloff on the outer radius.
 	output.Color = input.Color * innerColorScale + 1 - innerColorScale;
+	//output.Color = 0;
 	return output;
 }
