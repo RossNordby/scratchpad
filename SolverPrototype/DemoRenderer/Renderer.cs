@@ -71,6 +71,7 @@ namespace DemoRenderer
             OnResize();
             var rasterizerStateDescription = RasterizerStateDescription.Default();
             rasterizerStateDescription.IsFrontCounterClockwise = true;
+            rasterizerStateDescription.CullMode = CullMode.None;
             rasterizerState = new RasterizerState(Surface.Device, rasterizerStateDescription);
             rasterizerState.DebugName = "Default Rasterizer State";
 

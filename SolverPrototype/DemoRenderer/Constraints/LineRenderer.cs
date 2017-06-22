@@ -54,10 +54,10 @@ namespace DemoRenderer.Constraints
         VertexShader vertexShader;
         PixelShader pixelShader;
 
-        public LineRenderer(Device device, ShaderCache cache, int maximumInstancesPerDraw = 2048)
+        public LineRenderer(Device device, ShaderCache cache, int maximumInstancesPerDraw = 8192)
         {
             instances = new StructuredBuffer<LineInstance>(device, maximumInstancesPerDraw, "Line Instances");
-            indices = new IndexBuffer(Helpers.GetQuadIndices(maximumInstancesPerDraw), device, "Line Quad Indices");
+            indices = new IndexBuffer(Helpers.GetBoxIndices(maximumInstancesPerDraw), device, "Line Quad Indices");
 
             vertexConstants = new ConstantsBuffer<VertexConstants>(device, debugName: "Line Renderer Vertex Constants");
 
@@ -91,7 +91,7 @@ namespace DemoRenderer.Constraints
             {
                 var batchCount = Math.Min(this.instances.Capacity, count);
                 this.instances.Update(context, instances, batchCount, start);
-                context.DrawIndexed(batchCount * 6, 0, 0);
+                context.DrawIndexed(batchCount * 36, 0, 0);
                 count -= batchCount;
                 start += batchCount;
             }

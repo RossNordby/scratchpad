@@ -38,7 +38,7 @@ struct PSInput
 #define SampleRadius 0.70710678118
 PSInput VSMain(uint vertexId : SV_VertexId)
 {
-	int instanceId = vertexId >> 2;
+	int instanceId = vertexId >> 3;
 	LineInstance instance = Instances[instanceId];
 	PSInput output;
 
@@ -47,8 +47,8 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	float4 start = mul(float4(instance.Start, 1), ViewProjection);
 	float4 end = mul(float4(instance.End, 1), ViewProjection);
 	//Keep the z and w components unmodified. They'll be brought back to compute the vertex position.
-	start.xy /= start.w;
-	end.xy /= end.w;
+	start.xy /= start.w * sign(start.z);
+	end.xy /= end.w * sign(end.z);
 	//Now in NDC. Scale x and y to screenspace.
 	output.Start = float2(
 		start.x * NDCToScreenScale.x + NDCToScreenScale.x,
@@ -61,28 +61,40 @@ PSInput VSMain(uint vertexId : SV_VertexId)
 	output.LineDirection = output.Length > 1e-5 ? output.LineDirection / output.Length : float2(1, 0);
 	output.Color = UnpackR11G11B10_UNorm(instance.PackedColor);
 
-	//Build the quad vertices in screenspace, padded by 1 pixel on each side. 
-	float2 quadCoordinates = float2(vertexId & 1, (vertexId & 2) >> 1);
-	float3 worldLineX = instance.End - instance.Start;
-	worldLineX -= CameraForward * dot(CameraForward, worldLineX);
+	//Convert the vertex id to local box coordinates.
+	//Note that this id->coordinate transformation requires consistency with the index buffer
+	//to ensure proper triangle winding. A set bit in a given position makes it higher along the axis.
+	//So vertexId&1 == 1 => +x, vertexId&2 == 2 => +y, and vertexId&4 == 4 => +z.
+	float3 boxCoordinates = float3(vertexId & 1, (vertexId & 2) >> 1, (vertexId & 4) >> 2);
+	float3 worldLine = instance.End - instance.Start;
+	float worldLineLength = length(worldLine);
+	worldLine = worldLineLength > 1e-7 ? worldLine / worldLineLength : float3(1, 0, 0);
+	float3 worldLineX = cross(CameraForward, worldLine);
 	float worldLineXLength = length(worldLineX);
-	worldLineX = worldLineXLength > 1e-5 ? worldLineX / worldLineXLength : CameraRight;
+	if (worldLineXLength < 1e-7)
+	{
+		worldLineX = cross(CameraRight, worldLine);
+		worldLineXLength = length(worldLineX);
+	}
+	worldLineX /= worldLineXLength;
+	float3 worldLineY = cross(worldLine, worldLineX);
 	//How wide is a pixel at this vertex, approximately?
-	float3 endpoint = quadCoordinates.x > 0 ? instance.End : instance.Start;
+	float3 endpoint = boxCoordinates.z > 0 ? instance.End : instance.Start;
 	//Note that distance is used instead of z. Resizing lines based on camera orientation is a bit odd.
 	float distance = length(endpoint - CameraPosition);
 	float pixelSize = distance * TanAnglePerPixel;
-	//Use the pixel size in world space to pad the quad.
+	//Use the pixel size in world space to pad out the bounding box.
 	const float paddingInPixels = OuterRadius + SampleRadius;
-	//Points down in screenspace by convention to match UI line stuff.
-	float3 worldLineY = cross(CameraForward, worldLineX);
 
 	float worldPadding = paddingInPixels * pixelSize;
-	float3 horizontalPadding = worldPadding * worldLineX;
-	float3 position = quadCoordinates.x > 0 ? 
-		instance.End + horizontalPadding :
-		instance.Start - horizontalPadding;
-	position += (quadCoordinates.y * 2 - 1) * (worldPadding * worldLineY);
+	float3 paddingX = worldPadding * worldLineX;
+	float3 paddingY = worldPadding * worldLineY;
+	float3 paddingZ = worldPadding * worldLine;
+	float3 position = boxCoordinates.z > 0 ?
+		instance.End + paddingZ :
+		instance.Start - paddingZ;
+	position += (boxCoordinates.x * 2 - 1) * paddingX;
+	position += (boxCoordinates.y * 2 - 1) * paddingY;
 	output.Position = mul(float4(position, 1), ViewProjection);
 	return output;
 	//A couple of notes:

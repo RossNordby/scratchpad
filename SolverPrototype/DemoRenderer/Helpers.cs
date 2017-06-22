@@ -102,7 +102,68 @@ namespace DemoRenderer
             }
             return indexData;
         }
-
+        /// <summary>
+        /// Creates an index buffer of the specified size for boxes.
+        /// </summary>
+        /// <param name="quadCount">Number of boxes to create indices for.</param>
+        /// <returns>Index buffer for boxes.</returns> 
+        /// <remarks>Using redundant indices for batches avoids a slow path for low triangle count instancing. This is hardware/driver specific; it may change on newer cards.</remarks>
+        public static uint[] GetBoxIndices(int boxCount)
+        {
+            //Build a AABB mesh's index buffer, repeated. A redundant index buffer tends to be faster than instancing tiny models. Impact varies between hardware.
+            var indexData = new uint[boxCount * 36];
+            uint baseVertex = 0;
+            for (int glyphIndexStart = 0; glyphIndexStart < indexData.Length; glyphIndexStart += 36)
+            {
+                //Note that the order and winding is important and must be consistent with the RenderSpheres.hlsl VS usage.
+                //It assumes that an unset bit in the 3-bit string of the vertex id corresponds to the minimum position: 
+                //vertex id 0 becomes (-1, -1, -1), while vertex id 7 becomes (1, 1, 1).
+                //-X
+                indexData[glyphIndexStart + 0] = baseVertex + 0;
+                indexData[glyphIndexStart + 1] = baseVertex + 4;
+                indexData[glyphIndexStart + 2] = baseVertex + 6;
+                indexData[glyphIndexStart + 3] = baseVertex + 6;
+                indexData[glyphIndexStart + 4] = baseVertex + 2;
+                indexData[glyphIndexStart + 5] = baseVertex + 0;
+                //+X
+                indexData[glyphIndexStart + 6] = baseVertex + 5;
+                indexData[glyphIndexStart + 7] = baseVertex + 1;
+                indexData[glyphIndexStart + 8] = baseVertex + 3;
+                indexData[glyphIndexStart + 9] = baseVertex + 3;
+                indexData[glyphIndexStart + 10] = baseVertex + 7;
+                indexData[glyphIndexStart + 11] = baseVertex + 5;
+                //-Y
+                indexData[glyphIndexStart + 12] = baseVertex + 0;
+                indexData[glyphIndexStart + 13] = baseVertex + 1;
+                indexData[glyphIndexStart + 14] = baseVertex + 5;
+                indexData[glyphIndexStart + 15] = baseVertex + 5;
+                indexData[glyphIndexStart + 16] = baseVertex + 4;
+                indexData[glyphIndexStart + 17] = baseVertex + 0;
+                //+Y
+                indexData[glyphIndexStart + 18] = baseVertex + 2;
+                indexData[glyphIndexStart + 19] = baseVertex + 6;
+                indexData[glyphIndexStart + 20] = baseVertex + 7;
+                indexData[glyphIndexStart + 21] = baseVertex + 7;
+                indexData[glyphIndexStart + 22] = baseVertex + 3;
+                indexData[glyphIndexStart + 23] = baseVertex + 2;
+                //-Z
+                indexData[glyphIndexStart + 24] = baseVertex + 1;
+                indexData[glyphIndexStart + 25] = baseVertex + 0;
+                indexData[glyphIndexStart + 26] = baseVertex + 2;
+                indexData[glyphIndexStart + 27] = baseVertex + 2;
+                indexData[glyphIndexStart + 28] = baseVertex + 3;
+                indexData[glyphIndexStart + 29] = baseVertex + 1;
+                //+Z
+                indexData[glyphIndexStart + 30] = baseVertex + 4;
+                indexData[glyphIndexStart + 31] = baseVertex + 5;
+                indexData[glyphIndexStart + 32] = baseVertex + 7;
+                indexData[glyphIndexStart + 33] = baseVertex + 7;
+                indexData[glyphIndexStart + 34] = baseVertex + 6;
+                indexData[glyphIndexStart + 35] = baseVertex + 4;
+                baseVertex += 8;
+            }
+            return indexData;
+        }
         /// <summary>
         /// Packs an RGB color in a UNORM manner such that bits 0 through 10 are R, bits 11 through 21 are G, and bits 22 through 31 are B. 
         /// </summary>
