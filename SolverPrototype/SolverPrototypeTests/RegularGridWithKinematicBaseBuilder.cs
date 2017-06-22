@@ -7,10 +7,12 @@ namespace SolverPrototypeTests
     {
         public Vector3 Spacing;
         public Vector3 Origin;
-        public RegularGridWithKinematicBaseBuilder(Vector3 spacing, Vector3 origin)
+        public float InverseInertiaMultiplier;
+        public RegularGridWithKinematicBaseBuilder(Vector3 spacing, Vector3 origin, int inverseInertiaMultiplier = 0)
         {
             Spacing = spacing;
             Origin = origin;
+            InverseInertiaMultiplier = inverseInertiaMultiplier;
         }
 
         public void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription)
@@ -24,6 +26,10 @@ namespace SolverPrototypeTests
                 },
                 LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 }
             };
+            var inverseInertia = bodyDescription.LocalInertia.InverseMass * InverseInertiaMultiplier;
+            bodyDescription.LocalInertia.InverseInertiaTensor.M11 = inverseInertia;
+            bodyDescription.LocalInertia.InverseInertiaTensor.M22 = inverseInertia;
+            bodyDescription.LocalInertia.InverseInertiaTensor.M33 = inverseInertia;
 
         }
     }
