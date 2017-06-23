@@ -6,52 +6,12 @@ using DemoUtilities;
 using OpenTK.Input;
 using System;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
 namespace SolverPrototypeTests
 {
-    public struct Controls
-    {
-        public Key MoveForward;
-        public Key MoveBackward;
-        public Key MoveLeft;
-        public Key MoveRight;
-        public Key MoveUp;
-        public Key MoveDown;
-        public float MouseSensitivity;
-        public float CameraMoveSpeed;
-
-        public Key LockMouse;
-        public Key Exit;
-        public Key ChangeTimingDisplayMode;
-        public Key ShowControls;
-
-        public static Controls Default
-        {
-            get
-            {
-                return new Controls
-                {
-                    MoveForward = Key.W,
-                    MoveBackward = Key.S,
-                    MoveLeft = Key.A,
-                    MoveRight = Key.D,
-                    MoveDown = Key.ControlLeft,
-                    MoveUp = Key.ShiftLeft,
-                    MouseSensitivity = 3e-3f,
-                    CameraMoveSpeed = 5,
-
-                    LockMouse = Key.Tab,
-                    Exit = Key.Escape,
-                    ChangeTimingDisplayMode = Key.F2,
-                    ShowControls = Key.F1,
-                };
-            }
-
-        }
-    }
-
     public class DemoHarness : IDisposable
     {
         Window window;
@@ -168,33 +128,82 @@ namespace SolverPrototypeTests
             UpdateTimingGraphForMode(timingDisplayMode);
         }
 
+        enum CameraMoveSpeedState
+        {
+            Regular,
+            Slow,
+            Fast
+        }
+        CameraMoveSpeedState cameraSpeedState;
+
         public void Update(float dt)
         {
             //Don't bother responding to input if the window isn't focused.
             if (window.Focused)
             {
-                if (input.WasPushed(controls.Exit))
+                if (controls.Exit.WasTriggered(input))
                 {
                     window.Close();
                     return;
                 }
 
+                if (controls.MoveFaster.WasTriggered(input))
+                {
+                    switch (cameraSpeedState)
+                    {
+                        case CameraMoveSpeedState.Slow:
+                            cameraSpeedState = CameraMoveSpeedState.Regular;
+                            break;
+                        case CameraMoveSpeedState.Regular:
+                            cameraSpeedState = CameraMoveSpeedState.Fast;
+                            break;
+                    }
+                }
+                if (controls.MoveSlower.WasTriggered(input))
+                {
+                    switch (cameraSpeedState)
+                    {
+                        case CameraMoveSpeedState.Regular:
+                            cameraSpeedState = CameraMoveSpeedState.Slow;
+                            break;
+                        case CameraMoveSpeedState.Fast:
+                            cameraSpeedState = CameraMoveSpeedState.Regular;
+                            break;
+                    }
+                }
+
                 var cameraOffset = new Vector3();
-                if (input.IsDown(controls.MoveForward))
+                if (controls.MoveForward.IsDown(input))
                     cameraOffset += camera.Forward;
-                if (input.IsDown(controls.MoveBackward))
+                if (controls.MoveBackward.IsDown(input))
                     cameraOffset += camera.Backward;
-                if (input.IsDown(controls.MoveLeft))
+                if (controls.MoveLeft.IsDown(input))
                     cameraOffset += camera.Left;
-                if (input.IsDown(controls.MoveRight))
+                if (controls.MoveRight.IsDown(input))
                     cameraOffset += camera.Right;
-                if (input.IsDown(controls.MoveUp))
+                if (controls.MoveUp.IsDown(input))
                     cameraOffset += camera.Up;
-                if (input.IsDown(controls.MoveDown))
+                if (controls.MoveDown.IsDown(input))
                     cameraOffset += camera.Down;
                 var length = cameraOffset.Length();
+
                 if (length > 1e-7f)
-                    cameraOffset *= dt * controls.CameraMoveSpeed / length;
+                {
+                    float cameraMoveSpeed;
+                    switch (cameraSpeedState)
+                    {
+                        case CameraMoveSpeedState.Slow:
+                            cameraMoveSpeed = controls.CameraSlowMoveSpeed;
+                            break;
+                        case CameraMoveSpeedState.Fast:
+                            cameraMoveSpeed = controls.CameraFastMoveSpeed;
+                            break;
+                        default:
+                            cameraMoveSpeed = controls.CameraMoveSpeed;
+                            break;
+                    }
+                    cameraOffset *= dt * cameraMoveSpeed / length;
+                }
                 else
                     cameraOffset = new Vector3();
                 camera.Position += cameraOffset;
@@ -207,17 +216,17 @@ namespace SolverPrototypeTests
                         camera.Pitch += delta.Y * controls.MouseSensitivity;
                     }
                 }
-                if (input.WasPushed(controls.LockMouse))
+                if (controls.LockMouse.WasTriggered(input))
                 {
                     input.MouseLocked = !input.MouseLocked;
                 }
 
-                if (input.WasPushed(controls.ShowControls))
+                if (controls.ShowControls.WasTriggered(input))
                 {
                     showControls = !showControls;
                 }
 
-                if (input.WasPushed(controls.ChangeTimingDisplayMode))
+                if (controls.ChangeTimingDisplayMode.WasTriggered(input))
                 {
                     var newDisplayMode = (int)timingDisplayMode + 1;
                     if (newDisplayMode > 2)
@@ -250,7 +259,7 @@ namespace SolverPrototypeTests
             if (showControls)
             {
                 var penPosition = new Vector2(window.Resolution.X - textHeight * 6 - 25, window.Resolution.Y - 25);
-                penPosition.Y -= 10 * lineSpacing;
+                penPosition.Y -= 12 * lineSpacing;
                 uiText.Clear().Append("Controls: ");
                 var headerHeight = textHeight * 1.2f;
                 renderer.TextBatcher.Write(uiText, penPosition - new Vector2(0.5f * GlyphBatch.MeasureLength(uiText, font, headerHeight), 0), headerHeight, textColor, font);
@@ -259,41 +268,30 @@ namespace SolverPrototypeTests
                 var controlPosition = penPosition;
                 controlPosition.X += textHeight * 0.5f;
 
-                void WriteName(string controlName)
+                void WriteName(string controlName, string control)
                 {
                     uiText.Clear().Append(controlName).Append(":");
                     renderer.TextBatcher.Write(uiText, penPosition - new Vector2(GlyphBatch.MeasureLength(uiText, font, textHeight), 0), textHeight, textColor, font);
                     penPosition.Y += lineSpacing;
-                }
 
-                WriteName(nameof(controls.MoveForward));
-                WriteName(nameof(controls.MoveBackward));
-                WriteName(nameof(controls.MoveLeft));
-                WriteName(nameof(controls.MoveRight));
-                WriteName(nameof(controls.MoveUp));
-                WriteName(nameof(controls.MoveDown));
-                WriteName(nameof(controls.LockMouse));
-                WriteName(nameof(controls.Exit));
-                WriteName(nameof(controls.ChangeTimingDisplayMode));
-                WriteName(nameof(controls.ShowControls));
-
-                void WriteControl(string control)
-                {
                     uiText.Clear().Append(control);
                     renderer.TextBatcher.Write(uiText, controlPosition, textHeight, textColor, font);
                     controlPosition.Y += lineSpacing;
                 }
+
                 //Conveniently, enum strings are cached. Every (Key).ToString() returns the same reference for the same key, so no garbage worries.
-                WriteControl(controls.MoveForward.ToString());
-                WriteControl(controls.MoveBackward.ToString());
-                WriteControl(controls.MoveLeft.ToString());
-                WriteControl(controls.MoveRight.ToString());
-                WriteControl(controls.MoveUp.ToString());
-                WriteControl(controls.MoveDown.ToString());
-                WriteControl(controls.LockMouse.ToString());
-                WriteControl(controls.Exit.ToString());
-                WriteControl(controls.ChangeTimingDisplayMode.ToString());
-                WriteControl(controls.ShowControls.ToString());
+                WriteName(nameof(controls.MoveForward), controls.MoveForward.ToString());
+                WriteName(nameof(controls.MoveBackward), controls.MoveBackward.ToString());
+                WriteName(nameof(controls.MoveLeft), controls.MoveLeft.ToString());
+                WriteName(nameof(controls.MoveRight), controls.MoveRight.ToString());
+                WriteName(nameof(controls.MoveUp), controls.MoveUp.ToString());
+                WriteName(nameof(controls.MoveDown), controls.MoveDown.ToString());
+                WriteName(nameof(controls.MoveSlower), controls.MoveSlower.ToString());
+                WriteName(nameof(controls.MoveFaster), controls.MoveFaster.ToString());
+                WriteName(nameof(controls.LockMouse), controls.LockMouse.ToString());
+                WriteName(nameof(controls.Exit), controls.Exit.ToString());
+                WriteName(nameof(controls.ChangeTimingDisplayMode), controls.ChangeTimingDisplayMode.ToString());
+                WriteName(nameof(controls.ShowControls), controls.ShowControls.ToString());
             }
             else
             {

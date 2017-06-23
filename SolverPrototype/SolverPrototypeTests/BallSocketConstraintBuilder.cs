@@ -24,7 +24,7 @@ namespace SolverPrototypeTests
             description.SpringSettings = new SpringSettingsAOS
             {
                 NaturalFrequency = (float)(Math.PI * .5f * 60),
-                DampingRatio = 0.25f
+                DampingRatio = 5000.25f
             };
         }
         static void TryConnectTo(int sliceIndex, int rowIndex, int columnIndex,

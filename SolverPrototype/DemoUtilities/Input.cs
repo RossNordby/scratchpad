@@ -56,6 +56,18 @@ namespace DemoUtilities
             }
         }
 
+        /// <summary>
+        /// Gets the amount of upward mouse wheel scrolling since the last flush regardless of how much downward scrolling occurred.
+        /// </summary>
+        public float ScrolledUp { get; private set; }
+        /// <summary>
+        /// Gets the amount of downward mouse wheel scrolling since the last flush regardless of how much upward scrolling occurred.
+        /// </summary>
+        public float ScrolledDown { get; private set; }
+        /// <summary>
+        /// Gets the mouse wheel scroll delta since the last flush.
+        /// </summary>
+        public float ScrollDelta {  get { return ScrolledUp + ScrolledDown; } }
 
         public Input(Window window)
         {
@@ -64,8 +76,16 @@ namespace DemoUtilities
             this.window.KeyUp += KeyUp;
             this.window.MouseDown += MouseDown;
             this.window.MouseUp += MouseUp;
+            this.window.MouseWheel += MouseWheel;
         }
 
+        private void MouseWheel(object sender, MouseWheelEventArgs e)
+        {
+            if (e.DeltaPrecise > 0)
+                ScrolledUp += e.DeltaPrecise;
+            else
+                ScrolledDown += e.DeltaPrecise;
+        }
 
         private void MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -180,6 +200,8 @@ namespace DemoUtilities
             previousDownedButtons.Clear();
             previousDownedKeys.UnionWith(downedKeys);
             previousDownedButtons.UnionWith(downedButtons);
+            ScrolledDown = 0;
+            ScrolledUp = 0;
         }
 
         /// <summary>
