@@ -3,6 +3,7 @@ using System.Diagnostics;
 using OpenTK;
 using BEPUutilities2;
 using OpenTK.Graphics;
+using System.Threading;
 
 namespace DemoUtilities
 {
@@ -31,7 +32,7 @@ namespace DemoUtilities
             set
             {
                 switch (value)
-                {                    
+                {
                     case WindowMode.FullScreen:
                         if (windowMode != WindowMode.FullScreen)
                         {
@@ -135,7 +136,11 @@ namespace DemoUtilities
                 }
                 if (resized)
                 {
-                    onResize(new Int2(window.Width, window.Height));
+                    //Note that minimizing or resizing the window to invalid sizes don't result in actual resize attempts. Zero width rendering surfaces aren't allowed.
+                    if (window.Width > 0 && window.Height > 0)
+                    {
+                        onResize(new Int2(window.Width, window.Height));
+                    }
                     resized = false;
                 }
                 window.ProcessEvents();
@@ -144,7 +149,15 @@ namespace DemoUtilities
                 var dt = (float)((time - previousTime) / (double)Stopwatch.Frequency);
                 previousTime = time;
 
-                updateHandler(dt);
+                if (window.WindowState != WindowState.Minimized)
+                {
+                    updateHandler(dt);
+                }
+                else
+                {
+                    //If the window is minimized, take a breather.
+                    Thread.Sleep(1);
+                }
             }
             windowUpdateLoopRunning = false;
         }

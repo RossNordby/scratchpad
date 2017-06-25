@@ -86,6 +86,10 @@ namespace SolverPrototype
                 //However, if we detect contacts from a predicted transform, this mostly goes out the window.
                 //2) There is no need for a second 'force application' stage before the AABB update. Realistically, the force application would be bundled into the AABB update.
                 //3) Advanced users are free to trivially intervene in the velocity modifications caused by constraints before they are integrated. (A callback would be just as good.)
+                //4) PoseIntegrator->AABBUpdate allows the pose/velocity information required by pose integration to remain in LLC for use by AABB update.
+                //Having collision detection and the solver in between would likely evict pose and velocity on larger simulations. Given that we assume that the cache is evicted
+                //in between frames, the AABB->coldet->solve->poseintegrate could end up paying the cost of pose/velocity loads twice. It's not THAT bad, but it's not free- 
+                //about 0.15-0.25ms on a simulation with 32768 bodies.
                 //And one big con:
                 //If you modify velocity outside of the update, it will be directly used to integrate position during the next frame, ignoring all constraints.
                 //This WILL be a problem, especially since BEPUphysics v1 trained people to use velocity modifications to control motion.
@@ -95,10 +99,13 @@ namespace SolverPrototype
 
                 //TODO:
                 //I suspect that splitting the gravity application from this integrator will be the right choice in the end. Bundling it with AABB calculation would free
-                //up the integrator to be placed on either end of execution without worrying about odd velocities being visible in resting objects, and there is basically no downside. 
+                //up the integrator to be placed on either end of execution without worrying about odd velocities being visible in resting objects.
                 //(Note that the AABB calculation must sample both pose and velocity, so there's no additional bandwidth used.)
                 //You could then provide different update orders. People could use the position-first or position-last variant as desired.
                 //Whatever handles gravity will also probably end up handling drag.
+                //Note that if we choose to SIMDify AABB calculation, we can't actually do it here. Bodies are not bundled for AABB calculation (nor should they be-
+                //efficient constraint access is far more important.) We'd have to have collidable type batches which gather shape, pose, and velocity before computing AABBs,
+                //and then they'd scatter that out to the broadphase.
 
                 //Note that we avoid accelerating kinematics. Kinematics are any body with an inverse mass of zero (so a mass of ~infinity). No force can move them.
                 Vector3Wide.Add(ref gravityDt, ref velocity.LinearVelocity, out var acceleratedLinearVelocity);

@@ -168,7 +168,7 @@ namespace SolverPrototype
                 ProfilerStart(SolverBatchCompressor);
                 SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
                 ProfilerEnd(SolverBatchCompressor);
-
+                
                 ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt, threadDispatcher);
                 ProfilerEnd(PoseIntegrator);
