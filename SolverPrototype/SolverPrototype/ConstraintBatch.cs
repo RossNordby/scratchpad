@@ -43,7 +43,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public T GetTypeBatch<T>() where T : TypeBatch
         {
-            var typeBatchIndex = TypeIndexToTypeBatchIndex[ConstraintTypeIds.GetId<T>()];
+            var typeBatchIndex = TypeIndexToTypeBatchIndex[TypeIds<TypeBatch>.GetId<T>()];
             var typeBatch = TypeBatches[typeBatchIndex];
             Debug.Assert(typeof(T) == TypeBatches[typeBatchIndex].GetType(), "If the type batch we have stored for this index isn't of the expected type, then something is broken.");
             return Unsafe.As<TypeBatch, T>(ref typeBatch);
@@ -93,7 +93,7 @@ namespace SolverPrototype
                 }
                 else
                 {
-                    Debug.Assert(ConstraintTypeIds.GetType(typeId) == TypeBatches[typeBatchIndex].GetType());
+                    Debug.Assert(TypeIds<TypeBatch>.GetType(typeId) == TypeBatches[typeBatchIndex].GetType());
                     return TypeBatches[typeBatchIndex];
                 }
             }

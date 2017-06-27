@@ -14,7 +14,7 @@ namespace SolverPrototypeTests
     {
         public void RegisterConstraintTypes()
         {
-            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
+            TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
         }
         static void CreateManifoldConstraint(ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ, out ContactManifold4Constraint description)
         {

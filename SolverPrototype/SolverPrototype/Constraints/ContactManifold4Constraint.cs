@@ -151,7 +151,7 @@ namespace SolverPrototype.Constraints
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return ConstraintTypeIds.GetId<ContactManifold4TypeBatch>();
+                return TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>();
             }
         }
     }

@@ -7,38 +7,46 @@ using System.Runtime.CompilerServices;
 namespace SolverPrototype
 {
     /// <summary>
+    /// Helper class to register the default types of constraints and shapes with the engine.
+    /// </summary>
+    public static class DefaultTypes
+    {
+        /// <summary>
+        /// Registers the set of shapes constraints that are packaged in the engine.
+        /// </summary>
+        public static void Register()
+        {
+            TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
+            TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
+        }
+    }
+
+    /// <summary>
     /// Handles the registration and retrieval of type ids for constraint batch types.
     /// </summary>
+    /// <typeparam name="TTypeParent">Parent type of types registered in this type id set.</typeparam>
     /// <remarks>
     /// Nothing in this class is thread safe. It is assumed that calls to Register, Clear, and GetId are always safely synchronized.
     /// </remarks>
-    public static class ConstraintTypeIds
+    public static class TypeIds<TTypeParent>
     {
         static class Ids<T>
         {
             internal static int Id;
         }
 
-        static List<Type> registeredBatchTypes = new List<Type>();
+        static List<Type> registeredTypes = new List<Type>();
+
 
         /// <summary>
-        /// Registers the set of constraints that are packaged in the engine.
+        /// Gets the number of types that have been registered.
         /// </summary>
-        public static void RegisterDefaults()
-        {
-            Register<BallSocketTypeBatch>();
-            Register<ContactManifold4TypeBatch>();
-        }
-
-        /// <summary>
-        /// Gets the number of constraint type batch types that have been registered.
-        /// </summary>
-        public static int RegisteredTypeCount { get { return registeredBatchTypes.Count; } }
+        public static int RegisteredTypeCount { get { return registeredTypes.Count; } }
 
         [Conditional("DEBUG")]
         static void ValidateType<T>()
         {
-            Debug.Assert(registeredBatchTypes.Contains(typeof(T)), "Type must exist in the constraint type set.");
+            Debug.Assert(registeredTypes.Contains(typeof(T)), "Type must exist in the constraint type set.");
         }
         /// <summary>
         /// Gets the id associated with the given type.
@@ -47,7 +55,7 @@ namespace SolverPrototype
         /// <returns>Id of the given type.</returns>
         /// <remarks>Not thread safe with calls to Reset, Register, or ChangeMinimumCapacity. All changes to registration should be be performed outside of any usage.</remarks>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int GetId<T>() where T : TypeBatch
+        public static int GetId<T>() where T : TTypeParent
         {
             ValidateType<T>();
             return Ids<T>.Id;
@@ -61,8 +69,8 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Type GetType(int typeId)
         {
-            Debug.Assert(typeId >= 0 && typeId < registeredBatchTypes.Count);
-            return registeredBatchTypes[typeId];
+            Debug.Assert(typeId >= 0 && typeId < registeredTypes.Count);
+            return registeredTypes[typeId];
         }
 
         /// <summary>
@@ -72,7 +80,7 @@ namespace SolverPrototype
         /// <returns>Id of the given type if it was registered. -1 otherwise.</returns>
         public static int GetId(Type type)
         {
-            return registeredBatchTypes.IndexOf(type);
+            return registeredTypes.IndexOf(type);
         }
         
         /// <summary>
@@ -80,17 +88,17 @@ namespace SolverPrototype
         /// </summary>
         /// <typeparam name="T">Type to register.</typeparam>
         /// <returns>Id associated with the type.</returns>
-        public static int Register<T>() where T : TypeBatch, new()
+        public static int Register<T>() where T : TTypeParent, new()
         {
             var newType = typeof(T);
-            var index = registeredBatchTypes.IndexOf(newType);
+            var index = registeredTypes.IndexOf(newType);
             if (index > -1)
             {
                 Debug.Assert(Ids<T>.Id == index);
                 return index;
             }
-            index = registeredBatchTypes.Count;
-            registeredBatchTypes.Add(newType);
+            index = registeredTypes.Count;
+            registeredTypes.Add(newType);
             Ids<T>.Id = index;
             return index;
         }
@@ -100,7 +108,7 @@ namespace SolverPrototype
         /// </summary>
         public static void Clear()
         {
-            registeredBatchTypes.Clear();
+            registeredTypes.Clear();
         }
 
     }

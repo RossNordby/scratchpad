@@ -66,8 +66,8 @@ namespace DemoRenderer.Constraints
         public LineExtractor(int initialLineCapacity = 8192)
         {
             QuickList<LineInstance, Array<LineInstance>>.Create(new PassthroughArrayPool<LineInstance>(), initialLineCapacity, out lines);
-            lineExtractors = new TypeLineExtractor[ConstraintTypeIds.RegisteredTypeCount];
-            lineExtractors[ConstraintTypeIds.GetId<BallSocketTypeBatch>()] =
+            lineExtractors = new TypeLineExtractor[TypeIds<TypeBatch>.RegisteredTypeCount];
+            lineExtractors[TypeIds<TypeBatch>.GetId<BallSocketTypeBatch>()] =
                 new TypeLineExtractor<BallSocketLineExtractor, BallSocketTypeBatch, TwoBodyReferences, BallSocketPrestepData, BallSocketProjection, Vector3Wide>();
             QuickList<ThreadJob, Array<ThreadJob>>.Create(new PassthroughArrayPool<ThreadJob>(), Environment.ProcessorCount * (jobsPerThread + 1), out jobs);
         }

@@ -102,7 +102,7 @@ namespace SolverPrototype
             {
                 //The new constraint results in constructors being invoked with reflection at the moment, but we shouldn't be creating new type batches frequently.
                 //If you've got 32 constraint types and 128 batches, you'll need a total of 4096 invocations. It's a very small cost.               
-                pools[typeId] = new Pool<TypeBatch>(() => (TypeBatch)Activator.CreateInstance(ConstraintTypeIds.GetType(typeId)), cleaner: batch => batch.Dispose(BufferPool));
+                pools[typeId] = new Pool<TypeBatch>(() => (TypeBatch)Activator.CreateInstance(TypeIds<TypeBatch>.GetType(typeId)), cleaner: batch => batch.Dispose(BufferPool));
             }
             var typeBatch = pools[typeId].Take();
             //We didn't initialize it in the pool; do so here. (The pool COULD use an initializer, but, well, I didn't do that.)
@@ -119,7 +119,7 @@ namespace SolverPrototype
         {
             Validate(typeId);
             Debug.Assert(pools[typeId] != null, "Can't return something to a pool that doesn't exist.");
-            Debug.Assert(typeBatch.GetType() == ConstraintTypeIds.GetType(typeId), "Type of returned type batch and the type implied by the type id must match.");
+            Debug.Assert(typeBatch.GetType() == TypeIds<TypeBatch>.GetType(typeId), "Type of returned type batch and the type implied by the type id must match.");
             pools[typeId].Return(typeBatch);
         }
 

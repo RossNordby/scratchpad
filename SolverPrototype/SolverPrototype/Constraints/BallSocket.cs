@@ -18,7 +18,7 @@ namespace SolverPrototype.Constraints
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return ConstraintTypeIds.GetId<BallSocketTypeBatch>();
+                return TypeIds<TypeBatch>.GetId<BallSocketTypeBatch>();
             }
         }
 

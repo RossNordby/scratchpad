@@ -99,8 +99,8 @@ namespace SolverPrototypeTests
                 simulation.Add(ref bodyDescription);
             }
             var random = new Random(5);
-            ConstraintTypeIds.Register<ContactManifold4TypeBatch>();
-            ConstraintTypeIds.Register<BallSocketTypeBatch>();
+            TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
+            TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
             Test<ContactManifold4Constraint>(simulation, random, 2);
             Test<BallSocket>(simulation, random, 2);
 

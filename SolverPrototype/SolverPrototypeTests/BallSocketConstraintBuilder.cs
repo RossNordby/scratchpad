@@ -14,7 +14,7 @@ namespace SolverPrototypeTests
     {
         public void RegisterConstraintTypes()
         {
-            ConstraintTypeIds.Register<BallSocketTypeBatch>();
+            TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
         }
         static void CreateBallSocket(ref BodyPose a, ref BodyPose b, out BallSocket description)
         {

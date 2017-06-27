@@ -7,10 +7,13 @@ using DemoUtilities;
 using OpenTK;
 using OpenTK.Input;
 using SolverPrototype;
+using SolverPrototype.Collidables;
+using SolverPrototype.Constraints;
 using SolverPrototypeTests.Properties;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace SolverPrototypeTests
 {
@@ -19,9 +22,9 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             Console.ReadKey();
+            DefaultTypes.Register();
             var window = new Window("pretty cool multicolored window", 
                 new Int2((int)(DisplayDevice.Default.Width * 0.75f), (int)(DisplayDevice.Default.Height * 0.75f)), WindowMode.Windowed);
-            ConstraintTypeIds.RegisterDefaults();
             var loop = new GameLoop(window);
             ContentArchive content;
             using (var stream = new MemoryStream(Resources.SolverPrototypeTestsContent))
