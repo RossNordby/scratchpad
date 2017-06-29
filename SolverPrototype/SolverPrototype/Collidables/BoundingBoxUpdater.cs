@@ -44,8 +44,9 @@ namespace SolverPrototype.Collidables
             }
         }
 
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ExpandBoundingBoxes(ref Vector3Wide min, ref Vector3Wide max, ref BodyVelocities velocities, float dt, ref Vector<float> maximumRadius, ref Vector<float> maximumExpansion)
+        public static void ExpandBoundingBoxes(ref Vector3Wide min, ref Vector3Wide max, ref BodyVelocities velocities, float dt, ref Vector<float> maximumRadius, ref Vector<float> maximumExpansion)
         {
             /*
             If an object sitting on a plane had a raw (unexpanded) AABB that is just barely above the plane, no contacts would be generated. 
@@ -56,12 +57,12 @@ namespace SolverPrototype.Collidables
             1) Introduce an 'allowed penetration' so that objects can overlap a little bit. This tends to confuse people a little bit when they notice it, 
             and in some circumstances objects can be seen settling into the allowed penetration slowly. It looks a bit odd.
             2) Make contact constraints fight to maintain zero penetration depth, but expand the bounding box with velocity and allow contacts to be generated speculatively- 
-            that is, contacts with negative penetration depth.
+            contacts with negative penetration depth.
 
             #2 is a form of continuous collision detection, but it's handy for general contact stability too. 
             In this version of the engine, all objects generate speculative contacts by default, though only within a per-collidable-tuned 'speculative margin'. 
-            It's kind of like BEPUphysics v1's AllowedPenetration, except inverted. Speculative contacts that would lie within the speculative margin- 
-            that is, their negative depth has a magnitude less than the margin- are kept.
+            It's kind of like BEPUphysics v1's AllowedPenetration, except inverted. Speculative contacts that fall within the speculative margin- 
+            that is, those with negative depth of a magnitude less than the margin- are kept.
 
             So, a user could choose to have a very large speculative margin, and the speculative contact generation would provide a form of continuous collision detection. 
             The main purpose, though, is just contact stability. With this in isolation, there's no strong reason to expand the bounding box more than the speculative margin. 

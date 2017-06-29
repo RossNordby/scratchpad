@@ -25,6 +25,19 @@ namespace SolverPrototype
             result.Y = a.Y + b.Y;
             result.Z = a.Z + b.Z;
         }
+        /// <summary>
+        /// Finds the result of adding a scalar to every component of a vector.
+        /// </summary>
+        /// <param name="v">Vector to add to.</param>
+        /// <param name="s">Scalar to add to every component of the vector.</param>
+        /// <param name="result">Vector with components equal to the input vector added to the input scalar.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Add(ref Vector3Wide v, ref Vector<float> s, out Vector3Wide result)
+        {
+            result.X = v.X + s;
+            result.Y = v.Y + s;
+            result.Z = v.Z + s;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Subtract(ref Vector3Wide a, ref Vector3Wide b, out Vector3Wide result)
@@ -32,6 +45,32 @@ namespace SolverPrototype
             result.X = a.X - b.X;
             result.Y = a.Y - b.Y;
             result.Z = a.Z - b.Z;
+        }
+        /// <summary>
+        /// Finds the result of subtracting a scalar from every component of a vector.
+        /// </summary>
+        /// <param name="v">Vector to subtract from.</param>
+        /// <param name="s">Scalar to subtract from every component of the vector.</param>
+        /// <param name="result">Vector with components equal the input scalar subtracted from the input vector.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Subtract(ref Vector3Wide v, ref Vector<float> s, out Vector3Wide result)
+        {
+            result.X = v.X - s;
+            result.Y = v.Y - s;
+            result.Z = v.Z - s;
+        }
+        /// <summary>
+        /// Finds the result of subtracting the components of a vector from a scalar.
+        /// </summary>
+        /// <param name="v">Vector to subtract from the scalar.</param>
+        /// <param name="s">Scalar to subtract from.</param>
+        /// <param name="result">Vector with components equal the input vector subtracted from the input scalar.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Subtract(ref Vector<float> s, ref Vector3Wide v, out Vector3Wide result)
+        {
+            result.X = s - v.X;
+            result.Y = s - v.Y;
+            result.Z = s - v.Z;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -127,7 +166,7 @@ namespace SolverPrototype
         {
             length = Vector.SquareRoot(v.X * v.X + v.Y * v.Y + v.Z * v.Z);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Distance(ref Vector3Wide a, ref Vector3Wide b, out Vector<float> distance)
         {

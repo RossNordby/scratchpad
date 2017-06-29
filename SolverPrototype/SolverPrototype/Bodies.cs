@@ -389,12 +389,12 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void GatherPoseForBody(ref float targetPositionBase, ref float targetOrientationBase, int i, int bundleIndex, int innerIndex)
+        private void GatherPoseForBody(ref float targetPositionBase, ref float targetOrientationBase, int laneIndex, int bundleIndex, int innerIndex)
         {
             ref var sourcePosition = ref GatherScatter.Get(ref Poses[bundleIndex].Position.X, innerIndex);
             ref var sourceOrientation = ref Unsafe.Add(ref sourcePosition, 3 * Vector<float>.Count);
-            ref var targetPositionSlot = ref Unsafe.Add(ref targetPositionBase, i);
-            ref var targetOrientationSlot = ref Unsafe.Add(ref targetOrientationBase, i);
+            ref var targetPositionSlot = ref Unsafe.Add(ref targetPositionBase, laneIndex);
+            ref var targetOrientationSlot = ref Unsafe.Add(ref targetOrientationBase, laneIndex);
             targetPositionSlot = sourcePosition;
             Unsafe.Add(ref targetPositionSlot, Vector<float>.Count) = Unsafe.Add(ref sourcePosition, Vector<float>.Count);
             Unsafe.Add(ref targetPositionSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref sourcePosition, 2 * Vector<float>.Count);
@@ -404,6 +404,20 @@ namespace SolverPrototype
             Unsafe.Add(ref targetOrientationSlot, 3 * Vector<float>.Count) = Unsafe.Add(ref sourceOrientation, 3 * Vector<float>.Count);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void GatherVelocityForBody(ref float targetLinearVelocityBase, ref float targetAngularVelocityBase, int laneIndex, int bundleIndex, int innerIndex)
+        {
+            ref var sourceLinear = ref GatherScatter.Get(ref Poses[bundleIndex].Position.X, innerIndex);
+            ref var sourceAngular = ref Unsafe.Add(ref sourceLinear, 3 * Vector<float>.Count);
+            ref var targetLinearSlot = ref Unsafe.Add(ref targetLinearVelocityBase, laneIndex);
+            ref var targetAngularSlot = ref Unsafe.Add(ref targetAngularVelocityBase, laneIndex);
+            targetLinearSlot = sourceLinear;
+            Unsafe.Add(ref targetLinearSlot, Vector<float>.Count) = Unsafe.Add(ref sourceLinear, Vector<float>.Count);
+            Unsafe.Add(ref targetLinearSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceLinear, 2 * Vector<float>.Count);
+            targetAngularSlot = sourceAngular;
+            Unsafe.Add(ref targetAngularSlot, Vector<float>.Count) = Unsafe.Add(ref sourceAngular, Vector<float>.Count);
+            Unsafe.Add(ref targetAngularSlot, 2 * Vector<float>.Count) = Unsafe.Add(ref sourceAngular, 2 * Vector<float>.Count);
+        }
 
         //TODO: In future versions, we will likely store the body position in different forms to allow for extremely large worlds.
         //That will be an opt-in feature. The default implementation will use the FP32 representation, but the user could choose to swap it out for a int64 based representation.
@@ -475,6 +489,24 @@ namespace SolverPrototype
                 var bundleIndexB = Unsafe.Add(ref bundleIndexA, 2 * Vector<float>.Count);
                 var innerIndexB = Unsafe.Add(ref bundleIndexA, 3 * Vector<float>.Count);
                 GatherInertiaForBody(ref targetInertiaBaseB, i, bundleIndexB, innerIndexB);
+            }
+        }
+
+        //This looks a little different because it's used by AABB calculation, not constraint pairs.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void GatherPoseAndVelocity(ref Vector<int> bodyIndices, int count, out BodyPoses poses, out BodyVelocities velocities)
+        {
+            Debug.Assert(count <= Vector<float>.Count);
+            ref var targetPositionBase = ref Unsafe.As<Vector<float>, float>(ref poses.Position.X);
+            ref var targetOrientationBase = ref Unsafe.As<Vector<float>, float>(ref poses.Orientation.X);
+            ref var targetLinearBase = ref Unsafe.As<Vector<float>, float>(ref velocities.LinearVelocity.X);
+            ref var targetAngularBase = ref Unsafe.As<Vector<float>, float>(ref velocities.AngularVelocity.X);
+            for (int i = 0; i < count; ++i)
+            {
+                var index = bodyIndices[i];
+                BundleIndexing.GetBundleIndices(index, out var bundle, out var inner);
+                GatherPoseForBody(ref targetPositionBase, ref targetOrientationBase, i, bundle, inner);
+                GatherVelocityForBody(ref targetLinearBase, ref targetAngularBase, i, bundle, inner);
             }
         }
 

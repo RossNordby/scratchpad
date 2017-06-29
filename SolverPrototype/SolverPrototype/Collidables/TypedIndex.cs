@@ -46,5 +46,6 @@ namespace SolverPrototype.Collidables
             ValidateIndex(index);
             packed = (uint)((type << 24) | index);
         }
+
     }
 }
