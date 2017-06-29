@@ -1,19 +1,29 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Collidables
 {
+    //honestly these generics arent necessary i just wanted to see it 
     /// <summary>
     /// Defines a type usable as a shape by collidables.
     /// </summary>
-    public interface IShape
+    public interface IShape//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape>
     {
+    }
+    public interface IShapeBundle//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape> 
+    {
+        void ComputeBoundingBoxes(ref BodyPoses poses, out Vector3Wide min, out Vector3Wide max);
     }
 
     public abstract class ShapeBatch
     {
         protected BufferPool pool;
         public abstract BodyCollidableBatch CreateBodyCollidableBatchForType(int initialCapacityPerCollidableBatch);
+
+        
+
 
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }

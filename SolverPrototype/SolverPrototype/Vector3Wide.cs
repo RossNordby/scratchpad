@@ -40,6 +40,34 @@ namespace SolverPrototype
             result = a.X * b.X + a.Y * b.Y + a.Z * b.Z;
         }
 
+        /// <summary>
+        /// Computes the per-component minimum between a scalar value and the components of a vector.
+        /// </summary>
+        /// <param name="s">Scalar to compare to each vector component.</param>
+        /// <param name="v">Vector whose components will be compared.</param>
+        /// <param name="result">Vector with components matching the smaller of the scalar value and the input vector.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Min(ref Vector<float> s, ref Vector3Wide v, out Vector3Wide result)
+        {
+            result.X = Vector.Min(s, v.X);
+            result.Y = Vector.Min(s, v.Y);
+            result.Z = Vector.Min(s, v.Z);
+        }
+
+        /// <summary>
+        /// Computes the per-component maximum between a scalar value and the components of a vector.
+        /// </summary>
+        /// <param name="s">Scalar to compare to each vector component.</param>
+        /// <param name="v">Vector whose components will be compared.</param>
+        /// <param name="result">Vector with components matching the larger of the scalar value and the input vector.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Max(ref Vector<float> s, ref Vector3Wide v, out Vector3Wide result)
+        {
+            result.X = Vector.Max(s, v.X);
+            result.Y = Vector.Max(s, v.Y);
+            result.Z = Vector.Max(s, v.Z);
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Scale(ref Vector3Wide vector, ref Vector<float> scalar, out Vector3Wide result)
         {
