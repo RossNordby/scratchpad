@@ -1,13 +1,10 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
-using SolverPrototype.Colldiables;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace SolverPrototype.Collidables
 {
@@ -335,10 +332,10 @@ namespace SolverPrototype.Collidables
         {
             var typeIndex = collidableDescription.ShapeIndex.Type;
             var index = collidableDescription.ShapeIndex.Index;
-            Debug.Assert(typeIndex >= 0 && typeIndex < Shapes.RegisteredTypeCount);
-            if (batches.Length < Shapes.RegisteredTypeCount)
+            Debug.Assert(typeIndex >= 0 && typeIndex < Shapes.RegisteredTypeSpan);
+            if (batches.Length < Shapes.RegisteredTypeSpan)
             {
-                Array.Resize(ref batches, Shapes.RegisteredTypeCount);
+                Array.Resize(ref batches, Shapes.RegisteredTypeSpan);
             }
             ref var batch = ref batches[typeIndex];
             if (batch == null)

@@ -1,4 +1,5 @@
 ﻿using SolverPrototype;
+using SolverPrototype.Collidables;
 using System.Numerics;
 
 namespace SolverPrototypeTests
@@ -8,14 +9,16 @@ namespace SolverPrototypeTests
         public Vector3 Spacing;
         public Vector3 Origin;
         public float InverseInertiaMultiplier;
-        public RegularGridWithKinematicBaseBuilder(Vector3 spacing, Vector3 origin, float inverseInertiaMultiplier = 0)
+        public TypedIndex ShapeIndex;
+        public RegularGridWithKinematicBaseBuilder(Vector3 spacing, Vector3 origin, float inverseInertiaMultiplier = 0, TypedIndex shapeIndex = new TypedIndex())
         {
             Spacing = spacing;
             Origin = origin;
             InverseInertiaMultiplier = inverseInertiaMultiplier;
+            ShapeIndex = shapeIndex;
         }
 
-        public void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription)
+        public void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription, out CollidableDescription collidableDescription)
         {
             bodyDescription = new BodyDescription
             {
@@ -25,6 +28,12 @@ namespace SolverPrototypeTests
                     Orientation = BEPUutilities2.Quaternion.Identity
                 },
                 LocalInertia = new BodyInertia { InverseMass = rowIndex > 0 ? 1 : 0 }
+            };
+            collidableDescription = new CollidableDescription
+            {
+                Continuity = new ContinuousDetectionSettings(),
+                SpeculativeMargin = 0.1f,
+                ShapeIndex = ShapeIndex
             };
             var inverseInertia = bodyDescription.LocalInertia.InverseMass * InverseInertiaMultiplier;
             bodyDescription.LocalInertia.InverseInertiaTensor.M11 = inverseInertia;

@@ -1,15 +1,10 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Memory;
-using SolverPrototype.Colldiables;
 using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
@@ -52,7 +47,7 @@ namespace SolverPrototype
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
-            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
+            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BodyCollidables, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, BodyCollidables);
@@ -85,8 +80,10 @@ namespace SolverPrototype
         public int Add(ref BodyDescription bodyDescription, ref CollidableDescription collidableDescription)
         {
             var handle = Add(ref bodyDescription);
-            Debug.Assert(collidableDescription.ShapeIndex.Exists, "If the overload that takes a collidable description is used, it is assumed that the collidable will actually exist.");
-            BodyCollidables.Add(Bodies, Bodies.HandleToIndex[handle], ref collidableDescription, BufferPool);
+            if (collidableDescription.ShapeIndex.Exists)
+            {
+                BodyCollidables.Add(Bodies, Bodies.HandleToIndex[handle], ref collidableDescription, BufferPool);
+            }
             return handle;
         }
 

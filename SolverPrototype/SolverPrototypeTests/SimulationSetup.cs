@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype;
+using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ namespace SolverPrototypeTests
 {
     public interface IBodyBuilder
     {
-        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription);
+        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription, out CollidableDescription collidableDescription);
     }
     public interface IConstraintBuilder
     {
@@ -113,9 +114,9 @@ namespace SolverPrototypeTests
                 {
                     for (int columnIndex = 0; columnIndex < width; ++columnIndex)
                     {
-                        bodyBuilder.Build(columnIndex, rowIndex, sliceIndex, out var bodyDescription);
+                        bodyBuilder.Build(columnIndex, rowIndex, sliceIndex, out var bodyDescription, out var collidableDescription);
                         bodyGetter.TryGetId(columnIndex, rowIndex, sliceIndex, out var id);
-                        bodyHandles[id] = simulation.Add(ref bodyDescription);
+                        bodyHandles[id] = simulation.Add(ref bodyDescription, ref collidableDescription);
                     }
                 }
             }

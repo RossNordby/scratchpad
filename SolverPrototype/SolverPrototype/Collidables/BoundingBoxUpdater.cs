@@ -28,7 +28,7 @@ namespace SolverPrototype.Collidables
             this.pool = pool.SpecializeFor<int>();
             this.dt = dt;
             //The number of registered types cannot change mid-frame, because adding collidables mid-update is illegal. Can just allocate based on current count.
-            pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(collidables.Shapes.RegisteredTypeCount, out batchesPerType);
+            pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(collidables.Shapes.RegisteredTypeSpan, out batchesPerType);
         }
 
         public void TryAdd(TypedIndex collidableIndex)

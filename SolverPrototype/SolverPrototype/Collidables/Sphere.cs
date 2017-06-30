@@ -10,6 +10,11 @@ namespace SolverPrototype.Collidables
     {
         public float Radius;
 
+        public Sphere(float radius)
+        {
+            Radius = radius;
+        }
+
         public float MaximumRadius
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

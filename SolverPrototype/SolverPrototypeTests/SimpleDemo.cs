@@ -1,5 +1,6 @@
 ﻿using DemoRenderer;
 using SolverPrototype;
+using SolverPrototype.Collidables;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -12,11 +13,13 @@ namespace SolverPrototypeTests
         public override void Initialize(Camera camera)
         {
             Simulation = new Simulation(BufferPool);
+            var shape = new Sphere(0.5f);
+            var shapeIndex = Simulation.Shapes.Add(ref shape);
             const int width = 32;
             const int height = 32;
             const int length = 32;
             SimulationSetup.BuildLattice(
-                new RegularGridWithKinematicBaseBuilder(new Vector3(3), new Vector3(), 1f),
+                new RegularGridWithKinematicBaseBuilder(new Vector3(3), new Vector3(), 1f, shapeIndex),
                 new BallSocketConstraintBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);

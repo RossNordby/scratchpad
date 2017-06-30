@@ -1,6 +1,4 @@
-﻿using SolverPrototype.Collidables;
-
-namespace SolverPrototype.Colldiables
+﻿namespace SolverPrototype.Collidables
 {
     public struct CollidableDescription
     {

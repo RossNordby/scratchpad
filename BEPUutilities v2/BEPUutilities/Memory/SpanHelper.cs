@@ -186,5 +186,45 @@ namespace BEPUutilities2.Memory
                 targetHandle.Free();
         }
 
+        /// <summary>
+        /// Checks if the memory backing an instance is fully zeroed.
+        /// </summary>
+        /// <typeparam name="T">Type of the memory to check.</typeparam>
+        /// <param name="memory">Memory to check.</param>
+        /// <returns>True if all bytes backing the memory are zero, false otherwise.</returns>
+        public static bool IsZeroed<T>(ref T memory) where T : struct
+        {
+            //This could be made much much faster, but at the moment this is only used in debug-related things. If you actually end up needing it elsewhere, consider
+            //optimizing it to use wider types.
+            var byteCount = Unsafe.SizeOf<T>();
+            ref var byteStart = ref Unsafe.As<T, byte>(ref memory);
+            for (int i = 0; i < byteCount; ++i)
+            {
+                if (Unsafe.Add(ref byteStart, i) != 0)
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Checks if the memory backing a span region is fully zeroed.
+        /// </summary>
+        /// <typeparam name="T">Type of the instances in the span.</typeparam>
+        /// <typeparam name="TSpan">Type of the span.</typeparam>
+        /// <param name="span">Span to check for zeroing.</param>
+        /// <param name="start">Inclusive start index of the region to check.</param>
+        /// <param name="end">Exclusive end index of the region to check.</param>
+        /// <returns>True if all bytes backing the memory are zero, false otherwise.</returns>
+        public static bool IsZeroed<T, TSpan>(ref TSpan span, int start, int end) where TSpan : ISpan<T> where T : struct
+        {
+            //Again, this is way, way slower than it needs to be- it just doesn't matter right now.
+            for (int i = start; i < end; ++i)
+            {
+                if (!IsZeroed(ref span[i]))
+                    return false;
+            }
+            return true;
+        }
+
     }
 }
