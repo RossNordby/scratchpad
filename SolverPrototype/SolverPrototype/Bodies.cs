@@ -9,53 +9,7 @@ using SolverPrototype.Collidables;
 
 namespace SolverPrototype
 {
-    public struct BodyPoses
-    {
-        public Vector3Wide Position;
-        //Note that we store a quaternion rather than a matrix3x3. While this often requires some overhead when performing vector transforms or extracting basis vectors, 
-        //systems needing to interact directly with this representation are often terrifically memory bound. Spending the extra ALU time to convert to a basis can actually be faster
-        //than loading the extra 5 elements needed to express the full 3x3 rotation matrix. Also, it's marginally easier to keep the rotation normalized over time.
-        //There may be an argument for the matrix variant to ALSO be stored for some bandwidth-unconstrained stages, but don't worry about that until there's a reason to worry about it.
-        public QuaternionWide Orientation;
-    }
 
-    public struct BodyVelocities
-    {
-        public Vector3Wide LinearVelocity;
-        public Vector3Wide AngularVelocity;
-    }
-
-    public struct BodyInertias
-    {
-        public Triangular3x3Wide InverseInertiaTensor;
-        //Note that the inverse mass is included in the BodyInertias bundle. InverseMass is rotationally invariant, so it doesn't need to be updated...
-        //But it's included alongside the rotated inertia tensor because to split it out would require that constraint presteps suffer another cache miss when they
-        //gather the inverse mass in isolation. (From the solver's perspective, inertia/mass gathering is incoherent.)
-        public Vector<float> InverseMass;
-    }
-
-    public struct BodyPose
-    {
-        public Vector3 Position;
-        public BEPUutilities2.Quaternion Orientation;
-    }
-
-    public struct BodyVelocity
-    {
-        public Vector3 Linear;
-        public Vector3 Angular;
-    }
-    public struct BodyInertia
-    {
-        public Triangular3x3 InverseInertiaTensor;
-        public float InverseMass;
-    }
-    public struct BodyDescription
-    {
-        public BodyPose Pose;
-        public BodyInertia LocalInertia;
-        public BodyVelocity Velocity;
-    }
     /// <summary>
     /// Collection of allocated bodies.
     /// </summary>
@@ -155,6 +109,7 @@ namespace SolverPrototype
             var index = BodyCount++;
             HandleToIndex[handle] = index;
             IndexToHandle[index] = handle;
+            //Collidable is left as default value. We'll assign it externally. This is just for simplicity in the presence of a two way dependency between BodyCollidables and Bodies.
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
             SetLane(ref Poses[bundleIndex], indexInBundle, ref bodyDescription.Pose);
@@ -166,6 +121,51 @@ namespace SolverPrototype
         }
 
         /// <summary>
+        /// Removes a body from the set by index and returns whether a move occurred. If another body took its place, the move is output.
+        /// </summary>
+        /// <param name="bodyIndex">Index of the body to remove.</param>
+        /// <param name="movedBodyOriginalIndex">Original index of the body that was moved into the removed body's slot. -1 if no body had to be moved.</param>
+        /// <returns>True if a body was moved, false otherwise.</returns>
+        public bool RemoveAt(int bodyIndex, out int movedBodyOriginalIndex)
+        {
+            Debug.Assert(bodyIndex >= 0 && bodyIndex < BodyCount);
+            var handle = IndexToHandle[bodyIndex];
+            //Move the last body into the removed slot.
+            //This does introduce disorder- there may be value in a second overload that preserves order, but it would require large copies.
+            //In the event that so many adds and removals are performed at once that they destroy contiguity, it may be better to just
+            //explicitly sort after the fact rather than attempt to retain contiguity incrementally. Handle it as a batch, in other words.
+            --BodyCount;
+            bool bodyMoved = bodyIndex < BodyCount;
+            if (bodyMoved)
+            {
+                movedBodyOriginalIndex = BodyCount;
+                //Copy the memory state of the last element down.
+                BundleIndexing.GetBundleIndices(bodyIndex, out var targetBundle, out var targetInner);
+                BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
+                GatherScatter.CopyLane(ref Poses[sourceBundle], sourceInner, ref Poses[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
+                //Note that if you ever treat the world inertias as 'always updated', it would need to be copied here.
+                Collidables[bodyIndex] = Collidables[movedBodyOriginalIndex];
+                //Point the body handles at the new location.
+                var lastHandle = IndexToHandle[movedBodyOriginalIndex];
+                HandleToIndex[lastHandle] = bodyIndex;
+                IndexToHandle[bodyIndex] = lastHandle;
+
+            }
+            else
+            {
+                movedBodyOriginalIndex = -1;
+            }
+            //We rely on the collidable references being nonexistent beyond the body count.
+            Collidables[BodyCount] = new TypedIndex();
+            //The indices should also be set to all -1's beyond the body count.
+            IndexToHandle[BodyCount] = -1;
+            IdPool.Return(handle);
+            HandleToIndex[handle] = -1;
+            return bodyMoved;
+        }
+        /// <summary>
         /// Removes a body from the set and returns whether a move occurred. If another body took its place, the move is output.
         /// </summary>
         /// <param name="handle">Handle of the body to remove.</param>
@@ -176,37 +176,7 @@ namespace SolverPrototype
         {
             ValidateExistingHandle(handle);
             removedIndex = HandleToIndex[handle];
-
-            //Move the last body into the removed slot.
-            //This does introduce disorder- there may be value in a second overload that preserves order, but it would require large copies.
-            //In the event that so many adds and removals are performed at once that they destroy contiguity, it may be better to just
-            //explicitly sort after the fact rather than attempt to retain contiguity incrementally. Handle it as a batch, in other words.
-            --BodyCount;
-            bool bodyMoved = removedIndex < BodyCount;
-            if (bodyMoved)
-            {
-                movedBodyOriginalIndex = BodyCount;
-                //Copy the memory state of the last element down.
-                BundleIndexing.GetBundleIndices(removedIndex, out var targetBundle, out var targetInner);
-                BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
-                GatherScatter.CopyLane(ref Poses[sourceBundle], sourceInner, ref Poses[targetBundle], targetInner);
-                GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
-                GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
-                //Note that if you ever treat the world inertias as 'always updated', it would need to be copied here.
-                //Point the body handles at the new location.
-                var lastHandle = IndexToHandle[movedBodyOriginalIndex];
-                HandleToIndex[lastHandle] = removedIndex;
-                IndexToHandle[removedIndex] = lastHandle;
-                IndexToHandle[movedBodyOriginalIndex] = -1;
-
-            }
-            else
-            {
-                movedBodyOriginalIndex = -1;
-            }
-            IdPool.Return(handle);
-            HandleToIndex[handle] = -1;
-            return bodyMoved;
+            return RemoveAt(removedIndex, out movedBodyOriginalIndex);
         }
 
         [Conditional("DEBUG")]

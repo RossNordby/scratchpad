@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
+using SolverPrototype.Colldiables;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -177,19 +178,19 @@ namespace SolverPrototype.Collidables
         /// Removes a body collidable from the batch and which body owns the collidable that moved to fill its slot, if any. 
         /// </summary>
         /// <param name="index">Index to remove from the batch.</param>
-        /// <param name="bodyHandleOfMovedCollidable">If the index was not the last slot in the collidables (and so this function returned true),
+        /// <param name="bodyIndexOfMovedCollidable">If the index was not the last slot in the collidables (and so this function returned true),
         /// this is the handle of the body owning the body collidable that was moved to fill its slot.
         /// If no collidable was moved (and so this function returned false), the value is undefined.</param>
         /// <returns>True if a body collidable was moved and reported, false otherwise.</returns>
-        public bool RemoveAt(int index, out int bodyHandleOfMovedCollidable)
+        public bool RemoveAt(int index, out int bodyIndexOfMovedCollidable)
         {
             collidables.FastRemoveAt(index);
             if (index < collidables.Count)
             {
-                bodyHandleOfMovedCollidable = collidables[index].BodyIndex;
+                bodyIndexOfMovedCollidable = collidables[index].BodyIndex;
                 return true;
             }
-            bodyHandleOfMovedCollidable = -1;
+            bodyIndexOfMovedCollidable = -1;
             return false;
         }
 
@@ -211,7 +212,7 @@ namespace SolverPrototype.Collidables
                 Unsafe.Add(ref firstExpansion, i) = collidable.Continuity.AllowExpansionBeyondSpeculativeMargin ? float.MaxValue : collidable.SpeculativeMargin;
             }
         }
-        
+
         /// <summary>
         /// Defines a type that acts as a source of data needed for bounding box calculations.
         /// </summary>
@@ -248,7 +249,7 @@ namespace SolverPrototype.Collidables
             for (int i = 0; i < bundleSource.Count; i += Vector<float>.Count)
             {
                 bundleSource.GatherCollidableBundle(i, out var shapeIndices, out var maximumExpansion, out var poses, out var velocities);
-                
+
                 //The bundle bounder is responsible for gathering shapes from type specific sources. Since it has type knowledge, it is able to both
                 //gather the necessary shape information and call the appropriate bounding box calculator.
                 bundleBounder.GetBounds(ref shapeIndices, ref poses, out var maximumRadius, out var min, out var max);
@@ -330,10 +331,10 @@ namespace SolverPrototype.Collidables
             batches = new BodyCollidableBatch[16];
         }
 
-        public void Add(int bodyIndex, TypedIndex shapeIndex, BufferPool pool)
+        public void Add(Bodies bodies, int bodyIndex, ref CollidableDescription collidableDescription, BufferPool pool)
         {
-            var typeIndex = shapeIndex.Type;
-            var index = shapeIndex.Index;
+            var typeIndex = collidableDescription.ShapeIndex.Type;
+            var index = collidableDescription.ShapeIndex.Index;
             Debug.Assert(typeIndex >= 0 && typeIndex < Shapes.RegisteredTypeCount);
             if (batches.Length < Shapes.RegisteredTypeCount)
             {
@@ -345,11 +346,24 @@ namespace SolverPrototype.Collidables
                 batch = Shapes[typeIndex].CreateBodyCollidableBatchForType(InitialCapacityPerCollidableBatch);
             }
             var collidableIndex = batch.Allocate(pool);
+            //Note that this is responsible for setting the body's collidable reference back to the collidable. A little less gross in practice than forcing the simulation to handle
+            //that mapping, and it's consistent with the way the Remove function works.
+            bodies.Collidables[bodyIndex] = new TypedIndex(typeIndex, collidableIndex);
             ref var collidable = ref batch[collidableIndex];
             collidable.BodyIndex = bodyIndex;
             collidable.ShapeIndex = index;
             collidable.BroadPhaseIndex = broadPhase.AllocateForCollidable(new CollidableReference(true, typeIndex, collidableIndex));
+            collidable.SpeculativeMargin = collidableDescription.SpeculativeMargin;
+            collidable.Continuity = collidableDescription.Continuity;
         }
 
+        public void Remove(Bodies bodies, TypedIndex collidableIndex)
+        {
+            if (batches[collidableIndex.Type].RemoveAt(collidableIndex.Index, out var bodyIndexOfMovedCollidable))
+            {
+                //When another collidable is moved into the removed slot, we must notify the body of the moved collidable of the new position.
+                bodies.Collidables[bodyIndexOfMovedCollidable] = collidableIndex;
+            }
+        }
     }
 }

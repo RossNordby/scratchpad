@@ -148,7 +148,9 @@ namespace SolverPrototypeTests
                 new BufferPool(),
                 new SimulationAllocationSizes
                 {
-                    Bodies = (int)Math.Ceiling(bodyCount / (double)Vector<int>.Count),
+                    Bodies = bodyCount,
+                    ShapesPerType = 128,
+                    CollidablesPerType = bodyCount,
                     Constraints = bodyCount * 3,
                     ConstraintsPerTypeBatch = (bodyCount * 3) / 6,
                     ConstraintCountPerBodyEstimate = 6
@@ -159,7 +161,7 @@ namespace SolverPrototypeTests
 
 
 
-        
+
     }
 }
 

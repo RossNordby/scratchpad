@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Memory;
+using SolverPrototype.Colldiables;
 using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
 using System;
@@ -73,6 +74,7 @@ namespace SolverPrototype
         {
         }
 
+
         public int Add(ref BodyDescription bodyDescription)
         {
             var handle = Bodies.Add(ref bodyDescription);
@@ -80,19 +82,54 @@ namespace SolverPrototype
             return handle;
         }
 
+        public int Add(ref BodyDescription bodyDescription, ref CollidableDescription collidableDescription)
+        {
+            var handle = Add(ref bodyDescription);
+            Debug.Assert(collidableDescription.ShapeIndex.Exists, "If the overload that takes a collidable description is used, it is assumed that the collidable will actually exist.");
+            BodyCollidables.Add(Bodies, Bodies.HandleToIndex[handle], ref collidableDescription, BufferPool);
+            return handle;
+        }
+
+        /// <summary>
+        /// Changes the collidable associated with a body with no restriction on whether the body currently has a collidable or what shape it is.
+        /// </summary>
+        /// <param name="bodyHandle">Handle of the body to change the collidable of.</param>
+        /// <param name="collidableDescription">Description of the collidable to create for the body.</param>
+        /// <remarks>This is useful when the body is changing to an entirely different collidable. If you only want to change the settings associated with a body's existing collidable
+        /// without changing the type of shape it uses, it is more efficient to just directly access its properties by looking it up in the BodyCollidables.</remarks>
+        public void ChangeBodyCollidable(int bodyHandle, ref CollidableDescription collidableDescription)
+        {
+            Bodies.ValidateExistingHandle(bodyHandle);
+            var bodyIndex = Bodies.HandleToIndex[bodyHandle];
+            ref var collidableIndex = ref Bodies.Collidables[bodyIndex];
+            //Remove the collidable if it already exists.
+            if (collidableIndex.Exists)
+            {
+                BodyCollidables.Remove(Bodies, collidableIndex);
+            }
+            BodyCollidables.Add(Bodies, bodyIndex, ref collidableDescription, BufferPool);
+        }
+
 
         public void RemoveBody(int bodyHandle)
         {
             Bodies.ValidateExistingHandle(bodyHandle);
 
-            if (Bodies.Remove(bodyHandle, out var removedIndex, out var movedBodyOriginalIndex))
+            var bodyIndex = Bodies.HandleToIndex[bodyHandle];
+            var collidableIndex = Bodies.Collidables[bodyIndex];
+            if (Bodies.RemoveAt(bodyIndex, out var movedBodyOriginalIndex))
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, removedIndex, BodyCollidables, ConstraintGraph, Solver);
+                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BodyCollidables, ConstraintGraph, Solver);
+            }
+            //Not every body is forced to have a collidable. Only try to remove those that exist!
+            if (collidableIndex.Exists)
+            {
+                BodyCollidables.Remove(Bodies, collidableIndex);
             }
 
-            var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(removedIndex, movedBodyOriginalIndex);
+            var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);
             Debug.Assert(constraintListWasEmpty, "Removing a body without first removing its constraints results in orphaned constraints that will break stuff. Don't do it!");
 
 
@@ -182,7 +219,7 @@ namespace SolverPrototype
                 ProfilerEnd(SolverBatchCompressor);
 
                 ProfilerStart(PoseIntegrator);
-                PoseIntegrator.Update(dt, threadDispatcher);
+                PoseIntegrator.Update(dt, BufferPool, threadDispatcher);
                 ProfilerEnd(PoseIntegrator);
 
                 ProfilerStart(Solver);
@@ -204,7 +241,7 @@ namespace SolverPrototype
                 ProfilerEnd(SolverBatchCompressor);
 
                 ProfilerStart(PoseIntegrator);
-                PoseIntegrator.Update(dt);
+                PoseIntegrator.Update(dt, BufferPool);
                 ProfilerEnd(PoseIntegrator);
 
                 ProfilerStart(Solver);
@@ -223,6 +260,7 @@ namespace SolverPrototype
             ConstraintGraph.Clear(Bodies);
             Solver.Clear();
             Bodies.Clear();
+            //TODO: shapes/collidables
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target.
@@ -238,6 +276,7 @@ namespace SolverPrototype
             Bodies.EnsureCapacity(allocationTarget.Bodies);
             ConstraintGraph.EnsureCapacity(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
+            //TODO: shapes/collidables
 
         }
         /// <summary>
@@ -254,6 +293,7 @@ namespace SolverPrototype
             Bodies.Compact(allocationTarget.Bodies);
             ConstraintGraph.Compact(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
+            //TODO: shapes/collidables
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target, and decreases the allocation size of any buffers that are unnecessarily large.
@@ -269,6 +309,7 @@ namespace SolverPrototype
             Bodies.Resize(allocationTarget.Bodies);
             ConstraintGraph.Resize(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
+            //TODO: shapes/collidables
         }
         /// <summary>
         /// Clears the simulation of every object and returns all pooled memory to the buffer pool.
@@ -281,6 +322,7 @@ namespace SolverPrototype
             Bodies.Dispose();
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();
+            //TODO: shapes/collidables
         }
     }
 }

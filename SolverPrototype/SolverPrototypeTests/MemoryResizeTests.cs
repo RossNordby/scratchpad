@@ -35,6 +35,8 @@ namespace SolverPrototypeTests
                     simulation.EnsureCapacity(new SimulationAllocationSizes
                     {
                         Bodies = bodyHandles.Length,
+                        CollidablesPerType = 128,
+                        ShapesPerType = 16,
                         Constraints = constraintHandles.Length,
                         ConstraintCountPerBodyEstimate = 8,
                         ConstraintsPerTypeBatch = 128
@@ -54,9 +56,11 @@ namespace SolverPrototypeTests
                     var sizes = new SimulationAllocationSizes
                     {
                         Bodies = (int)(bodyHandles.Length * scale),
+                        CollidablesPerType = (int)(128 * scale),
+                        ShapesPerType = (int)(16 * scale),
                         Constraints = (int)(constraintHandles.Length * scale),
                         ConstraintCountPerBodyEstimate = (int)(8 * scale),
-                        ConstraintsPerTypeBatch = (int)(128 * scale)
+                        ConstraintsPerTypeBatch = (int)(128 * scale),
                     };
                     //None of these should ever shrink the size below the current sim size.
                     if (sample < 0.4)
@@ -186,6 +190,8 @@ namespace SolverPrototypeTests
                     var sizes = new SimulationAllocationSizes
                     {
                         Bodies = (int)(bodyHandles.Length * scale),
+                        CollidablesPerType = (int)(bodyHandles.Length * scale),
+                        ShapesPerType = (int)(16 * scale),
                         Constraints = (int)(constraintHandles.Length * scale),
                         ConstraintCountPerBodyEstimate = (int)(8 * scale),
                         ConstraintsPerTypeBatch = (int)(128 * scale)
