@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
+using SolverPrototype.Collidables;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,17 +25,21 @@ namespace SolverPrototype
     public class PoseIntegrator
     {
         Bodies bodies;
-        public PoseIntegrator(Bodies bodies)
-        {
-            this.bodies = bodies;
-        }
+        BodyCollidables collidables;
 
         /// <summary>
         /// Acceleration of gravity to apply to all dynamic bodies in the simulation.
         /// </summary>
         public Vector3 Gravity;
 
-        void IntegrateBundles(int startBundle, int exclusiveEndBundle, float dt)
+        public PoseIntegrator(Bodies bodies, BodyCollidables collidables)
+        {
+            this.bodies = bodies;
+            this.collidables = collidables;
+        }
+
+
+        void IntegrateBundles(int startBundle, int exclusiveEndBundle, float dt, ref BoundingBoxUpdater boundingBoxUpdater)
         {
             ref var basePoses = ref bodies.Poses[0];
             ref var baseVelocities = ref bodies.Velocities[0];
@@ -95,17 +100,7 @@ namespace SolverPrototype
                 //This WILL be a problem, especially since BEPUphysics v1 trained people to use velocity modifications to control motion.
 
                 //This isn't an unsolvable problem- making it easy to handle velocity modifications mid-update by exposing a callback of some sort would work. But that's one step more
-                //than the v1 'just set the velocity' style.
-
-                //TODO:
-                //I suspect that splitting the gravity application from this integrator will be the right choice in the end. Bundling it with AABB calculation would free
-                //up the integrator to be placed on either end of execution without worrying about odd velocities being visible in resting objects.
-                //(Note that the AABB calculation must sample both pose and velocity, so there's no additional bandwidth used.)
-                //You could then provide different update orders. People could use the position-first or position-last variant as desired.
-                //Whatever handles gravity will also probably end up handling drag.
-                //Note that if we choose to SIMDify AABB calculation, we can't actually do it here. Bodies are not bundled for AABB calculation (nor should they be-
-                //efficient constraint access is far more important.) We'd have to have collidable type batches which gather shape, pose, and velocity before computing AABBs,
-                //and then they'd scatter that out to the broadphase.
+                //than the v1 'just set the velocity' style.                
 
                 //Note that we avoid accelerating kinematics. Kinematics are any body with an inverse mass of zero (so a mass of ~infinity). No force can move them.
                 Vector3Wide.Add(ref gravityDt, ref velocity.LinearVelocity, out var acceleratedLinearVelocity);
@@ -117,12 +112,32 @@ namespace SolverPrototype
                 //misses necessarily increases. Slowing down the solver in order to speed up the pose integrator is a really, really bad trade, especially when the benefit is a few ALU ops.
 
 
+                //Bounding boxes are accumulated in a scalar fashion, but the actual bounding box calculations are deferred until a sufficient number of collidables are accumulated to make
+                //executing a bundle worthwhile. This does two things: 
+                //1) SIMD can be used to do the mathy bits of bounding box calculation. The calculations are usually pretty cheap, 
+                //but they will often be more expensive than the pose stuff above.
+                //2) The number of virtual function invocations required is reduced by a factor equal to the size of the accumulator cache.
+                //Note that the accumulator caches are kept relatively small so that it is very likely that the pose and velocity of the collidable's body will still be in L1 cache
+                //when it comes time to actually compute bounding boxes.
+                var bundleBodyIndexBase = i << BundleIndexing.VectorShift;
+                for (int j = 0; j < Vector<float>.Count; ++j)
+                {
+                    //Note that any collidable that lacks a collidable, or any reference that is beyond the set of collidables, will have a specially formed index.
+                    //The accumulator will detect that and not try to add a nonexistent collidable- hence, "TryAdd".
+                    boundingBoxUpdater.TryAdd(bodies.Collidables[bundleBodyIndexBase + j]);
+                }
+
+                //It's helpful to do the bounding box update here in the pose integrator because they share information. If the phases were split, there could be a penalty
+                //associated with loading all the body poses and velocities from memory again. Even if the L3 cache persisted, it would still be worse than looking into L1 or L2.
+                //Also, the pose integrator in isolation is extremely memory bound to the point where it can hardly benefit from multithreading. By interleaving some less memory bound
+                //work into the mix, we can hopefully fill some execution gaps.
             }
         }
 
         float cachedDt;
         Vector3Wide gravityDt;
         int bundlesPerJob;
+        IThreadDispatcher threadDispatcher;
 
         //Note that we aren't using a very cache-friendly work distribution here.
         //This is working on the assumption that the jobs will be large enough that border region cache misses won't be a big concern.
@@ -132,22 +147,25 @@ namespace SolverPrototype
         void Worker(int workerIndex)
         {
             var bodyBundleCount = bodies.BodyBundleCount;
+            var boundingBoxUpdater = new BoundingBoxUpdater(bodies, collidables, threadDispatcher.GetThreadMemoryPool(workerIndex), cachedDt);
             while (true)
             {
                 var jobIndex = Interlocked.Decrement(ref availableJobCount);
                 if (jobIndex < 0)
-                    return;
+                    break;
                 var start = jobIndex * bundlesPerJob;
                 var exclusiveEnd = start + bundlesPerJob;
                 if (exclusiveEnd > bodyBundleCount)
                     exclusiveEnd = bodyBundleCount;
                 Debug.Assert(exclusiveEnd > start, "Jobs that would involve bundles beyond the body count should not be created.");
-                IntegrateBundles(start, exclusiveEnd, cachedDt);
+
+                IntegrateBundles(start, exclusiveEnd, cachedDt, ref boundingBoxUpdater);
 
             }
+            boundingBoxUpdater.FlushAndDispose();
 
         }
-        public void Update(float dt, IThreadDispatcher threadDispatcher = null)
+        public void Update(float dt, BufferPool pool, IThreadDispatcher threadDispatcher = null)
         {
             var workerCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
             var scalarGravityDt = Gravity * dt;
@@ -171,11 +189,15 @@ namespace SolverPrototype
                 availableJobCount = bodyBundleCount / bundlesPerJob;
                 if (bundlesPerJob * availableJobCount < bodyBundleCount)
                     ++availableJobCount;
+                this.threadDispatcher = threadDispatcher;
                 threadDispatcher.DispatchWorkers(Worker);
+                this.threadDispatcher = null;
             }
             else
             {
-                IntegrateBundles(0, bodies.BodyBundleCount, dt);
+                var boundingBoxUpdater = new BoundingBoxUpdater(bodies, collidables, pool, dt);
+                IntegrateBundles(0, bodies.BodyBundleCount, dt, ref boundingBoxUpdater);
+                boundingBoxUpdater.FlushAndDispose();
             }
 
         }

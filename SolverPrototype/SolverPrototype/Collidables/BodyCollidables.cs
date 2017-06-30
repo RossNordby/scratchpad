@@ -135,6 +135,19 @@ namespace SolverPrototype.Collidables
     }
 
 
+    public interface IBundleBounder
+    {
+        void Initialize(ShapeBatch batch);
+        //Note that this requires the bundle bounder to have access to the type-specific shape data; a typed shape collection is not passed in.
+        //This helps limit type exposure and generics explosion.
+        void GetBounds(ref Vector<int> shapeIndices, ref BodyPoses poses, out Vector<float> maximumRadius, out Vector3Wide min, out Vector3Wide max);
+    }
+
+    public interface IBoundsScatterer
+    {
+        void Scatter(ref Vector3Wide min, ref Vector3Wide max, int index);
+    }
+
 
     public abstract class BodyCollidableBatch
     {
@@ -181,7 +194,7 @@ namespace SolverPrototype.Collidables
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        protected void GatherCollidableData(ref QuickList<int, Buffer<int>> bundledCollidables, int startIndex,
+        internal void GatherCollidableData(ref QuickList<int, Buffer<int>> bundledCollidables, int startIndex,
             out Vector<int> shapeIndices, out Vector<int> bodyIndices, out Vector<float> maximumExpansion)
         {
             ref var firstCollidable = ref bundledCollidables[startIndex];
@@ -195,62 +208,95 @@ namespace SolverPrototype.Collidables
                 ref var collidable = ref collidables[Unsafe.Add(ref firstCollidable, i)];
                 Unsafe.Add(ref firstShapeIndex, i) = collidable.ShapeIndex;
                 Unsafe.Add(ref firstBodyIndex, i) = collidable.BodyIndex;
-                Unsafe.Add(ref firstExpansion, i) = collidable.DetectionMode == DetectionMode.Discrete ? collidable.SpeculativeMargin : float.MaxValue;
+                Unsafe.Add(ref firstExpansion, i) = collidable.Continuity.AllowExpansionBeyondSpeculativeMargin ? float.MaxValue : collidable.SpeculativeMargin;
+            }
+        }
+        
+        /// <summary>
+        /// Defines a type that acts as a source of data needed for bounding box calculations.
+        /// </summary>
+        /// <remarks>
+        /// Collidables may be pulled from objects directly in the world or from compound children. Compound children have to pull and compute information from the parent compound,
+        /// and the result of the calculation has to be pushed back to the compound parent for further processing. In contrast, body collidables that live natively in the space simply
+        /// gather data directly from the bodies set and scatter bounds directly into the broad phase.
+        /// </remarks>
+        public interface ICollidableBundleSource
+        {
+            /// <summary>
+            /// Gets the number of collidables in this set of bundles.
+            /// </summary>
+            int Count { get; }
+            /// <summary>
+            /// Gathers collidable data required to calculate the bounding boxes for a bundle.
+            /// </summary>
+            /// <param name="collidablesStartIndex">Start index of the bundle in the collidables set to gather bounding box relevant data for.</param>
+            void GatherCollidableBundle(int collidablesStartIndex, out Vector<int> shapeIndices, out Vector<float> maximumExpansion,
+                out BodyPoses poses, out BodyVelocities velocities);
+            /// <summary>
+            /// Scatters the calculated bounds into the target memory locations.
+            /// </summary>
+            void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int collidablesStartIndex);
+        }
+
+        public struct NativePrimitiveBundleSource : ICollidableBundleSource
+        { }
+
+        public static void UpdatePrimitiveBoundingBoxes<TBundleBounder, TBundleSource>(
+            ref TBundleSource bundleSource, ref TBundleBounder bundleBounder, Bodies bodies, float dt)
+            where TBundleBounder : IBundleBounder where TBundleSource : ICollidableBundleSource
+        {
+            for (int i = 0; i < bundleSource.Count; i += Vector<float>.Count)
+            {
+                bundleSource.GatherCollidableBundle(i, out var shapeIndices, out var maximumExpansion, out var poses, out var velocities);
+                
+                //The bundle bounder is responsible for gathering shapes from type specific sources. Since it has type knowledge, it is able to both
+                //gather the necessary shape information and call the appropriate bounding box calculator.
+                bundleBounder.GetBounds(ref shapeIndices, ref poses, out var maximumRadius, out var min, out var max);
+                BoundingBoxUpdater.ExpandBoundingBoxes(ref min, ref max, ref velocities, dt, ref maximumRadius, ref maximumExpansion);
+
+                //The bounding boxes are now fully expanded. Scatter them to the target location. For raw primitives in the broad phase, this means sticking them
+                //in the broad phase's acceleration structure. For compound children, we stick them in the waiting compound temporary slots.
+                //To avoid branching or virtual indirections, we once again abuse generics to supply the scattering logic.
+                bundleSource.ScatterBounds(ref min, ref max, i);
+
             }
         }
 
-
-
-        public abstract void FlushUpdates(Bodies bodies, ref QuickList<int, Buffer<int>> collidablesToUpdate);
+        public abstract void FlushUpdates(Bodies bodies, float dt, ref QuickList<int, Buffer<int>> collidablesToUpdate);
 
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }
 
-    public class BodyCollidableBatch<TShape> : BodyCollidableBatch where TShape : struct, IShape
+    struct SphereBundleBounder : IBundleBounder
     {
-        ShapeBatch<TShape> shapes;
+        ShapeBatch<Sphere> shapes;
 
-        public BodyCollidableBatch(ShapeBatch shapeBatch, BufferPool pool, int initialCollidableCount)
+        //Using an initialize function gets around generic issues with constructors.
+        public void Initialize(ShapeBatch shapes)
+        {
+            this.shapes = (ShapeBatch<Sphere>)shapes;
+        }
+
+        public void GetBounds(ref Vector<int> shapeIndices, ref BodyPoses poses, out Vector<float> maximumRadius, out Vector3Wide min, out Vector3Wide max)
+        {
+        }
+    }
+
+
+    public class PrimitiveCollidableBatch<TBundleBounder> : BodyCollidableBatch where TBundleBounder : struct, IBundleBounder
+    {
+        TBundleBounder bundleBounder;
+
+        public PrimitiveCollidableBatch(ShapeBatch shapeBatch, BufferPool pool, int initialCollidableCount)
             : base(pool, initialCollidableCount)
         {
-            shapes = (ShapeBatch<TShape>)shapeBatch;
+            bundleBounder = default(TBundleBounder);
+            bundleBounder.Initialize(shapeBatch);
         }
 
-        public interface IBoundingBoxBundleCalculator
+        public sealed override void FlushUpdates(Bodies bodies, float dt, ref QuickList<int, Buffer<int>> collidablesToUpdate)
         {
-
-        }
-
-        public void UpdatePrimitiveBoundingBoxes<TBoundingBoxBundleCalculator>(ref TBoundingBoxBundleCalculator calculator,
-            Bodies bodies, float dt, ref QuickList<int, Buffer<int>> collidablesToUpdate)
-        {
-            for (int i = 0; i < collidablesToUpdate.Count; i += Vector<float>.Count)
-            {
-                //Create a bundle and execute it.
-                GatherCollidableData(ref collidablesToUpdate, i, out var shapeIndices, out var bodyIndices);
-
-                int count = collidablesToUpdate.Count - i;
-                if (count > Vector<float>.Count)
-                    count = Vector<float>.Count;
-                bodies.GatherPoseAndVelocity(ref bodyIndices, count, out var poses, out var velocities);
-                calculator.GetBounds(shapes, ref shapeIndices, ref poses, out var min, out var max);
-                BoundingBoxUpdater.ExpandBoundingBoxes(ref min, ref max, ref velocities, dt, ref maximumRadius, ref maximumExpansion);
-            }
-
-        public override void FlushUpdates(Bodies bodies, ref QuickList<int, Buffer<int>> collidablesToUpdate)
-        {
-            Debug.Assert((collidablesToUpdate.Count & (collidablesToUpdate.Count - 1)) == 0 && collidablesToUpdate.Count >= Vector<float>.Count,
-                "Primitive batches expect actual vector multiples.");
-
-            for (int i = 0; i < collidablesToUpdate.Count; i += Vector<float>.Count)
-            {
-                //Create a bundle and execute it.
-                ToShapeIndicesBundle(ref collidablesToUpdate, i, out var shapeIndices);
-                SphereBundle bundle = new SphereBundle(shapes, shapeIndices);
-                BodyPoses gatheredPoses;
-                bundle.ComputeBoundingBoxes(ref gatheredPoses, out var min, out var max);
-                BoundingBoxUpdater.exp
-            }
+            UpdatePrimitiveBoundingBoxes(this, ref bundleBounder, bodies, dt, ref collidablesToUpdate);
         }
     }
 

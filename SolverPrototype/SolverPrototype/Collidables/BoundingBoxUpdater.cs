@@ -8,10 +8,12 @@ namespace SolverPrototype.Collidables
 {
     public struct BoundingBoxUpdater
     {
-        Buffer<QuickList<int, Buffer<int>>> batchesPerType;
 
-        public BodyCollidables Collidables;
+        BodyCollidables collidables;
+        Bodies bodies;
         BufferPool<int> pool;
+        float dt;
+        Buffer<QuickList<int, Buffer<int>>> batchesPerType;
 
         /// <summary>
         /// The number of bodies to accumulate per type before executing an AABB update. The more bodies per batch, the less virtual overhead and execution divergence.
@@ -19,28 +21,34 @@ namespace SolverPrototype.Collidables
         /// </summary>
         public const int CollidablesPerFlush = 16;
 
-        public BoundingBoxUpdater(BodyCollidables collidables, BufferPool pool)
+        public BoundingBoxUpdater(Bodies bodies, BodyCollidables collidables, BufferPool pool, float dt)
         {
+            this.bodies = bodies;
+            this.collidables = collidables;
             this.pool = pool.SpecializeFor<int>();
+            this.dt = dt;
             //The number of registered types cannot change mid-frame, because adding collidables mid-update is illegal. Can just allocate based on current count.
             pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(collidables.Shapes.RegisteredTypeCount, out batchesPerType);
-            Collidables = collidables;
         }
 
-        public void Add(Bodies bodies, TypedIndex collidableIndex)
+        public void TryAdd(TypedIndex collidableIndex)
         {
-            var typeIndex = collidableIndex.Type;
-            Debug.Assert(typeIndex >= 0 && typeIndex < batchesPerType.Length, "The preallocated type batch array should be able to hold every type index. Is the type index broken?");
-            ref var batchSlot = ref batchesPerType[typeIndex];
-            if (!batchSlot.Span.Allocated)
+            //For convenience, this function handles the case where the collidable reference points to nothing.
+            if (collidableIndex.Exists)
             {
-                //No list exists for this type yet.
-                QuickList<int, Buffer<int>>.Create(pool, CollidablesPerFlush, out batchSlot);
-            }
-            batchSlot.AddUnsafely(collidableIndex.Index);
-            if (batchSlot.Count == CollidablesPerFlush)
-            {
-                Collidables[typeIndex].FlushUpdates(bodies, ref batchSlot);
+                var typeIndex = collidableIndex.Type;
+                Debug.Assert(typeIndex >= 0 && typeIndex < batchesPerType.Length, "The preallocated type batch array should be able to hold every type index. Is the type index broken?");
+                ref var batchSlot = ref batchesPerType[typeIndex];
+                if (!batchSlot.Span.Allocated)
+                {
+                    //No list exists for this type yet.
+                    QuickList<int, Buffer<int>>.Create(pool, CollidablesPerFlush, out batchSlot);
+                }
+                batchSlot.AddUnsafely(collidableIndex.Index);
+                if (batchSlot.Count == CollidablesPerFlush)
+                {
+                    collidables[typeIndex].FlushUpdates(bodies, dt, ref batchSlot);
+                }
             }
         }
 
@@ -126,12 +134,8 @@ namespace SolverPrototype.Collidables
             var a6 = a4 * a2;
             var cosAngle = Vector<float>.One - a2 * new Vector<float>(1f / 2f) + a4 * new Vector<float>(1f / 24f) - a6 * new Vector<float>(1f / 720f);
             var angularExpansion = Vector.SquareRoot(maximumRadius * maximumRadius - new Vector<float>(2) * maximumRadius * cosAngle + Vector<float>.One);
-            minDisplacement.X -= angularExpansion;
-            minDisplacement.Y -= angularExpansion;
-            minDisplacement.Z -= angularExpansion;
-            maxDisplacement.X += angularExpansion;
-            maxDisplacement.Y += angularExpansion;
-            maxDisplacement.Z += angularExpansion;
+            Vector3Wide.Subtract(ref minDisplacement, ref angularExpansion, out minDisplacement);
+            Vector3Wide.Add(ref maxDisplacement, ref angularExpansion, out maxDisplacement);
 
             //The maximum expansion passed into this function is the speculative margin for discrete mode collidables, and ~infinity for continuous ones.
             var negativeMaximum = -maximumExpansion;
@@ -146,11 +150,12 @@ namespace SolverPrototype.Collidables
             //with 64 bit positions is silly.)
         }
 
-        public void Dispose()
+        public void FlushAndDispose()
         {
-            for (int i = 0; i < batchesPerType.Length; ++i)
+            for (int typeIndex = 0; typeIndex < batchesPerType.Length; ++typeIndex)
             {
-                ref var batch = ref batchesPerType[i];
+                ref var batch = ref batchesPerType[typeIndex];
+                collidables[typeIndex].FlushUpdates(bodies, dt, ref batch);
                 if (batch.Span.Allocated)
                     batch.Dispose(pool);
             }

@@ -8,43 +8,40 @@ namespace SolverPrototype.Collidables
         uint packed;
 
         /// <summary>
-        /// Gets or sets the type index of the object.
+        /// Gets the type index of the object.
         /// </summary>
         public int Type
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (int)(packed & 0xFF000000) >> 24; }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set { ValidateType(value); packed = (packed & 0x00FFFFFF) | (uint)(value << 24); }
+            get { return (int)(packed & 0x7F000000) >> 24; }
         }
 
         /// <summary>
-        /// Gets or sets the index of the object.
+        /// Gets the index of the object.
         /// </summary>
         public int Index
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return (int)(packed & 0x00FFFFFF); }
+        }
+
+        /// <summary>
+        /// Gets whether this index actually refers to anything. The Type and Index should only be used if this is true.
+        /// </summary>
+        public bool Exists
+        {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set { ValidateIndex(value); packed = (packed & 0xFF000000) | (uint)value; }
+            get { return (packed & (1 << 31)) > 0; }
         }
-
-        [Conditional("DEBUG")]
-        public void ValidateType(int type)
-        {
-            Debug.Assert(type >= 0 && type < 256, "Do you really have that many type indices, or is the index corrupt?");
-        }
-        [Conditional("DEBUG")]
-        public void ValidateIndex(int index)
-        {
-            Debug.Assert(index >= 0 && index < 256, "Do you really have that many instances, or is the index corrupt?");
-        }
-
+        
         public TypedIndex(int type, int index)
         {
-            ValidateType(type);
-            ValidateIndex(index);
-            packed = (uint)((type << 24) | index);
+            Debug.Assert(type >= 0 && type < 128, "Do you really have that many type indices, or is the index corrupt?");
+            Debug.Assert(index >= 0 && index < (1 << 24), "Do you really have that many instances, or is the index corrupt?");
+            //Note the inclusion of a set bit in the most significant slot.
+            //This encodes that the index was explicitly constructed, so it is a 'real' reference.
+            //A default constructed TypeIndex will have a 0 in the MSB, so we can use the default constructor for empty references.
+            packed = (uint)((type << 24) | index | (1u << 31));
         }
 
     }

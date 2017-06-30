@@ -25,5 +25,13 @@
         /// New bodies will be given enough memory for this number of constraints, and any compaction will not reduce the allocations below it.
         /// </summary>
         public int ConstraintCountPerBodyEstimate;
+        /// <summary>
+        /// Minimum number of shapes to allocate space for in each shape type batch.
+        /// </summary>
+        public int ShapesPerType;
+        /// <summary>
+        /// Minimum number of collidable descriptions to allocate space for in each collidable type batch.
+        /// </summary>
+        public int CollidablesPerType;
     }
 }

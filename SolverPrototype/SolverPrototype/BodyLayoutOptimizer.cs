@@ -46,7 +46,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void UpdateConstraintsForBodyMemoryMove(int bodyIndex, int newBodyIndex, ConstraintConnectivityGraph graph, Solver solver)
+        public static void UpdateForBodyMemoryMove(int bodyIndex, int newBodyIndex, ConstraintConnectivityGraph graph, Solver solver)
         {
             ref var list = ref graph.GetConstraintList(bodyIndex);
             for (int i = 0; i < list.Count; ++i)
@@ -63,8 +63,8 @@ namespace SolverPrototype
             //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
             //Note that references to both bodies must be changed- both bodies moved!
             //This function does not update the actual position of the list in the graph, so we can modify both without worrying about invalidating indices.
-            UpdateConstraintsForBodyMemoryMove(a, b, graph, solver);
-            UpdateConstraintsForBodyMemoryMove(b, a, graph, solver);
+            UpdateForBodyMemoryMove(a, b, graph, solver);
+            UpdateForBodyMemoryMove(b, a, graph, solver);
 
             //Update the body and graph locations.
             bodies.Swap(a, b);

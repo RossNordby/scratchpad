@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using SolverPrototype.Constraints;
+using SolverPrototype.Collidables;
 
 namespace SolverPrototype
 {
@@ -76,6 +77,10 @@ namespace SolverPrototype
         /// Remaps a body index to its handle.
         /// </summary>
         public Buffer<int> IndexToHandle;
+        /// <summary>
+        /// The set of references to collidables owned by each body. Bodies are not required to have collidables; the index may be default constructed to point at nothing.
+        /// </summary>
+        public Buffer<TypedIndex> Collidables;
 
         public Buffer<BodyPoses> Poses;
         public Buffer<BodyVelocities> Velocities;
@@ -125,9 +130,12 @@ namespace SolverPrototype
             pool.SpecializeFor<BodyInertias>().Resize(ref Inertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, BodyCount);
             pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, BodyCount);
+            pool.SpecializeFor<TypedIndex>().Resize(ref Collidables, targetBodyCapacity, BodyCount);
             //Initialize all the indices beyond the copied region to -1.
             Unsafe.InitBlock(((int*)HandleToIndex.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - BodyCount)));
             Unsafe.InitBlock(((int*)IndexToHandle.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - BodyCount)));
+            //Collidables beyond the body count should all point to nothing, which corresponds to zero.
+            Collidables.Clear(BodyCount, Collidables.Length - BodyCount);
             //Note that we do NOT modify the idpool's internal queue size here. We lazily handle that during adds, and during explicit calls to EnsureCapacity, Compact, and Resize.
             //The idpool's internal queue will often be nowhere near as large as the actual body size except in corner cases, so in the usual case, being lazy saves a little space.
             //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.

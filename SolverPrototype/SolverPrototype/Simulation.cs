@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Memory;
+using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,8 @@ namespace SolverPrototype
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
         public Bodies Bodies { get; private set; }
+        public Shapes Shapes { get; private set; }
+        public BodyCollidables BodyCollidables { get; private set; }
         public PoseIntegrator PoseIntegrator { get; private set; }
         public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
@@ -42,6 +45,8 @@ namespace SolverPrototype
         {
             BufferPool = bufferPool;
             Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
+            Shapes = new Shapes(initialAllocationSizes.ShapesPerType);
+            BodyCollidables = new BodyCollidables(Shapes, initialAllocationSizes.CollidablesPerType);
             Solver = new Solver(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
@@ -49,14 +54,22 @@ namespace SolverPrototype
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
-            PoseIntegrator = new PoseIntegrator(Bodies);
+            PoseIntegrator = new PoseIntegrator(Bodies, BodyCollidables);
         }
         /// <summary>
         /// Constructs a full featured simulation supporting dynamic movement and constraints. Uses a default preallocation size.
         /// </summary>
         /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
         public Simulation(BufferPool bufferPool)
-            : this(bufferPool, new SimulationAllocationSizes { Bodies = 4096, ConstraintCountPerBodyEstimate = 8, Constraints = 16384, ConstraintsPerTypeBatch = 256 })
+            : this(bufferPool, new SimulationAllocationSizes
+            {
+                Bodies = 4096,
+                ShapesPerType = 128,
+                CollidablesPerType = 4096,
+                ConstraintCountPerBodyEstimate = 8,
+                Constraints = 16384,
+                ConstraintsPerTypeBatch = 256
+            })
         {
         }
 
@@ -76,7 +89,7 @@ namespace SolverPrototype
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.UpdateConstraintsForBodyMemoryMove(movedBodyOriginalIndex, removedIndex, ConstraintGraph, Solver);
+                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, removedIndex, BodyCollidables, ConstraintGraph, Solver);
             }
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(removedIndex, movedBodyOriginalIndex);
@@ -167,7 +180,7 @@ namespace SolverPrototype
                 ProfilerStart(SolverBatchCompressor);
                 SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
                 ProfilerEnd(SolverBatchCompressor);
-                
+
                 ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt, threadDispatcher);
                 ProfilerEnd(PoseIntegrator);

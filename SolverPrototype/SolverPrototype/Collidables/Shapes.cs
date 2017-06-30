@@ -62,13 +62,16 @@ namespace SolverPrototype.Collidables
 
         public int RegisteredTypeCount => batches.Count;
 
+        public int InitialCapacityPerTypeBatch { get; set; }
         public ShapeBatch this[int typeIndex] => batches[typeIndex];
 
-        public Shapes()
+        public Shapes(int initialCapacityPerTypeBatch)
         {
+            InitialCapacityPerTypeBatch = initialCapacityPerTypeBatch;
             //This list pretty much will never resize unless something really strange happens, and since batches use virtual calls, we have to allow storage of reference types.
             QuickList<ShapeBatch, Array<ShapeBatch>>.Create(new PassthroughArrayPool<ShapeBatch>(), 16, out batches);
         }
 
+        //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }
 }

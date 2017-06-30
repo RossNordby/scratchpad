@@ -8,9 +8,9 @@ namespace SolverPrototype.Collidables
         internal uint packed;
 
         /// <summary>
-        /// Gets or sets whether this reference points to a body collidable. If false, the reference points to a static.
+        /// Gets or sets whether this reference points to a static collidable. If false, the reference points to a body.
         /// </summary>
-        public bool IsBody
+        public bool IsStatic
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return (packed & 31) > 0; }
@@ -65,7 +65,7 @@ namespace SolverPrototype.Collidables
         //1) Is this associated with a body, or a static? (Activity state is implicit- if it's in the active broadphase, then it's associated with an active body.)
         //2) What is the type of the shape underlying the collidable?
         //3) Where is the collidable in that batch?
-        //Bit 31: 0 if body, 1 if static.
+        //Bit 31: 0 if body, 1 if static. The bodies set can store -1 as a collidable reference to imply 'no collidable'.
         //Bits 24-30: shape type index.
         //Bits 0-23: collidable index within the type batch (within the body or static set).
     }
