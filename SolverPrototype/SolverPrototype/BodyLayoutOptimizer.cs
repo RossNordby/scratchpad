@@ -17,7 +17,6 @@ namespace SolverPrototype
     public partial class BodyLayoutOptimizer
     {
         Bodies bodies;
-        BodyCollidables bodyCollidables;
         ConstraintConnectivityGraph graph;
         Solver solver;
 
@@ -39,23 +38,17 @@ namespace SolverPrototype
             }
         }
 
-        public BodyLayoutOptimizer(Bodies bodies, BodyCollidables bodyCollidables, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
+        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
         {
             this.bodies = bodies;
-            this.bodyCollidables = bodyCollidables;
             this.graph = graph;
             this.solver = solver;
             OptimizationFraction = optimizationFraction;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void UpdateForBodyMemoryMove(int bodyIndex, int newBodyIndex, Bodies bodies, BodyCollidables collidables, ConstraintConnectivityGraph graph, Solver solver)
+        public static void UpdateForBodyMemoryMove(int bodyIndex, int newBodyIndex, Bodies bodies, ConstraintConnectivityGraph graph, Solver solver)
         {
-            var collidableIndex = bodies.Collidables[bodyIndex];
-            if (collidableIndex.Exists)
-            {
-                collidables[collidableIndex.Type][collidableIndex.Index].BodyIndex = newBodyIndex;
-            }
             ref var list = ref graph.GetConstraintList(bodyIndex);
             for (int i = 0; i < list.Count; ++i)
             {

@@ -6,11 +6,14 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Collidables
 {
+    /// <summary>
+    /// Computes bounding boxes for bodies.
+    /// </summary>
+    /// <remarks>Note that only bodies need a dynamic bounding box updater. Bounding boxes for statics can be updated on demand- which should be extremely rare.</remarks>
     public struct BoundingBoxUpdater
-    {
-
-        BodyCollidables collidables;
+    {        
         Bodies bodies;
+        Shapes shapes;
         BufferPool<int> pool;
         float dt;
         Buffer<QuickList<int, Buffer<int>>> batchesPerType;
@@ -21,22 +24,27 @@ namespace SolverPrototype.Collidables
         /// </summary>
         public const int CollidablesPerFlush = 16;
 
-        public BoundingBoxUpdater(Bodies bodies, BodyCollidables collidables, BufferPool pool, float dt)
+        public BoundingBoxUpdater(Bodies bodies, Shapes shapes, BufferPool pool, float dt)
         {
             this.bodies = bodies;
-            this.collidables = collidables;
+            this.shapes = shapes;
             this.pool = pool.SpecializeFor<int>();
             this.dt = dt;
             //The number of registered types cannot change mid-frame, because adding collidables mid-update is illegal. Can just allocate based on current count.
-            pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(collidables.Shapes.RegisteredTypeSpan, out batchesPerType);
+            pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(shapes.RegisteredTypeSpan, out batchesPerType);
         }
 
-        public void TryAdd(TypedIndex collidableIndex)
+        public void TryAdd(int bodyIndex)
         {
             //For convenience, this function handles the case where the collidable reference points to nothing.
-            if (collidableIndex.Exists)
+            //Note that this touches the memory associated with the full collidable. That's okay- we'll be reading the rest of it shortly if it has a collidable.
+            ref var collidable = ref bodies.Collidables[bodyIndex];
+            //Technically, you could make a second pass that only processes collidables, rather than iterating over all bodies and doing last second branches.
+            //But then you'd be evicting everything from cache L1/L2. And, 99.99% of the time, bodies are going to have shapes, so this isn't going to be a difficult branch to predict.
+            //Even if it was 50%, the cache benefit of executing alongside the just-touched data source would outweigh the misprediction.
+            if (collidable.Shape.Exists)
             {
-                var typeIndex = collidableIndex.Type;
+                var typeIndex = collidable.Shape.Type;
                 Debug.Assert(typeIndex >= 0 && typeIndex < batchesPerType.Length, "The preallocated type batch array should be able to hold every type index. Is the type index broken?");
                 ref var batchSlot = ref batchesPerType[typeIndex];
                 if (!batchSlot.Span.Allocated)
@@ -44,7 +52,7 @@ namespace SolverPrototype.Collidables
                     //No list exists for this type yet.
                     QuickList<int, Buffer<int>>.Create(pool, CollidablesPerFlush, out batchSlot);
                 }
-                batchSlot.AddUnsafely(collidableIndex.Index);
+                batchSlot.AddUnsafely(bodyIndex);
                 if (batchSlot.Count == CollidablesPerFlush)
                 {
                     collidables[typeIndex].FlushUpdates(bodies, dt, ref batchSlot);

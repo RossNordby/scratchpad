@@ -25,17 +25,17 @@ namespace SolverPrototype
     public class PoseIntegrator
     {
         Bodies bodies;
-        BodyCollidables collidables;
+        Shapes shapes;
 
         /// <summary>
         /// Acceleration of gravity to apply to all dynamic bodies in the simulation.
         /// </summary>
         public Vector3 Gravity;
 
-        public PoseIntegrator(Bodies bodies, BodyCollidables collidables)
+        public PoseIntegrator(Bodies bodies, Shapes shapes)
         {
             this.bodies = bodies;
-            this.collidables = collidables;
+            this.shapes = shapes;
         }
 
 
@@ -124,7 +124,7 @@ namespace SolverPrototype
                 {
                     //Note that any collidable that lacks a collidable, or any reference that is beyond the set of collidables, will have a specially formed index.
                     //The accumulator will detect that and not try to add a nonexistent collidable- hence, "TryAdd".
-                    boundingBoxUpdater.TryAdd(bodies.Collidables[bundleBodyIndexBase + j]);
+                    boundingBoxUpdater.TryAdd(bundleBodyIndexBase + j);
                 }
 
                 //It's helpful to do the bounding box update here in the pose integrator because they share information. If the phases were split, there could be a penalty
@@ -147,7 +147,7 @@ namespace SolverPrototype
         void Worker(int workerIndex)
         {
             var bodyBundleCount = bodies.BodyBundleCount;
-            var boundingBoxUpdater = new BoundingBoxUpdater(bodies, collidables, threadDispatcher.GetThreadMemoryPool(workerIndex), cachedDt);
+            var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, threadDispatcher.GetThreadMemoryPool(workerIndex), cachedDt);
             while (true)
             {
                 var jobIndex = Interlocked.Decrement(ref availableJobCount);
@@ -195,7 +195,7 @@ namespace SolverPrototype
             }
             else
             {
-                var boundingBoxUpdater = new BoundingBoxUpdater(bodies, collidables, pool, dt);
+                var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, pool, dt);
                 IntegrateBundles(0, bodies.BodyBundleCount, dt, ref boundingBoxUpdater);
                 boundingBoxUpdater.FlushAndDispose();
             }

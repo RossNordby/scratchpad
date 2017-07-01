@@ -16,7 +16,6 @@ namespace SolverPrototype
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
         public Bodies Bodies { get; private set; }
         public Shapes Shapes { get; private set; }
-        public BodyCollidables BodyCollidables { get; private set; }
         public PoseIntegrator PoseIntegrator { get; private set; }
         public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
@@ -41,16 +40,15 @@ namespace SolverPrototype
         {
             BufferPool = bufferPool;
             Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
-            Shapes = new Shapes(initialAllocationSizes.ShapesPerType);
-            BodyCollidables = new BodyCollidables(Shapes, initialAllocationSizes.CollidablesPerType);
+            Shapes = new Shapes(bufferPool, initialAllocationSizes.ShapesPerType);
             Solver = new Solver(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
-            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BodyCollidables, ConstraintGraph, Solver, bufferPool);
+            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
-            PoseIntegrator = new PoseIntegrator(Bodies, BodyCollidables);
+            PoseIntegrator = new PoseIntegrator(Bodies, Shapes);
         }
         /// <summary>
         /// Constructs a full featured simulation supporting dynamic movement and constraints. Uses a default preallocation size.
@@ -69,42 +67,17 @@ namespace SolverPrototype
         {
         }
 
-
-        public int Add(ref BodyDescription bodyDescription)
-        {
-            var handle = Bodies.Add(ref bodyDescription);
-            ConstraintGraph.AddBodyList(Bodies.HandleToIndex[handle]);
-            return handle;
-        }
-
+        
         public int Add(ref BodyDescription bodyDescription, ref CollidableDescription collidableDescription)
         {
-            var handle = Add(ref bodyDescription);
-            if (collidableDescription.ShapeIndex.Exists)
+            var handle = Bodies.Add(ref bodyDescription, ref collidableDescription);
+            if(collidableDescription.ShapeIndex.Exists)
             {
-                BodyCollidables.Add(Bodies, Bodies.HandleToIndex[handle], ref collidableDescription, BufferPool);
+                //This body has a collidable; stick it in the broadphase.
+                //TODO: Add it to the broadphase!
+                //Bodies.Collidables[Bodies.HandleToIndex[handle]].BroadPhaseIndex = BroadPhase.Add();
             }
             return handle;
-        }
-
-        /// <summary>
-        /// Changes the collidable associated with a body with no restriction on whether the body currently has a collidable or what shape it is.
-        /// </summary>
-        /// <param name="bodyHandle">Handle of the body to change the collidable of.</param>
-        /// <param name="collidableDescription">Description of the collidable to create for the body.</param>
-        /// <remarks>This is useful when the body is changing to an entirely different collidable. If you only want to change the settings associated with a body's existing collidable
-        /// without changing the type of shape it uses, it is more efficient to just directly access its properties by looking it up in the BodyCollidables.</remarks>
-        public void ChangeBodyCollidable(int bodyHandle, ref CollidableDescription collidableDescription)
-        {
-            Bodies.ValidateExistingHandle(bodyHandle);
-            var bodyIndex = Bodies.HandleToIndex[bodyHandle];
-            ref var collidableIndex = ref Bodies.Collidables[bodyIndex];
-            //Remove the collidable if it already exists.
-            if (collidableIndex.Exists)
-            {
-                BodyCollidables.Remove(Bodies, collidableIndex);
-            }
-            BodyCollidables.Add(Bodies, bodyIndex, ref collidableDescription, BufferPool);
         }
 
 
@@ -113,19 +86,19 @@ namespace SolverPrototype
             Bodies.ValidateExistingHandle(bodyHandle);
 
             var bodyIndex = Bodies.HandleToIndex[bodyHandle];
-            var collidableIndex = Bodies.Collidables[bodyIndex];
+            ref var collidable = ref Bodies.Collidables[bodyIndex];
+            if(collidable.Shape.Exists)
+            {
+                //The collidable exists, so it should be removed from the broadphase.
+                //TODO: remove the collidable from the broadphase :)
+            }
             if (Bodies.RemoveAt(bodyIndex, out var movedBodyOriginalIndex))
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BodyCollidables, ConstraintGraph, Solver);
+                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, ConstraintGraph, Solver);
             }
-            //Not every body is forced to have a collidable. Only try to remove those that exist!
-            if (collidableIndex.Exists)
-            {
-                BodyCollidables.Remove(Bodies, collidableIndex);
-            }
-
+   
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);
             Debug.Assert(constraintListWasEmpty, "Removing a body without first removing its constraints results in orphaned constraints that will break stuff. Don't do it!");
 

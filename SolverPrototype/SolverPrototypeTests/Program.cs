@@ -1,19 +1,12 @@
 ﻿using BEPUutilities2;
 using DemoContentLoader;
-using DemoRenderer;
-using DemoRenderer.Background;
 using DemoRenderer.UI;
 using DemoUtilities;
 using OpenTK;
-using OpenTK.Input;
 using SolverPrototype;
-using SolverPrototype.Collidables;
-using SolverPrototype.Constraints;
 using SolverPrototypeTests.Properties;
 using System;
-using System.Diagnostics;
 using System.IO;
-using System.Runtime.CompilerServices;
 
 namespace SolverPrototypeTests
 {

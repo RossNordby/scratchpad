@@ -21,11 +21,7 @@ namespace SolverPrototype.Collidables
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return Radius; }
         }
-
-        public BodyCollidableBatch CreateCollidableBatch(ShapeBatch shapeBatch, BufferPool pool, int initialCapacity)
-        {
-            return new BodyCollidableBatch<Sphere>
-        }
+        
     }
 
     public struct SphereBundle : IShapeBundle
