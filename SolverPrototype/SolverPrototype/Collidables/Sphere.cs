@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using BEPUutilities2.Memory;
 
 namespace SolverPrototype.Collidables
 {
@@ -19,6 +20,11 @@ namespace SolverPrototype.Collidables
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return Radius; }
+        }
+
+        public BodyCollidableBatch CreateCollidableBatch(ShapeBatch shapeBatch, BufferPool pool, int initialCapacity)
+        {
+            return new BodyCollidableBatch<Sphere>
         }
     }
 

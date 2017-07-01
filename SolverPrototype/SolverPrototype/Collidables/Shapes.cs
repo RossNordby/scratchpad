@@ -14,6 +14,8 @@ namespace SolverPrototype.Collidables
     public interface IShape//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape>
     {
         float MaximumRadius { get; }
+
+        BodyCollidableBatch CreateCollidableBatch(ShapeBatch shapeBatch, BufferPool pool, int initialCapacity);
     }
     public interface IShapeBundle//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape> 
     {
