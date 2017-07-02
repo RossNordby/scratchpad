@@ -88,4 +88,37 @@ namespace SolverPrototype.Collidables
         internal bool UseInnerSphere { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return ((uint)Mode & 2) > 0; } }
         internal bool UseSubstepping { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return ((uint)Mode & 4) > 0; } }
     }
+
+    /// <summary>
+    /// Description of a collidable instance living in the broad phase and able to generate collision pairs.
+    /// Collidables with a ShapeIndex that points to nothing (a default constructed TypedIndex) do not actually refer to any existing Collidable.
+    /// This can be used for a body which needs no collidable representation.
+    /// </summary>
+    public struct Collidable
+    {
+        /// <summary>
+        /// Index of the shape used by the body.
+        /// </summary>
+        public TypedIndex Shape;
+        /// <summary>
+        /// Index of the collidable in the broad phase. Used to look up the target location for bounding box scatters.
+        /// </summary>
+        public int BroadPhaseIndex;
+        /// <summary>
+        /// Size of the margin around the surface of the shape in which contacts can be generated. These contacts will have negative depth and only contribute if the frame's velocities
+        /// would push the shapes of a pair into overlap. This should be positive to avoid jittering. It can also be used as a form of continuous collision detection, but excessively 
+        /// high values combined with fast motion may result in visible 'ghost collision' artifacts. 
+        /// <para>For continuous collision detection with less chance of ghost collisions, use the dedicated continuous collision detection modes.</para>
+        /// </summary>
+        public float SpeculativeMargin;
+
+        /// <summary>
+        /// Continuous collision detection settings for this collidable. Includes the collision detection mode to use and tuning variables associated with those modes.
+        /// </summary>
+        public ContinuousDetectionSettings Continuity;
+        //These CCD settings are bundled together away from the rest of the collidable data for a few reasons:
+        //1) They do a little packing to avoid pointless memory overhead,
+        //2) It's possible that we'll want to split them out later if data access patterns suggest that it's a good idea,
+        //3) Don't really want to pollute this structure's members with CCD-conditional tuning variables.
+    }
 }

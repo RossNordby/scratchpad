@@ -7,32 +7,29 @@ using System.Diagnostics;
 
 namespace SolverPrototype.Collidables
 {
-    //honestly these generics arent necessary i just wanted to see it 
     /// <summary>
     /// Defines a type usable as a shape by collidables.
     /// </summary>
-    public interface IShape//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape>
+    public interface IShape<TShape, TShapeBundle> where TShape : IShape<TShape, TShapeBundle> where TShapeBundle : IShapeBundle
     {
         float MaximumRadius { get; }
 
-        BodyCollidableBatch CreateCollidableBatch(ShapeBatch shapeBatch, BufferPool pool, int initialCapacity);
+        void Gather(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, out TShapeBundle shapeBundle);
     }
     public interface IShapeBundle//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape> 
     {
-        void ComputeBoundingBoxes(ref BodyPoses poses, out Vector3Wide min, out Vector3Wide max);
+        void GetBounds(ref BodyPoses poses, out Vector<float> maximumRadius, out Vector3Wide min, out Vector3Wide max);
     }
 
     public abstract class ShapeBatch
     {
         protected BufferPool pool;
-        public abstract BodyCollidableBatch CreateBodyCollidableBatchForType(int initialCapacityPerCollidableBatch);
-
-
+        public abstract void ComputeBounds<TBundleSource>(ref TBundleSource source) where TBundleSource : ICollidableBundleSource;
         public abstract void RemoveAt(int index);
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }
 
-    public class ShapeBatch<TShape> : ShapeBatch where TShape : struct, IShape //TODO: When blittable is supported, shapes should be made blittable. We store them in buffers.
+    public class ShapeBatch<TShape, TShapeBundle> : ShapeBatch where TShape : struct, IShape<TShape, TShapeBundle> where TShapeBundle : IShapeBundle //TODO: When blittable is supported, shapes should be made blittable. We store them in buffers.
     {
 
         Buffer<TShape> shapes;
@@ -56,13 +53,9 @@ namespace SolverPrototype.Collidables
         /// <returns>Reference to the shape at the given index.</returns>
         public ref TShape this[int shapeIndex] { get { return ref shapes[shapeIndex]; } }
 
-        //The virtual cost of creating a colliable batch is negligible- it happens a handful of times per simulation.
-        //We punt responsibility for the actual batch creation to a shape type to avoid requiring per-shape type ShapeBatch<TShape> subclasses.
-        //TODO: This touches a pretty wiggly design. Except it to change.
-        public sealed override BodyCollidableBatch CreateBodyCollidableBatchForType(int initialCapacity)
-        {
-            return default(TShape).CreateCollidableBatch(this, pool, initialCapacity);
-        }
+
+
+
 
         //Note that shapes cannot be moved; there is no reference to the collidables using them, so we can't correct their indices.
         //But that's fine- we never directly iterate over the shapes set anyway.
@@ -97,6 +90,21 @@ namespace SolverPrototype.Collidables
             idPool.Return(index);
         }
 
+        public override void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt)
+        {
+            for (int i = 0; i < source.Count; i += Vector<float>.Count)
+            {
+                source.GatherCollidableBundle(i, out var shapeIndices, out var maximumExpansions, out var poses, out var velocities);
+                //TODO: Confirm zero overhead.
+                //Note that this outputs a bundle, which we turn around and immediately use. Considering only this function in isolation, they could be combined.
+                //However, in the narrow phase, it's useful to be able to gather shapes, and you don't want to do bounds computation at the same time.
+                default(TShape).Gather(ref shapes, ref shapeIndices, out var shapeBundle);
+                shapeBundle.GetBounds(ref poses, out var maximumRadius, out var min, out var max);
+                BoundingBoxUpdater.ExpandBoundingBoxes(ref min, ref max, ref velocities, dt, ref maximumRadius, ref maximumExpansions);
+                source.ScatterBounds(ref min, ref max, i);
+            }
+        }
+
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }
     public class Shapes
@@ -121,12 +129,12 @@ namespace SolverPrototype.Collidables
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref TShape GetShape<TShape>(int shapeIndex) where TShape : struct, IShape
+        public ref TShape GetShape<TShape>(int shapeIndex) where TShape : struct, IShape<TShape, TShapeBundle>
         {
-            var typeIndex = TypeIds<IShape>.GetId<TShape>();
-            return ref Unsafe.As<ShapeBatch, ShapeBatch<TShape>>(ref batches[typeIndex])[shapeIndex];            
+            var typeIndex = TypeIds<>.GetId<TShape>();
+            return ref Unsafe.As<ShapeBatch, ShapeBatch<TShape>>(ref batches[typeIndex])[shapeIndex];
         }
-        
+
         public TypedIndex Add<TShape>(ref TShape shape) where TShape : struct, IShape
         {
             var typeId = TypeIds<IShape>.GetId<TShape>();
