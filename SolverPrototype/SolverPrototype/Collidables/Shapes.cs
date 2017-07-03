@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System;
 using System.Diagnostics;
+using SolverPrototype.CollisionDetection;
 
 namespace SolverPrototype.Collidables
 {
@@ -12,12 +13,23 @@ namespace SolverPrototype.Collidables
     /// </summary>
     public interface IShape
     {
+
         //Note that the shape gathering required for get bounds is also useful for narrow phase calculations.
         //However, exposing it in a type-safe way isn't trivial. So instead, we just choose at the API level to bundle the gather and AABB calculation together.
         //Analogously to the bounds calculation, narrow phase pairs will have the type information to directly call the underlying type's gather function.
-        void GetBounds<TShape>(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, int count, ref BodyPoses poses,
+        void GetBounds<TShape>(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, int count, ref QuaternionWide orientations,
            out Vector<float> maximumRadius, out Vector<float> maximumAngularExpansion, out Vector3Wide min, out Vector3Wide max)
            where TShape : struct, IShape;
+        //One-off bounds calculations are useful sometimes, even within the engine. Adding individual bodies to the simulation, for example.
+        //(Of course, if you wanted to add a lot of bodies, you'd want to batch everything up and use either cached values or the above bundle bounds calculator, but 
+        //for most use cases, body-adding isn't the bottleneck.)
+        //Note, however, that we do not bother supporting velocity expansion on the one-off variant. For the purposes of adding objects to the simulation, that is basically irrelevant.
+        //I don't predict ever needing it, but such an implementation could be added...
+        void GetBounds(ref BEPUutilities2.Quaternion orientation, out Vector3 min, out Vector3 max);
+        
+        //These functions require only an orientation because the effect of the position on the bounding box is the same for all shapes.
+        //By isolating the shape from the position, we can more easily swap out the position representation for higher precision modes while only modifying the stuff that actually
+        //deals with positions directly.
     }
 
 
@@ -45,19 +57,21 @@ namespace SolverPrototype.Collidables
         /// <summary>
         /// Scatters the calculated bounds into the target memory locations.
         /// </summary>
-        void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int collidablesStartIndex);
+        void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int startIndex, int count);
     }
 
     public struct BodyBundleSource : ICollidableBundleSource
     {
         public Bodies Bodies;
+        public BroadPhase BroadPhase;
         public QuickList<int, Buffer<int>> BodyIndices;
         public int Count
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return BodyIndices.Count; }
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void GatherCollidableBundle(int collidablesStartIndex, out Vector<int> shapeIndices, out Vector<float> maximumExpansion, out BodyPoses poses, out BodyVelocities velocities)
         {
             var count = BodyIndices.Count - collidablesStartIndex;
@@ -66,12 +80,24 @@ namespace SolverPrototype.Collidables
             Bodies.GatherDataForBounds(ref BodyIndices[collidablesStartIndex], count, out poses, out velocities, out shapeIndices, out maximumExpansion);
         }
 
-        public void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int collidablesStartIndex)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int startIndex, int count)
         {
-            for (int i = collidablesStartIndex; i < Vector<float>.Count; ++i)
+            ref var minBase = ref Unsafe.As<Vector<float>, float>(ref min.X);
+            ref var maxBase = ref Unsafe.As<Vector<float>, float>(ref max.X);
+            for (int i = 0; i < count; ++i)
             {
-                //TODO: body bundle updates scatter to the broad phase.
-                //ref var startIndex = ref BroadPhase.GetBoundsReference(Bodies.Collidables[BodyIndices[i]].BroadPhaseIndex);
+                //Note that we're hardcoding a relationship between the broadphase implementation and AABB calculation. This increases coupling and makes it harder to swap
+                //broadphases, but in practice, I don't think a single person besides me ever created a broad phase for v1, and there was only ever a single broad phase implementation 
+                //that was worth using at any given time. Abstraction for the sake of abstraction at the cost of virtual calls everywhere isn't worth it.
+                BroadPhase.GetBoundsPointers(Bodies.Collidables[BodyIndices[startIndex + i]].BroadPhaseIndex, out var minPointer, out var maxPointer);
+                //TODO: Check codegen.
+                *minPointer = Unsafe.Add(ref minBase, i);
+                *(minPointer + 1) = Unsafe.Add(ref minBase, i + Vector<float>.Count);
+                *(minPointer + 2) = Unsafe.Add(ref minBase, i + Vector<float>.Count * 2);
+                *maxPointer = Unsafe.Add(ref maxBase, i);
+                *(maxPointer + 1) = Unsafe.Add(ref maxBase, i + Vector<float>.Count);
+                *(maxPointer + 2) = Unsafe.Add(ref maxBase, i + Vector<float>.Count * 2);
             }
         }
     }
@@ -81,6 +107,8 @@ namespace SolverPrototype.Collidables
         protected BufferPool pool;
         public abstract void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt) where TBundleSource : ICollidableBundleSource;
         public abstract void RemoveAt(int index);
+
+        public abstract void ComputeBounds(int shapeIndex, ref BodyPose pose, out Vector3 min, out Vector3 max);
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }
 
@@ -144,7 +172,7 @@ namespace SolverPrototype.Collidables
 #endif
             idPool.Return(index);
         }
-
+        
         public override void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt)
         {
             for (int i = 0; i < source.Count; i += Vector<float>.Count)
@@ -153,13 +181,21 @@ namespace SolverPrototype.Collidables
                 int count = source.Count - i;
                 if (count > Vector<float>.Count)
                     count = Vector<float>.Count;
-                //TODO: Confirm zero overhead.
                 //Note that this outputs a bundle, which we turn around and immediately use. Considering only this function in isolation, they could be combined.
                 //However, in the narrow phase, it's useful to be able to gather shapes, and you don't want to do bounds computation at the same time.
-                default(TShape).GetBounds(ref shapes, ref shapeIndices, count, ref poses, out var maximumRadius, out var maximumAngularExpansion, out var min, out var max);
+                default(TShape).GetBounds(ref shapes, ref shapeIndices, count, ref poses.Orientation, out var maximumRadius, out var maximumAngularExpansion, out var min, out var max);
+                Vector3Wide.Add(ref min, ref poses.Position, out min);
+                Vector3Wide.Add(ref max, ref poses.Position, out max);
                 BoundingBoxUpdater.ExpandBoundingBoxes(ref min, ref max, ref velocities, dt, ref maximumRadius, ref maximumAngularExpansion, ref maximumExpansions);
-                source.ScatterBounds(ref min, ref max, i);
+                source.ScatterBounds(ref min, ref max, i, count);
             }
+        }
+
+        public override void ComputeBounds(int shapeIndex, ref BodyPose pose, out Vector3 min, out Vector3 max)
+        {
+            shapes[shapeIndex].GetBounds(ref pose.Orientation, out min, out max);
+            min += pose.Position;
+            max += pose.Position;
         }
 
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose

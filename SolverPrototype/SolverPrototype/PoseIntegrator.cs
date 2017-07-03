@@ -2,6 +2,7 @@
 using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,16 +27,18 @@ namespace SolverPrototype
     {
         Bodies bodies;
         Shapes shapes;
+        BroadPhase broadPhase;
 
         /// <summary>
         /// Acceleration of gravity to apply to all dynamic bodies in the simulation.
         /// </summary>
         public Vector3 Gravity;
 
-        public PoseIntegrator(Bodies bodies, Shapes shapes)
+        public PoseIntegrator(Bodies bodies, Shapes shapes, BroadPhase broadPhase)
         {
             this.bodies = bodies;
             this.shapes = shapes;
+            this.broadPhase = broadPhase;
         }
 
 
@@ -147,7 +150,7 @@ namespace SolverPrototype
         void Worker(int workerIndex)
         {
             var bodyBundleCount = bodies.BodyBundleCount;
-            var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, threadDispatcher.GetThreadMemoryPool(workerIndex), cachedDt);
+            var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, broadPhase, threadDispatcher.GetThreadMemoryPool(workerIndex), cachedDt);
             while (true)
             {
                 var jobIndex = Interlocked.Decrement(ref availableJobCount);
@@ -195,7 +198,7 @@ namespace SolverPrototype
             }
             else
             {
-                var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, pool, dt);
+                var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, broadPhase, pool, dt);
                 IntegrateBundles(0, bodies.BodyBundleCount, dt, ref boundingBoxUpdater);
                 boundingBoxUpdater.FlushAndDispose();
             }

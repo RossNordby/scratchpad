@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
@@ -17,6 +18,7 @@ namespace SolverPrototype
         public Bodies Bodies { get; private set; }
         public Shapes Shapes { get; private set; }
         public PoseIntegrator PoseIntegrator { get; private set; }
+        public BroadPhase BroadPhase { get; private set; }
         public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
         public BatchCompressor SolverBatchCompressor { get; private set; }
@@ -48,8 +50,10 @@ namespace SolverPrototype
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
-            PoseIntegrator = new PoseIntegrator(Bodies, Shapes);
+            BroadPhase = new BroadPhase();
+            PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
         }
+
         /// <summary>
         /// Constructs a full featured simulation supporting dynamic movement and constraints. Uses a default preallocation size.
         /// </summary>
@@ -67,7 +71,7 @@ namespace SolverPrototype
         {
         }
 
-        
+
         public int Add(ref BodyDescription bodyDescription)
         {
             var handle = Bodies.Add(ref bodyDescription);
@@ -75,8 +79,14 @@ namespace SolverPrototype
             if (bodyDescription.Collidable.Shape.Exists)
             {
                 //This body has a collidable; stick it in the broadphase.
-                //TODO: Add it to the broadphase!
-                //Bodies.Collidables[Bodies.HandleToIndex[handle]].BroadPhaseIndex = BroadPhase.Add();
+                //Note that we have to calculate an initial bounding box for the broad phase to be able to insert it efficiently.
+                //(In the event of batch adds, you'll want to use batched AABB calculations or just use cached values.)
+                var typeIndex = bodyDescription.Collidable.Shape.Type;
+                var shapeIndex = bodyDescription.Collidable.Shape.Index;
+                //Note: the min and max here are in absolute coordinates, which means this is a spot that has to be updated in the event that positions use a higher precision representation.
+                Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out var min, out var max);
+                Bodies.Collidables[Bodies.HandleToIndex[handle]].BroadPhaseIndex =
+                    BroadPhase.Add(new CollidableReference(true, typeIndex, shapeIndex), ref min, ref max);
             }
             return handle;
         }
@@ -88,10 +98,10 @@ namespace SolverPrototype
 
             var bodyIndex = Bodies.HandleToIndex[bodyHandle];
             ref var collidable = ref Bodies.Collidables[bodyIndex];
-            if(collidable.Shape.Exists)
+            if (collidable.Shape.Exists)
             {
                 //The collidable exists, so it should be removed from the broadphase.
-                //TODO: remove the collidable from the broadphase :)
+                BroadPhase.RemoveAt(collidable.BroadPhaseIndex);
             }
             if (Bodies.RemoveAt(bodyIndex, out var movedBodyOriginalIndex))
             {
@@ -99,7 +109,7 @@ namespace SolverPrototype
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
                 BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, ConstraintGraph, Solver);
             }
-   
+
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);
             Debug.Assert(constraintListWasEmpty, "Removing a body without first removing its constraints results in orphaned constraints that will break stuff. Don't do it!");
 
@@ -231,7 +241,7 @@ namespace SolverPrototype
             ConstraintGraph.Clear(Bodies);
             Solver.Clear();
             Bodies.Clear();
-            //TODO: shapes/collidables
+            //TODO: shapes/broadphase
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target.
@@ -247,7 +257,7 @@ namespace SolverPrototype
             Bodies.EnsureCapacity(allocationTarget.Bodies);
             ConstraintGraph.EnsureCapacity(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
-            //TODO: shapes/collidables
+            //TODO: shapes/broadphase
 
         }
         /// <summary>
@@ -264,7 +274,7 @@ namespace SolverPrototype
             Bodies.Compact(allocationTarget.Bodies);
             ConstraintGraph.Compact(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
-            //TODO: shapes/collidables
+            //TODO: shapes/broadphase
         }
         /// <summary>
         /// Increases the allocation size of any buffers too small to hold the allocation target, and decreases the allocation size of any buffers that are unnecessarily large.
@@ -280,7 +290,7 @@ namespace SolverPrototype
             Bodies.Resize(allocationTarget.Bodies);
             ConstraintGraph.Resize(Bodies, allocationTarget.Bodies, allocationTarget.ConstraintCountPerBodyEstimate);
             BodyLayoutOptimizer.ResizeForBodiesCapacity(BufferPool);
-            //TODO: shapes/collidables
+            //TODO: shapes/broadphase
         }
         /// <summary>
         /// Clears the simulation of every object and returns all pooled memory to the buffer pool.
@@ -290,6 +300,7 @@ namespace SolverPrototype
         {
             Clear();
             Solver.Dispose();
+            BroadPhase.Dispose();
             Bodies.Dispose();
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();

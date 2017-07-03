@@ -17,7 +17,7 @@ namespace SolverPrototype.Collidables
         {
             Radius = radius;
         }
-        
+
         //Note that spheres are sufficiently simple that no explicit bundle is required. A single vector<float> suffices.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Gather(ref Buffer<Sphere> shapes, ref Vector<int> shapeIndices, int count, out Vector<float> radii)
@@ -32,7 +32,7 @@ namespace SolverPrototype.Collidables
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GetBounds<TShape>(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, int count, ref BodyPoses poses,
+        public void GetBounds<TShape>(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, int count, ref QuaternionWide orientations,
             out Vector<float> maximumRadius, out Vector<float> maximumAngularExpansion, out Vector3Wide min, out Vector3Wide max)
             where TShape : struct, IShape
         {
@@ -44,8 +44,16 @@ namespace SolverPrototype.Collidables
 
             //It's technically true that spheres (and only spheres) do not require orientation to be loaded and could be special cased to reduce memory traffic, but just heck no.
             //It's very likely that the orientation loaded for the sphere was already in L1 anyway due to the online batching performed during the pose integrator.
-            Vector3Wide.Subtract(ref poses.Position, ref radii, out min);
-            Vector3Wide.Add(ref poses.Position, ref radii, out max);
+            var negatedRadii = -radii;
+            max = new Vector3Wide(ref radii);
+            min = new Vector3Wide(ref negatedRadii);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void GetBounds(ref BEPUutilities2.Quaternion orientation, out Vector3 min, out Vector3 max)
+        {
+            min = new Vector3(-Radius);
+            max = new Vector3(Radius);
         }
     }
 }

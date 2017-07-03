@@ -11,6 +11,14 @@ namespace SolverPrototype
         public Vector<float> Z;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Vector3Wide(ref Vector<float> s)
+        {
+            X = s;
+            Y = s;
+            Z = s;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CreateFrom(ref Vector3 source, out Vector3Wide broadcasted)
         {
             broadcasted.X = new Vector<float>(source.X);

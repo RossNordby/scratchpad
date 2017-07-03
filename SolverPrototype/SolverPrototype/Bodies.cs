@@ -408,7 +408,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherVelocityForBody(ref float targetLinearVelocityBase, ref float targetAngularVelocityBase, int targetLaneIndex, int bundleIndex, int innerIndex)
         {
-            ref var sourceLinear = ref GatherScatter.Get(ref Poses[bundleIndex].Position.X, innerIndex);
+            ref var sourceLinear = ref GatherScatter.Get(ref Velocities[bundleIndex].LinearVelocity.X, innerIndex);
             ref var sourceAngular = ref Unsafe.Add(ref sourceLinear, 3 * Vector<float>.Count);
             ref var targetLinearSlot = ref Unsafe.Add(ref targetLinearVelocityBase, targetLaneIndex);
             ref var targetAngularSlot = ref Unsafe.Add(ref targetAngularVelocityBase, targetLaneIndex);

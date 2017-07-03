@@ -54,11 +54,17 @@ namespace SolverPrototype.Collidables
                 "If you actually have 16777216+ collidables of a single type, this needs a redesign. Are you sure this is a correct index?");
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public CollidableReference(bool isBody, int shapeTypeIndex, int collidableIndex)
         {
             ValidateTypeIndex(shapeTypeIndex);
             ValidateCollidableIndex(collidableIndex);
             packed = ((isBody ? 1u << 31 : 0u) | ((uint)shapeTypeIndex << 24) | (uint)collidableIndex);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public CollidableReference(bool isBody, TypedIndex typedIndex)
+            : this(isBody, typedIndex.Type, typedIndex.Index)
+        {
         }
 
         //We need two know three things:

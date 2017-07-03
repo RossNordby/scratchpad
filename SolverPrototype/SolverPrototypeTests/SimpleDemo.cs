@@ -24,8 +24,8 @@ namespace SolverPrototypeTests
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
             BodyVelocity velocity;
-            velocity.Linear = new Vector3(1, 0, 0);
-            velocity.Angular = new Vector3();
+            //velocity.Linear = new Vector3(1, 0, 0);
+            //velocity.Angular = new Vector3();
             //Simulation.Bodies.SetVelocity(1, ref velocity);
             Simulation.Solver.IterationCount = 8;
             //camera.Position = new Vector3(-40, -10, 5);

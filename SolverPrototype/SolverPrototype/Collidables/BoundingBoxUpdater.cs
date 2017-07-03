@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
+using SolverPrototype.CollisionDetection;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -12,7 +13,7 @@ namespace SolverPrototype.Collidables
     /// <remarks>Note that only bodies need a dynamic bounding box updater. Bounding boxes for statics can be updated on demand- which should be extremely rare.</remarks>
     public struct BoundingBoxUpdater
     {
-        Bodies bodies;
+        BodyBundleSource bundleSource;
         Shapes shapes;
         BufferPool<int> pool;
         float dt;
@@ -24,9 +25,13 @@ namespace SolverPrototype.Collidables
         /// </summary>
         public const int CollidablesPerFlush = 16;
 
-        public BoundingBoxUpdater(Bodies bodies, Shapes shapes, BufferPool pool, float dt)
+        public BoundingBoxUpdater(Bodies bodies, Shapes shapes, BroadPhase broadPhase, BufferPool pool, float dt)
         {
-            this.bodies = bodies;
+            bundleSource = new BodyBundleSource
+            {
+                Bodies = bodies,
+                BroadPhase = broadPhase
+            };
             this.shapes = shapes;
             this.pool = pool.SpecializeFor<int>();
             this.dt = dt;
@@ -140,7 +145,7 @@ namespace SolverPrototype.Collidables
         {
             //For convenience, this function handles the case where the collidable reference points to nothing.
             //Note that this touches the memory associated with the full collidable. That's okay- we'll be reading the rest of it shortly if it has a collidable.
-            ref var collidable = ref bodies.Collidables[bodyIndex];
+            ref var collidable = ref bundleSource.Bodies.Collidables[bodyIndex];
             //Technically, you could make a second pass that only processes collidables, rather than iterating over all bodies and doing last second branches.
             //But then you'd be evicting everything from cache L1/L2. And, 99.99% of the time, bodies are going to have shapes, so this isn't going to be a difficult branch to predict.
             //Even if it was 50%, the cache benefit of executing alongside the just-touched data source would outweigh the misprediction.
@@ -157,8 +162,8 @@ namespace SolverPrototype.Collidables
                 batchSlot.AddUnsafely(bodyIndex);
                 if (batchSlot.Count == CollidablesPerFlush)
                 {
-                    var bodyBundleSource = new BodyBundleSource { Bodies = bodies, BodyIndices = batchSlot };
-                    shapes[typeIndex].ComputeBounds(ref bodyBundleSource, dt);
+                    bundleSource.BodyIndices = batchSlot;
+                    shapes[typeIndex].ComputeBounds(ref bundleSource, dt);
                     batchSlot.Count = 0;
                 }
             }
@@ -166,14 +171,13 @@ namespace SolverPrototype.Collidables
 
         public void FlushAndDispose()
         {
-            var bodyBundleSource = new BodyBundleSource { Bodies = bodies };
             for (int typeIndex = 0; typeIndex < batchesPerType.Length; ++typeIndex)
             {
                 ref var batch = ref batchesPerType[typeIndex];
                 if (batch.Span.Allocated)
                 {
-                    bodyBundleSource.BodyIndices = batch;
-                    shapes[typeIndex].ComputeBounds(ref bodyBundleSource, dt);
+                    bundleSource.BodyIndices = batch;
+                    shapes[typeIndex].ComputeBounds(ref bundleSource, dt);
                     batch.Dispose(pool);
                 }
             }
