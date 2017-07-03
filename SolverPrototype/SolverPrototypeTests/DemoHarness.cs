@@ -317,7 +317,7 @@ namespace SolverPrototypeTests
             renderer.Shapes.ClearInstances();
             renderer.Shapes.AddInstances(demo.Simulation);
             renderer.Lines.ClearInstances();
-            renderer.Lines.AddInstances(demo.Simulation);
+            renderer.Lines.Extract(demo.Simulation);
         }
 
         bool disposed;

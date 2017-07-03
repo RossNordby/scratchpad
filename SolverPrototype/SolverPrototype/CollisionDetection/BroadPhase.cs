@@ -22,6 +22,9 @@ namespace SolverPrototype.CollisionDetection
         }
 
         int Count;
+
+        public int HighestPossibleLeafIndex { get { return Count - 1; } }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Add(CollidableReference collidable, ref Vector3 initialMin, ref Vector3 initialMax)
         {
@@ -32,12 +35,21 @@ namespace SolverPrototype.CollisionDetection
         {
             Debug.Assert(index >= 0);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void GetBoundsPointers(int broadPhaseIndex, out float* minPointer, out float* maxPointer)
         {
             minPointer = &testPointer[broadPhaseIndex].Min.X;
             maxPointer = &testPointer[broadPhaseIndex].Max.X;
+        }
+        //Note that some systems (like the demos renderer bounding box line extractor) iterate over the leaves. However, they're not contiguously stored.
+        //So, the user needs a way to know if the leaf index exists. Hence, a 'try' variant. If there happen to be more use cases for checking existence, a
+        //dedicated 'leafexists' method would probably be a better idea.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetBoundsPointers(int broadPhaseIndex, out float* minPointer, out float* maxPointer)
+        {
+            GetBoundsPointers(broadPhaseIndex, out minPointer, out maxPointer);
+            return true;
         }
 
 
