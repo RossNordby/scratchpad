@@ -41,14 +41,14 @@ namespace SolverPrototype.Collidables
         }
 
         [Conditional("DEBUG")]
-        void ValidateTypeIndex(int shapeTypeIndex)
+        static void ValidateTypeIndex(int shapeTypeIndex)
         {
             Debug.Assert(shapeTypeIndex >= 0 && shapeTypeIndex < 128,
                 "If the number of shape type indices somehow exceeds the packing limit, this needs a redesign. Are you sure the type index is right?");
         }
 
         [Conditional("DEBUG")]
-        void ValidateCollidableIndex(int collidableIndex)
+        static void ValidateCollidableIndex(int collidableIndex)
         { 
             Debug.Assert(collidableIndex >= 0 && collidableIndex < (1 << 24),
                 "If you actually have 16777216+ collidables of a single type, this needs a redesign. Are you sure this is a correct index?");

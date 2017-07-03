@@ -97,7 +97,7 @@ namespace SolverPrototype
             //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.
         }
 
-        public unsafe int Add(ref BodyDescription bodyDescription, ref CollidableDescription collidableDescription)
+        public unsafe int Add(ref BodyDescription bodyDescription)
         {
             if (BodyCount == HandleToIndex.Length)
             {
@@ -112,9 +112,9 @@ namespace SolverPrototype
             HandleToIndex[handle] = index;
             IndexToHandle[index] = handle;
             ref var collidable = ref Collidables[index];
-            collidable.Shape = collidableDescription.ShapeIndex;
-            collidable.Continuity = collidableDescription.Continuity;
-            collidable.SpeculativeMargin = collidableDescription.SpeculativeMargin;
+            collidable.Shape = bodyDescription.Collidable.Shape;
+            collidable.Continuity = bodyDescription.Collidable.Continuity;
+            collidable.SpeculativeMargin = bodyDescription.Collidable.SpeculativeMargin;
             //Collidable's broad phase index is left unset. The simulation is responsible for attaching that data.
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
@@ -343,18 +343,35 @@ namespace SolverPrototype
         public void GetDescription(int handle, out BodyDescription description)
         {
             ValidateExistingHandle(handle);
-            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
+            var index = HandleToIndex[handle];
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             GetLane(ref Poses[bundleIndex], innerIndex, out description.Pose);
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out description.LocalInertia);
             GetLane(ref Velocities[bundleIndex], innerIndex, out description.Velocity);
+            ref var collidable = ref Collidables[index];
+            description.Collidable.Continuity = collidable.Continuity;
+            description.Collidable.Shape = collidable.Shape;
+            description.Collidable.SpeculativeMargin = collidable.SpeculativeMargin;
         }
         public void SetDescription(int handle, ref BodyDescription description)
         {
             ValidateExistingHandle(handle);
-            GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
+            var index = HandleToIndex[handle];
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             SetLane(ref Poses[bundleIndex], innerIndex, ref description.Pose);
             SetLane(ref LocalInertias[bundleIndex], innerIndex, ref description.LocalInertia);
             SetLane(ref Velocities[bundleIndex], innerIndex, ref description.Velocity);
+            ref var collidable = ref Collidables[index];
+            collidable.Continuity = description.Collidable.Continuity;
+            collidable.SpeculativeMargin = description.Collidable.SpeculativeMargin;
+            //TODO: If users are hitting this with any frequency, supporting the path out of the box would be a good idea.
+            //In fact, this function existing at all in the bodies set (where it lacks direct broadphase access) is questionable because of its lack of generality.
+            //Something to consider for later.
+            Debug.Assert(description.Collidable.Shape.Exists == collidable.Shape.Exists, 
+                "Setting the description should not be used to add or remove collidables, only to change their shape and properties. " +
+                "The broad phase requires notification when a collidable is added or removed. " +
+                "You can remove and re-add the body to the simulation, manually notify the broadphase, or create a variant of this function that is broadphase aware.");
+            collidable.Shape = description.Collidable.Shape;
         }
 
 

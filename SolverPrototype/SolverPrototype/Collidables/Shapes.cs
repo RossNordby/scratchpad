@@ -10,26 +10,81 @@ namespace SolverPrototype.Collidables
     /// <summary>
     /// Defines a type usable as a shape by collidables.
     /// </summary>
-    public interface IShape<TShape, TShapeBundle> where TShape : IShape<TShape, TShapeBundle> where TShapeBundle : IShapeBundle
+    public interface IShape
     {
-        float MaximumRadius { get; }
-
-        void Gather(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, out TShapeBundle shapeBundle);
+        //Note that the shape gathering required for get bounds is also useful for narrow phase calculations.
+        //However, exposing it in a type-safe way isn't trivial. So instead, we just choose at the API level to bundle the gather and AABB calculation together.
+        //Analogously to the bounds calculation, narrow phase pairs will have the type information to directly call the underlying type's gather function.
+        void GetBounds<TShape>(ref Buffer<TShape> shapes, ref Vector<int> shapeIndices, int count, ref BodyPoses poses,
+           out Vector<float> maximumRadius, out Vector<float> maximumAngularExpansion, out Vector3Wide min, out Vector3Wide max)
+           where TShape : struct, IShape;
     }
-    public interface IShapeBundle//<TShapeBundle, TShape> where TShapeBundle : IShapeBundle<TShapeBundle, TShape> where TShape : IShape<TShapeBundle, TShape> 
+
+
+
+    /// <summary>
+    /// Defines a type that acts as a source of data needed for bounding box calculations.
+    /// </summary>
+    /// <remarks>
+    /// Collidables may be pulled from objects directly in the world or from compound children. Compound children have to pull and compute information from the parent compound,
+    /// and the result of the calculation has to be pushed back to the compound parent for further processing. In contrast, body collidables that live natively in the space simply
+    /// gather data directly from the bodies set and scatter bounds directly into the broad phase.
+    /// </remarks>
+    public interface ICollidableBundleSource
     {
-        void GetBounds(ref BodyPoses poses, out Vector<float> maximumRadius, out Vector3Wide min, out Vector3Wide max);
+        /// <summary>
+        /// Gets the number of collidables in this set of bundles.
+        /// </summary>
+        int Count { get; }
+        /// <summary>
+        /// Gathers collidable data required to calculate the bounding boxes for a bundle.
+        /// </summary>
+        /// <param name="collidablesStartIndex">Start index of the bundle in the collidables set to gather bounding box relevant data for.</param>
+        void GatherCollidableBundle(int collidablesStartIndex, out Vector<int> shapeIndices, out Vector<float> maximumExpansion,
+            out BodyPoses poses, out BodyVelocities velocities);
+        /// <summary>
+        /// Scatters the calculated bounds into the target memory locations.
+        /// </summary>
+        void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int collidablesStartIndex);
+    }
+
+    public struct BodyBundleSource : ICollidableBundleSource
+    {
+        public Bodies Bodies;
+        public QuickList<int, Buffer<int>> BodyIndices;
+        public int Count
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get { return BodyIndices.Count; }
+        }
+
+        public void GatherCollidableBundle(int collidablesStartIndex, out Vector<int> shapeIndices, out Vector<float> maximumExpansion, out BodyPoses poses, out BodyVelocities velocities)
+        {
+            var count = BodyIndices.Count - collidablesStartIndex;
+            if (count > Vector<float>.Count)
+                count = Vector<float>.Count;
+            Bodies.GatherDataForBounds(ref BodyIndices[collidablesStartIndex], count, out poses, out velocities, out shapeIndices, out maximumExpansion);
+        }
+
+        public void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int collidablesStartIndex)
+        {
+            for (int i = collidablesStartIndex; i < Vector<float>.Count; ++i)
+            {
+                //TODO: body bundle updates scatter to the broad phase.
+                //ref var startIndex = ref BroadPhase.GetBoundsReference(Bodies.Collidables[BodyIndices[i]].BroadPhaseIndex);
+            }
+        }
     }
 
     public abstract class ShapeBatch
     {
         protected BufferPool pool;
-        public abstract void ComputeBounds<TBundleSource>(ref TBundleSource source) where TBundleSource : ICollidableBundleSource;
+        public abstract void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt) where TBundleSource : ICollidableBundleSource;
         public abstract void RemoveAt(int index);
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
     }
 
-    public class ShapeBatch<TShape, TShapeBundle> : ShapeBatch where TShape : struct, IShape<TShape, TShapeBundle> where TShapeBundle : IShapeBundle //TODO: When blittable is supported, shapes should be made blittable. We store them in buffers.
+    public class ShapeBatch<TShape> : ShapeBatch where TShape : struct, IShape//TODO: When blittable is supported, shapes should be made blittable. We store them in buffers.
     {
 
         Buffer<TShape> shapes;
@@ -95,12 +150,14 @@ namespace SolverPrototype.Collidables
             for (int i = 0; i < source.Count; i += Vector<float>.Count)
             {
                 source.GatherCollidableBundle(i, out var shapeIndices, out var maximumExpansions, out var poses, out var velocities);
+                int count = source.Count - i;
+                if (count > Vector<float>.Count)
+                    count = Vector<float>.Count;
                 //TODO: Confirm zero overhead.
                 //Note that this outputs a bundle, which we turn around and immediately use. Considering only this function in isolation, they could be combined.
                 //However, in the narrow phase, it's useful to be able to gather shapes, and you don't want to do bounds computation at the same time.
-                default(TShape).Gather(ref shapes, ref shapeIndices, out var shapeBundle);
-                shapeBundle.GetBounds(ref poses, out var maximumRadius, out var min, out var max);
-                BoundingBoxUpdater.ExpandBoundingBoxes(ref min, ref max, ref velocities, dt, ref maximumRadius, ref maximumExpansions);
+                default(TShape).GetBounds(ref shapes, ref shapeIndices, count, ref poses, out var maximumRadius, out var maximumAngularExpansion, out var min, out var max);
+                BoundingBoxUpdater.ExpandBoundingBoxes(ref min, ref max, ref velocities, dt, ref maximumRadius, ref maximumAngularExpansion, ref maximumExpansions);
                 source.ScatterBounds(ref min, ref max, i);
             }
         }
@@ -129,9 +186,9 @@ namespace SolverPrototype.Collidables
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ref TShape GetShape<TShape>(int shapeIndex) where TShape : struct, IShape<TShape, TShapeBundle>
+        public ref TShape GetShape<TShape>(int shapeIndex) where TShape : struct, IShape
         {
-            var typeIndex = TypeIds<>.GetId<TShape>();
+            var typeIndex = TypeIds<IShape>.GetId<TShape>();
             return ref Unsafe.As<ShapeBatch, ShapeBatch<TShape>>(ref batches[typeIndex])[shapeIndex];
         }
 

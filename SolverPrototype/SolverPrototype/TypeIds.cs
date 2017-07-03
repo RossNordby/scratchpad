@@ -1,4 +1,5 @@
-﻿using SolverPrototype.Constraints;
+﻿using SolverPrototype.Collidables;
+using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,6 +17,7 @@ namespace SolverPrototype
         /// </summary>
         public static void Register()
         {
+            TypeIds<IShape>.Register<Sphere>();
             TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
             TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
         }
@@ -46,7 +48,7 @@ namespace SolverPrototype
         [Conditional("DEBUG")]
         static void ValidateType<T>()
         {
-            Debug.Assert(registeredTypes.Contains(typeof(T)), "Type must exist in the constraint type set.");
+            Debug.Assert(registeredTypes.Contains(typeof(T)), "Type must exist in the registered type set.");
         }
         /// <summary>
         /// Gets the id associated with the given type.

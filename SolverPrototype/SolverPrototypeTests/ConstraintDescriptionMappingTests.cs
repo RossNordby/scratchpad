@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2.Memory;
 using SolverPrototype;
+using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;

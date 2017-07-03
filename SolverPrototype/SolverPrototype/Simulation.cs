@@ -68,10 +68,11 @@ namespace SolverPrototype
         }
 
         
-        public int Add(ref BodyDescription bodyDescription, ref CollidableDescription collidableDescription)
+        public int Add(ref BodyDescription bodyDescription)
         {
-            var handle = Bodies.Add(ref bodyDescription, ref collidableDescription);
-            if(collidableDescription.ShapeIndex.Exists)
+            var handle = Bodies.Add(ref bodyDescription);
+            ConstraintGraph.AddBodyList(Bodies.HandleToIndex[handle]);
+            if (bodyDescription.Collidable.Shape.Exists)
             {
                 //This body has a collidable; stick it in the broadphase.
                 //TODO: Add it to the broadphase!

@@ -1,4 +1,5 @@
 ﻿using SolverPrototype;
+using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;

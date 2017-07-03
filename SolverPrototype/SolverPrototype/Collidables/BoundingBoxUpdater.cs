@@ -11,7 +11,7 @@ namespace SolverPrototype.Collidables
     /// </summary>
     /// <remarks>Note that only bodies need a dynamic bounding box updater. Bounding boxes for statics can be updated on demand- which should be extremely rare.</remarks>
     public struct BoundingBoxUpdater
-    {        
+    {
         Bodies bodies;
         Shapes shapes;
         BufferPool<int> pool;
@@ -34,35 +34,11 @@ namespace SolverPrototype.Collidables
             pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(shapes.RegisteredTypeSpan, out batchesPerType);
         }
 
-        public void TryAdd(int bodyIndex)
-        {
-            //For convenience, this function handles the case where the collidable reference points to nothing.
-            //Note that this touches the memory associated with the full collidable. That's okay- we'll be reading the rest of it shortly if it has a collidable.
-            ref var collidable = ref bodies.Collidables[bodyIndex];
-            //Technically, you could make a second pass that only processes collidables, rather than iterating over all bodies and doing last second branches.
-            //But then you'd be evicting everything from cache L1/L2. And, 99.99% of the time, bodies are going to have shapes, so this isn't going to be a difficult branch to predict.
-            //Even if it was 50%, the cache benefit of executing alongside the just-touched data source would outweigh the misprediction.
-            if (collidable.Shape.Exists)
-            {
-                var typeIndex = collidable.Shape.Type;
-                Debug.Assert(typeIndex >= 0 && typeIndex < batchesPerType.Length, "The preallocated type batch array should be able to hold every type index. Is the type index broken?");
-                ref var batchSlot = ref batchesPerType[typeIndex];
-                if (!batchSlot.Span.Allocated)
-                {
-                    //No list exists for this type yet.
-                    QuickList<int, Buffer<int>>.Create(pool, CollidablesPerFlush, out batchSlot);
-                }
-                batchSlot.AddUnsafely(bodyIndex);
-                if (batchSlot.Count == CollidablesPerFlush)
-                {
-                    collidables[typeIndex].FlushUpdates(bodies, dt, ref batchSlot);
-                }
-            }
-        }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ExpandBoundingBoxes(ref Vector3Wide min, ref Vector3Wide max, ref BodyVelocities velocities, float dt, ref Vector<float> maximumRadius, ref Vector<float> maximumExpansion)
+        public static void ExpandBoundingBoxes(ref Vector3Wide min, ref Vector3Wide max, ref BodyVelocities velocities, float dt,
+            ref Vector<float> maximumRadius, ref Vector<float> maximumAngularExpansion, ref Vector<float> maximumExpansion)
         {
             /*
             If an object sitting on a plane had a raw (unexpanded) AABB that is just barely above the plane, no contacts would be generated. 
@@ -141,7 +117,10 @@ namespace SolverPrototype.Collidables
             var a4 = a2 * a2;
             var a6 = a4 * a2;
             var cosAngle = Vector<float>.One - a2 * new Vector<float>(1f / 2f) + a4 * new Vector<float>(1f / 24f) - a6 * new Vector<float>(1f / 720f);
-            var angularExpansion = Vector.SquareRoot(maximumRadius * maximumRadius - new Vector<float>(2) * maximumRadius * cosAngle + Vector<float>.One);
+            //Note that it's impossible for angular motion to cause an increase in bounding box size beyond (maximumRadius-minimumRadius) on any given axis.
+            //That value, or a conservative approximation, is stored as the maximum angular expansion.
+            var angularExpansion = Vector.Min(maximumAngularExpansion,
+                Vector.SquareRoot(maximumRadius * maximumRadius - new Vector<float>(2) * maximumRadius * cosAngle + Vector<float>.One));
             Vector3Wide.Subtract(ref minDisplacement, ref angularExpansion, out minDisplacement);
             Vector3Wide.Add(ref maxDisplacement, ref angularExpansion, out maxDisplacement);
 
@@ -157,15 +136,46 @@ namespace SolverPrototype.Collidables
             //the bounding box calculation needs to be aware. (In the more extreme cases, so does the broad phase. The amount of conservative padding needed for a 32 bit bounding box
             //with 64 bit positions is silly.)
         }
+        public void TryAdd(int bodyIndex)
+        {
+            //For convenience, this function handles the case where the collidable reference points to nothing.
+            //Note that this touches the memory associated with the full collidable. That's okay- we'll be reading the rest of it shortly if it has a collidable.
+            ref var collidable = ref bodies.Collidables[bodyIndex];
+            //Technically, you could make a second pass that only processes collidables, rather than iterating over all bodies and doing last second branches.
+            //But then you'd be evicting everything from cache L1/L2. And, 99.99% of the time, bodies are going to have shapes, so this isn't going to be a difficult branch to predict.
+            //Even if it was 50%, the cache benefit of executing alongside the just-touched data source would outweigh the misprediction.
+            if (collidable.Shape.Exists)
+            {
+                var typeIndex = collidable.Shape.Type;
+                Debug.Assert(typeIndex >= 0 && typeIndex < batchesPerType.Length, "The preallocated type batch array should be able to hold every type index. Is the type index broken?");
+                ref var batchSlot = ref batchesPerType[typeIndex];
+                if (!batchSlot.Span.Allocated)
+                {
+                    //No list exists for this type yet.
+                    QuickList<int, Buffer<int>>.Create(pool, CollidablesPerFlush, out batchSlot);
+                }
+                batchSlot.AddUnsafely(bodyIndex);
+                if (batchSlot.Count == CollidablesPerFlush)
+                {
+                    var bodyBundleSource = new BodyBundleSource { Bodies = bodies, BodyIndices = batchSlot };
+                    shapes[typeIndex].ComputeBounds(ref bodyBundleSource, dt);
+                    batchSlot.Count = 0;
+                }
+            }
+        }
 
         public void FlushAndDispose()
         {
+            var bodyBundleSource = new BodyBundleSource { Bodies = bodies };
             for (int typeIndex = 0; typeIndex < batchesPerType.Length; ++typeIndex)
             {
                 ref var batch = ref batchesPerType[typeIndex];
-                collidables[typeIndex].FlushUpdates(bodies, dt, ref batch);
                 if (batch.Span.Allocated)
+                {
+                    bodyBundleSource.BodyIndices = batch;
+                    shapes[typeIndex].ComputeBounds(ref bodyBundleSource, dt);
                     batch.Dispose(pool);
+                }
             }
             pool.Raw.SpecializeFor<QuickList<int, Buffer<int>>>().Return(ref batchesPerType);
         }

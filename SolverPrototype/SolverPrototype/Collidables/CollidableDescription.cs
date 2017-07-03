@@ -2,7 +2,7 @@
 {
     public struct CollidableDescription
     {
-        public TypedIndex ShapeIndex;
+        public TypedIndex Shape;
         public float SpeculativeMargin;
         public ContinuousDetectionSettings Continuity;
     }

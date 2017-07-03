@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using SolverPrototype.Collidables;
+using System.Numerics;
 
 namespace SolverPrototype
 {
@@ -24,6 +25,7 @@ namespace SolverPrototype
         public BodyPose Pose;
         public BodyInertia LocalInertia;
         public BodyVelocity Velocity;
+        public CollidableDescription Collidable;
     }
 
     public struct BodyPoses
