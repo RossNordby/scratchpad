@@ -26,7 +26,7 @@ namespace SolverPrototype.Collidables
         //Note, however, that we do not bother supporting velocity expansion on the one-off variant. For the purposes of adding objects to the simulation, that is basically irrelevant.
         //I don't predict ever needing it, but such an implementation could be added...
         void GetBounds(ref BEPUutilities2.Quaternion orientation, out Vector3 min, out Vector3 max);
-        
+
         //These functions require only an orientation because the effect of the position on the bounding box is the same for all shapes.
         //By isolating the shape from the position, we can more easily swap out the position representation for higher precision modes while only modifying the stuff that actually
         //deals with positions directly.
@@ -52,7 +52,7 @@ namespace SolverPrototype.Collidables
         /// Gathers collidable data required to calculate the bounding boxes for a bundle.
         /// </summary>
         /// <param name="collidablesStartIndex">Start index of the bundle in the collidables set to gather bounding box relevant data for.</param>
-        void GatherCollidableBundle(int collidablesStartIndex, out Vector<int> shapeIndices, out Vector<float> maximumExpansion,
+        void GatherCollidableBundle(int collidablesStartIndex, int count, out Vector<int> shapeIndices, out Vector<float> maximumExpansion,
             out BodyPoses poses, out BodyVelocities velocities);
         /// <summary>
         /// Scatters the calculated bounds into the target memory locations.
@@ -70,17 +70,16 @@ namespace SolverPrototype.Collidables
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return BodyIndices.Count; }
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GatherCollidableBundle(int collidablesStartIndex, out Vector<int> shapeIndices, out Vector<float> maximumExpansion, out BodyPoses poses, out BodyVelocities velocities)
+        public void GatherCollidableBundle(int collidablesStartIndex, int count, out Vector<int> shapeIndices, out Vector<float> maximumExpansion, out BodyPoses poses, out BodyVelocities velocities)
         {
-            var count = BodyIndices.Count - collidablesStartIndex;
-            if (count > Vector<float>.Count)
-                count = Vector<float>.Count;
             Bodies.GatherDataForBounds(ref BodyIndices[collidablesStartIndex], count, out poses, out velocities, out shapeIndices, out maximumExpansion);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        //TODO: There's a compiler bug if this is inlined (wrong values are written; presumably caused by the same compiler bug affecting the Bodies.GatherInertiaAndPose. 
+        //Revisit once newer compiler versions become available.
+        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void ScatterBounds(ref Vector3Wide min, ref Vector3Wide max, int startIndex, int count)
         {
             ref var minBase = ref Unsafe.As<Vector<float>, float>(ref min.X);
@@ -172,15 +171,16 @@ namespace SolverPrototype.Collidables
 #endif
             idPool.Return(index);
         }
-        
+
         public override void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt)
         {
             for (int i = 0; i < source.Count; i += Vector<float>.Count)
             {
-                source.GatherCollidableBundle(i, out var shapeIndices, out var maximumExpansions, out var poses, out var velocities);
                 int count = source.Count - i;
                 if (count > Vector<float>.Count)
                     count = Vector<float>.Count;
+                source.GatherCollidableBundle(i, count, out var shapeIndices, out var maximumExpansions, out var poses, out var velocities);
+
                 //Note that this outputs a bundle, which we turn around and immediately use. Considering only this function in isolation, they could be combined.
                 //However, in the narrow phase, it's useful to be able to gather shapes, and you don't want to do bounds computation at the same time.
                 default(TShape).GetBounds(ref shapes, ref shapeIndices, count, ref poses.Orientation, out var maximumRadius, out var maximumAngularExpansion, out var min, out var max);

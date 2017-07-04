@@ -21,6 +21,9 @@ namespace SolverPrototypeTests
         Font font;
 
         bool showControls;
+        bool showConstraints = true; 
+        bool showContacts;
+        bool showBoundingBoxes;
 
         enum TimingDisplayMode
         {
@@ -226,6 +229,18 @@ namespace SolverPrototypeTests
                     showControls = !showControls;
                 }
 
+                if (controls.ShowConstraints.WasTriggered(input))
+                {
+                    showConstraints = !showConstraints;
+                }
+                if (controls.ShowContacts.WasTriggered(input))
+                {
+                    showContacts = !showContacts;
+                }
+                if (controls.ShowBoundingBoxes.WasTriggered(input))
+                {
+                    showBoundingBoxes = !showBoundingBoxes;
+                }
                 if (controls.ChangeTimingDisplayMode.WasTriggered(input))
                 {
                     var newDisplayMode = (int)timingDisplayMode + 1;
@@ -241,6 +256,7 @@ namespace SolverPrototypeTests
 
             demo.Update(dt);
             timeSamples.RecordFrame(demo.Simulation);
+            var stats = timeSamples.PoseIntegrator.ComputeStats();
         }
 
         StringBuilder uiText = new StringBuilder(128);
@@ -259,7 +275,7 @@ namespace SolverPrototypeTests
             if (showControls)
             {
                 var penPosition = new Vector2(window.Resolution.X - textHeight * 6 - 25, window.Resolution.Y - 25);
-                penPosition.Y -= 12 * lineSpacing;
+                penPosition.Y -= 15 * lineSpacing;
                 uiText.Clear().Append("Controls: ");
                 var headerHeight = textHeight * 1.2f;
                 renderer.TextBatcher.Write(uiText, penPosition - new Vector2(0.5f * GlyphBatch.MeasureLength(uiText, font, headerHeight), 0), headerHeight, textColor, font);
@@ -290,6 +306,9 @@ namespace SolverPrototypeTests
                 WriteName(nameof(controls.MoveFaster), controls.MoveFaster.ToString());
                 WriteName(nameof(controls.LockMouse), controls.LockMouse.ToString());
                 WriteName(nameof(controls.Exit), controls.Exit.ToString());
+                WriteName(nameof(controls.ShowConstraints), controls.ShowConstraints.ToString());
+                WriteName(nameof(controls.ShowContacts), controls.ShowContacts.ToString());
+                WriteName(nameof(controls.ShowBoundingBoxes), controls.ShowBoundingBoxes.ToString());
                 WriteName(nameof(controls.ChangeTimingDisplayMode), controls.ChangeTimingDisplayMode.ToString());
                 WriteName(nameof(controls.ShowControls), controls.ShowControls.ToString());
             }
@@ -317,7 +336,7 @@ namespace SolverPrototypeTests
             renderer.Shapes.ClearInstances();
             renderer.Shapes.AddInstances(demo.Simulation);
             renderer.Lines.ClearInstances();
-            renderer.Lines.Extract(demo.Simulation);
+            renderer.Lines.Extract(demo.Simulation, showConstraints, showContacts, showBoundingBoxes);
         }
 
         bool disposed;

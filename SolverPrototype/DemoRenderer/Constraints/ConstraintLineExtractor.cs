@@ -81,7 +81,13 @@ namespace DemoRenderer.Constraints
             lineExtractors[typeBatch.TypeId].ExtractLines(simulation, typeBatch, job.ConstraintStart, job.ConstraintCount, ref job.jobLines);
         }
 
-        public void AddInstances(Simulation simulation, ref QuickList<LineInstance, Array<LineInstance>> lines)
+        bool IsContactBatch(TypeBatch typeBatch)
+        {
+            var typeId = typeBatch.TypeId;
+            return typeId == TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>();
+        }
+
+        public void AddInstances(Simulation simulation, bool showConstraints, bool showContacts, ref QuickList<LineInstance, Array<LineInstance>> lines)
         {
             int neededLineCapacity = lines.Count;
             jobs.Count = 0;
@@ -93,7 +99,8 @@ namespace DemoRenderer.Constraints
                 {
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
                     var extractor = lineExtractors[typeBatch.TypeId];
-                    if (extractor != null)
+                    var isContactBatch = IsContactBatch(typeBatch);
+                    if (extractor != null && (isContactBatch && showContacts) || (!isContactBatch && showConstraints))
                     {
                         jobs.Add(new ThreadJob
                         {

@@ -23,7 +23,7 @@ namespace SolverPrototypeTests
                 new BallSocketConstraintBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-            BodyVelocity velocity;
+            //BodyVelocity velocity;
             //velocity.Linear = new Vector3(1, 0, 0);
             //velocity.Angular = new Vector3();
             //Simulation.Bodies.SetVelocity(1, ref velocity);

@@ -9,8 +9,6 @@ namespace DemoRenderer.Constraints
         internal QuickList<LineInstance, Array<LineInstance>> lines;
         ConstraintLineExtractor constraints;
         BoundingBoxLineExtractor boundingBoxes;
-        public bool ShowConstraints { get; set; } = true;
-        public bool ShowBoundingBoxes { get; set; } = true;
 
         public LineExtractor(int initialLineCapacity = 8192)
         {
@@ -19,11 +17,11 @@ namespace DemoRenderer.Constraints
             boundingBoxes = new BoundingBoxLineExtractor();
         }
 
-        public void Extract(Simulation simulation)
+        public void Extract(Simulation simulation, bool showConstraints = true, bool showContacts = false, bool showBoundingBoxes = false)
         {
-            if (ShowConstraints)
-                constraints.AddInstances(simulation, ref lines);
-            if (ShowBoundingBoxes)
+            if (showConstraints)
+                constraints.AddInstances(simulation, showConstraints, showContacts, ref lines);
+            if (showBoundingBoxes)
                 boundingBoxes.AddInstances(simulation, ref lines);
         }
         public void ClearInstances()

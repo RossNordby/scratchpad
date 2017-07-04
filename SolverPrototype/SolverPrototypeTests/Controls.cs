@@ -172,6 +172,9 @@ namespace SolverPrototypeTests
 
         public InstantBind LockMouse;
         public InstantBind Exit;
+        public InstantBind ShowConstraints;
+        public InstantBind ShowContacts;
+        public InstantBind ShowBoundingBoxes;
         public InstantBind ChangeTimingDisplayMode;
         public InstantBind ShowControls;
 
@@ -196,6 +199,9 @@ namespace SolverPrototypeTests
 
                     LockMouse = Key.Tab,
                     Exit = Key.Escape,
+                    ShowConstraints = Key.J,
+                    ShowContacts = Key.K,
+                    ShowBoundingBoxes = Key.L,
                     ChangeTimingDisplayMode = Key.F2,
                     ShowControls = Key.F1,
                 };

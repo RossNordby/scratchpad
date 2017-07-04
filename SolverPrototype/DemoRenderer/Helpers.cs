@@ -5,6 +5,7 @@ using SharpDX.Direct3D11;
 using Buffer = SharpDX.Direct3D11.Buffer;
 using System.Runtime.CompilerServices;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace DemoRenderer
 {
@@ -55,21 +56,17 @@ namespace DemoRenderer
         /// <param name="sourceOffset">Starting index in the new values array to read from.</param>
         /// <param name="count">Number of elements in the values to upload into the buffer.</param>
         /// <param name="destinationOffset">Offset from the beginning of the buffer to store the new values.</param>
-        public static void UpdateBuffer<T>(this DeviceContext context, Buffer buffer, T[] newValues, int count, int sourceOffset = 0, int destinationOffset = 0) where T : struct
+        public static unsafe void UpdateBuffer<T>(this DeviceContext context, Buffer buffer, T[] newValues, int count, int sourceOffset = 0, int destinationOffset = 0) where T : struct
         {
-            Utilities.Pin(newValues, ptr =>
-            {
-                unsafe
-                {
-                    var strideInBytes = Unsafe.SizeOf<T>();
-                    var bytePtr = (byte*)ptr;
-                    context.UpdateSubresource(
-                        new DataBox(new IntPtr(bytePtr + sourceOffset * strideInBytes)), buffer, 0,
-                        new ResourceRegion(
-                            destinationOffset * strideInBytes, 0, 0,
-                            (destinationOffset + count) * strideInBytes, 1, 1));
-                }
-            });
+            var handle = GCHandle.Alloc(newValues, GCHandleType.Pinned);
+            var bytes = (byte*)handle.AddrOfPinnedObject();
+            var strideInBytes = Unsafe.SizeOf<T>();
+            context.UpdateSubresource(
+                new DataBox(new IntPtr(bytes + sourceOffset * strideInBytes)), buffer, 0,
+                new ResourceRegion(
+                    destinationOffset * strideInBytes, 0, 0,
+                    (destinationOffset + count) * strideInBytes, 1, 1));
+            handle.Free();
         }
 
         /// <summary>
