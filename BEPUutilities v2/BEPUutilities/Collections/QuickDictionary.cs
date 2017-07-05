@@ -323,11 +323,6 @@ namespace BEPUutilities2.Collections
             keyPool.Return(ref Keys);
             valuePool.Return(ref Values);
             tablePool.Return(ref Table);
-#if DEBUG
-            Keys = default(TKeySpan);
-            Values = default(TValueSpan);
-            Table = default(TTableSpan);
-#endif
         }
 
         /// <summary>

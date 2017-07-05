@@ -196,9 +196,6 @@ namespace BEPUutilities2.Collections
         {
             ClearSpanManaged(ref Span, FirstIndex, LastIndex, Count);
             pool.Return(ref Span);
-#if DEBUG
-            Span = default(TSpan);
-#endif
         }
         /// <summary>
         /// Ensures that the queue has enough room to hold the specified number of elements.

@@ -443,6 +443,7 @@ namespace BEPUutilities2.Memory
             Debug.Assert(span.Length > 0, "If this span has zero length, then it can't be an original request, and so isn't a valid buffer to return.");
             var rawBuffer = new RawBuffer(span.Memory, 1 << SpanHelper.GetContainingPowerOf2(Unsafe.SizeOf<T>() * span.Length), span.Id);
             Raw.Return(ref rawBuffer);
+            span = new Buffer<T>();
         }
 
 

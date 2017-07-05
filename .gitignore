@@ -55,6 +55,7 @@ dlldata.c
 .builds
 *.pidb
 *.svclog
+*.ide
 # Demo content pipeline cache files
 *.scc
 *.sc

@@ -1,23 +1,58 @@
 ﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using OpenTK;
 using OpenTK.Input;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace DemoUtilities
 {
+    using KeySet = QuickSet<Key, Array<Key>, Array<int>, KeyComparer>;
+    using MouseButtonSet = QuickSet<MouseButton, Array<MouseButton>, Array<int>, MouseButtonComparer>;
+    struct KeyComparer : IEqualityComparerRef<Key>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ref Key a, ref Key b)
+        {
+            return a == b;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Hash(ref Key item)
+        {
+            return (int)item;
+        }
+    }
+    struct MouseButtonComparer : IEqualityComparerRef<MouseButton>
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ref MouseButton a, ref MouseButton b)
+        {
+            return a == b;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Hash(ref MouseButton item)
+        {
+            return (int)item;
+        }
+    }
     public class Input : IDisposable
     {
         NativeWindow window;
+
+
         //You could use GetState-like stuff to avoid the need to explicitly grab these, but shrug. This keeps events localized to just the window, and we can do a little logic of our own.
-        HashSet<Key> anyDownedKeys = new HashSet<Key>();
-        HashSet<Key> downedKeys = new HashSet<Key>();
-        HashSet<Key> previousDownedKeys = new HashSet<Key>();
-        HashSet<MouseButton> anyDownedButtons = new HashSet<MouseButton>();
-        HashSet<MouseButton> downedButtons = new HashSet<MouseButton>();
-        HashSet<MouseButton> previousDownedButtons = new HashSet<MouseButton>();
-        
+        KeySet anyDownedKeys;
+        KeySet downedKeys;
+        KeySet previousDownedKeys;
+        MouseButtonSet anyDownedButtons;
+        MouseButtonSet downedButtons;
+        MouseButtonSet previousDownedButtons;
+
         /// <summary>
         /// Forces the mouse to stay at the center of the screen by recentering it on every flush.
         /// </summary>
@@ -67,7 +102,7 @@ namespace DemoUtilities
         /// <summary>
         /// Gets the mouse wheel scroll delta since the last flush.
         /// </summary>
-        public float ScrollDelta {  get { return ScrolledUp + ScrolledDown; } }
+        public float ScrollDelta { get { return ScrolledUp + ScrolledDown; } }
 
         public Input(Window window)
         {
@@ -77,6 +112,16 @@ namespace DemoUtilities
             this.window.MouseDown += MouseDown;
             this.window.MouseUp += MouseUp;
             this.window.MouseWheel += MouseWheel;
+
+            var keyPool = new PassthroughArrayPool<Key>();
+            var mouseButtonPool = new PassthroughArrayPool<MouseButton>();
+            var intPool = new PassthroughArrayPool<int>();
+            MouseButtonSet.Create(mouseButtonPool, intPool, 3, 3, out anyDownedButtons);
+            MouseButtonSet.Create(mouseButtonPool, intPool, 3, 3, out downedButtons);
+            MouseButtonSet.Create(mouseButtonPool, intPool, 3, 3, out previousDownedButtons);
+            KeySet.Create(keyPool, intPool, 3, 3, out anyDownedKeys);
+            KeySet.Create(keyPool, intPool, 3, 3, out downedKeys);
+            KeySet.Create(keyPool, intPool, 3, 3, out previousDownedKeys);
         }
 
         private void MouseWheel(object sender, MouseWheelEventArgs e)
@@ -89,22 +134,22 @@ namespace DemoUtilities
 
         private void MouseDown(object sender, MouseButtonEventArgs e)
         {
-            anyDownedButtons.Add(e.Button);
-            downedButtons.Add(e.Button);
+            anyDownedButtons.Add(e.Button, new PassthroughArrayPool<MouseButton>(), new PassthroughArrayPool<int>());
+            downedButtons.Add(e.Button, new PassthroughArrayPool<MouseButton>(), new PassthroughArrayPool<int>());
         }
         private void MouseUp(object sender, MouseButtonEventArgs e)
         {
-            downedButtons.Remove(e.Button);
+            downedButtons.FastRemove(e.Button);
         }
 
         private void KeyDown(object sender, KeyboardKeyEventArgs e)
         {
-            anyDownedKeys.Add(e.Key);
-            downedKeys.Add(e.Key);
+            anyDownedKeys.Add(e.Key, new PassthroughArrayPool<Key>(), new PassthroughArrayPool<int>());
+            downedKeys.Add(e.Key, new PassthroughArrayPool<Key>(), new PassthroughArrayPool<int>());
         }
         private void KeyUp(object sender, KeyboardKeyEventArgs e)
         {
-            downedKeys.Remove(e.Key);
+            downedKeys.FastRemove(e.Key);
         }
 
 
@@ -198,8 +243,13 @@ namespace DemoUtilities
             anyDownedButtons.Clear();
             previousDownedKeys.Clear();
             previousDownedButtons.Clear();
-            previousDownedKeys.UnionWith(downedKeys);
-            previousDownedButtons.UnionWith(downedButtons);
+            var keyPool = new PassthroughArrayPool<Key>();
+            var mouseButtonPool = new PassthroughArrayPool<MouseButton>();
+            var intPool = new PassthroughArrayPool<int>();
+            for (int i = 0; i < downedKeys.Count; ++i)
+                previousDownedKeys.Add(downedKeys[i], keyPool, intPool);
+            for (int i = 0; i < downedButtons.Count; ++i)
+                previousDownedButtons.Add(downedButtons[i], mouseButtonPool, intPool);
             ScrolledDown = 0;
             ScrolledUp = 0;
         }

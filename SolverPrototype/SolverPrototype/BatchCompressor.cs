@@ -92,13 +92,14 @@ namespace SolverPrototype
         Buffer<WorkerContext> workerContexts;
 
 
-
+        Action<int> analysisWorkerDelegate;
         public BatchCompressor(Solver solver, Bodies bodies, float targetCandidateFraction = 0.01f, float maximumCompressionFraction = 0.0005f)
         {
             this.Solver = solver;
             this.Bodies = bodies;
             TargetCandidateFraction = targetCandidateFraction;
             this.MaximumCompressionFraction = maximumCompressionFraction;
+            analysisWorkerDelegate = AnalysisWorker;
         }
         struct AnalysisStart
         {
@@ -344,7 +345,7 @@ namespace SolverPrototype
             ScheduleAnalysisRegions(workerCount, rawPool);
             if (threadDispatcher != null)
             {
-                threadDispatcher.DispatchWorkers(AnalysisWorker);
+                threadDispatcher.DispatchWorkers(analysisWorkerDelegate);
             }
             else
             {

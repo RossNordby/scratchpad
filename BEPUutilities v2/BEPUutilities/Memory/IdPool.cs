@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2.Collections;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2.Memory
 {
@@ -25,23 +26,24 @@ namespace BEPUutilities2.Memory
         public IdPool(TPool pool, int initialCapacity = 128)
         {
             this.pool = pool;
-            QuickQueue<int, TSpan>.Create(this.pool, initialCapacity, out AvailableIds);
+            QuickList<int, TSpan>.Create(this.pool, initialCapacity, out AvailableIds);
         }
 
         //Note that all availableIds are guaranteed to be less than nextIndex.
         //[0, nextIndex) contains all currently used ids and ids contained within availableIds.
-        public QuickQueue<int, TSpan> AvailableIds;
+        public QuickList<int, TSpan> AvailableIds;
 
         public int Take()
         {
-            if (AvailableIds.TryDequeue(out var id))
+            if (AvailableIds.TryPop(out var id))
                 return id;
             return nextIndex++;
         }
-
+        
         public void Return(int id)
         {
-            AvailableIds.Enqueue(id, pool);
+            Console.WriteLine($"Count: {AvailableIds.Count}, returning id {id}");
+            AvailableIds.Add(id, pool);
         }
 
         /// <summary>
@@ -50,23 +52,23 @@ namespace BEPUutilities2.Memory
         public void Clear()
         {
             nextIndex = 0;
-            AvailableIds.FastClear();
+            AvailableIds.Count = 0;
         }
 
         /// <summary>
         /// Ensures that the underlying id queue can hold at least a certain number of ids.
         /// </summary>
-        /// <param name="queuedCount">Number of elements to preallocate space for in the available ids queue.</param>
-        public void EnsureCapacity(int queuedCount)
+        /// <param name="count">Number of elements to preallocate space for in the available ids queue.</param>
+        public void EnsureCapacity(int count)
         {
             if (!AvailableIds.Span.Allocated)
             {
                 //If this was disposed, we must explicitly rehydrate it.
-                QuickQueue<int, TSpan>.Create(pool, queuedCount, out AvailableIds);
+                QuickList<int, TSpan>.Create(pool, count, out AvailableIds);
             }
             else
             {
-                AvailableIds.EnsureCapacity(queuedCount, pool);
+                AvailableIds.EnsureCapacity(count, pool);
             }
         }
 
@@ -85,16 +87,16 @@ namespace BEPUutilities2.Memory
         /// <summary>
         /// Resizes the underlying buffer to the smallest size required to hold the given count and the current available id count.
         /// </summary>
-        /// <param name="queuedCount">Number of elements to guarantee space for in the available ids queue.</param>
-        public void Resize(int queuedCount)
+        /// <param name="count">Number of elements to guarantee space for in the available ids queue.</param>
+        public void Resize(int count)
         {
             if (!AvailableIds.Span.Allocated)
             {
                 //If this was disposed, we must explicitly rehydrate it.
-                QuickQueue<int, TSpan>.Create(pool, queuedCount, out AvailableIds);
+                QuickList<int, TSpan>.Create(pool, count, out AvailableIds);
                 return;
             }
-            var targetLength = BufferPool<int>.GetLowestContainingElementCount(Math.Max(queuedCount, AvailableIds.Count));
+            var targetLength = BufferPool<int>.GetLowestContainingElementCount(Math.Max(count, AvailableIds.Count));
             if (AvailableIds.Span.Length != targetLength)
             {
                 AvailableIds.Resize(targetLength, pool);
@@ -110,7 +112,7 @@ namespace BEPUutilities2.Memory
             AvailableIds.Dispose(pool);
             //This simplifies reuse and makes it harder to use invalid data.
             nextIndex = 0;
-            AvailableIds = new QuickQueue<int, TSpan>();
+            AvailableIds = new QuickList<int, TSpan>();
         }
 
     }

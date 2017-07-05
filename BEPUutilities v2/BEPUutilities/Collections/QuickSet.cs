@@ -242,10 +242,6 @@ namespace BEPUutilities2.Collections
             Span.ClearManagedReferences(0, Count);
             pool.Return(ref Span);
             tablePool.Return(ref Table);
-#if DEBUG
-            Span = default(TSpan);
-            Table = default(TTableSpan);
-#endif
         }
 
         /// <summary>

@@ -569,7 +569,7 @@ namespace SolverPrototype
 
         }
 
-        public double MultithreadedUpdate(IThreadDispatcher threadPool, BufferPool bufferPool, float dt)
+        public void MultithreadedUpdate(IThreadDispatcher threadPool, BufferPool bufferPool, float dt)
         {
             var workerCount = context.WorkerCount = threadPool.ThreadCount;
             context.WorkerCompletedCount = 0;
@@ -597,19 +597,16 @@ namespace SolverPrototype
             {
                 context.WorkerBoundsA[i] = new WorkerBounds { Min = int.MaxValue, Max = int.MinValue };
             }
-
-            var start = Stopwatch.GetTimestamp();
+            
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
             if (Batches.Count > 0)
-                threadPool.DispatchWorkers(Work);
-            var end = Stopwatch.GetTimestamp();
+                threadPool.DispatchWorkers(workDelegate);
 
             context.WorkBlocks.Dispose(bufferPool.SpecializeFor<WorkBlock>());
             context.BatchBoundaries.Dispose(bufferPool.SpecializeFor<int>());
             bufferPool.SpecializeFor<int>().Return(ref context.BlockClaims);
             bufferPool.SpecializeFor<WorkerBounds>().Return(ref context.WorkerBoundsA);
             bufferPool.SpecializeFor<WorkerBounds>().Return(ref context.WorkerBoundsB);
-            return (end - start) / (double)Stopwatch.Frequency;
         }
 
 

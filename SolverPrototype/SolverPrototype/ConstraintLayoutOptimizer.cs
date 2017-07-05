@@ -51,11 +51,19 @@ namespace SolverPrototype
             }
         }
 
+        Action<int> generateSortKeysDelegate;
+        Action<int> regatherDelegate;
+        Action<int> copyToCacheAndSortDelegate;
+
         public ConstraintLayoutOptimizer(Bodies bodies, Solver solver, float optimizationFraction = 0.044f)
         {
             this.bodies = bodies;
             this.solver = solver;
             OptimizationFraction = optimizationFraction;
+
+            generateSortKeysDelegate = GenerateSortKeys;
+            regatherDelegate = Regather;
+            copyToCacheAndSortDelegate = CopyToCacheAndSort;
         }
 
         bool WrapBatch(ref Optimization o)
@@ -266,7 +274,7 @@ namespace SolverPrototype
                 ref context.ScratchKeys, ref context.ScratchValues, 0, context.ConstraintsInSortRegionCount,
                 context.KeyUpperBound, pool,
                 out context.SortedKeys, out context.SortedSourceIndices);
-            
+
             var workerBundleStart = context.SourceStartBundleIndex;
             var workerBundleCount = 0 < context.CopyBundlesPerWorkerRemainder ? context.CopyBundlesPerWorker + 1 : context.CopyBundlesPerWorker;
             var workerConstraintStart = workerBundleStart << BundleIndexing.VectorShift;
@@ -298,6 +306,7 @@ namespace SolverPrototype
                 ref context.IndexToHandleCache, ref context.BodyReferencesCache, ref context.PrestepDataCache, ref context.AccumulatesImpulsesCache, ref handlesToConstraints);
 
         }
+
 
 
 
@@ -356,9 +365,9 @@ namespace SolverPrototype
             }
             else
             {
-                threadDispatcher.DispatchWorkers(GenerateSortKeys);
-                threadDispatcher.DispatchWorkers(CopyToCacheAndSort);
-                threadDispatcher.DispatchWorkers(Regather);
+                threadDispatcher.DispatchWorkers(generateSortKeysDelegate);
+                threadDispatcher.DispatchWorkers(copyToCacheAndSortDelegate);
+                threadDispatcher.DispatchWorkers(regatherDelegate);
             }
 
             this.typeBatch = null;

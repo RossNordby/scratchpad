@@ -13,9 +13,11 @@ namespace BEPUutilities2.Memory
     /// <typeparam name="T">Type of the arrays returned by the pool.</typeparam>
     public struct PassthroughArrayPool<T> : IMemoryPool<T, Array<T>>
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Return(ref Array<T> span)
         {
             //Drop it on the floor and let the GC deal with it.
+            span = new Array<T>();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

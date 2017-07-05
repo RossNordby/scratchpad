@@ -20,6 +20,8 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" />
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'" />
+
   <ItemGroup>
     <None Remove="Content\Carlito-Regular.ttf" />
     <None Remove="Content\Courier Prime Sans.ttf" />

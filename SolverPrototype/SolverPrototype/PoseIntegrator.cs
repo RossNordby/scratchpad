@@ -34,11 +34,13 @@ namespace SolverPrototype
         /// </summary>
         public Vector3 Gravity;
 
+        Action<int> workerDelegate;
         public PoseIntegrator(Bodies bodies, Shapes shapes, BroadPhase broadPhase)
         {
             this.bodies = bodies;
             this.shapes = shapes;
             this.broadPhase = broadPhase;
+            workerDelegate = Worker;
         }
 
 
@@ -193,7 +195,7 @@ namespace SolverPrototype
                 if (bundlesPerJob * availableJobCount < bodyBundleCount)
                     ++availableJobCount;
                 this.threadDispatcher = threadDispatcher;
-                threadDispatcher.DispatchWorkers(Worker);
+                threadDispatcher.DispatchWorkers(workerDelegate);
                 this.threadDispatcher = null;
             }
             else

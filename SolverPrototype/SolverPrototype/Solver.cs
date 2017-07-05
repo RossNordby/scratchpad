@@ -97,6 +97,7 @@ namespace SolverPrototype
             }
         }
 
+        Action<int> workDelegate;
         const int TypeCountEstimate = 32;
         const int BatchCountEstimate = 32;
         public Solver(Bodies bodies, BufferPool bufferPool, int iterationCount = 5,
@@ -114,6 +115,7 @@ namespace SolverPrototype
             QuickList<ConstraintBatch, Array<ConstraintBatch>>.Create(new PassthroughArrayPool<ConstraintBatch>(), BatchCountEstimate, out Batches);
             bufferPool.SpecializeFor<ConstraintLocation>().Take(initialCapacity, out HandleToConstraint);
             TypeBatchAllocation = new TypeBatchAllocation(TypeCountEstimate, minimumCapacityPerTypeBatch, bufferPool);
+            workDelegate = Work;
         }
 
         /// <summary>

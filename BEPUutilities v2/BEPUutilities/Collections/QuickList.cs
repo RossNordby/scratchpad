@@ -138,9 +138,6 @@ namespace BEPUutilities2.Collections
         {
             Span.ClearManagedReferences(0, Count);
             pool.Return(ref Span);
-#if DEBUG
-            Span = default(TSpan);
-#endif
         }
 
         /// <summary>

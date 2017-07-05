@@ -16,7 +16,7 @@ namespace BEPUutilities2.Memory
         /// <summary>
         /// Gets the locker used by LockingTake and LockingReturn.
         /// </summary>
-        public ref SpinLock Locker //WATCH OUT: If you ever change to the System.Threading.SpinLock, it will return by copy.
+        public ref SpinLock Locker
         {
             get
             {

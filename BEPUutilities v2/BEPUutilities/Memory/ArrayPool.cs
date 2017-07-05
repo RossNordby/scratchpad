@@ -49,6 +49,7 @@ namespace BEPUutilities2.Memory
         /// Gets the number of buffers for a pool index.
         /// </summary>
         /// <param name="power">Index of the pool to count.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int GetArrayCount(int power)
         {
             return pools[power].Count;
@@ -82,6 +83,7 @@ namespace BEPUutilities2.Memory
         /// </summary>
         /// <param name="power">Exponent that defines the size of the span. The span's length will be 2^power.</param>
         /// <param name="array">Span for the given power.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void TakeForPower(int power, out Array<T> array)
         {
             ValidateCount();
@@ -103,6 +105,7 @@ namespace BEPUutilities2.Memory
         /// Releases a array back to the pool without clearing it out.
         /// </summary>
         /// <param name="array">Array to return to the pool.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Return(ref Array<T> array)
         {
             ValidateCount();
@@ -111,6 +114,7 @@ namespace BEPUutilities2.Memory
             
 #endif
             pools[SpanHelper.GetContainingPowerOf2(array.Length)].Push(array.Memory);
+            array = new Array<T>();
         }
 
         [Conditional("DEBUG")]

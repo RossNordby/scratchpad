@@ -38,12 +38,15 @@ namespace SolverPrototype
             }
         }
 
+        Action<int> incrementalOptimizeWorkDelegate;
         public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
         {
             this.bodies = bodies;
             this.graph = graph;
             this.solver = solver;
             OptimizationFraction = optimizationFraction;
+
+            incrementalOptimizeWorkDelegate = IncrementalOptimizeWork;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -390,7 +393,7 @@ namespace SolverPrototype
             //Every worker moves forward from its start location by decrementing the optimization count to claim an optimization job.
             remainingOptimizationAttemptCount = Math.Min(bodies.BodyCount, optimizationCount);
 
-            threadPool.DispatchWorkers(IncrementalOptimizeWork);
+            threadPool.DispatchWorkers(incrementalOptimizeWorkDelegate);
 
             int lowestWorkerJobsCompleted = int.MaxValue;
             for (int i = 0; i < threadPool.ThreadCount; ++i)
