@@ -29,6 +29,10 @@ namespace DemoContentBuilder
         {
             using (var projectCollection = new ProjectCollection())
             {
+                //TODO: Watch out, this takes a dependency on a specific version of the ms build tools, requiring a user to have it installed.
+                //Would be nice to have a better way to do this. Preferably that doesn't rely on registry, since a registry issue is why this got added in the first place.
+                //Maybe a modification to the projects to specify a wildcarded version or something.
+                projectCollection.DefaultToolsVersion = "14.0";
                 var project = projectCollection.LoadProject(projectPath);
                 workingPath = project.DirectoryPath + Path.DirectorySeparatorChar;
 

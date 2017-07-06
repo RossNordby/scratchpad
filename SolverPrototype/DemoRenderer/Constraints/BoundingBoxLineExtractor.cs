@@ -24,6 +24,7 @@ namespace DemoRenderer.Constraints
             public Array<LineInstance> MasterLinesSpan;
         }
 
+        Action<int> workDelegate;
         public BoundingBoxLineExtractor()
         {
             QuickList<ThreadJob, Array<ThreadJob>>.Create(new PassthroughArrayPool<ThreadJob>(), Environment.ProcessorCount * jobsPerThread, out jobs);
@@ -33,6 +34,7 @@ namespace DemoRenderer.Constraints
             {
                 QuickList<LineInstance, Array<LineInstance>>.Create(new PassthroughArrayPool<LineInstance>(), Environment.ProcessorCount * jobsPerThread, out jobs.Span[i].JobLines);
             }
+            workDelegate = Work;
         }
 
         private unsafe void Work(int jobIndex)
@@ -99,7 +101,7 @@ namespace DemoRenderer.Constraints
             }
             this.simulation = simulation;
             masterLinesCount = lines.Count;
-            Parallel.For(0, jobs.Count, Work);
+            Parallel.For(0, jobs.Count, workDelegate);
             lines.Count = masterLinesCount;
             this.simulation = null;
             jobs.Count = 0;

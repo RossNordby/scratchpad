@@ -64,12 +64,15 @@ namespace DemoRenderer.Constraints
 
         public bool Enabled { get; set; } = true;
 
+        Action<int> executeJobDelegate;
         public ConstraintLineExtractor()
         {
             lineExtractors = new TypeLineExtractor[TypeIds<TypeBatch>.RegisteredTypeCount];
             lineExtractors[TypeIds<TypeBatch>.GetId<BallSocketTypeBatch>()] =
                 new TypeLineExtractor<BallSocketLineExtractor, BallSocketTypeBatch, TwoBodyReferences, BallSocketPrestepData, BallSocketProjection, Vector3Wide>();
             QuickList<ThreadJob, Array<ThreadJob>>.Create(new PassthroughArrayPool<ThreadJob>(), Environment.ProcessorCount * (jobsPerThread + 1), out jobs);
+
+            executeJobDelegate = ExecuteJob;
         }
 
         Simulation simulation;
@@ -155,7 +158,7 @@ namespace DemoRenderer.Constraints
                 jobs[i].jobLines.Count = jobs[i].LineStart;
             }
             this.simulation = simulation;
-            Parallel.For(0, jobs.Count, ExecuteJob);
+            Parallel.For(0, jobs.Count, executeJobDelegate);
             this.simulation = null;
         }
 
