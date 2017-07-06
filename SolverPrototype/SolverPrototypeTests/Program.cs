@@ -3,6 +3,7 @@ using DemoContentLoader;
 using DemoRenderer.UI;
 using DemoUtilities;
 using OpenTK;
+using OpenTK.Input;
 using SolverPrototype;
 using SolverPrototypeTests.Properties;
 using System;

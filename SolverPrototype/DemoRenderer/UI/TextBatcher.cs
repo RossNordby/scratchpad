@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Memory;
+using DemoUtilities;
 using SharpDX.Direct3D11;
 using System;
 using System.Collections.Generic;
@@ -27,7 +28,7 @@ namespace DemoRenderer.UI
             }
         }
         
-        public void Write(StringBuilder characters, int start, int count, Vector2 targetPosition, float height,
+        public void Write(TextBuilder characters, int start, int count, Vector2 targetPosition, float height,
             Vector2 horizontalAxis, Vector3 color, Font font)
         {
             if (!batches.TryGetValue(font, out var glyphBatch))
@@ -39,12 +40,12 @@ namespace DemoRenderer.UI
             glyphBatch.Add(characters, start, count, screenToPackedScale, targetPosition, horizontalAxis, color, height, font);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(StringBuilder characters, Vector2 targetPosition, float height, Vector3 color, Font font)
+        public void Write(TextBuilder characters, Vector2 targetPosition, float height, Vector3 color, Font font)
         {
             Write(characters, 0, characters.Length, targetPosition, height, new Vector2(1, 0), color, font);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Write(StringBuilder characters, Vector2 targetPosition, float height, Vector2 horizontalAxis, Vector3 color, Font font)
+        public void Write(TextBuilder characters, Vector2 targetPosition, float height, Vector2 horizontalAxis, Vector3 color, Font font)
         {
             Write(characters, 0, characters.Length, targetPosition, height, horizontalAxis, color, font);
         }

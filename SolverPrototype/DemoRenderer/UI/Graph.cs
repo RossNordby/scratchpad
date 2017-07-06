@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
+using DemoUtilities;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -155,7 +156,7 @@ namespace DemoRenderer.UI
             graphSeries.Clear();
         }
 
-        public void Draw(StringBuilder characters, UILineBatcher lines, TextBatcher text)
+        public void Draw(TextBuilder characters, UILineBatcher lines, TextBatcher text)
         {
             //Collect information to define data window ranges.
             int minX = int.MaxValue;
@@ -281,7 +282,7 @@ namespace DemoRenderer.UI
                     var backgroundEnd = penPosition + new Vector2(description.BodySpan.X, 0);
                     lines.Draw(penPosition, tickEnd, description.IntervalTickRadius, description.BodyLineColor);
                     lines.Draw(penPosition, backgroundEnd, description.BackgroundLineRadius, description.BodyLineColor);
-                    characters.Clear().Append(tickValue);
+                    characters.Clear().Append(tickValue, description.VerticalIntervalLabelRounding);
                     text.Write(characters,
                         tickEnd + new Vector2(-description.VerticalTickTextPadding, 0.5f * GlyphBatch.MeasureLength(characters, description.Font, description.IntervalTextHeight)),
                         description.IntervalTextHeight, new Vector2(0, -1), description.TextColor, description.Font);

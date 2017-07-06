@@ -48,7 +48,7 @@ namespace DemoContentBuilder
 
         public override string ToString()
         {
-            StringBuilder builder = new StringBuilder();
+            var builder = new StringBuilder();
             builder.Append(Path);
             builder.Append(Stage.Extension);
             if (ShaderMacros.Length > 0)

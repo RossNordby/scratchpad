@@ -36,6 +36,8 @@ namespace SolverPrototype.Collidables
             out Vector<float> maximumRadius, out Vector<float> maximumAngularExpansion, out Vector3Wide min, out Vector3Wide max)
             where TShape : struct, IShape
         {
+            //TODO: You could directly create the min and max during a scalar gather-like operation. Spheres don't really take advantage of bundled math.
+            //Might be worth a quick try, but don't expect it to move the time more than a few microseconds.
             Gather(ref Unsafe.As<Buffer<TShape>, Buffer<Sphere>>(ref shapes), ref shapeIndices, count, out var radii);
 
             //Spheres have perfect symmetry, so there is no need for angular expansion.

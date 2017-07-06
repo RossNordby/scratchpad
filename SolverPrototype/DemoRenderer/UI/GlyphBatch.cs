@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2;
+using DemoUtilities;
 using System;
 using System.Numerics;
 using System.Text;
@@ -32,7 +33,7 @@ namespace DemoRenderer.UI
             GlyphCount = 0;
         }
 
-        public static float MeasureLength(StringBuilder characters, Font font, float height)
+        public static float MeasureLength(TextBuilder characters, Font font, float height)
         {
             if (characters.Length > 0)
             {
@@ -54,7 +55,7 @@ namespace DemoRenderer.UI
             return 0;
         }
 
-        public void Add(StringBuilder characters, int start, int count, Vector2 screenToPackedScale,
+        public void Add(TextBuilder characters, int start, int count, Vector2 screenToPackedScale,
             Vector2 startingPosition, Vector2 horizontalAxis, Vector3 color, float height, Font font)
         {
             var scale = height * font.Content.InverseSizeInTexels;

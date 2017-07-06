@@ -42,7 +42,6 @@ namespace BEPUutilities2.Memory
         
         public void Return(int id)
         {
-            Console.WriteLine($"Count: {AvailableIds.Count}, returning id {id}");
             AvailableIds.Add(id, pool);
         }
 

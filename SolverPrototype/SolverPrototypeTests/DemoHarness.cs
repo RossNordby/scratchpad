@@ -259,7 +259,7 @@ namespace SolverPrototypeTests
             var stats = timeSamples.PoseIntegrator.ComputeStats();
         }
 
-        StringBuilder uiText = new StringBuilder(128);
+        TextBuilder uiText = new TextBuilder(128);
         public void Render(Renderer renderer)
         {
             //Perform any demo-specific rendering first.
@@ -330,7 +330,7 @@ namespace SolverPrototypeTests
                 const float timingTextSize = 14;
                 const float inset = 25;
                 renderer.TextBatcher.Write(
-                    uiText.Clear().Append(Math.Round(1e3 * timeSamples.Simulation[timeSamples.Simulation.End - 1], timingGraph.Description.VerticalIntervalLabelRounding)).Append(" ms/step"),
+                    uiText.Clear().Append(1e3 * timeSamples.Simulation[timeSamples.Simulation.End - 1], timingGraph.Description.VerticalIntervalLabelRounding).Append(" ms/step"),
                     new Vector2(window.Resolution.X - inset - GlyphBatch.MeasureLength(uiText, font, timingTextSize), inset), timingTextSize, timingGraph.Description.TextColor, font);
             }
             renderer.Shapes.ClearInstances();

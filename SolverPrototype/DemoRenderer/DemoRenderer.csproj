@@ -37,6 +37,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj" />
     <ProjectReference Include="..\DemoContentLoader\DemoContentLoader.csproj" />
+    <ProjectReference Include="..\DemoUtilities\DemoUtilities.csproj" />
     <ProjectReference Include="..\SolverPrototype\SolverPrototype.csproj" />
   </ItemGroup>
 

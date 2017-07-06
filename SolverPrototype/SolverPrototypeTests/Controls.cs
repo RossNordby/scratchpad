@@ -7,6 +7,55 @@ using System.Text;
 
 namespace SolverPrototypeTests
 {
+    /// <summary>
+    /// Caches strings for enum values to avoid enum boxing.
+    /// </summary>
+    static class ControlStrings
+    {
+        static Dictionary<Key, string> keys;
+        static Dictionary<MouseButton, string> mouseButtons;
+        static Dictionary<MouseWheelAction, string> mouseWheel;
+
+        public static string GetName(Key key)
+        {
+            return keys[key];
+        }
+        public static string GetName(MouseButton button)
+        {
+            return mouseButtons[button];
+        }
+        public static string GetName(MouseWheelAction wheelAction)
+        {
+            return mouseWheel[wheelAction];
+        }
+
+        static ControlStrings()
+        {
+            keys = new Dictionary<Key, string>();
+            var keyNames = Enum.GetNames(typeof(Key));
+            var keyValues = (Key[])Enum.GetValues(typeof(Key));
+            for (int i = 0; i < keyNames.Length; ++i)
+            {
+                keys.TryAdd(keyValues[i], keyNames[i]);
+            }
+            mouseButtons = new Dictionary<MouseButton, string>();
+            var mouseButtonNames = Enum.GetNames(typeof(MouseButton));
+            var mouseButtonValues = (MouseButton[])Enum.GetValues(typeof(MouseButton));
+            for (int i = 0; i < mouseButtonNames.Length; ++i)
+            {
+                mouseButtons.TryAdd(mouseButtonValues[i], mouseButtonNames[i]);
+            }
+            mouseWheel = new Dictionary<MouseWheelAction, string>();
+            var wheelNames = Enum.GetNames(typeof(MouseWheelAction));
+            var wheelValues = (MouseWheelAction[])Enum.GetValues(typeof(MouseWheelAction));
+            for (int i = 0; i < wheelNames.Length; ++i)
+            {
+                mouseWheel.TryAdd(wheelValues[i], wheelNames[i]);
+            }
+        }
+    }
+
+
     public enum HoldableControlType
     {
         Key,
@@ -63,9 +112,10 @@ namespace SolverPrototypeTests
         public override string ToString()
         {
             if (Type == HoldableControlType.Key)
-                return Key.ToString();
-            return Button.ToString();
+                return ControlStrings.GetName(Key);
+            return ControlStrings.GetName(Button);
         }
+
     }
 
     public enum InstantControlType
@@ -145,11 +195,11 @@ namespace SolverPrototypeTests
             switch (Type)
             {
                 case InstantControlType.Key:
-                    return Key.ToString();
+                    return ControlStrings.GetName(Key);
                 case InstantControlType.MouseButton:
-                    return Button.ToString();
+                    return ControlStrings.GetName(Button);
                 case InstantControlType.MouseWheel:
-                    return Wheel.ToString();
+                    return ControlStrings.GetName(Wheel);
             }
             return "";
         }
