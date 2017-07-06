@@ -6,6 +6,7 @@ using SolverPrototype.Constraints;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using System.Diagnostics;
+using BEPUutilities2;
 
 namespace DemoRenderer.Constraints
 {
@@ -90,7 +91,7 @@ namespace DemoRenderer.Constraints
             return typeId == TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>();
         }
 
-        public void AddInstances(Simulation simulation, bool showConstraints, bool showContacts, ref QuickList<LineInstance, Array<LineInstance>> lines)
+        internal void AddInstances(Simulation simulation, bool showConstraints, bool showContacts, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
         {
             int neededLineCapacity = lines.Count;
             jobs.Count = 0;
@@ -158,7 +159,7 @@ namespace DemoRenderer.Constraints
                 jobs[i].jobLines.Count = jobs[i].LineStart;
             }
             this.simulation = simulation;
-            Parallel.For(0, jobs.Count, executeJobDelegate);
+            looper.For(0, jobs.Count, executeJobDelegate);
             this.simulation = null;
         }
 

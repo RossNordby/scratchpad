@@ -5,6 +5,7 @@ using SolverPrototype;
 using System.Numerics;
 using System.Threading.Tasks;
 using System.Threading;
+using BEPUutilities2;
 
 namespace DemoRenderer.Constraints
 {
@@ -74,7 +75,7 @@ namespace DemoRenderer.Constraints
 
 
 
-        internal unsafe void AddInstances(Simulation simulation, ref QuickList<LineInstance, Array<LineInstance>> lines)
+        internal unsafe void AddInstances(Simulation simulation, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
         {
             //Note that not every leaf index is occupied. Leaf indices are designed to be like handles, so that user code doesn't need to be aware of memory layout changes
             //when a collidable is removed. That means we'll be scanning some leaves that do not exist, but that's fine.
@@ -101,7 +102,7 @@ namespace DemoRenderer.Constraints
             }
             this.simulation = simulation;
             masterLinesCount = lines.Count;
-            Parallel.For(0, jobs.Count, workDelegate);
+            looper.For(0, jobs.Count, workDelegate);
             lines.Count = masterLinesCount;
             this.simulation = null;
             jobs.Count = 0;

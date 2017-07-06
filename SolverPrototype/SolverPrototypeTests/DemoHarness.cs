@@ -334,9 +334,9 @@ namespace SolverPrototypeTests
                     new Vector2(window.Resolution.X - inset - GlyphBatch.MeasureLength(uiText, font, timingTextSize), inset), timingTextSize, timingGraph.Description.TextColor, font);
             }
             renderer.Shapes.ClearInstances();
-            renderer.Shapes.AddInstances(demo.Simulation);
+            renderer.Shapes.AddInstances(demo.Simulation, demo.ThreadDispatcher);
             renderer.Lines.ClearInstances();
-            renderer.Lines.Extract(demo.Simulation, showConstraints, showContacts, showBoundingBoxes);
+            renderer.Lines.Extract(demo.Simulation, showConstraints, showContacts, showBoundingBoxes, demo.ThreadDispatcher);
         }
 
         bool disposed;

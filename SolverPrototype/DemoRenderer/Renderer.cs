@@ -33,6 +33,9 @@ namespace DemoRenderer
         public TextBatcher TextBatcher { get; private set; }
         public UILineBatcher UILineBatcher { get; private set; }
 
+
+        ParallelLooper looper;
+
         Texture2D depthBuffer;
         DepthStencilView dsv;
         //Technically we could get away with rendering directly to the backbuffer, but a dedicated color buffer simplifies some things- 
@@ -51,14 +54,15 @@ namespace DemoRenderer
 
         public Renderer(RenderSurface surface)
         {
+            looper = new ParallelLooper();
             Surface = surface;
             using (var stream = new MemoryStream(Resources.DemoRendererShaders))
             {
                 ShaderCache = ShaderCache.Load(stream);
             }
-            Shapes = new ShapesExtractor();
+            Shapes = new ShapesExtractor(looper);
             SphereRenderer = new SphereRenderer(surface.Device, ShaderCache);
-            Lines = new LineExtractor();
+            Lines = new LineExtractor(looper);
             LineRenderer = new LineRenderer(surface.Device, ShaderCache);
             Background = new BackgroundRenderer(surface.Device, ShaderCache);
             CompressToSwap = new CompressToSwap(surface.Device, ShaderCache);
