@@ -42,12 +42,24 @@ namespace BEPUutilities2
         /// <param name="b">Second bounding box to test.</param>
         /// <returns>Whether the bounding boxes intersected.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Intersects(ref BoundingBox a, ref BoundingBox b)
+        public static bool Intersects(ref BoundingBox a, ref BoundingBox b)
         {
-            return a.Max.X >= b.Min.X & a.Max.Y >= b.Min.Y & a.Max.Z >= b.Min.Z &
-                   b.Max.X >= a.Min.X & b.Max.Y >= a.Min.Y & b.Max.Z >= a.Min.Z;
+            return Intersects(ref a.Min, ref a.Max, ref b.Min, ref b.Max);
         }
-
+        //TODO: At some point in the past, intersection was found to be faster with non-short circuiting operators.
+        //While that does make some sense (the branches aren't really valuable relative to their cost), it's still questionable enough that it should be reevaluated on a modern compiler. 
+        /// <summary>
+        /// Determines if a bounding box intersects another bounding box.
+        /// </summary>
+        /// <param name="a">First bounding box to test.</param>
+        /// <param name="b">Second bounding box to test.</param>
+        /// <returns>Whether the bounding boxes intersected.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static bool Intersects(ref Vector3 minA, ref Vector3 maxA, ref Vector3 minB, ref Vector3 maxB)
+        {
+            return maxA.X >= minB.X & maxA.Y >= minB.Y & maxA.Z >= minB.Z &
+                   maxB.X >= minA.X & maxB.Y >= minA.Y & maxB.Z >= minA.Z;
+        }
 
         /// <summary>
         /// Computes the volume of the bounding box.
