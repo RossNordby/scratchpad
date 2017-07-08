@@ -1,5 +1,7 @@
 ﻿using BEPUutilities2;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -14,6 +16,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="merged">Bounding box holding both the new and existing leaves.</param>
         /// <returns>Index of the leaf </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+
         unsafe int MergeLeafNodes(ref BoundingBox newLeafBounds, int parentIndex, int indexInParent, ref BoundingBox merged)
         {
             //It's a leaf node.
@@ -64,99 +67,121 @@ namespace SolverPrototype.CollisionDetection
         }
         enum BestInsertionChoice
         {
-            EmptySlot,
-            MergeLeaf,
-            Internal
+            NewInternal,
+            Traverse
         }
-        public unsafe void Add(int leafId, ref BoundingBox box)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void CreateMerged(ref Vector3 minA, ref Vector3 maxA, ref Vector3 minB, ref Vector3 maxB, out BoundingBox merged)
         {
+            merged.Min = Vector3.Min(minA, minB);
+            merged.Max = Vector3.Max(maxA, maxB);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static unsafe BestInsertionChoice ComputeBestInsertionChoice(ref BoundingBox box, ref NodeChild child, out BoundingBox mergedCandidate, out float costChange)
+        {
+            CreateMerged(ref child.Min, ref child.Max, ref box.Min, ref box.Max, out mergedCandidate);
+            var newCost = ComputeBoundsMetric(ref mergedCandidate);
+            if (child.Index >= 0)
+            {
+                costChange = newCost - ComputeBoundsMetric(ref child.Min, ref child.Max);
+                return BestInsertionChoice.Traverse;
+            }
+            else
+            {
+                costChange = newCost;
+                return BestInsertionChoice.NewInternal;
+            }
+
+        }
+
+        /// <summary>
+        /// Adds a leaf to the tree with the given bounding box and returns the index of the added leaf.
+        /// </summary>
+        /// <param name="box">Bounding box of the leaf to add.</param>
+        /// <returns>Index of the leaf allocated in the tree's leaf array.</returns>
+        public unsafe int Add(ref BoundingBox box)
+        {
+            //The rest of the function assumes we have sufficient room. We don't want to deal with invalidated pointers mid-add.
+            if(Leaves.Length == leafCount)
+            {
+                //Note that, while we add 1, the underlying pool will request the next higher power of 2 in bytes that can hold it.
+                //Since we're already at capacity, that will be ~double the size.
+                Resize(leafCount + 1); 
+            }
+
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             int nodeIndex = 0;
             while (true)
             {
                 //Which child should the leaf belong to?
 
-                //Give the leaf to whichever node had the least volume change. 
+                //Give the leaf to whichever node had the least cost change. 
                 var node = nodes + nodeIndex;
-                var children = &node->A;
-                int minimumIndex = 0;
-                float minimumChange = float.MaxValue;
-                BoundingBox merged = new BoundingBox();
-                var bestChoice = BestInsertionChoice.EmptySlot;
-                if (node->ChildCount < 2)
+                //This is a binary tree, so the only time a node can have less than full children is when it's the root node.
+                //By convention, an empty tree still has a root node with no children, so we do have to handle this case.
+                if (leafCount < 2)
                 {
-                    //The best slot will, at best, be tied with inserting it in a leaf node because the change in heuristic cost
-                    //for filling an empty slot is zero.
-                    minimumIndex = node->ChildCount;
-                    merged = box;
-                    minimumChange = 0;
-                    bestChoice = BestInsertionChoice.EmptySlot;
+                    //The best slot will, at best, be tied with inserting it in a leaf node because the change in heuristic cost for filling an empty slot is zero.
+                    InsertLeafIntoEmptySlot(ref box, nodeIndex, leafCount, node);
                 }
                 else
                 {
-                    for (int i = 0; i < node->ChildCount; ++i)
+                    ref var a = ref node->A;
+                    ref var b = ref node->B;
+                    var choiceA = ComputeBestInsertionChoice(ref box, ref a, out var mergedA, out var costChangeA);
+                    var choiceB = ComputeBestInsertionChoice(ref box, ref b, out var mergedB, out var costChangeB);
+                    if(costChangeA <= costChangeB)
                     {
-                        BoundingBox.Merge(ref children[i], ref box, out var mergedCandidate);
-                        var newCost = ComputeBoundsMetric(ref mergedCandidate);
-                        //Since we already checked for an empty slot, the two remaining possibilities are merging with an existing leaf node
-                        //and continuing down another internal node.
-                        //Going into another internal node only increases the relevant cost (that of internal nodes) by the change in merged volume.
-                        //Merging into a leaf node generates a whole new internal node, so it tends to be more expensive.
-                        BestInsertionChoice choice;
-                        float costChange;
-                        if (children[i] >= 0)
+                        if(choiceA == BestInsertionChoice.NewInternal)
                         {
-                            choice = BestInsertionChoice.Internal;
-                            costChange = newCost - ComputeBoundsMetric(ref boundingBoxes[i]);
+                            return MergeLeafNodes(ref box, nodeIndex, 0, ref mergedA);
                         }
-                        else
+                        else //if (choiceA == BestInsertionChoice.Traverse)
                         {
-                            choice = BestInsertionChoice.MergeLeaf;
-                            costChange = newCost;
+                            a.Min = mergedA.Min;
+                            a.Max = mergedA.Max;
+                            nodeIndex = a.Index;
+                            ++a.LeafCount;
                         }
-
-
-                        if (costChange < minimumChange)
-                        {
-                            minimumChange = costChange;
-                            minimumIndex = i;
-                            merged = mergedCandidate;
-                            bestChoice = choice;
-                        }
-
                     }
-
+                    else
+                    {
+                        if (choiceB == BestInsertionChoice.NewInternal)
+                        {
+                            return MergeLeafNodes(ref box, nodeIndex, 1, ref mergedB);
+                        }
+                        else //if (choiceB == BestInsertionChoice.Traverse)
+                        {
+                            b.Min = mergedB.Min;
+                            b.Max = mergedB.Max;
+                            nodeIndex = b.Index;
+                            ++b.LeafCount;
+                        }
+                    }
                 }
 
-                switch (bestChoice)
-                {
-                    case BestInsertionChoice.EmptySlot:
-                        {
-                            //There is no child at all.
-                            //Put the new leaf here.
-                            bool leavesInvalidated;
-                            InsertLeafIntoEmptySlot(leafId, ref box, nodeIndex, minimumIndex, node, out leavesInvalidated);
-                            return;
-                        }
-                    case BestInsertionChoice.MergeLeaf:
-                        {
-                            bool nodesInvalidated, leavesInvalidated;
-                            MergeLeafNodes(leafId, ref box, nodeIndex, minimumIndex, ref merged, out nodesInvalidated, out leavesInvalidated);
-                            //No pointers need to be updated. All the old ones are done with.
-                            return;
-                        }
-                    case BestInsertionChoice.Internal:
-                        {
-                            //It's an internal node. Traverse to the next node.
-                            boundingBoxes[minimumIndex] = merged;
-                            nodeIndex = children[minimumIndex];
-                            ++leafCounts[minimumIndex];
-                            break;
-                        }
-
-                }
 
             }
+        }
+        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static float ComputeBoundsMetric(ref BoundingBox bounds)
+        {
+            return ComputeBoundsMetric(ref bounds.Min, ref bounds.Max);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static float ComputeBoundsMetric(ref Vector3 min, ref Vector3 max)
+        {
+            //Note that we just use the SAH. While we are primarily interested in volume queries for the purposes of collision detection, the topological difference
+            //between a volume heuristic and surface area heuristic isn't huge. There is, however, one big annoying issue that volume heuristics run into:
+            //all bounding boxes with one extent equal to zero have zero cost. Surface area approaches avoid this hole simply.
+            var offset = max - min;
+            //Note that this is merely proportional to surface area. Being scaled by a constant factor is irrelevant.
+            return offset.X * offset.Y + offset.Y * offset.Z + offset.X * offset.Z;
         }
     }
 }
