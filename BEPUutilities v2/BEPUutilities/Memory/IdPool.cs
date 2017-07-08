@@ -11,6 +11,8 @@ namespace BEPUutilities2.Memory
     /// </summary>
     public class IdPool<TSpan, TPool> where TSpan : ISpan<int> where TPool : IMemoryPool<int, TSpan>
     {
+        //TODO: You could make this quite a bit more memory efficient in the case where a bunch of ids are requested, then returned.
+        //It would require a little more bookkeeping effort, though; it's likely that either taking or returning ids would slow down a little.
         private int nextIndex;
 
         /// <summary>
