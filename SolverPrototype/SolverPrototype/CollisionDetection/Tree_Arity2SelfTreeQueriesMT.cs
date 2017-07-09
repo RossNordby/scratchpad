@@ -1,6 +1,9 @@
 ﻿using BEPUutilities.DataStructures;
 using BEPUutilities.ResourceManagement;
 using BEPUutilities.Threading;
+using BEPUutilities2;
+using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -16,84 +19,76 @@ namespace SolverPrototype.CollisionDetection
 {
     partial class Tree
     {
-        public class SelfTestMultithreadedContext
+        //TODO: 
+        //There are a some issues inherited from the prototype that we'd like to address at some point:
+        //1) Recursion. There's no reason to use recursion here.
+        //2) Duplicate work with the single threaded variant. The current load balancing approach uses a single threaded pass to dive into the tree, and that logic
+        //is basically identical. It would be great to have a zero overhead abstraction that unifies the two. Unclear how useful this is- it's possible that the abstraction
+        //would end up being more complex than just two near-identical implementations.
+        //3) Limited workstealing capacity. While we can dive arbitrarily far in the first pass, it increases the single threaded phase.
+        //If the narrow phase relies on the broadphase for its work balancing (that is, the overlap handler directly triggers narrow phase work), 
+        //you may need to dive so deeply to maintain load balance that the single threaded phase starts to limit parallelism meaningfully. 
+        //Any constant cost less than ~5us is basically irrelevant, though- if you can collect 128 nodepairs to test in 5us, that would likely be enough to load balance the narrow phase
+        //even on something like 16 cores. 
+        //4) If the handler directly executes narrow phase work, overlaps handled during the single threaded collection phase could be nasty. This should be pretty rare for any nontrivial
+        //tree, but it's still something to be aware of in corner cases.
+
+        //To specifically address #3 above, consider explicit workstealing. When a worker is out of directly accessible work (its exhausted its own stack, and no more precollected roots exist),
+        //it could snoop other worker stacks. This would introduce sync requirements on every stack. 
+        //1) The stealer would probably start at claim 0 and walk forward. The largest jobs are at the top of the stack, which gives you the most bang for the sync work buck.
+        //It would check the claims state of each stack entry- there would be a integer on each entry marking it as claimed or not. Once a candidate is found, compare exchange to claim it.
+        //It would have to distinguish between 'stolen' blocks and locally claimed blocks. A thief can step over stolen blocks, but if it hits a locally claimed block, it has to stop.
+        //2) While pushing new jobs to the local stack is free, victims must always check to confirm that a stack pop will not consume a job that has been stolen by another thread.
+        //Given that shallow stack accesses will tend to be less work, the local thread should probably prefer claiming chunks of its stack at a time. It can do this simply by 
+        //performing a compare exchange on a stack element the desired number of elements up the stack. Since thieves always work step by step without leaving any gaps, the local thread
+        //can block them by claiming at any (unclaimed) point in the stack. All later stack entries can be unaffected. In practice, this means local threads should be able to 
+        //avoid doing interlocked operations on the overwhelming majority of pop operations.
+
+        //With such a scheme, you would still want to somehow collect an initial set of jobs to give workers something to munch on, but you don't need lots of jobs per worker anymore.
+        //So, if you had a 128 core machine, you could get away with still having ~256 jobs- which you can probably collect in less than 20us even on lower frequency processors 
+        //(like the ones you'd find in a 128 core machine).
+        public class MultithreadedSelfTest<TOverlapHandler> where TOverlapHandler : struct, IOverlapHandler
         {
-            public Tree Tree;
-            public int ThreadCount
+            struct Overlap
             {
-                get; private set;
+                public int A;
+                public int B;
             }
-            public BufferPool<Overlap> Pool
-            {
-                get; private set;
-            }
-            public QuickList<Overlap>[] WorkerOverlaps
-            {
-                get; private set;
-            }
+
+            private Tree tree;
+
             int NextNodePair;
-            public QuickList<Overlap> NodePairsToTest;
-            public Action<int> PairTestAction
+            private QuickList<Overlap, Buffer<Overlap>> nodePairsToTest;
+            private Action<int> pairTestAction;
+
+            public MultithreadedSelfTest()
             {
-                get; private set;
+                pairTestAction = PairTest;
             }
 
-            bool disposed;
+            Buffer<TOverlapHandler> overlapHandlers;
 
-            public SelfTestMultithreadedContext(int threadCount, BufferPool<Overlap> pool)
+            public void SelfTest(Tree tree, ref Buffer<TOverlapHandler> overlapHandlers, BufferPool pool, IThreadDispatcher threadDispatcher)
             {
-                Initialize(threadCount, pool);
-            }
-
-            public void Initialize(int threadCount, BufferPool<Overlap> pool)
-            {
-                NodePairsToTest = new QuickList<Overlap>(pool);
-                if (WorkerOverlaps == null || threadCount != ThreadCount)
-                {
-                    ThreadCount = threadCount;
-                    WorkerOverlaps = new QuickList<Overlap>[ThreadCount];
-                }
-                for (int i = 0; i < ThreadCount; ++i)
-                {
-                    WorkerOverlaps[i] = new QuickList<Overlap>(pool);
-                }
-                PairTestAction = PairTest;
-                disposed = false;
-            }
-
-            /// <summary>
-            /// Prepares the context for immediate use.
-            /// </summary>
-            /// <param name="tree">Tree that the context will be operating on.</param>
-            internal void Prepare(Tree tree)
-            {
-                Debug.Assert(!disposed);
-                Tree = tree;
-                for (int i = 0; i < WorkerOverlaps.Length; ++i)
-                {
-                    WorkerOverlaps[i].Count = 0;
-                }
-                NextNodePair = -1;
-                NodePairsToTest.Count = 0;
-            }
-
-            /// <summary>
-            /// Performs any cleaning necessary for the context to return to a pool safely (i.e. without holding resources to objects it doesn't own).
-            /// </summary>
-            internal void CleanUp()
-            {
-                Debug.Assert(!disposed);
-                Tree = null;
+                Debug.Assert(overlapHandlers.Allocated && overlapHandlers.Length >= threadDispatcher.ThreadCount);
+                const float jobMultiplier = 1.5f;
+                var targetJobCount = Math.Max(1, jobMultiplier * threadDispatcher.ThreadCount);
+                var leafThreshold = tree.leafCount / targetJobCount;
+                this.overlapHandlers = overlapHandlers;
+                this.tree = tree;
+                QuickList<Overlap, Buffer<Overlap>>.Create(pool.SpecializeFor<Overlap>(), (int)(targetJobCount * 2), out nodePairsToTest);
+                threadDispatcher.DispatchWorkers(pairTestAction);
+                this.tree = null;
+                this.overlapHandlers = default(Buffer<TOverlapHandler>);
             }
 
             unsafe void PairTest(int workerIndex)
             {
-                Debug.Assert(!disposed);
                 int nextNodePairIndex;
                 //To minimize the number of worker overlap lists, perform direct load balancing by manually grabbing the next indices.
-                while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < NodePairsToTest.Count)
+                while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < nodePairsToTest.Count)
                 {
-                    var overlap = NodePairsToTest[nextNodePairIndex];
+                    var overlap = nodePairsToTest[nextNodePairIndex];
                     if (overlap.A >= 0)
                     {
                         if (overlap.A == overlap.B)
@@ -125,26 +120,7 @@ namespace SolverPrototype.CollisionDetection
                         //The collection routine should take care of that, since it has more convenient access to bounding boxes and because a single test isn't worth an atomic increment.
                     }
                 }
-            }
-
-            /// <summary>
-            /// Releases all resources held by the context.
-            /// </summary>
-            public void Dispose()
-            {
-                if (!disposed)
-                {
-                    CleanUp();
-                    NodePairsToTest.Count = 0;
-                    NodePairsToTest.Dispose();
-                    for (int i = 0; i < ThreadCount; ++i)
-                    {
-                        WorkerOverlaps[i].Count = 0;
-                        WorkerOverlaps[i].Dispose();
-                    }
-                }
-            }
-
+            }            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -282,15 +258,15 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        public unsafe void GetSelfOverlaps(IParallelLooper looper, SelfTestMultithreadedContext context)
-        {            
+        public unsafe void GetSelfOverlaps(IParallelLooper looper, MultithreadedSelfTest context)
+        {
             //If there are not multiple children, there's no need to recurse.
             //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
             if (nodes->ChildCount < 2)
                 return;
 
             context.Prepare(this);
-            
+
             int collisionTestThreshold = (int)(leafCount / (1.5f * looper.ThreadCount));
             CollectNodePairs(collisionTestThreshold, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
             //CollectNodePairs2(looper.ThreadCount * 16, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
