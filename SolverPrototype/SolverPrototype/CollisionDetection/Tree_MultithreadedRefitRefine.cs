@@ -398,59 +398,63 @@ namespace SolverPrototype.CollisionDetection
             looper.ForLoop(0, Math.Min(looper.ThreadCount, context.RefinementTargets.Count), context.RefineAction);
 
 
-            //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
-            //Note that more cache optimization is required with more threads, since spreading it out more slightly lessens its effectiveness.
-            var cacheOptimizeCount = GetCacheOptimizeTuning(context.MaximumSubtrees, context.RefitCostChange, (Math.Max(1, looper.ThreadCount * 0.25f)) * cacheOptimizeAggressivenessScale);
-
-            var cacheOptimizationTasks = looper.ThreadCount * 2;
-            context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / cacheOptimizationTasks;
-            var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
-            context.CacheOptimizeStarts.Add(startIndex);
-
-            var optimizationSpacing = nodeCount / looper.ThreadCount;
-            var optimizationSpacingWithExtra = optimizationSpacing + 1;
-            var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
-
-            for (int i = 1; i < cacheOptimizationTasks; ++i)
+            //There's no reason to perform any kind of cache optimization on a tree with less than 2 leaf nodes.
+            //That, combined with using a binary tree, gives us a guarantee: every node has 2 children. No need for per-node child counts.
+            if (leafCount > 2)
             {
-                if (optimizationRemainder > 0)
-                {
-                    startIndex += optimizationSpacingWithExtra;
-                    --optimizationRemainder;
-                }
-                else
-                {
-                    startIndex += optimizationSpacing;
-                }
-                if (startIndex >= nodeCount)
-                    startIndex -= nodeCount;
-                Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
+                //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
+                //Note that more cache optimization is required with more threads, since spreading it out more slightly lessens its effectiveness.
+                var cacheOptimizeCount = GetCacheOptimizeTuning(context.MaximumSubtrees, context.RefitCostChange, (Math.Max(1, looper.ThreadCount * 0.25f)) * cacheOptimizeAggressivenessScale);
+
+                var cacheOptimizationTasks = looper.ThreadCount * 2;
+                context.PerWorkerCacheOptimizeCount = cacheOptimizeCount / cacheOptimizationTasks;
+                var startIndex = (int)(((long)frameIndex * context.PerWorkerCacheOptimizeCount) % nodeCount);
                 context.CacheOptimizeStarts.Add(startIndex);
+
+                var optimizationSpacing = nodeCount / looper.ThreadCount;
+                var optimizationSpacingWithExtra = optimizationSpacing + 1;
+                var optimizationRemainder = nodeCount - optimizationSpacing * looper.ThreadCount;
+
+                for (int i = 1; i < cacheOptimizationTasks; ++i)
+                {
+                    if (optimizationRemainder > 0)
+                    {
+                        startIndex += optimizationSpacingWithExtra;
+                        --optimizationRemainder;
+                    }
+                    else
+                    {
+                        startIndex += optimizationSpacing;
+                    }
+                    if (startIndex >= nodeCount)
+                        startIndex -= nodeCount;
+                    Debug.Assert(startIndex >= 0 && startIndex < nodeCount);
+                    context.CacheOptimizeStarts.Add(startIndex);
+                }
+
+                //for (int i = 0; i < looper.ThreadCount; ++i)
+                //{
+                //    var start = context.CacheOptimizeStarts[i];
+                //    var end = Math.Min(start + context.PerWorkerCacheOptimizeCount, NodeCount);
+                //    for (int j = start; j < end; ++j)
+                //    {
+                //        //ValidateRefineFlags(0);
+                //        IncrementalCacheOptimizeThreadSafe(j);
+                //        //ValidateRefineFlags(0);
+                //    }
+                //}
+
+
+                //var start = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+                //Validate();
+                //ValidateRefineFlags(0);
+                looper.ForLoop(0, cacheOptimizationTasks, context.CacheOptimizeAction);
+                //ValidateRefineFlags(0);
+                //var end = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+
+                //Validate();
+                //Console.WriteLine($"Cache optimize time: {end - start}");
             }
-
-            //for (int i = 0; i < looper.ThreadCount; ++i)
-            //{
-            //    var start = context.CacheOptimizeStarts[i];
-            //    var end = Math.Min(start + context.PerWorkerCacheOptimizeCount, NodeCount);
-            //    for (int j = start; j < end; ++j)
-            //    {
-            //        //ValidateRefineFlags(0);
-            //        IncrementalCacheOptimizeThreadSafe(j);
-            //        //ValidateRefineFlags(0);
-            //    }
-            //}
-
-
-            //var start = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-            //Validate();
-            //ValidateRefineFlags(0);
-            looper.ForLoop(0, cacheOptimizationTasks, context.CacheOptimizeAction);
-            //ValidateRefineFlags(0);
-            //var end = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-
-            //Validate();
-            //Console.WriteLine($"Cache optimize time: {end - start}");
-
 
 
             context.CleanUp();

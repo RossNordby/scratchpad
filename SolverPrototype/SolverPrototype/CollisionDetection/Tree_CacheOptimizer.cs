@@ -1,13 +1,7 @@
-﻿using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -34,67 +28,40 @@ namespace SolverPrototype.CollisionDetection
                 //That parent has moved.
                 b->Parent = indexA;
             }
-            (&nodes[a->Parent].ChildA)[a->IndexInParent] = indexA;
-            (&nodes[b->Parent].ChildA)[b->IndexInParent] = indexB;
+            (&nodes[a->Parent].A)[a->IndexInParent].Index = indexA;
+            (&nodes[b->Parent].A)[b->IndexInParent].Index = indexB;
 
 
             //Update the parent pointers of the children.
-            var children = &a->ChildA;
-            for (int i = 0; i < a->ChildCount; ++i)
+            var children = &a->A;
+            for (int i = 0; i < 2; ++i)
             {
-                if (children[i] >= 0)
+                ref var child = ref children[i];
+                if (child.Index >= 0)
                 {
-                    nodes[children[i]].Parent = indexA;
+                    nodes[child.Index].Parent = indexA;
                 }
                 else
                 {
-                    var leafIndex = Encode(children[i]);
-                    leaves[leafIndex].NodeIndex = indexA;
+                    var leafIndex = Encode(child.Index);
+                    leaves[leafIndex] = new Leaf(indexA, i);
                 }
             }
-            children = &b->ChildA;
-            for (int i = 0; i < b->ChildCount; ++i)
+            children = &b->A;
+            for (int i = 0; i < 2; ++i)
             {
-                if (children[i] >= 0)
+                ref var child = ref children[i];
+                if (child.Index >= 0)
                 {
-                    nodes[children[i]].Parent = indexB;
+                    nodes[child.Index].Parent = indexB;
                 }
                 else
                 {
-                    var leafIndex = Encode(children[i]);
-                    leaves[leafIndex].NodeIndex = indexB;
+                    var leafIndex = Encode(child.Index);
+                    leaves[leafIndex] = new Leaf(indexB, i);
                 }
             }
 
-        }
-
-        unsafe void Attempt(int nodeIndex, ref int targetIndex, int min, int max)
-        {
-            //TWO KNOWNS:
-            //1) The parent node is in its global optimum position.
-            //2) All simultaneously executing cache optimizations target global optimums, so the parent node cannot move.
-
-            //It is possible that the children will move
-            var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-
-            //Acquire a lock on all children that are outside of the range.
-            //DANGER: DEADLOCKS. Need to be able to prove that it can't happen, but current organization makes it very likely.
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                //If the child is already within the subtree's dedicated memory range, we know that no other thread will interfere with it.
-                // Consider:
-                //  There is only one thread operating per logical subtree.
-                //  Other threads 
-                //
-                //No lock is necessary.
-                if (children[i] < min || children[i] >= max)
-                {
-                    //Lock(children[i]);
-                }
-            }
-
-            //All children are now immobile.
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -168,14 +135,15 @@ namespace SolverPrototype.CollisionDetection
                 if (!needSwapTargetParentLock || TryLock(ref swapTarget->Parent))
                 {
 
-                    int childrenLockedCount = swapTarget->ChildCount;
-                    var children = &swapTarget->ChildA;
-                    for (int i = 0; i < swapTarget->ChildCount; ++i)
+                    int childrenLockedCount = 2;
+                    var children = &swapTarget->A;
+                    for (int i = 0; i < 2; ++i)
                     {
+                        ref var child = ref children[i];
                         //Don't lock children[i] if:
                         //1) children[i] == swapperIndex, because the swapper is already locked 
                         //2) children[i] == swapperParentIndex, because the swapperParent is already locked
-                        if (children[i] >= 0 && children[i] != swapperIndex && children[i] != swapperParentIndex && !TryLock(ref children[i]))
+                        if (child.Index >= 0 && child.Index != swapperIndex && child.Index != swapperParentIndex && !TryLock(ref child.Index))
                         {
                             //Failed to acquire lock on all children.
                             childrenLockedCount = i;
@@ -183,19 +151,20 @@ namespace SolverPrototype.CollisionDetection
                         }
                     }
 
-                    if (childrenLockedCount == swapTarget->ChildCount)
+                    if (childrenLockedCount == 2)
                     {
                         //Nodes locked successfully.
                         SwapNodes(swapperIndex, swapTargetIndex);
                         success = true;
 
                         //Unlock children of the original swap target, *which now lives in the swapperIndex*.
-                        children = &nodes[swapperIndex].ChildA;
+                        children = &nodes[swapperIndex].A;
                         for (int i = childrenLockedCount - 1; i >= 0; --i)
                         {
+                            ref var child = ref children[i];
                             //Again, note use of swapTargetIndex instead of swapperIndex.
-                            if (children[i] >= 0 && children[i] != swapTargetIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
-                                nodes[children[i]].RefineFlag = 0;
+                            if (child.Index >= 0 && child.Index != swapTargetIndex && child.Index != swapperParentIndex) //Avoid unlocking children already locked by the caller.
+                                nodes[child.Index].RefineFlag = 0;
                         }
                     }
                     else
@@ -203,8 +172,9 @@ namespace SolverPrototype.CollisionDetection
                         //No swap occurred. Can still use the swapTarget->ChildA pointer.
                         for (int i = childrenLockedCount - 1; i >= 0; --i)
                         {
-                            if (children[i] >= 0 && children[i] != swapperIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
-                                nodes[children[i]].RefineFlag = 0;
+                            ref var child = ref children[i];
+                            if (child.Index >= 0 && child.Index != swapperIndex && child.Index != swapperParentIndex) //Avoid unlocking children already locked by the caller.
+                                nodes[child.Index].RefineFlag = 0;
                         }
                     }
 
@@ -286,14 +256,15 @@ namespace SolverPrototype.CollisionDetection
                 if (!needSwapTargetParentLock || TryLock(ref swapTarget->Parent))
                 {
 
-                    int childrenLockedCount = swapTarget->ChildCount;
-                    var children = &swapTarget->ChildA;
-                    for (int i = 0; i < swapTarget->ChildCount; ++i)
+                    int childrenLockedCount = 2;
+                    var children = &swapTarget->A;
+                    for (int i = 0; i < 2; ++i)
                     {
+                        ref var child = ref children[i];
                         //Don't lock children[i] if:
                         //1) children[i] == swapperIndex, because the swapper is already locked 
                         //2) children[i] == swapperParentIndex, because the swapperParent is already locked
-                        if (children[i] != swapperIndex && children[i] != swapperParentIndex && !TryLock(ref children[i]))
+                        if (child.Index != swapperIndex && child.Index != swapperParentIndex && !TryLock(ref child.Index))
                         {
                             //Failed to acquire lock on all children.
                             childrenLockedCount = i;
@@ -301,7 +272,7 @@ namespace SolverPrototype.CollisionDetection
                         }
                     }
 
-                    if (childrenLockedCount == swapTarget->ChildCount)
+                    if (childrenLockedCount == 2)
                     {
                         //Nodes locked successfully.
                         success = true;
@@ -309,8 +280,9 @@ namespace SolverPrototype.CollisionDetection
                     //TODO: should not unlock here because this is a LOCK function!
                     for (int i = childrenLockedCount - 1; i >= 0; --i)
                     {
-                        if (children[i] != swapperIndex && children[i] != swapperParentIndex) //Avoid unlocking children already locked by the caller.
-                            nodes[children[i]].RefineFlag = 0;
+                        ref var child = ref children[i];
+                        if (child.Index != swapperIndex && child.Index != swapperParentIndex) //Avoid unlocking children already locked by the caller.
+                            nodes[child.Index].RefineFlag = 0;
                     }
 
                     if (needSwapTargetParentLock)
@@ -365,11 +337,12 @@ namespace SolverPrototype.CollisionDetection
                         if (bParentAvoidedLock || TryLock(ref b->Parent))
                         {
 
-                            int aChildrenLockedCount = a->ChildCount;
-                            var aChildren = &a->ChildA;
-                            for (int i = 0; i < a->ChildCount; ++i)
+                            int aChildrenLockedCount = 2;
+                            var aChildren = &a->A;
+                            for (int i = 0; i < 2; ++i)
                             {
-                                if (aChildren[i] != bIndex && aChildren[i] != b->Parent && !TryLock(ref aChildren[i]))
+                                ref var child = ref aChildren[i];
+                                if (child.Index != bIndex && child.Index != b->Parent && !TryLock(ref child.Index))
                                 {
                                     //Failed to acquire lock on all children.
                                     aChildrenLockedCount = i;
@@ -377,13 +350,14 @@ namespace SolverPrototype.CollisionDetection
                                 }
                             }
 
-                            if (aChildrenLockedCount == a->ChildCount)
+                            if (aChildrenLockedCount == 2)
                             {
-                                int bChildrenLockedCount = b->ChildCount;
-                                var bChildren = &b->ChildA;
-                                for (int i = 0; i < b->ChildCount; ++i)
+                                int bChildrenLockedCount = 2;
+                                var bChildren = &b->A;
+                                for (int i = 0; i < 2; ++i)
                                 {
-                                    if (bChildren[i] != aIndex && bChildren[i] != a->Parent && !TryLock(ref bChildren[i]))
+                                    ref var child = ref bChildren[i];
+                                    if (child.Index != aIndex && child.Index != a->Parent && !TryLock(ref child.Index))
                                     {
                                         //Failed to acquire lock on all children.
                                         bChildrenLockedCount = i;
@@ -391,7 +365,7 @@ namespace SolverPrototype.CollisionDetection
                                     }
                                 }
 
-                                if (bChildrenLockedCount == b->ChildCount)
+                                if (bChildrenLockedCount == 2)
                                 {
                                     //ALL nodes locked successfully.
                                     SwapNodes(aIndex, bIndex);
@@ -400,14 +374,16 @@ namespace SolverPrototype.CollisionDetection
 
                                 for (int i = bChildrenLockedCount - 1; i >= 0; --i)
                                 {
-                                    if (bChildren[i] != aIndex && bChildren[i] != a->Parent) //Do not yet unlock a or its parent.
-                                        nodes[bChildren[i]].RefineFlag = 0;
+                                    ref var child = ref bChildren[i];
+                                    if (child.Index != aIndex && child.Index != a->Parent) //Do not yet unlock a or its parent.
+                                        nodes[child.Index].RefineFlag = 0;
                                 }
                             }
                             for (int i = aChildrenLockedCount - 1; i >= 0; --i)
                             {
-                                if (aChildren[i] != bIndex && aChildren[i] != b->Parent) //Do not yet unlock b or its parent.
-                                    nodes[aChildren[i]].RefineFlag = 0;
+                                ref var child = ref aChildren[i];
+                                if (child.Index != bIndex && child.Index != b->Parent) //Do not yet unlock b or its parent.
+                                    nodes[child.Index].RefineFlag = 0;
                             }
                             if (!bParentAvoidedLock)
                                 nodes[b->Parent].RefineFlag = 0;
@@ -433,6 +409,8 @@ namespace SolverPrototype.CollisionDetection
         /// Will return true even if not all nodes are optimized if the reason was a target index outside of the node list bounds.</returns>
         public unsafe bool IncrementalCacheOptimizeThreadSafe(int nodeIndex)
         {
+            Debug.Assert(leafCount >= 2,
+                "Should only use cache optimization when there are at least two leaves. Every node has to have 2 children, and optimizing a 0 or 1 leaf tree is silly anyway.");
             //Multithreaded cache optimization attempts to acquire a lock on every involved node.
             //If any lock fails, it just abandons the entire attempt.
             //That's acceptable- the incremental optimization only cares about eventual success.
@@ -444,11 +422,9 @@ namespace SolverPrototype.CollisionDetection
 
             if (0 == Interlocked.CompareExchange(ref node->RefineFlag, 1, 0))
             {
-                var children = &node->ChildA;
-
-                var leafCounts = &node->LeafCountA;
+                var children = &node->A;
                 var targetIndex = nodeIndex + 1;
-                
+
 
 
                 //Note that we pull all children up to their final positions relative to the current node index.
@@ -457,8 +433,9 @@ namespace SolverPrototype.CollisionDetection
                 //TODO: N-ary tree support. Tricky without subtree count and without fixed numbers of children per node, but it may be possible
                 //to stil choose something which converged.
 
-                for (int i = 0; i < node->ChildCount; ++i)
+                for (int i = 0; i < 2; ++i)
                 {
+                    ref var child = ref children[i];
                     if (targetIndex >= nodeCount)
                     {
                         //This attempted swap would reach beyond the allocated nodes.
@@ -470,34 +447,34 @@ namespace SolverPrototype.CollisionDetection
                     }
                     //It is very possible that this child pointer could swap between now and the compare exchange read. 
                     //However, a child pointer will not turn from an internal node (positive) to a leaf node (negative), and that's all that matters.
-                    if (children[i] >= 0)
+                    if (child.Index >= 0)
                     {
                         //Lock before comparing the children to stop the children from changing.
-                        if (TryLock(ref children[i]))
+                        if (TryLock(ref child.Index))
                         {
-                            var originalChildIndex = children[i];
                             //While we checked if children[i] != targetIndex earlier as an early-out, it must be done post-lock for correctness because children[i] could have changed.
                             //Attempting a swap between an index and itself is invalid.
-                            if (originalChildIndex != targetIndex)
+                            if (child.Index != targetIndex)
                             {
                                 //Now lock all of this child's children.
-                                var child = nodes + originalChildIndex;
-                                var grandchildren = &child->ChildA;
-                                int lockedChildrenCount = child->ChildCount;
-                                for (int grandchildIndex = 0; grandchildIndex < child->ChildCount; ++grandchildIndex)
+                                var childNode = nodes + child.Index;
+                                var grandchildren = &childNode->A;
+                                int lockedChildrenCount = 2;
+                                for (int grandchildIndex = 0; grandchildIndex < 2; ++grandchildIndex)
                                 {
+                                    ref var grandchild = ref grandchildren[grandchildIndex];
                                     //It is very possible that this grandchild pointer could swap between now and the compare exchange read. 
                                     //However, a child pointer will not turn from an internal node (positive) to a leaf node (negative), and that's all that matters.
-                                    if (grandchildren[grandchildIndex] >= 0 && !TryLock(ref grandchildren[grandchildIndex]))
+                                    if (grandchild.Index >= 0 && !TryLock(ref grandchild.Index))
                                     {
                                         lockedChildrenCount = grandchildIndex;
                                         break;
                                     }
                                 }
-                                if (lockedChildrenCount == child->ChildCount)
+                                if (lockedChildrenCount == 2)
                                 {
                                     Debug.Assert(node->RefineFlag == 1);
-                                    if (!TrySwapNodeWithTargetThreadSafe(originalChildIndex, nodeIndex, targetIndex))
+                                    if (!TrySwapNodeWithTargetThreadSafe(child.Index, nodeIndex, targetIndex))
                                     {
                                         //Failed target lock.
                                         success = false;
@@ -514,17 +491,18 @@ namespace SolverPrototype.CollisionDetection
                                 //Unlock all grandchildren.
                                 //Note that we can't use the old grandchildren pointer. If the swap went through, it's pointing to the *target's* children.
                                 //So update the pointer.
-                                grandchildren = &nodes[children[i]].ChildA;
+                                grandchildren = &nodes[child.Index].A;
                                 for (int grandchildIndex = lockedChildrenCount - 1; grandchildIndex >= 0; --grandchildIndex)
                                 {
-                                    if (grandchildren[grandchildIndex] >= 0)
-                                        nodes[grandchildren[grandchildIndex]].RefineFlag = 0;
+                                    ref var grandchild = ref grandchildren[grandchildIndex];
+                                    if (grandchild.Index >= 0)
+                                        nodes[grandchild.Index].RefineFlag = 0;
                                 }
 
                             }
                             //Unlock. children[i] is either the targetIndex, if a swap went through, or it's the original child index if it didn't.
                             //Those are the proper targets.
-                            nodes[children[i]].RefineFlag = 0;
+                            nodes[child.Index].RefineFlag = 0;
                         }
                         else
                         {
@@ -532,7 +510,7 @@ namespace SolverPrototype.CollisionDetection
                             success = false;
                         }
                         //Leafcounts cannot change due to other threads.
-                        targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
+                        targetIndex += child.LeafCount - 1; //Only works on 2-ary trees.
                     }
                 }
                 //Unlock the parent.
@@ -543,97 +521,21 @@ namespace SolverPrototype.CollisionDetection
                 //Failed parent lock.
                 success = false;
             }
-            //{
-            //    //TEMP DEBUG. broken in multithread.
-            //    Debug.Assert(node->RefineFlag == 0);
-            //    var children = &node->ChildA;
-
-            //    for (int i = 0; i < node->ChildCount; ++i)
-            //    {
-            //        if (children[i] >= 0)
-            //        {
-            //            Debug.Assert(nodes[children[i]].RefineFlag == 0);
-            //            var child = nodes + children[i];
-            //            var grandchildren = &child->ChildA;
-            //            for (int j = 0; j < child->ChildCount; ++j)
-            //            {
-            //                if (grandchildren[j] >= 0)
-            //                {
-            //                    Debug.Assert(nodes[grandchildren[j]].RefineFlag == 0);
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
             return success;
         }
 
         public unsafe void IncrementalCacheOptimize(int nodeIndex)
         {
-            Debug.Assert(ChildrenCapacity == 2, "the multi-swap of children only works on 2-ary trees due to child count guarantees. Is it even necessary?");
+            if (leafCount <= 2)
+            {
+                //Don't bother cache optimizing if there are only two leaves. There's no work to be done, and it supplies a guarantee to the rest of the optimization logic
+                //so that we don't have to check per-node child counts.
+                return;
+            }
+
             var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-            var leafCounts = &node->LeafCountA;
-
-
-            //{
-
-            //    int largestIndex = -1;
-            //    float largestMetric = 0;
-            //    var bounds = &node->A;
-            //    for (int i = 0; i < node->ChildCount; ++i)
-            //    {
-            //        if (children[i] >= 0) //Only swap internal nodes forward, because leaf nodes are irrelevant to cache behavior.
-            //        {
-            //            var metric = ComputeBoundsMetric(ref bounds[i]);
-            //            if (metric > largestMetric)
-            //            {
-            //                largestIndex = i;
-            //                largestMetric = metric;
-            //            }
-            //        }
-            //    }
-            //    if (largestIndex > 0)
-            //    {
-            //        //The largest index should be in the first slot, because the first slot is stored contiguously.
-            //        //(There are other ways to guarantee this- like during construction, or even just choosing different target indices above-
-            //        //but this just makes things simple.)
-            //        var tempBounds = bounds[0];
-            //        bounds[0] = bounds[largestIndex];
-            //        bounds[largestIndex] = tempBounds;
-            //        var tempChild = children[0];
-            //        children[0] = children[largestIndex];
-            //        children[largestIndex] = tempChild;
-            //        var tempLeafCount = leafCounts[0];
-            //        leafCounts[0] = leafCounts[largestIndex];
-            //        leafCounts[largestIndex] = tempLeafCount;
-
-            //        if (children[0] >= 0)
-            //        {
-            //            nodes[children[0]].IndexInParent = 0;
-            //        }
-            //        else
-            //        {
-            //            var leafIndex = Encode(children[0]);
-            //            leaves[leafIndex].ChildIndex = 0;
-            //        }
-            //        if (children[largestIndex] >= 0)
-            //        {
-            //            nodes[children[largestIndex]].IndexInParent = largestIndex;
-            //        }
-            //        else
-            //        {
-            //            var leafIndex = Encode(children[largestIndex]);
-            //            leaves[leafIndex].ChildIndex = largestIndex;
-            //        }
-            //    }
-            //}
-
-
-
-
+            var children = &node->A;
             var targetIndex = nodeIndex + 1;
-
 
             //Note that we pull all children up to their final positions relative to the current node index.
             //This helps ensure that more nodes can converge to their final positions- if we didn't do this,
@@ -641,7 +543,7 @@ namespace SolverPrototype.CollisionDetection
             //TODO: N-ary tree support. Tricky without subtree count and without fixed numbers of children per node, but it may be possible
             //to stil choose something which converged.
 
-            for (int i = 0; i < node->ChildCount; ++i)
+            for (int i = 0; i < 2; ++i)
             {
                 if (targetIndex >= nodeCount)
                 {
@@ -652,21 +554,39 @@ namespace SolverPrototype.CollisionDetection
                     //We could aggressively swap this node upward. More complicated.
                     break;
                 }
-                if (children[i] >= 0)
+                ref var child = ref children[i];
+                if (child.Index >= 0)
                 {
-                    if (children[i] != targetIndex)
+                    if (child.Index != targetIndex)
                     {
-                        //Validate();
-                        SwapNodes(children[i], targetIndex);
-                        //Validate();
+                        SwapNodes(child.Index, targetIndex);
                     }
                     //break;
-                    targetIndex += leafCounts[i] - 1; //Only works on 2-ary trees.
+                    targetIndex += child.LeafCount - 1;
                 }
             }
+        }
 
+        
 
-
+        unsafe void CacheOptimize(int nodeIndex, ref int nextIndex)
+        {
+            var node = nodes + nodeIndex;
+            var children = &node->A;
+            for (int i = 0; i < 2; ++i)
+            {
+                ref var child = ref children[i];
+                if (child.Index >= 0)
+                {
+                    Debug.Assert(nextIndex >= 0 && nextIndex < nodeCount,
+                        "Swap target should be within the node set. If it's not, the initial node was probably not in global optimum position.");
+                    if (child.Index != nextIndex)
+                        SwapNodes(child.Index, nextIndex);
+                    Debug.Assert(child.Index != nextIndex);
+                    ++nextIndex;
+                    CacheOptimize(child.Index, ref nextIndex);
+                }
+            }
         }
 
 
@@ -677,31 +597,15 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="nodeIndex">Node to begin the optimization process at.</param>
         public unsafe void CacheOptimize(int nodeIndex)
         {
+            if (leafCount <= 2)
+            {
+                //Don't bother cache optimizing if there are only two leaves. There's no work to be done, and it supplies a guarantee to the rest of the optimization logic
+                //so that we don't have to check per-node child counts.
+                return;
+            }
             var targetIndex = nodeIndex + 1;
 
             CacheOptimize(nodeIndex, ref targetIndex);
-        }
-
-
-        unsafe void CacheOptimize(int nodeIndex, ref int nextIndex)
-        {
-            var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (children[i] >= 0)
-                {
-                    Debug.Assert(nextIndex >= 0 && nextIndex < nodeCount, "Swap target should be within the node set. If it's not, the initial node was probably not in global optimum position.");
-                    //if (nextIndex < 0 || nextIndex >= nodeCount)
-                    //    continue;
-                    if (children[i] != nextIndex)
-                        SwapNodes(children[i], nextIndex);
-                    if (children[i] != nextIndex)
-                        Console.WriteLine("That's impossible");
-                    ++nextIndex;
-                    CacheOptimize(children[i], ref nextIndex);
-                }
-            }
         }
     }
 
