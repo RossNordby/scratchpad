@@ -1,19 +1,12 @@
-﻿using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
-using BEPUutilities.Threading;
-using BEPUutilities2;
+﻿using BEPUutilities2;
 using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -56,8 +49,10 @@ namespace SolverPrototype.CollisionDetection
             }
 
             private Tree tree;
+            private BufferPool<Overlap> overlapPool;
 
             int NextNodePair;
+            int leafThreshold;
             private QuickList<Overlap, Buffer<Overlap>> nodePairsToTest;
             private Action<int> pairTestAction;
 
@@ -70,15 +65,27 @@ namespace SolverPrototype.CollisionDetection
 
             public void SelfTest(Tree tree, ref Buffer<TOverlapHandler> overlapHandlers, BufferPool pool, IThreadDispatcher threadDispatcher)
             {
+                //If there are not multiple children, there's no need to recurse.
+                //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
+                if (tree.leafCount < 2)
+                    return;
+
                 Debug.Assert(overlapHandlers.Allocated && overlapHandlers.Length >= threadDispatcher.ThreadCount);
                 const float jobMultiplier = 1.5f;
                 var targetJobCount = Math.Max(1, jobMultiplier * threadDispatcher.ThreadCount);
-                var leafThreshold = tree.leafCount / targetJobCount;
+                leafThreshold = (int)(tree.leafCount / targetJobCount);
                 this.overlapHandlers = overlapHandlers;
                 this.tree = tree;
+                this.overlapPool = pool.SpecializeFor<Overlap>();
                 QuickList<Overlap, Buffer<Overlap>>.Create(pool.SpecializeFor<Overlap>(), (int)(targetJobCount * 2), out nodePairsToTest);
+                NextNodePair = -1;
+                //Collect jobs.
+                CollectJobsInNode(0, tree.leafCount, ref overlapHandlers[0]);
+                //Do the jobs!
                 threadDispatcher.DispatchWorkers(pairTestAction);
+                nodePairsToTest.Dispose(pool.SpecializeFor<Overlap>());
                 this.tree = null;
+                this.overlapPool = default(BufferPool<Overlap>);
                 this.overlapHandlers = default(Buffer<TOverlapHandler>);
             }
 
@@ -94,187 +101,162 @@ namespace SolverPrototype.CollisionDetection
                         if (overlap.A == overlap.B)
                         {
                             //Same node.
-                            Tree.GetOverlapsInNode2(Tree.nodes + overlap.A, ref WorkerOverlaps[workerIndex]);
+                            tree.GetOverlapsInNode2(tree.nodes + overlap.A, ref overlapHandlers[workerIndex]);
                         }
                         else if (overlap.B >= 0)
                         {
                             //Different nodes.
-                            Tree.GetOverlapsBetweenDifferentNodes2(Tree.nodes + overlap.A, Tree.nodes + overlap.B, ref WorkerOverlaps[workerIndex]);
+                            tree.GetOverlapsBetweenDifferentNodes2(tree.nodes + overlap.A, tree.nodes + overlap.B, ref overlapHandlers[workerIndex]);
                         }
                         else
                         {
                             //A is an internal node, B is a leaf.
-                            var leafIndex = Tree.Encode(overlap.B);
-                            var leaf = Tree.leaves + leafIndex;
-                            Tree.TestLeafAgainstNode2(leafIndex, ref (&Tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex], overlap.A, ref WorkerOverlaps[workerIndex]);
+                            var leafIndex = Encode(overlap.B);
+                            var leaf = tree.leaves + leafIndex;
+                            ref var childOwningLeaf = ref (&tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
+                            tree.TestLeafAgainstNode2(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.A, ref overlapHandlers[workerIndex]);
                         }
                     }
                     else
                     {
                         //A is a leaf, B is internal.
-                        var leafIndex = Tree.Encode(overlap.A);
-                        var leaf = Tree.leaves + leafIndex;
-                        Tree.TestLeafAgainstNode2(leafIndex, ref (&Tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex], overlap.B, ref WorkerOverlaps[workerIndex]);
+                        var leafIndex = Encode(overlap.A);
+                        var leaf = tree.leaves + leafIndex;
+                        ref var childOwningLeaf = ref (&tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
+                        tree.TestLeafAgainstNode2(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.B, ref overlapHandlers[workerIndex]);
 
                         //NOTE THAT WE DO NOT HANDLE THE CASE THAT BOTH A AND B ARE LEAVES HERE.
                         //The collection routine should take care of that, since it has more convenient access to bounding boxes and because a single test isn't worth an atomic increment.
                     }
                 }
-            }            
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void TestForCollectNodeLeafPairs<TResultList>(int leafIndex, ref BoundingBox leafBounds, int nodeIndex, int nodeLeafCount, int collisionTestThreshold, ref QuickList<Overlap> nodePairsToTest, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            if (nodeIndex < 0)
-            {
-                //Add directly to the overlaps list; no reason to make a worker thread do it.
-                results.Add(new Overlap { A = leafIndex, B = Encode(nodeIndex) });
             }
-            else
+
+            unsafe void DispatchTestForLeaf(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, int nodeLeafCount, ref TOverlapHandler results)
             {
-                if (Math.Log(nodeLeafCount) <= collisionTestThreshold)
-                //if (nodeLeafCount <= collisionTestThreshold)
+                if (nodeIndex < 0)
                 {
-                    nodePairsToTest.Add(new Overlap { A = Encode(leafIndex), B = nodeIndex });
+                    results.Handle(leafIndex, Encode(nodeIndex));
                 }
                 else
                 {
-                    CollectNodeLeafPairs(leafIndex, ref leafBounds, nodeIndex, nodeLeafCount, collisionTestThreshold, ref nodePairsToTest, ref results);
+                    if (nodeLeafCount <= leafThreshold)
+                        nodePairsToTest.Add(new Overlap { A = Encode(leafIndex), B = nodeIndex }, overlapPool);
+                    else
+                        TestLeafAgainstNode(leafIndex, ref leafMin, ref leafMax, nodeIndex, ref results);
                 }
             }
-        }
-        unsafe void CollectNodeLeafPairs<TResultList>(int leafIndex, ref BoundingBox leafBounds, int nodeIndex, int nodeLeafCount, int collisionTestThreshold, ref QuickList<Overlap> nodePairsToTest, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            var node = nodes + nodeIndex;
 
-            var a = BoundingBox.Intersects(ref leafBounds, ref node->A);
-            var b = BoundingBox.Intersects(ref leafBounds, ref node->B);
-
-            var nodeChildA = node->ChildA;
-            var nodeChildB = node->ChildB;
-
-            if (a)
+            unsafe void TestLeafAgainstNode(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, ref TOverlapHandler results)
             {
-                TestForCollectNodeLeafPairs(leafIndex, ref leafBounds, nodeChildA, node->LeafCountA, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-            if (b)
-            {
-                TestForCollectNodeLeafPairs(leafIndex, ref leafBounds, nodeChildB, node->LeafCountB, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void TestForCollectNodePairs<TResultList>(ref BoundingBox boundsA, ref BoundingBox boundsB, int childA, int childB, int leafCountA, int leafCountB, int collisionTestThreshold,
-            ref QuickList<Overlap> nodePairsToTest, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            if (childA >= 0)
-            {
-                if (childB >= 0)
+                var node = tree.nodes + nodeIndex;
+                ref var a = ref node->A;
+                ref var b = ref node->B;
+                //Despite recursion, leafBounds should remain in L1- it'll be used all the way down the recursion from here.
+                //However, while we likely loaded child B when we loaded child A, there's no guarantee that it will stick around.
+                //Reloading that in the event of eviction would require more work than keeping the derived data on the stack.
+                //TODO: this is some pretty questionable microtuning. It's not often that the post-leaf-found recursion will be long enough to evict L1. Definitely test it.
+                var bIndex = b.Index;
+                var bLeafCount = b.LeafCount;
+                var aIntersects = BoundingBox.Intersects(ref leafMin, ref leafMax, ref a.Min, ref a.Max);
+                var bIntersects = BoundingBox.Intersects(ref leafMin, ref leafMax, ref b.Min, ref b.Max);
+                if (aIntersects)
                 {
-                    if (Math.Max(leafCountA, leafCountB) <= collisionTestThreshold)
+                    DispatchTestForLeaf(leafIndex, ref leafMin, ref leafMax, a.Index, a.LeafCount, ref results);
+                }
+                if (bIntersects)
+                {
+                    DispatchTestForLeaf(leafIndex, ref leafMin, ref leafMax, bIndex, bLeafCount, ref results);
+                }
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            unsafe void DispatchTestForNodes(ref NodeChild a, ref NodeChild b, ref TOverlapHandler results)
+            {
+                if (a.Index >= 0)
+                {
+                    if (b.Index >= 0)
                     {
-                        nodePairsToTest.Add(new Overlap { A = childA, B = childB });
+                        if (a.LeafCount + b.LeafCount <= leafThreshold)
+                            nodePairsToTest.Add(new Overlap { A = a.Index, B = b.Index }, overlapPool);
+                        else
+                            GetJobsBetweenDifferentNodes(tree.nodes + a.Index, tree.nodes + b.Index, ref results);
+
                     }
                     else
                     {
-                        CollectNodePairsFromDifferentNodes(nodes + childA, nodes + childB, collisionTestThreshold, ref nodePairsToTest, ref results);
+                        //leaf B versus node A.
+                        TestLeafAgainstNode(Encode(b.Index), ref b.Min, ref b.Max, a.Index, ref results);
                     }
+                }
+                else if (b.Index >= 0)
+                {
+                    //leaf A versus node B.
+                    TestLeafAgainstNode(Encode(a.Index), ref a.Min, ref a.Max, b.Index, ref results);
                 }
                 else
                 {
-                    //leaf B versus node A.
-                    TestForCollectNodeLeafPairs(Encode(childB), ref boundsB, childA, leafCountA, collisionTestThreshold, ref nodePairsToTest, ref results);
+                    //Two leaves.
+                    results.Handle(Encode(a.Index), Encode(b.Index));
                 }
             }
-            else if (childB >= 0)
+            
+            unsafe void GetJobsBetweenDifferentNodes(Node* a, Node* b, ref TOverlapHandler results)
             {
-                //leaf A versus node B.
-                TestForCollectNodeLeafPairs(Encode(childA), ref boundsA, childB, leafCountB, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-            else
-            {
-                //Two leaves.
-                //Add directly to the overlaps list; no reason to make a worker thread do it.
-                results.Add(new Overlap { A = Encode(childA), B = Encode(childB) });
-            }
-        }
+                //There are no shared children, so test them all.
 
-        unsafe void CollectNodePairsFromDifferentNodes<TResultList>(Node* a, Node* b, int collisionTestThreshold, ref QuickList<Overlap> nodePairsToTest, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            //There are no shared children, so test them all.
-            var aa = BoundingBox.Intersects(ref a->A, ref b->A);
-            var ab = BoundingBox.Intersects(ref a->A, ref b->B);
-            var ba = BoundingBox.Intersects(ref a->B, ref b->A);
-            var bb = BoundingBox.Intersects(ref a->B, ref b->B);
+                ref var aa = ref a->A;
+                ref var ab = ref a->B;
+                ref var ba = ref b->A;
+                ref var bb = ref b->B;
+                var aaIntersects = Intersects(ref aa, ref ba);
+                var abIntersects = Intersects(ref aa, ref bb);
+                var baIntersects = Intersects(ref ab, ref ba);
+                var bbIntersects = Intersects(ref ab, ref bb);
 
-            if (aa)
-            {
-                TestForCollectNodePairs(ref a->A, ref b->A, a->ChildA, b->ChildA, a->LeafCountA, b->LeafCountA, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-            if (ab)
-            {
-                TestForCollectNodePairs(ref a->A, ref b->B, a->ChildA, b->ChildB, a->LeafCountA, b->LeafCountB, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-            if (ba)
-            {
-                TestForCollectNodePairs(ref a->B, ref b->A, a->ChildB, b->ChildA, a->LeafCountB, b->LeafCountA, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-            if (bb)
-            {
-                TestForCollectNodePairs(ref a->B, ref b->B, a->ChildB, b->ChildB, a->LeafCountB, b->LeafCountB, collisionTestThreshold, ref nodePairsToTest, ref results);
+                if (aaIntersects)
+                {
+                    DispatchTestForNodes(ref aa, ref ba, ref results);
+                }
+                if (abIntersects)
+                {
+                    DispatchTestForNodes(ref aa, ref bb, ref results);
+                }
+                if (baIntersects)
+                {
+                    DispatchTestForNodes(ref ab, ref ba, ref results);
+                }
+                if (bbIntersects)
+                {
+                    DispatchTestForNodes(ref ab, ref bb, ref results);
+                }
+
             }
 
-        }
-
-        unsafe void CollectNodePairsInNode<TResultList>(int nodeIndex, int leafCount, int collisionTestThreshold, ref QuickList<Overlap> nodePairsToTest, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            if (leafCount <= collisionTestThreshold)
+            unsafe void CollectJobsInNode(int nodeIndex, int leafCount, ref TOverlapHandler results)
             {
-                nodePairsToTest.Add(new Overlap { A = nodeIndex, B = nodeIndex });
-                return;
+                if(leafCount <= leafThreshold)
+                {
+                    nodePairsToTest.Add(new Overlap { A = nodeIndex, B = nodeIndex }, overlapPool);
+                    return;
+                }
+
+                var node = tree.nodes + nodeIndex;
+                ref var a = ref node->A;
+                ref var b = ref node->B;
+
+                var ab = Intersects(ref a, ref b);
+
+                if (a.Index >= 0)
+                    CollectJobsInNode(a.Index, a.LeafCount, ref results);
+                if (b.Index >= 0)
+                    CollectJobsInNode(b.Index, b.LeafCount, ref results);
+                
+                if (ab)
+                {
+                    DispatchTestForNodes(ref a, ref b, ref results);
+                }
+
             }
-            var node = nodes + nodeIndex;
-            var nodeChildA = node->ChildA;
-            var nodeChildB = node->ChildB;
-
-            var ab = BoundingBox.Intersects(ref node->A, ref node->B);
-
-            if (nodeChildA >= 0)
-                CollectNodePairsInNode(nodeChildA, node->LeafCountA, collisionTestThreshold, ref nodePairsToTest, ref results);
-            if (nodeChildB >= 0)
-                CollectNodePairsInNode(nodeChildB, node->LeafCountB, collisionTestThreshold, ref nodePairsToTest, ref results);
-
-            //Test all different nodes.
-            if (ab)
-            {
-                TestForCollectNodePairs(ref node->A, ref node->B, nodeChildA, nodeChildB, node->LeafCountA, node->LeafCountB, collisionTestThreshold, ref nodePairsToTest, ref results);
-            }
-
-        }
-        public unsafe void CollectNodePairs<TResultList>(int collisionTestThreshold, ref QuickList<Overlap> nodePairsToTest, ref TResultList results) where TResultList : IList<Overlap>
-        {
-            CollectNodePairsInNode(0, leafCount, collisionTestThreshold, ref nodePairsToTest, ref results);
-
-        }
-
-        public unsafe void GetSelfOverlaps(IParallelLooper looper, MultithreadedSelfTest context)
-        {
-            //If there are not multiple children, there's no need to recurse.
-            //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
-            if (nodes->ChildCount < 2)
-                return;
-
-            context.Prepare(this);
-
-            int collisionTestThreshold = (int)(leafCount / (1.5f * looper.ThreadCount));
-            CollectNodePairs(collisionTestThreshold, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
-            //CollectNodePairs2(looper.ThreadCount * 16, ref context.NodePairsToTest, ref context.WorkerOverlaps[0]);
-
-            //Console.WriteLine($"number of pairs to test: {context.NodePairsToTest.Count}");
-            looper.ForLoop(0, looper.ThreadCount, context.PairTestAction);
-
-            context.CleanUp();
         }
     }
 }

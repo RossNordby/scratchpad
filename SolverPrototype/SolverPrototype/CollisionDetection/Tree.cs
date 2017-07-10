@@ -75,7 +75,7 @@ namespace SolverPrototype.CollisionDetection
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        int Encode(int index)
+        static int Encode(int index)
         {
             return -1 - index;
         }

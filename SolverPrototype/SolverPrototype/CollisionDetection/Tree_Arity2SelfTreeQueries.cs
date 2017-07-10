@@ -139,12 +139,8 @@ namespace SolverPrototype.CollisionDetection
             }
 
         }
-        public unsafe void GetSelfOverlaps2<TOverlapHandler>(ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
-        {
-            GetOverlapsInNode2(nodes, ref results);
-        }       
-
-        public unsafe void GetSelfOverlapsArityDedicated<TOverlapHandler>(ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
+ 
+        public unsafe void GetSelfOverlaps<TOverlapHandler>(ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
         {
             //If there are less than two leaves, there can't be any overlap.
             //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
