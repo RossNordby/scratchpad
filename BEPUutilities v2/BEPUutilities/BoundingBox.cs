@@ -73,6 +73,23 @@ namespace BEPUutilities2
             return diagonal.X * diagonal.Y * diagonal.Z;
         }
 
+
+        /// <summary>
+        /// Computes a bounding box which contains two other bounding boxes.
+        /// </summary>
+        /// <param name="minA">Minimum of the first bounding box to merge.</param>
+        /// <param name="maxA">Maximum of the first bounding box to merge.</param>
+        /// <param name="minB">Minimum of the second bounding box to merge.</param>
+        /// <param name="maxB">Maximum of the second bounding box to merge.</param>
+        /// <param name="min">Minimum of the merged bounding box.</param>
+        /// <param name="max">Maximum of the merged bounding box.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateMerged(ref Vector3 minA, ref Vector3 maxA, ref Vector3 minB, ref Vector3 maxB, out Vector3 min, out Vector3 max)
+        {
+            min = Vector3.Min(minA, minB);
+            max = Vector3.Max(maxA, maxB);
+        }
+
         /// <summary>
         /// Computes a bounding box which contains two other bounding boxes.
         /// </summary>
@@ -82,8 +99,7 @@ namespace BEPUutilities2
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void CreateMerged(ref BoundingBox a, ref BoundingBox b, out BoundingBox merged)
         {
-            merged.Min = Vector3.Min(a.Min, b.Min);
-            merged.Max = Vector3.Max(a.Max, b.Max);
+            CreateMerged(ref a.Min, ref a.Max, ref b.Min, ref b.Max, out merged.Min, out merged.Max);
         }
 
         /// <summary>
