@@ -1,120 +1,86 @@
-﻿using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
+﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace SolverPrototype.CollisionDetection
 {
     partial class Tree
     {
 
-        unsafe float RefitAndMeasure(int nodeIndex, ref BoundingBox boundingBox)
+        unsafe float RefitAndMeasure(ref NodeChild child)
         {
-            var node = nodes + nodeIndex;
+            var node = nodes + child.Index;
 
-            //All non-root nodes are guaranteed to have at least 2 children, so it's safe to access the first ones.
-            Debug.Assert(node->ChildCount >= 2);
+            //All nodes are guaranteed to have at least 2 children.
+            Debug.Assert(leafCount >= 2);
 
-            var premetric = ComputeBoundsMetric(ref boundingBox);
+            var premetric = ComputeBoundsMetric(ref child.Min, ref child.Max);
             float childChange = 0;
-            if (node->ChildA >= 0)
+            ref var a = ref node->A;
+            if (a.Index >= 0)
             {
-                childChange += RefitAndMeasure(node->ChildA, ref node->A);
+                childChange += RefitAndMeasure(ref a);
             }
-            if (node->ChildB >= 0)
+            ref var b = ref node->B;
+            if (b.Index >= 0)
             {
-                childChange += RefitAndMeasure(node->ChildB, ref node->B);
+                childChange += RefitAndMeasure(ref b);
             }
-            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            BoundingBox.CreateMerged(ref a.Min, ref a.Max, ref b.Min, ref b.Max, out child.Min, out child.Max);
 
-#if !NODE2
-            for (int i = 2; i < node->ChildCount; ++i)
-            {
-                var child = (&node->ChildA)[i];
-                if (child >= 0)
-                {
-                    childChange = RefitAndScoreLower2(child, ref (&node->A)[i]);
-                }
-                BoundingBox.Merge(ref boundingBox, ref (&node->A)[i], out boundingBox);
-            }
-#endif
-
-            var postmetric = ComputeBoundsMetric(ref boundingBox);
+            var postmetric = ComputeBoundsMetric(ref child.Min, ref child.Max);
             return postmetric - premetric + childChange; //TODO: would clamping produce a superior result?
 
         }
 
-        unsafe float RefitAndMark(int index, int leafCountThreshold, ref QuickList<int> refinementCandidates, ref BoundingBox boundingBox)
+        unsafe float RefitAndMark(ref NodeChild child, int leafCountThreshold, ref QuickList<int, Buffer<int>> refinementCandidates, BufferPool<int> intPool)
         {
             Debug.Assert(leafCountThreshold > 1);
 
-            var node = nodes + index;
+            var node = nodes + child.Index;
             Debug.Assert(node->ChildCount >= 2);
             Debug.Assert(node->RefineFlag == 0);
             float childChange = 0;
 
-            var premetric = ComputeBoundsMetric(ref boundingBox);
+            var premetric = ComputeBoundsMetric(ref child.Min, ref child.Max);
             //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
             //Add them to a list of refinement candidates.
             //Note that leaves are not included, since they can't be refinement candidates.
-            if (node->ChildA >= 0)
+            ref var a = ref node->A;
+            if (a.Index >= 0)
             {
-                if (node->LeafCountA <= leafCountThreshold)
+                if (a.LeafCount <= leafCountThreshold)
                 {
-                    refinementCandidates.Add(node->ChildA);
-                    childChange += RefitAndMeasure(node->ChildA, ref node->A);
+                    refinementCandidates.Add(a.Index, intPool);
+                    childChange += RefitAndMeasure(ref a);
                 }
                 else
                 {
-                    childChange += RefitAndMark(node->ChildA, leafCountThreshold, ref refinementCandidates, ref node->A);
+                    childChange += RefitAndMark(ref a, leafCountThreshold, ref refinementCandidates, intPool);
                 }
             }
-            if (node->ChildB >= 0)
+            ref var b = ref node->B;
+            if (b.Index >= 0)
             {
-                if (node->LeafCountB <= leafCountThreshold)
+                if (b.LeafCount <= leafCountThreshold)
                 {
-                    refinementCandidates.Add(node->ChildB);
-                    childChange += RefitAndMeasure(node->ChildB, ref node->B);
+                    refinementCandidates.Add(b.Index, intPool);
+                    childChange += RefitAndMeasure(ref b);
                 }
                 else
                 {
-                    childChange += RefitAndMark(node->ChildB, leafCountThreshold, ref refinementCandidates, ref node->B);
+                    childChange += RefitAndMark(ref b, leafCountThreshold, ref refinementCandidates, intPool);
                 }
             }
 
-            BoundingBox.Merge(ref node->A, ref node->B, out boundingBox);
+            BoundingBox.CreateMerged(ref a.Min, ref a.Max, ref b.Min, ref b.Max, out child.Min, out child.Max);
 
-#if !NODE2
-            var bounds = &node->A;
-            var children = &node->ChildA;
-            var leafCounts = &node->LeafCountA;
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (children[i] >= 0)
-                {
-                    if (leafCounts[i] <= leafCountThreshold)
-                    {
-                        //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
-                        //Since we don't traverse into these children, there is no need to check the parent's leaf count.
-                        refinementCandidates.Add(children[i]);
-                        childChange += RefitAndMeasure(children[i], ref bounds[i]);
-                    }
-                    else
-                    {
-                        childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
-                    }
-                }
-                BoundingBox.Merge(ref bounds[i], ref boundingBox, out boundingBox);
-                //Leaves are not considered members of the wavefront. They're not *refinement candidates* since they're not internal nodes.
-            }
-#endif
-            var postmetric = ComputeBoundsMetric(ref boundingBox);
+
+            var postmetric = ComputeBoundsMetric(ref child.Min, ref child.Max);
 
             return postmetric - premetric + childChange; //TODO: Would clamp provide better results?
 
@@ -122,39 +88,33 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        unsafe float RefitAndMark(int leafCountThreshold, ref QuickList<int> refinementCandidates)
+        unsafe float RefitAndMark(int leafCountThreshold, ref QuickList<int, Buffer<int>> refinementCandidates, BufferPool<int> intPool)
         {
-            if (nodes->ChildCount < 2)
-            {
-                Debug.Assert(nodes->ChildA < 0, "If there's only one child, it should be a leaf.");
-                //If there's only a leaf (or no children), then there's no internal nodes capable of changing in volume, so there's no relevant change in cost.
-                return 0;
-            }
+            Debug.Assert(LeafCount > 2, "There's no reason to refit a tree with 2 or less elements. Nothing would happen.");
 
-            var bounds = &nodes->A;
-            var children = &nodes->ChildA;
-            var leafCounts = &nodes->LeafCountA;
+            var children = &nodes->A;
             float childChange = 0;
             BoundingBox merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
-            for (int i = 0; i < nodes->ChildCount; ++i)
+            for (int i = 0; i < 2; ++i)
             {
                 //Note: these conditions mean the root will never be considered a wavefront node. That's acceptable;
                 //it will be included regardless.
-                if (children[i] >= 0)
+                ref var child = ref children[i];
+                if (child.Index >= 0)
                 {
-                    if (leafCounts[i] <= leafCountThreshold)
+                    if (child.LeafCount <= leafCountThreshold)
                     {
                         //The wavefront of internal nodes is defined by the transition from more than threshold to less than threshold.
                         //Since we don't traverse into these children, there is no need to check the parent's leaf count.
-                        refinementCandidates.Add(children[i]);
-                        childChange += RefitAndMeasure(children[i], ref bounds[i]);
+                        refinementCandidates.Add(child.Index, intPool);
+                        childChange += RefitAndMeasure(ref child);
                     }
                     else
                     {
-                        childChange += RefitAndMark(children[i], leafCountThreshold, ref refinementCandidates, ref bounds[i]);
+                        childChange += RefitAndMark(ref child, leafCountThreshold, ref refinementCandidates, intPool);
                     }
                 }
-                BoundingBox.Merge(ref bounds[i], ref merged, out merged);
+                BoundingBox.CreateMerged(ref child.Min, ref child.Max, ref merged.Min, ref merged.Max, out merged.Min, out merged.Max);
             }
 
             var postmetric = ComputeBoundsMetric(ref merged);
@@ -180,12 +140,13 @@ namespace SolverPrototype.CollisionDetection
             if (node->RefineFlag != 0)
                 Console.WriteLine("Bad refine flag");
 
-            var children = &node->ChildA;
+            var children = &node->A;
             for (int i = 0; i < node->ChildCount; ++i)
             {
-                if (children[i] >= 0)
+                ref var child = ref children[i];
+                if (child.Index >= 0)
                 {
-                    ValidateRefineFlags(children[i]);
+                    ValidateRefineFlags(child.Index);
                 }
             }
         }
@@ -193,7 +154,7 @@ namespace SolverPrototype.CollisionDetection
         void GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementCandidateCount, out int leafCountThreshold)
         {
             maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
-            estimatedRefinementCandidateCount = (leafCount * ChildrenCapacity) / maximumSubtrees;
+            estimatedRefinementCandidateCount = (leafCount * 2) / maximumSubtrees;
 
             leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
         }
@@ -236,7 +197,6 @@ namespace SolverPrototype.CollisionDetection
             //Don't proceed if the tree is empty.
             if (leafCount == 0)
                 return 0;
-            var pool = BufferPools<int>.Locking;
             int maximumSubtrees, estimatedRefinementCandidateCount, leafCountThreshold;
             GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementCandidateCount, out leafCountThreshold);
 
@@ -273,7 +233,7 @@ namespace SolverPrototype.CollisionDetection
                 nodes->RefineFlag = 1;
                 ++actualRefinementTargetsCount;
             }
-            
+
 
             //Refine all marked targets.
 
@@ -287,7 +247,7 @@ namespace SolverPrototype.CollisionDetection
 
             for (int i = 0; i < refinementTargets.Count; ++i)
             {
-                
+
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.Count = 0;
                 bool nodesInvalidated;
@@ -296,9 +256,9 @@ namespace SolverPrototype.CollisionDetection
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
                 nodes[refinementTargets.Elements[i]].RefineFlag = 0;
-                
+
             }
-            
+
 
             RemoveUnusedInternalNodes(ref spareNodes);
             region.Dispose();
@@ -324,7 +284,7 @@ namespace SolverPrototype.CollisionDetection
             }
             //var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             //Console.WriteLine($"Cache optimize time: {endTime - startTime}");
-            
+
             return actualRefinementTargetsCount;
         }
 

@@ -1,160 +1,142 @@
-﻿using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
-using BEPUutilities.Threading;
+﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
-
-using SpinLock = BEPUutilities.SpinLock;
 
 namespace SolverPrototype.CollisionDetection
 {
     partial class Tree
     {
-
-
-
-        unsafe void CollectNodesForMultithreadedRefit(int nodeIndex,
-            int multithreadingLeafCountThreshold, ref QuickList<int> refitAndMarkTargets,
-            int refinementLeafCountThreshold, ref QuickList<int> refinementCandidates)
-        {
-            var node = nodes + nodeIndex;
-            var children = &node->ChildA;
-            var leafCounts = &node->LeafCountA;
-            Debug.Assert(node->RefineFlag == 0);
-            for (int i = 0; i < node->ChildCount; ++i)
-            {
-                if (children[i] >= 0)
-                {
-                    //Each node stores how many children are involved in the multithreaded refit.
-                    //This allows the postphase to climb the tree in a thread safe way.
-                    ++node->RefineFlag;
-                    if (leafCounts[i] <= multithreadingLeafCountThreshold)
-                    {
-                        if (leafCounts[i] <= refinementLeafCountThreshold)
-                        {
-                            //It's possible that a wavefront node is this high in the tree, so it has to be captured here because the postpass won't find it.
-                            refinementCandidates.Add(children[i]);
-                            //Console.WriteLine("hit@@@@@@@@@@@@@@@@@@@@");
-                            //Encoding the child index tells the thread to use RefitAndMeasure instead of RefitAndMark since this was a wavefront node.
-                            refitAndMarkTargets.Add(Encode(children[i]));
-                        }
-                        else
-                        {
-                            refitAndMarkTargets.Add(children[i]);
-                        }
-                    }
-                    else
-                    {
-                        CollectNodesForMultithreadedRefit(children[i], multithreadingLeafCountThreshold, ref refitAndMarkTargets, refinementLeafCountThreshold, ref refinementCandidates);
-                    }
-                }
-            }
-        }
-
-
-        void CollectNodesForMultithreadedRefit(int threadCount, ref QuickList<int> refitAndMarkTargets,
-            int refinementLeafCountThreshold, ref QuickList<int> refinementCandidates)
-        {
-            //No point in using this if there aren't enough leaves.
-            Debug.Assert(leafCount > 2);
-            int multithreadingLeafCountThreshold = leafCount / (threadCount * 2);
-            if (multithreadingLeafCountThreshold < refinementLeafCountThreshold)
-                multithreadingLeafCountThreshold = refinementLeafCountThreshold;
-            CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref refitAndMarkTargets, refinementLeafCountThreshold, ref refinementCandidates);
-            //Console.WriteLine($"count:  {refitAndMarkTargets.Count}");
-        }
-
         /// <summary>
         /// Caches input and output for the multithreaded execution of a tree's refit and refinement operations.
         /// </summary>
         public class RefitAndRefineMultithreadedContext
         {
-            public Tree Tree;
+            Tree Tree;
+            
+            int RefitNodeIndex;
+            QuickList<int, Buffer<int>> RefitNodes;
+            float RefitCostChange;
 
-            public int RefitNodeIndex;
-            public QuickList<int> RefitNodes;
-            public float RefitCostChange;
-            public int LeafCountThreshold;
-            public RawList<QuickList<int>> RefinementCandidates;
-            public Action<int> RefitAndMarkAction;
+            int LeafCountThreshold;
+            Buffer<QuickList<int, Buffer<int>>> RefinementCandidates;
+            Action<int> RefitAndMarkAction;
 
-            public int RefineIndex;
-            public QuickList<int> RefinementTargets;
-            public BufferPool<int> Pool;
-            public int MaximumSubtrees;
-            public Action<int> RefineAction;
+            int RefineIndex;
+            QuickList<int, Buffer<int>> RefinementTargets;
+            int MaximumSubtrees;
+            Action<int> RefineAction;
 
-            public QuickList<int> CacheOptimizeStarts;
-            public int PerWorkerCacheOptimizeCount;
-            public Action<int> CacheOptimizeAction;
+            QuickList<int, Buffer<int>> CacheOptimizeStarts;
+            int PerWorkerCacheOptimizeCount;
+            Action<int> CacheOptimizeAction;
 
-            public RefitAndRefineMultithreadedContext(Tree tree)
+            IThreadDispatcher threadDispatcher;
+
+            public RefitAndRefineMultithreadedContext()
             {
-                Tree = tree;
                 RefitAndMarkAction = RefitAndMark;
                 RefineAction = Refine;
                 CacheOptimizeAction = CacheOptimize;
-                RefinementCandidates = new RawList<QuickList<int>>(Environment.ProcessorCount);
             }
 
-            public void Initialize(int workerCount, int estimatedRefinementCandidates, BufferPool<int> pool)
+            public void RefitAndRefine(Tree tree, IThreadDispatcher threadDispatcher)
             {
+                if (tree.leafCount <= 2)
+                {
+                    //If there are 2 or less leaves, then refit/refine/cache optimize doesn't do anything at all.
+                    //(The root node has no parent, so it does not have a bounding box, and the SAH won't change no matter how we swap the children of the root.)
+                    //Avoiding this case also gives the other codepath a guarantee that it will be working with nodes with two children.
+                    return;
+                }
+                this.threadDispatcher = threadDispatcher;
+                Tree = tree;
+                //Note that we create per-thread refinement candidates. That's because candidates are found during the multithreaded refit and mark phase, and 
+                //we don't want to spend the time doing sync work. The candidates are then pruned down to a target single target set for the refine pass.
+                Tree.Pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(threadDispatcher.ThreadCount, out RefinementCandidates);
+                tree.GetRefitAndMarkTuning(out MaximumSubtrees, out var LeafCountThreshold, out var refinementLeafCountThreshold);
+                //Note that we haven't rigorously guaranteed a refinement count maximum, so it's possible that the other threads will need to resize the per-thread refinement candidate lists.
+                //So we don't create the refinement candidate thread lists here; we let the worker do it.
+
+
+                int multithreadingLeafCountThreshold = Tree.leafCount / (threadDispatcher.ThreadCount * 2);
+                if (multithreadingLeafCountThreshold < refinementLeafCountThreshold)
+                    multithreadingLeafCountThreshold = refinementLeafCountThreshold;
+                CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref RefitNodes, refinementLeafCountThreshold, ref RefinementCandidates[0], 
+                    threadDispatcher.GetThreadMemoryPool(0).SpecializeFor<int>());
+
+                threadDispatcher.DispatchWorkers(RefitAndMarkAction);
+
+
+
                 RefitNodeIndex = -1;
-
-                RefitNodes = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(workerCount));
-
-                if (RefinementCandidates.Capacity < workerCount)
-                    RefinementCandidates.Capacity = workerCount;
-                RefinementCandidates.Count = workerCount;
-                var perThreadPoolIndex = BufferPool<int>.GetPoolIndex((int)Math.Ceiling(estimatedRefinementCandidates / (float)workerCount));
-                for (int i = 0; i < workerCount; ++i)
-                {
-                    RefinementCandidates.Elements[i] = new QuickList<int>(pool, perThreadPoolIndex);
-                }
-
                 RefineIndex = -1;
-                //Note that refinement targets are NOT initialized here, because we don't know the size yet.
-
-                CacheOptimizeStarts = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(workerCount));
-                Pool = pool;
+                for (int i = 0; i < threadDispatcher.ThreadCount; ++i)
+                {
+                    //Note the use of the thread memory pool. Each thread allocated their own memory for the list since resizes were possible.
+                    RefinementCandidates[i].Dispose(threadDispatcher.GetThreadMemoryPool(i).SpecializeFor<int>());
+                }
+                Tree.Pool.SpecializeFor<QuickList<int, Buffer<int>>>().Return(ref RefinementCandidates);
+                Tree = null;
+                this.threadDispatcher = null;
             }
 
-            public void CleanUp()
+            unsafe void CollectNodesForMultithreadedRefit(int nodeIndex,
+                int multithreadingLeafCountThreshold, ref QuickList<int, Buffer<int>> refitAndMarkTargets,
+                int refinementLeafCountThreshold, ref QuickList<int, Buffer<int>> refinementCandidates, BufferPool<int> intPool)
             {
-                RefitNodes.Dispose();
-                for (int i = 0; i < RefinementCandidates.Count; ++i)
+                var node = Tree.nodes + nodeIndex;
+                var children = &node->A;
+                Debug.Assert(node->RefineFlag == 0);
+                for (int i = 0; i < node->ChildCount; ++i)
                 {
-                    RefinementCandidates.Elements[i].Count = 0;
-                    RefinementCandidates.Elements[i].Dispose();
+                    ref var child = ref children[i];
+                    if (child.Index >= 0)
+                    {
+                        //Each node stores how many children are involved in the multithreaded refit.
+                        //This allows the postphase to climb the tree in a thread safe way.
+                        ++node->RefineFlag;
+                        if (child.LeafCount <= multithreadingLeafCountThreshold)
+                        {
+                            if (child.LeafCount <= refinementLeafCountThreshold)
+                            {
+                                //It's possible that a wavefront node is this high in the tree, so it has to be captured here because the postpass won't find it.
+                                refinementCandidates.Add(child.Index, intPool);
+                                //Encoding the child index tells the thread to use RefitAndMeasure instead of RefitAndMark since this was a wavefront node.
+                                refitAndMarkTargets.Add(Encode(child.Index), intPool);
+                            }
+                            else
+                            {
+                                refitAndMarkTargets.Add(child.Index, intPool);
+                            }
+                        }
+                        else
+                        {
+                            CollectNodesForMultithreadedRefit(child.Index, multithreadingLeafCountThreshold, ref refitAndMarkTargets, refinementLeafCountThreshold, ref refinementCandidates, intPool);
+                        }
+                    }
                 }
-                RefinementCandidates.Clear();
-
-                RefinementTargets.Count = 0;
-                RefinementTargets.Dispose();
-
-                CacheOptimizeStarts.Count = 0;
-                CacheOptimizeStarts.Dispose();
-
             }
 
             unsafe void RefitAndMark(int workerIndex)
             {
+                //Since resizes may occur, we have to use the thread's buffer pool.
+                var threadIntPool = threadDispatcher.GetThreadMemoryPool(workerIndex).SpecializeFor<int>();
+                QuickList<int, Buffer<int>>.Create(threadIntPool, LeafCountThreshold, out RefinementCandidates[workerIndex]);
                 int refitIndex;
                 while ((refitIndex = Interlocked.Increment(ref RefitNodeIndex)) < RefitNodes.Count)
                 {
 
-                    var nodeIndex = RefitNodes.Elements[refitIndex];
+                    var nodeIndex = RefitNodes[refitIndex];
                     bool shouldUseMark;
                     if (nodeIndex < 0)
                     {
                         //Node was already marked as a wavefront. Should proceed with a RefitAndMeasure instead of RefitAndMark.
-                        nodeIndex = Tree.Encode(nodeIndex);
+                        nodeIndex = Encode(nodeIndex);
                         shouldUseMark = false;
                     }
                     else
@@ -165,15 +147,15 @@ namespace SolverPrototype.CollisionDetection
                     var node = Tree.nodes + nodeIndex;
                     Debug.Assert(node->Parent >= 0, "The root should not be marked for refit.");
                     var parent = Tree.nodes + node->Parent;
-                    var boundingBoxInParent = &parent->A + node->IndexInParent;
+                    var childInParent = &parent->A + node->IndexInParent;
                     if (shouldUseMark)
                     {
-                        var costChange = Tree.RefitAndMark(nodeIndex, LeafCountThreshold, ref RefinementCandidates.Elements[workerIndex], ref *boundingBoxInParent);
+                        var costChange = Tree.RefitAndMark(ref *childInParent, LeafCountThreshold, ref RefinementCandidates[workerIndex], threadIntPool);
                         node->LocalCostChange = costChange;
                     }
                     else
                     {
-                        var costChange = Tree.RefitAndMeasure(nodeIndex, ref *boundingBoxInParent);
+                        var costChange = Tree.RefitAndMeasure(ref *childInParent);
                         node->LocalCostChange = costChange;
                     }
 
@@ -190,16 +172,17 @@ namespace SolverPrototype.CollisionDetection
                         if (Interlocked.Decrement(ref node->RefineFlag) == 0)
                         {
                             //Compute the child contributions to this node's volume change.
-                            var children = &node->ChildA;
+                            var children = &node->A;
                             node->LocalCostChange = 0;
                             for (int i = 0; i < node->ChildCount; ++i)
                             {
-                                if (children[i] >= 0)
+                                ref var child = ref children[i];
+                                if (child.Index >= 0)
                                 {
-                                    var child = Tree.nodes + children[i];
-                                    node->LocalCostChange += child->LocalCostChange;
+                                    var childMetadata = Tree.nodes + child.Index;
+                                    node->LocalCostChange += childMetadata->LocalCostChange;
                                     //Clear the refine flag (unioned).
-                                    child->RefineFlag = 0;
+                                    childMetadata->RefineFlag = 0;
 
                                 }
                             }
@@ -214,10 +197,10 @@ namespace SolverPrototype.CollisionDetection
                                 //doesn't really have any bearing on how much refinement should be done.
                                 //We do, however, need to divide by root volume so that we get the change in cost metric rather than volume.
                                 var merged = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
-                                var bounds = &node->A;
-                                for (int i = 0; i < node->ChildCount; ++i)
+                                for (int i = 0; i < 2; ++i)
                                 {
-                                    BoundingBox.Merge(ref bounds[i], ref merged, out merged);
+                                    ref var child = ref children[i];
+                                    BoundingBox.CreateMerged(ref child.Min, ref child.Max, ref merged.Min, ref merged.Max, out merged.Min, out merged.Max);
                                 }
                                 var postmetric = ComputeBoundsMetric(ref merged);
                                 if (postmetric > 1e-9f)
@@ -231,15 +214,16 @@ namespace SolverPrototype.CollisionDetection
                             else
                             {
                                 parent = Tree.nodes + node->Parent;
-                                boundingBoxInParent = &parent->A + node->IndexInParent;
-                                var premetric = ComputeBoundsMetric(ref *boundingBoxInParent);
-                                *boundingBoxInParent = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
-                                var bounds = &node->A;
-                                for (int i = 0; i < node->ChildCount; ++i)
+                                childInParent = &parent->A + node->IndexInParent;
+                                var premetric = ComputeBoundsMetric(ref childInParent->Min, ref childInParent->Max);
+                                childInParent->Min = new Vector3(float.MaxValue);
+                                childInParent->Max = new Vector3(float.MinValue);
+                                for (int i = 0; i < 2; ++i)
                                 {
-                                    BoundingBox.Merge(ref bounds[i], ref *boundingBoxInParent, out *boundingBoxInParent);
+                                    ref var child = ref children[i];
+                                    BoundingBox.CreateMerged(ref child.Min, ref child.Max, ref childInParent->Min, ref childInParent->Max, out childInParent->Min, out childInParent->Max);
                                 }
-                                var postmetric = ComputeBoundsMetric(ref *boundingBoxInParent);
+                                var postmetric = ComputeBoundsMetric(ref childInParent->Min, ref childInParent->Max);
                                 node->LocalCostChange += postmetric - premetric;
                                 node = parent;
                             }
@@ -258,40 +242,31 @@ namespace SolverPrototype.CollisionDetection
 
             unsafe void Refine(int workerIndex)
             {
-                var spareNodes = new QuickList<int>(Pool, 8);
-                var subtreeReferences = new QuickList<int>(Pool, BufferPool<int>.GetPoolIndex(MaximumSubtrees));
-                var treeletInternalNodes = new QuickList<int>(Pool, BufferPool<int>.GetPoolIndex(MaximumSubtrees));
-                int[] buffer;
-                MemoryRegion region;
-                BinnedResources resources;
-                CreateBinnedResources(Pool, MaximumSubtrees, out buffer, out region, out resources);
-
+                var threadPool = threadDispatcher.GetThreadMemoryPool(workerIndex);
+                var threadIntPool = threadPool.SpecializeFor<int>();
+                var subtreeCountEstimate = 1 << SpanHelper.GetContainingPowerOf2(MaximumSubtrees);
+                QuickList<int, Buffer<int>>.Create(threadIntPool, subtreeCountEstimate, out var subtreeReferences);
+                QuickList<int, Buffer<int>>.Create(threadIntPool, subtreeCountEstimate, out var treeletInternalNodes);
+                
                 int refineIndex;
                 while ((refineIndex = Interlocked.Increment(ref RefineIndex)) < RefinementTargets.Count)
                 {
                     subtreeReferences.Count = 0;
                     treeletInternalNodes.Count = 0;
-                    bool nodesInvalidated;
-                    Tree.BinnedRefine(RefinementTargets.Elements[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                    Tree.BinnedRefine(RefinementTargets[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref threadPool);
                     //Allow other refines to traverse this node.
-                    Tree.nodes[RefinementTargets.Elements[refineIndex]].RefineFlag = 0;
+                    Tree.nodes[RefinementTargets[refineIndex]].RefineFlag = 0;
                 }
-
-                Tree.RemoveUnusedInternalNodes(ref spareNodes);
-                region.Dispose();
-                Pool.GiveBack(buffer);
-                spareNodes.Dispose();
-                subtreeReferences.Count = 0;
-                subtreeReferences.Dispose();
-                treeletInternalNodes.Count = 0;
-                treeletInternalNodes.Dispose();
+                
+                subtreeReferences.Dispose(threadIntPool);
+                treeletInternalNodes.Dispose(threadIntPool);
 
 
             }
 
             void CacheOptimize(int workerIndex)
             {
-                var startIndex = CacheOptimizeStarts.Elements[workerIndex];
+                var startIndex = CacheOptimizeStarts[workerIndex];
 
                 //We could wrap around. But we could also not do that because it doesn't really matter!
                 var end = Math.Min(Tree.nodeCount, startIndex + PerWorkerCacheOptimizeCount);
@@ -305,22 +280,23 @@ namespace SolverPrototype.CollisionDetection
 
 
 
-        unsafe void CheckForRefinementOverlaps(int nodeIndex, ref QuickList<int> refinementTargets)
+        unsafe void CheckForRefinementOverlaps(int nodeIndex, ref QuickList<int, Buffer<int>> refinementTargets)
         {
 
             var node = nodes + nodeIndex;
-            var children = &node->ChildA;
+            var children = &node->A;
             for (int childIndex = 0; childIndex < node->ChildCount; ++childIndex)
             {
-                if (children[childIndex] >= 0)
+                ref var child = ref children[childIndex];
+                if (child.Index >= 0)
                 {
                     for (int i = 0; i < refinementTargets.Count; ++i)
                     {
-                        if (refinementTargets.Elements[i] == children[childIndex])
+                        if (refinementTargets[i] == child.Index)
                             Console.WriteLine("Found a refinement target in the children of a refinement target.");
                     }
 
-                    CheckForRefinementOverlaps(children[childIndex], ref refinementTargets);
+                    CheckForRefinementOverlaps(child.Index, ref refinementTargets);
                 }
 
             }

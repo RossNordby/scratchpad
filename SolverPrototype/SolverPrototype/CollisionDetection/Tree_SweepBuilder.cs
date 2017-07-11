@@ -1,7 +1,4 @@
-﻿//#define NODE8
-
-
-using BEPUutilities.ResourceManagement;
+﻿using BEPUutilities.ResourceManagement;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
