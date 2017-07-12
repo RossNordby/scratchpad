@@ -169,12 +169,12 @@ namespace SolverPrototype.CollisionDetection
         
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static float ComputeBoundsMetric(ref BoundingBox bounds)
+        internal static float ComputeBoundsMetric(ref BoundingBox bounds)
         {
             return ComputeBoundsMetric(ref bounds.Min, ref bounds.Max);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static float ComputeBoundsMetric(ref Vector3 min, ref Vector3 max)
+        internal static float ComputeBoundsMetric(ref Vector3 min, ref Vector3 max)
         {
             //Note that we just use the SAH. While we are primarily interested in volume queries for the purposes of collision detection, the topological difference
             //between a volume heuristic and surface area heuristic isn't huge. There is, however, one big annoying issue that volume heuristics run into:

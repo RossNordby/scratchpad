@@ -331,9 +331,9 @@ namespace SolverPrototype.CollisionDetection
                 int refineIndex;
                 while ((refineIndex = Interlocked.Increment(ref RefineIndex)) < RefinementTargets.Count)
                 {
+                    Tree.BinnedRefine(RefinementTargets[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref threadPool);
                     subtreeReferences.Count = 0;
                     treeletInternalNodes.Count = 0;
-                    Tree.BinnedRefine(RefinementTargets[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref threadPool);
                     //Allow other refines to traverse this node.
                     Tree.nodes[RefinementTargets[refineIndex]].RefineFlag = 0;
                 }
@@ -357,9 +357,7 @@ namespace SolverPrototype.CollisionDetection
 
             }
         }
-
-
-
+        
         unsafe void CheckForRefinementOverlaps(int nodeIndex, ref QuickList<int, Buffer<int>> refinementTargets)
         {
 
