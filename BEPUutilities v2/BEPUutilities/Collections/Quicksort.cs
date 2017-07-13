@@ -230,6 +230,12 @@ namespace BEPUutilities2.Collections
             Swap(ref Unsafe.Add(ref values, a), ref Unsafe.Add(ref values, b));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Swap<TKey>(ref TKey keys, int a, int b)
+        {
+            Swap(ref Unsafe.Add(ref keys, a), ref Unsafe.Add(ref keys, b));
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int FindMO3Index<TKey, TComparer>(ref TKey keys, int l, int r, ref TComparer comparer)
@@ -426,6 +432,65 @@ namespace BEPUutilities2.Collections
                     Sort(ref keys, ref values, l, j, ref comparer);
                 if (r > i)
                     Sort(ref keys, ref values, i, r, ref comparer);
+            }
+        }
+        public static void Sort<TKey, TComparer>(ref TKey keys, int l, int r, ref TComparer comparer) where TComparer : IComparerRef<TKey>
+        {
+            if (r - l <= 30)
+            {
+                //The area to address is very small. Use insertion sort.
+                InsertionSort.Sort(ref keys, l, r, ref comparer);
+            }
+            else
+            {
+                //Use MO3 to find a pivot to compensate for the common already-sorted case and to slightly improve worst-case behavior.
+                var pivotIndex = FindMO3Index(ref keys, l, r, ref comparer);
+
+                var pivot = Unsafe.Add(ref keys, pivotIndex);
+                //We cached the pivot key and value. Push the value in 'r' to the pivot's location, leaving r unused for the moment.
+                Unsafe.Add(ref keys, pivotIndex) = Unsafe.Add(ref keys, r);
+
+                int i = l - 1; //Start one below the partitioning area, because don't know if the first index is actually claimable.
+                int j = r; //The last element of the partition holds the pivot, which is excluded from the swapping process. Same logic as for i.
+                while (true)
+                {
+                    //Claim the chunk of the list which is partitioned on the left and right sides.
+                    while (true)
+                    {
+                        ++i;
+                        if (comparer.Compare(ref Unsafe.Add(ref keys, i), ref pivot) >= 0)
+                            break;
+                    }
+                    while (true)
+                    {
+                        --j;
+                        if (comparer.Compare(ref pivot, ref Unsafe.Add(ref keys, j)) >= 0 || j <= i)
+                            break;
+
+                    }
+                    //If the claims have met, then the partition is complete.
+                    if (i >= j)
+                    {
+                        break;
+                    }
+                    //By the claiming above and because we did not yet break out of the loop,
+                    //the value associated with i is >= the pivot, and the value associated with j is <= the pivot.
+                    //So swap them.
+                    Swap(ref keys, i, j);
+                }
+                //The pivot has not been reintroduced.
+                //Since the loop has terminated, we know that i has reached the the '>=pivot' side of the partition.
+                //So, push the first element of the greater-than-pivot side into r and the pivot into the first greater element's slot to guarantee sorting.
+                ref var firstGreaterKeySlot = ref Unsafe.Add(ref keys, i);
+                Unsafe.Add(ref keys, r) = firstGreaterKeySlot;
+                firstGreaterKeySlot = pivot;
+                j = i - 1; //Sort's parameters take an inclusive bound, so push j back.
+                i = i + 1; //The pivot takes i's spot, and the pivot should not be included in sorting, so push i up.
+                //Only bother sorting if there is anything to sort.
+                if (j > l)
+                    Sort(ref keys, l, j, ref comparer);
+                if (r > i)
+                    Sort(ref keys, i, r, ref comparer);
             }
         }
 

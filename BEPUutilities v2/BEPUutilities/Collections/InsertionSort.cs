@@ -81,5 +81,36 @@ namespace BEPUutilities2.Collections
                 }
             }
         }
+
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Sort<TKey, TComparer>
+           (ref TKey keys, int start, int inclusiveEnd, ref TComparer comparer)
+            where TComparer : IComparerRef<TKey>
+        {
+            for (int i = start + 1; i <= inclusiveEnd; ++i)
+            {
+                var originalKey = Unsafe.Add(ref keys, i);
+                int compareIndex;
+                for (compareIndex = i - 1; compareIndex >= start; --compareIndex)
+                {
+                    if (comparer.Compare(ref originalKey, ref Unsafe.Add(ref keys, compareIndex)) < 0)
+                    {
+                        //Move the element up one slot.
+                        var upperSlotIndex = compareIndex + 1;
+                        Unsafe.Add(ref keys, upperSlotIndex) = Unsafe.Add(ref keys, compareIndex);
+                    }
+                    else
+                        break;
+                }
+                var targetIndex = compareIndex + 1;
+                if (targetIndex != i)
+                {
+                    //Move the original index down.
+                    Unsafe.Add(ref keys, targetIndex) = originalKey;
+                }
+            }
+        }
     }
 }

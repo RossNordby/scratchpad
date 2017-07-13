@@ -22,7 +22,8 @@ namespace SolverPrototype.CollisionDetection
             QuickList<int, Buffer<int>> RefitNodes;
             float RefitCostChange;
 
-            int LeafCountThreshold;
+            int RefinementLeafCountThreshold;
+            int EstimatedRefinementCandidateCount;
             Buffer<QuickList<int, Buffer<int>>> RefinementCandidates;
             Action<int> RefitAndMarkAction;
 
@@ -59,7 +60,7 @@ namespace SolverPrototype.CollisionDetection
                 //Note that we create per-thread refinement candidates. That's because candidates are found during the multithreaded refit and mark phase, and 
                 //we don't want to spend the time doing sync work. The candidates are then pruned down to a target single target set for the refine pass.
                 Tree.Pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(threadDispatcher.ThreadCount, out RefinementCandidates);
-                tree.GetRefitAndMarkTuning(out MaximumSubtrees, out var LeafCountThreshold, out var refinementLeafCountThreshold);
+                tree.GetRefitAndMarkTuning(out MaximumSubtrees, out EstimatedRefinementCandidateCount, out RefinementLeafCountThreshold);
                 //Note that the number of refit nodes is not necessarily bound by MaximumSubtrees. It is just a heuristic estimate. Resizing has to be supported.
                 QuickList<int, Buffer<int>>.Create(tree.Pool.SpecializeFor<int>(), MaximumSubtrees, out RefitNodes);
                 //Note that we haven't rigorously guaranteed a refinement count maximum, so it's possible that the other threads will need to resize the per-thread refinement candidate lists.
@@ -67,9 +68,9 @@ namespace SolverPrototype.CollisionDetection
 
 
                 int multithreadingLeafCountThreshold = Tree.leafCount / (threadDispatcher.ThreadCount * 2);
-                if (multithreadingLeafCountThreshold < refinementLeafCountThreshold)
-                    multithreadingLeafCountThreshold = refinementLeafCountThreshold;
-                CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref RefitNodes, refinementLeafCountThreshold, ref RefinementCandidates[0],
+                if (multithreadingLeafCountThreshold < RefinementLeafCountThreshold)
+                    multithreadingLeafCountThreshold = RefinementLeafCountThreshold;
+                CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref RefitNodes, RefinementLeafCountThreshold, ref RefinementCandidates[0],
                     threadDispatcher.GetThreadMemoryPool(0).SpecializeFor<int>());
 
                 threadDispatcher.DispatchWorkers(RefitAndMarkAction);
@@ -206,7 +207,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 //Since resizes may occur, we have to use the thread's buffer pool.
                 var threadIntPool = threadDispatcher.GetThreadMemoryPool(workerIndex).SpecializeFor<int>();
-                QuickList<int, Buffer<int>>.Create(threadIntPool, LeafCountThreshold, out RefinementCandidates[workerIndex]);
+                QuickList<int, Buffer<int>>.Create(threadIntPool, EstimatedRefinementCandidateCount, out RefinementCandidates[workerIndex]);
                 int refitIndex;
                 while ((refitIndex = Interlocked.Increment(ref RefitNodeIndex)) < RefitNodes.Count)
                 {
@@ -230,7 +231,7 @@ namespace SolverPrototype.CollisionDetection
                     var childInParent = &parent->A + node->IndexInParent;
                     if (shouldUseMark)
                     {
-                        var costChange = Tree.RefitAndMark(ref *childInParent, LeafCountThreshold, ref RefinementCandidates[workerIndex], threadIntPool);
+                        var costChange = Tree.RefitAndMark(ref *childInParent, RefinementLeafCountThreshold, ref RefinementCandidates[workerIndex], threadIntPool);
                         node->LocalCostChange = costChange;
                     }
                     else
@@ -328,10 +329,12 @@ namespace SolverPrototype.CollisionDetection
                 QuickList<int, Buffer<int>>.Create(threadIntPool, subtreeCountEstimate, out var subtreeReferences);
                 QuickList<int, Buffer<int>>.Create(threadIntPool, subtreeCountEstimate, out var treeletInternalNodes);
 
+                CreateBinnedResources(threadPool, MaximumSubtrees, out var buffer, out var resources);
+
                 int refineIndex;
                 while ((refineIndex = Interlocked.Increment(ref RefineIndex)) < RefinementTargets.Count)
                 {
-                    Tree.BinnedRefine(RefinementTargets[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref threadPool);
+                    Tree.BinnedRefine(RefinementTargets[refineIndex], ref subtreeReferences, MaximumSubtrees, ref treeletInternalNodes, ref resources, threadPool);
                     subtreeReferences.Count = 0;
                     treeletInternalNodes.Count = 0;
                     //Allow other refines to traverse this node.
@@ -357,7 +360,7 @@ namespace SolverPrototype.CollisionDetection
 
             }
         }
-        
+
         unsafe void CheckForRefinementOverlaps(int nodeIndex, ref QuickList<int, Buffer<int>> refinementTargets)
         {
 
@@ -379,6 +382,6 @@ namespace SolverPrototype.CollisionDetection
 
             }
         }
-        
+
     }
 }

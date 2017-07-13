@@ -515,8 +515,7 @@ namespace SolverPrototype.CollisionDetection
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void ReifyChildren(int internalNodeIndex, Node* stagingNodes,
-            ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> treeletInternalNodes, ref int nextInternalNodeIndexToUse,
-            ref QuickList<int, Buffer<int>> spareNodes)
+            ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> treeletInternalNodes, ref int nextInternalNodeIndexToUse)
         {
             var internalNode = nodes + internalNodeIndex;
             var internalNodeChildren = &internalNode->A;
@@ -526,7 +525,7 @@ namespace SolverPrototype.CollisionDetection
                 if (child.Index >= 0)
                 {
                     child.Index = ReifyStagingNode(internalNodeIndex, i, stagingNodes, child.Index,
-                        ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes);
+                        ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse);
                 }
                 else
                 {
@@ -555,19 +554,17 @@ namespace SolverPrototype.CollisionDetection
 
         unsafe int ReifyStagingNode(int parent, int indexInParent, Node* stagingNodes, int stagingNodeIndex,
            ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> treeletInternalNodes,
-           ref int nextInternalNodeIndexToUse, ref QuickList<int, Buffer<int>> spareNodes)
+           ref int nextInternalNodeIndexToUse)
         {
 
             int internalNodeIndex;
-            if (nextInternalNodeIndexToUse < treeletInternalNodes.Count)
-            {
-                //There is an internal node that we can use.
-                //Note that we remove from the end to guarantee that the treelet root does not change location.
-                //The CollectSubtrees function guarantees that the treelet root is enqueued first.
-                internalNodeIndex = treeletInternalNodes[nextInternalNodeIndexToUse++];
-            }
-            Debug.Assert(spareNodes.Count > 0, "Binary trees should never need to create new nodes. There are always n-1 internal nodes for n leaf nodes.");
-            spareNodes.Pop(out internalNodeIndex);
+            Debug.Assert(nextInternalNodeIndexToUse < treeletInternalNodes.Count,
+                "Binary trees should never run out of available internal nodes when reifying staging nodes; no nodes are created or destroyed during the process.");
+
+            //There is an internal node that we can use.
+            //Note that we remove from the end to guarantee that the treelet root does not change location.
+            //The CollectSubtrees function guarantees that the treelet root is enqueued first.
+            internalNodeIndex = treeletInternalNodes[nextInternalNodeIndexToUse++];
 
             //To make the staging node real, it requires an accurate parent pointer, index in parent, and child indices.
             //Copy the staging node into the real tree.
@@ -581,13 +578,12 @@ namespace SolverPrototype.CollisionDetection
             internalNode->IndexInParent = indexInParent;
 
 
-            ReifyChildren(internalNodeIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes);
+            ReifyChildren(internalNodeIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse);
             return internalNodeIndex;
         }
 
         unsafe void ReifyStagingNodes(int treeletRootIndex, Node* stagingNodes,
-            ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> treeletInternalNodes,
-            ref int nextInternalNodeIndexToUse, ref QuickList<int, Buffer<int>> spareNodes)
+            ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> treeletInternalNodes, ref int nextInternalNodeIndexToUse)
         {
             //We take the staging node's child bounds, child indices, leaf counts, and child count.
             //The parent and index in parent of the treelet root CANNOT BE TOUCHED.
@@ -597,22 +593,21 @@ namespace SolverPrototype.CollisionDetection
             Debug.Assert(internalNode->ChildCount == 2);
             internalNode->A = stagingNodes->A;
             internalNode->B = stagingNodes->B;
-            ReifyChildren(treeletRootIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes);
+            ReifyChildren(treeletRootIndex, stagingNodes, ref subtrees, ref treeletInternalNodes, ref nextInternalNodeIndexToUse);
         }
 
 
 
         public unsafe void BinnedRefine(int nodeIndex,
             ref QuickList<int, Buffer<int>> subtreeReferences, int maximumSubtrees,
-            ref QuickList<int, Buffer<int>> treeletInternalNodes, ref QuickList<int, Buffer<int>> spareNodes,
-            ref BinnedResources resources)
+            ref QuickList<int, Buffer<int>> treeletInternalNodes,
+            ref BinnedResources resources, BufferPool pool)
         {
             Debug.Assert(subtreeReferences.Count == 0, "The subtree references list should be empty since it's about to get filled.");
             Debug.Assert(subtreeReferences.Span.Length >= maximumSubtrees, "Subtree references list should have a backing array large enough to hold all possible subtrees.");
             Debug.Assert(treeletInternalNodes.Count == 0, "The treelet internal nodes list should be empty since it's about to get filled.");
             Debug.Assert(treeletInternalNodes.Span.Length >= maximumSubtrees - 1, "Internal nodes queue should have a backing array large enough to hold all possible treelet internal nodes.");
-            float originalTreeletCost;
-            CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out originalTreeletCost);
+            CollectSubtrees(nodeIndex, maximumSubtrees, resources.SubtreeHeapEntries, ref subtreeReferences, ref treeletInternalNodes, out float originalTreeletCost);
             Debug.Assert(subtreeReferences.Count <= maximumSubtrees);
 
             //TODO: There's no reason to use a priority queue based node selection process for MOST treelets. It's only useful for the root node treelet.
@@ -658,8 +653,7 @@ namespace SolverPrototype.CollisionDetection
             int stagingNodeCount = 0;
 
 
-            float newTreeletCost;
-            CreateStagingNodeBinned(ref resources, 0, subtreeReferences.Count, ref stagingNodeCount, out newTreeletCost);
+            CreateStagingNodeBinned(ref resources, 0, subtreeReferences.Count, ref stagingNodeCount, out float newTreeletCost);
             //Copy the refine flag over from the treelet root so that it persists.
             resources.StagingNodes[0].RefineFlag = node->RefineFlag;
 
@@ -672,15 +666,10 @@ namespace SolverPrototype.CollisionDetection
                 //The refinement is an actual improvement.
                 //Apply the staged nodes to real nodes!
                 int nextInternalNodeIndexToUse = 0;
-                ReifyStagingNodes(nodeIndex, resources.StagingNodes, ref subtreeReferences, ref treeletInternalNodes, ref nextInternalNodeIndexToUse, ref spareNodes);
-                //If any nodes are left over, put them into the spares list for later reuse.
-                for (int i = nextInternalNodeIndexToUse; i < treeletInternalNodes.Count; ++i)
-                {
-                    spareNodes.AddUnsafely(treeletInternalNodes[i]);
-                }
+                ReifyStagingNodes(nodeIndex, resources.StagingNodes, ref subtreeReferences, ref treeletInternalNodes, ref nextInternalNodeIndexToUse);
             }
-        }       
-        
+        }
+
 
     }
 }

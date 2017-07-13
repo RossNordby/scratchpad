@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.Collections;
+﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using System;
 using System.Diagnostics;
@@ -170,10 +171,11 @@ namespace SolverPrototype.CollisionDetection
     partial class Tree
     {
 
-        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, SubtreeHeapEntry* entries, ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> internalNodes, out float treeletCost)
+        public unsafe void CollectSubtrees(int nodeIndex, int maximumSubtrees, SubtreeHeapEntry* entries,
+            ref QuickList<int, Buffer<int>> subtrees, ref QuickList<int, Buffer<int>> internalNodes, out float treeletCost)
         {
 
-            //Collect subtrees iteratively by choosing the highest surface area subtree repeatedly.
+            //Collect subtrees iteratively by choosing the highest cost subtree repeatedly.
             //This collects every child of a given node at once- the set of subtrees must not include only SOME of the children of a node.
 
             //(You could lift this restriction and only take some nodes, but it would complicate things. You could not simply remove
@@ -194,13 +196,11 @@ namespace SolverPrototype.CollisionDetection
             //Note that the treelet root's cost is excluded from the treeletCost.
             //That's because the treelet root cannot change.
             treeletCost = 0;
-            int highestIndex;
-            float highestCost;
             int remainingSubtreeSpace = maximumSubtrees - priorityQueue.Count - subtrees.Count;
-            while (priorityQueue.TryPop(nodes, ref remainingSubtreeSpace, ref subtrees, out highestIndex, out highestCost))
+            while (priorityQueue.TryPop(nodes, ref remainingSubtreeSpace, ref subtrees, out int highestIndex, out float highestCost))
             {
                 treeletCost += highestCost;
-                internalNodes.Add(highestIndex);
+                internalNodes.AddUnsafely(highestIndex);
 
                 //Add all the children to the set of subtrees.
                 //This is safe because we pre-validated the number of children in the node.
@@ -210,37 +210,36 @@ namespace SolverPrototype.CollisionDetection
 
             for (int i = 0; i < priorityQueue.Count; ++i)
             {
-                subtrees.Add(priorityQueue.Entries[i].Index);
+                subtrees.AddUnsafely(priorityQueue.Entries[i].Index);
             }
 
             //Sort the internal nodes so that the depth first builder will tend to produce less cache-scrambled results.
-            Array.Sort(internalNodes.Elements, 0, internalNodes.Count);
+            //TODO: Note that the range of values in node indices is VERY often constrained to values below 65535. In other words, a radix sort would be a significant win.
+            //Even better, use some form of implicit cache optimization that eliminates the possibility of noncontiguous internal nodes, so that this entire collection process
+            //boils down to computing a range of elements based on the root index and leaf count. Dealing with the root node is a little more complex.
+            //I suspect this entire function is going to go away later. For example:
+            //An internally multithreaded root builder that always runs, treating a set of subtrees as leaves, followed by externally multithreaded subtree refines.
+            //The root builder would write out its nodes into a new block of memory rather than working in place.
+            //If the root builder terminates with a set of subtrees of known leaf counts and known positions, then multithreaded refines will execute on contiguous regions.
+            //In other words, at no point is a sort of target nodes required, because they're all computed analytically and they are known to be in cache optimal locations.
+            var comparer = new PrimitiveComparer<int>();
+            QuickSort.Sort(ref internalNodes[0], 0, internalNodes.Count - 1, ref comparer);
 
         }
 
-
-        unsafe internal struct Subtrees
+        
+        unsafe void ValidateStaging(Node* stagingNodes, ref QuickList<int, Buffer<int>> subtreeNodePointers, int treeletParent, int treeletIndexInParent, BufferPool pool)
         {
-            public BoundingBox* BoundingBoxes;
-            public int* LeafCounts;
-            public int* IndexMap;
-            public float* CentroidsX;
-            public float* CentroidsY;
-            public float* CentroidsZ;
-        }
-
-        unsafe void ValidateStaging(Node* stagingNodes, ref QuickList<int> subtreeNodePointers, int treeletParent, int treeletIndexInParent)
-        {
-            int foundSubtrees, foundLeafCount;
-            QuickList<int> collectedSubtreeReferences = new QuickList<int>(BufferPools<int>.Thread);
-            QuickList<int> internalReferences = new QuickList<int>(BufferPools<int>.Thread);
-            internalReferences.Add(0);
-            ValidateStaging(stagingNodes, 0, ref subtreeNodePointers, ref collectedSubtreeReferences, ref internalReferences, out foundSubtrees, out foundLeafCount);
+            var intPool = pool.SpecializeFor<int>();
+            QuickList<int, Buffer<int>>.Create(intPool, subtreeNodePointers.Count, out var collectedSubtreeReferences);
+            QuickList<int, Buffer<int>>.Create(intPool, subtreeNodePointers.Count, out var internalReferences);
+            internalReferences.Add(0, intPool);
+            ValidateStaging(stagingNodes, 0, ref subtreeNodePointers, ref collectedSubtreeReferences, ref internalReferences, intPool, out int foundSubtrees, out int foundLeafCount);
             if (treeletParent < -1 || treeletParent >= nodeCount)
                 throw new Exception("Bad treelet parent.");
             if (treeletIndexInParent < -1 || (treeletParent >= 0 && treeletIndexInParent >= nodes[treeletParent].ChildCount))
                 throw new Exception("Bad treelet index in parent.");
-            if (treeletParent >= 0 && (&nodes[treeletParent].LeafCountA)[treeletIndexInParent] != foundLeafCount)
+            if (treeletParent >= 0 && (&nodes[treeletParent].A)[treeletIndexInParent].LeafCount != foundLeafCount)
             {
                 throw new Exception("Bad leaf count.");
             }
@@ -253,57 +252,58 @@ namespace SolverPrototype.CollisionDetection
                 if (!subtreeNodePointers.Contains(collectedSubtreeReferences[i]) || !collectedSubtreeReferences.Contains(subtreeNodePointers[i]))
                     throw new Exception("Bad subtree reference.");
             }
-            collectedSubtreeReferences.Dispose();
-            internalReferences.Dispose();
+            collectedSubtreeReferences.Dispose(intPool);
+            internalReferences.Dispose(intPool);
         }
-        unsafe void ValidateStaging(Node* stagingNodes, int stagingNodeIndex, ref QuickList<int> subtreeNodePointers, ref QuickList<int> collectedSubtreeReferences, ref QuickList<int> internalReferences, out int foundSubtrees, out int foundLeafCount)
+        unsafe void ValidateStaging(Node* stagingNodes, int stagingNodeIndex,
+            ref QuickList<int, Buffer<int>> subtreeNodePointers, ref QuickList<int, Buffer<int>> collectedSubtreeReferences,
+            ref QuickList<int, Buffer<int>> internalReferences, BufferPool<int> intPool, out int foundSubtrees, out int foundLeafCount)
         {
             var stagingNode = stagingNodes + stagingNodeIndex;
-            var children = &stagingNode->ChildA;
-            var leafCounts = &stagingNode->LeafCountA;
+            var children = &stagingNode->A;
             foundSubtrees = foundLeafCount = 0;
-            for (int i = 0; i < stagingNode->ChildCount; ++i)
+            for (int i = 0; i < 2; ++i)
             {
-                if (children[i] >= 0)
+                ref var child = ref children[i];
+                if (child.Index >= 0)
                 {
-                    int childFoundSubtrees, childFoundLeafCount;
-                    if (internalReferences.Contains(children[i]))
+                    if (internalReferences.Contains(child.Index))
                         throw new Exception("A child points to an internal node that was visited. Possible loop, or just general invalid.");
-                    internalReferences.Add(children[i]);
-                    ValidateStaging(stagingNodes, children[i], ref subtreeNodePointers, ref collectedSubtreeReferences, ref internalReferences, out childFoundSubtrees, out childFoundLeafCount);
+                    internalReferences.Add(child.Index, intPool);
+                    ValidateStaging(stagingNodes, child.Index, ref subtreeNodePointers, ref collectedSubtreeReferences, ref internalReferences, intPool, out int childFoundSubtrees, out int childFoundLeafCount);
 
-                    if (childFoundLeafCount != leafCounts[i])
+                    if (childFoundLeafCount != child.LeafCount)
                         throw new Exception("Bad leaf count.");
                     foundSubtrees += childFoundSubtrees;
                     foundLeafCount += childFoundLeafCount;
                 }
                 else
                 {
-                    var subtreeNodePointerIndex = Encode(children[i]);
-                    var subtreeNodePointer = subtreeNodePointers.Elements[subtreeNodePointerIndex];
+                    var subtreeNodePointerIndex = Encode(child.Index);
+                    var subtreeNodePointer = subtreeNodePointers[subtreeNodePointerIndex];
                     //Rather than looking up the shuffled SweepSubtree for information, just go back to the source.
                     if (subtreeNodePointer >= 0)
                     {
                         var node = nodes + subtreeNodePointer;
                         var totalLeafCount = 0;
-                        for (int childIndex = 0; childIndex < node->ChildCount; ++childIndex)
+                        for (int childIndex = 0; childIndex < 2; ++childIndex)
                         {
-                            totalLeafCount += (&node->LeafCountA)[childIndex];
+                            totalLeafCount += (&node->A)[childIndex].LeafCount;
                         }
 
-                        if (leafCounts[i] != totalLeafCount)
+                        if (child.LeafCount != totalLeafCount)
                             throw new Exception("bad leaf count.");
                         foundLeafCount += totalLeafCount;
                     }
                     else
                     {
                         var leafIndex = Encode(subtreeNodePointer);
-                        if (leafCounts[i] != 1)
+                        if (child.LeafCount != 1)
                             throw new Exception("bad leaf count.");
                         foundLeafCount += 1;
                     }
                     ++foundSubtrees;
-                    collectedSubtreeReferences.Add(subtreeNodePointer);
+                    collectedSubtreeReferences.Add(subtreeNodePointer, intPool);
                 }
             }
 

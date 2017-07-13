@@ -1,25 +1,16 @@
-﻿using BEPUutilities.DataStructures;
-using BEPUutilities.ResourceManagement;
+﻿using BEPUutilities2;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Numerics;
-using System.Text;
-using System.Threading.Tasks;
 
 
 namespace SolverPrototype.CollisionDetection
 {
-    public struct LeafMove
-    {
-        public int OriginalIndex;
-        public int NewIndex;
-    }
     partial class Tree
     {
         unsafe void RemoveNodeAt(int nodeIndex)
         {
+            //Note that this function is a cache scrambling influence. That's okay- the cache optimization routines will take care of it later.
             Debug.Assert(nodeIndex < nodeCount && nodeIndex >= 0);
             //We make no guarantees here about maintaining the tree's coherency after a remove.
             //That's the responsibility of whoever called RemoveAt.
@@ -36,77 +27,58 @@ namespace SolverPrototype.CollisionDetection
                 *node = nodes[nodeCount];
 
                 //Update the moved node's pointers:
-                //its parent's child pointer should change, and
-                (&nodes[node->Parent].ChildA)[node->IndexInParent] = nodeIndex;
+                //its parent's child pointer should change, and...
+                (&nodes[node->Parent].A)[node->IndexInParent].Index = nodeIndex;
                 //its children's parent pointers should change.
-                var nodeChildren = &node->ChildA;
-                for (int i = 0; i < node->ChildCount; ++i)
+                var nodeChildren = &node->A;
+                for (int i = 0; i < 2; ++i)
                 {
-                    if (nodeChildren[i] >= 0)
+                    ref var child = ref nodeChildren[i];
+                    if (child.Index >= 0)
                     {
-                        nodes[nodeChildren[i]].Parent = nodeIndex;
+                        nodes[child.Index].Parent = nodeIndex;
                     }
                     else
                     {
                         //It's a leaf node. It needs to have its pointers updated.
-                        leaves[Encode(nodeChildren[i])].NodeIndex = nodeIndex;
+                        leaves[Encode(child.Index)] = new Leaf(nodeIndex, i);
                     }
                 }
 
             }
-            
+
 
         }
 
 
-       
         unsafe void RefitForRemoval(Node* node)
         {
+            //Note that no attempt is made to refit the root node. Note that the root node is the only node that can have a number of children less than 2.
             while (node->Parent >= 0)
             {
                 //Compute the new bounding box for this node.
-                var nodeBounds = &node->A;
-                var nodeChildren = &node->ChildA;
-                var merged = nodeBounds[0];
-                for (int i = 1; i < node->ChildCount; ++i)
-                {
-                    BoundingBox.Merge(ref merged, ref nodeBounds[i], out merged);
-                }
-                //Push the changes to the parent.
                 var parent = nodes + node->Parent;
-                (&parent->A)[node->IndexInParent] = merged;
-                --(&parent->LeafCountA)[node->IndexInParent];
-
+                ref var childInParent = ref (&parent->A)[node->IndexInParent];
+                BoundingBox.CreateMerged(ref node->A.Min, ref node->A.Max, ref node->B.Min, ref node->B.Max, out childInParent.Min, out childInParent.Max);
+                --childInParent.LeafCount;
                 node = parent;
             }
         }
 
-        public unsafe LeafMove RemoveAt(int leafIndex)
+        public unsafe void RemoveAt(int leafIndex)
         {
             if (leafIndex < 0 || leafIndex >= leafCount)
                 throw new ArgumentOutOfRangeException("Leaf index must be a valid index in the tree's leaf array.");
 
-            //Cache the leaf before overwriting.
+            //Cache the leaf.
             var leaf = leaves[leafIndex];
 
             //Delete the leaf from the leaves array.
-            //This is done up front to make it easier for tests to catch bad behavior.
-            var lastIndex = leafCount - 1;
-            if (lastIndex != leafIndex)
-            {
-                //The removed leaf was in the middle of the leaves array. Take the last leaf and use it to fill the slot.
-                //The node owner's index must be updated to point to the new location.
-                var lastLeafOwner = nodes + leaves[lastIndex].NodeIndex;
-                (&lastLeafOwner->ChildA)[leaves[lastIndex].ChildIndex] = Encode(leafIndex);
-                leaves[leafIndex] = leaves[lastIndex];
-            }
-            leaves[lastIndex] = new Leaf();
-            leafCount = lastIndex;
+            LeafSlotsPool.Return(leafIndex);            
+            --leafCount;
 
             var node = nodes + leaf.NodeIndex;
-            var nodeChildren = &node->ChildA;
-            var nodeBounds = &node->A;
-            var nodeLeafCounts = &node->LeafCountA;
+            var nodeChildren = &node->A;
 
             //Remove the leaf from this node.
             //Note that the children must remain contiguous. Requires taking the last child of the node and moving into the slot
@@ -114,34 +86,36 @@ namespace SolverPrototype.CollisionDetection
             //Further, if a child is moved and if it is a leaf, that leaf's ChildIndex must be updated.
             //If a child is moved and it is an internal node, all immediate children of that node must have their parent nodes updated.
 
+            var survivingChildIndexInNode = leaf.ChildIndex == 0 ? 1 : 0;
+            ref var survivingChild = ref nodeChildren[survivingChildIndexInNode];
+
             //Check to see if this node should collapse.
-            if (node->ChildCount == 2 &&
-                node->Parent >= 0) //The root cannot 'collapse'. The root is the only node that can end up with 1 child.
+            if (node->Parent >= 0)
             {
-                Debug.Assert(node->ChildCount != 1);
-                //If there are only two children in the node, then the node containing the removed leaf will collapse.
-                var otherIndex = leaf.ChildIndex == 0 ? 1 : 0;
-                var otherChildIndex = nodeChildren[otherIndex];
+                //This is a non-root internal node.
+                //Since there are only two children in the node, then the node containing the removed leaf will collapse.
+                Debug.Assert(node->ChildCount == 2);
 
                 //Move the other node into the slot that used to point to the collapsing internal node.
                 var parentNode = nodes + node->Parent;
-                (&parentNode->A)[node->IndexInParent] = nodeBounds[otherIndex];
-                (&parentNode->ChildA)[node->IndexInParent] = otherChildIndex;
-                (&parentNode->LeafCountA)[node->IndexInParent] = nodeLeafCounts[otherIndex];
+                ref var childInParent = ref (&parentNode->A)[node->IndexInParent];
+                childInParent.Min = survivingChild.Min;
+                childInParent.Max = survivingChild.Max;
+                childInParent.Index = survivingChild.Index;
+                childInParent.LeafCount = survivingChild.LeafCount;
 
-                if (otherChildIndex < 0)
+                if (survivingChild.Index < 0)
                 {
                     //It's a leaf. Update the leaf's reference in the leaves array.
-                    var otherLeafIndex = Encode(otherChildIndex);
-                    leaves[otherLeafIndex].NodeIndex = node->Parent;
-                    leaves[otherLeafIndex].ChildIndex = node->IndexInParent;
+                    var otherLeafIndex = Encode(survivingChild.Index);
+                    leaves[otherLeafIndex] = new Leaf(node->Parent, node->IndexInParent);
                 }
                 else
                 {
                     //It's an internal node. Update its parent node.
-                    nodes[otherChildIndex].Parent = node->Parent;
-                    nodes[otherChildIndex].IndexInParent = node->IndexInParent;
-      
+                    nodes[survivingChild.Index].Parent = node->Parent;
+                    nodes[survivingChild.Index].IndexInParent = node->IndexInParent;
+
                 }
 
 
@@ -155,44 +129,39 @@ namespace SolverPrototype.CollisionDetection
             }
             else
             {
-                //The node has enough children that it should not collapse or it's the root; just need to remove the leaf.
-
-                var lastChildIndex = node->ChildCount - 1;
-                if (leaf.ChildIndex < lastChildIndex)
+                //This is the root. It cannot collapse, but if the other child is an internal node, then it will overwrite the root node.
+                //This maintains the guarantee that any tree with at least 2 leaf nodes has every single child slot filled with a node or leaf.
+                Debug.Assert(nodes == node, "Only the root should have a negative parent, so only the root should show up here.");
+                if(leafCount > 0)
                 {
-                    //The removed leaf is not the last child of the node it belongs to.
-                    //Move the last node into the position of the removed node.
-                    nodeBounds[leaf.ChildIndex] = nodeBounds[lastChildIndex];
-                    nodeChildren[leaf.ChildIndex] = nodeChildren[lastChildIndex];
-                    nodeLeafCounts[leaf.ChildIndex] = nodeLeafCounts[lastChildIndex];
-                    if (nodeChildren[lastChildIndex] >= 0)
+                    //The post-removal leafCount is still positive, so there must be at least one child in the root node.
+                    //If it is an internal node, then it will be promoted into the root node's slot.
+                    if(survivingChild.Index >= 0)
                     {
-                        //The moved child is an internal node.
-                        //Update the child's IndexInParent pointer.
-                        var movedInternalNode = nodes + nodeChildren[lastChildIndex];
-                        movedInternalNode->IndexInParent = leaf.ChildIndex;
+                        //The surviving child is an internal node and it should replace the root node.
+                        *nodes = nodes[survivingChild.Index]; //Note that this overwrites the memory pointed to by the otherChild reference.
+                        nodes->Parent = -1;
+                        nodes->IndexInParent = -1;
+                        nodes[nodes->A.Index].Parent = 0;
+                        nodes[nodes->B.Index].Parent = 0;
                     }
                     else
                     {
-                        //The moved node is a leaf, so update the leaf array's reference.
-                        leaves[Encode(nodeChildren[lastChildIndex])].ChildIndex = leaf.ChildIndex;
+                        //The surviving child is a leaf node.
+                        if (survivingChildIndexInNode > 0)
+                        {
+                            //It needs to be moved to keep the lowest slot filled.
+                            nodes->A = nodes->B;
+                            //Update the leaf pointer to reflect the change.
+                            leaves[Encode(survivingChild.Index)] = new Leaf(0, 0);
+                        }
                     }
                 }
-                //Clear out the last slot.
-                (&node->A)[lastChildIndex] = new BoundingBox { Min = new Vector3(float.MaxValue), Max = new Vector3(float.MinValue) };
-                (&node->ChildA)[lastChildIndex] = -1;
-                (&node->LeafCountA)[lastChildIndex] = 0;
-                --node->ChildCount;
+                --nodes->ChildCount;
 
-                //Work up the chain of parent pointers, refitting bounding boxes and decrementing leaf counts.
-                RefitForRemoval(node);
+                //No need to perform a RefitForRemoval here; it's the root. There is no higher bounding box.
             }
 
-
-
-
-
-            return new LeafMove { OriginalIndex = lastIndex, NewIndex = leafIndex };
         }
     }
 }

@@ -151,12 +151,12 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        void GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementCandidateCount, out int leafCountThreshold)
+        void GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementCandidateCount, out int refinementLeafCountThreshold)
         {
             maximumSubtrees = (int)(Math.Sqrt(leafCount) * 3);
             estimatedRefinementCandidateCount = (leafCount * 2) / maximumSubtrees;
 
-            leafCountThreshold = Math.Min(leafCount, maximumSubtrees);
+            refinementLeafCountThreshold = Math.Min(leafCount, maximumSubtrees);
         }
 
 
@@ -192,27 +192,24 @@ namespace SolverPrototype.CollisionDetection
 
 
 
-        public unsafe int RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
+        public unsafe void RefitAndRefine(int frameIndex, float refineAggressivenessScale = 1, float cacheOptimizeAggressivenessScale = 1)
         {
-            //Don't proceed if the tree is empty.
-            if (leafCount == 0)
-                return 0;
-            int maximumSubtrees, estimatedRefinementCandidateCount, leafCountThreshold;
-            GetRefitAndMarkTuning(out maximumSubtrees, out estimatedRefinementCandidateCount, out leafCountThreshold);
-
-            var refinementCandidates = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(estimatedRefinementCandidateCount));
+            //Don't proceed if the tree has no refitting or refinement required. This also guarantees that any nodes that do exist have two children.
+            if (leafCount <= 2)
+                return;
+            GetRefitAndMarkTuning(out int maximumSubtrees, out int estimatedRefinementCandidateCount, out int leafCountThreshold);
+            var intPool = Pool.SpecializeFor<int>();
+            QuickList<int, Buffer<int>>.Create(intPool, estimatedRefinementCandidateCount, out var refinementCandidates);
 
             //Collect the refinement candidates.
-            var costChange = RefitAndMark(leafCountThreshold, ref refinementCandidates);
+            var costChange = RefitAndMark(leafCountThreshold, ref refinementCandidates, Pool.SpecializeFor<int>());
 
 
-            int targetRefinementCount, period, offset;
-            GetRefineTuning(frameIndex, refinementCandidates.Count, refineAggressivenessScale, costChange, 1, out targetRefinementCount, out period, out offset);
+            GetRefineTuning(frameIndex, refinementCandidates.Count, refineAggressivenessScale, costChange, 1, out int targetRefinementCount, out int period, out int offset);
 
 
-            var refinementTargets = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(targetRefinementCount));
-
-            int actualRefinementTargetsCount = 0;
+            QuickList<int, Buffer<int>>.Create(intPool, targetRefinementCount, out var refinementTargets);
+            
             int index = offset;
             for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
@@ -221,71 +218,53 @@ namespace SolverPrototype.CollisionDetection
                     index -= refinementCandidates.Count;
                 Debug.Assert(index < refinementCandidates.Count && index >= 0);
 
-                refinementTargets.Elements[actualRefinementTargetsCount++] = refinementCandidates.Elements[index];
-                nodes[refinementCandidates.Elements[index]].RefineFlag = 1;
+                refinementTargets.AddUnsafely(refinementCandidates[index]);
+                nodes[refinementCandidates[index]].RefineFlag = 1;
             }
-            refinementTargets.Count = actualRefinementTargetsCount;
-            refinementCandidates.Count = 0;
-            refinementCandidates.Dispose();
+            refinementCandidates.Dispose(intPool);
             if (nodes->RefineFlag == 0)
             {
-                refinementTargets.Add(0);
+                refinementTargets.AddUnsafely(0);
                 nodes->RefineFlag = 1;
-                ++actualRefinementTargetsCount;
             }
 
 
             //Refine all marked targets.
+            
+            QuickList<int, Buffer<int>>.Create(intPool, maximumSubtrees, out var subtreeReferences);
+            QuickList<int, Buffer<int>>.Create(intPool, maximumSubtrees, out var treeletInternalNodes);
 
-            var spareNodes = new QuickList<int>(pool, 8);
-            var subtreeReferences = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-            var treeletInternalNodes = new QuickList<int>(pool, BufferPool<int>.GetPoolIndex(maximumSubtrees));
-            int[] buffer;
-            MemoryRegion region;
-            BinnedResources resources;
-            CreateBinnedResources(pool, maximumSubtrees, out buffer, out region, out resources);
+            CreateBinnedResources(Pool, maximumSubtrees, out var buffer, out var resources);
 
             for (int i = 0; i < refinementTargets.Count; ++i)
             {
 
                 subtreeReferences.Count = 0;
                 treeletInternalNodes.Count = 0;
-                bool nodesInvalidated;
-                BinnedRefine(refinementTargets.Elements[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref spareNodes, ref resources, out nodesInvalidated);
+                BinnedRefine(refinementTargets[i], ref subtreeReferences, maximumSubtrees, ref treeletInternalNodes, ref resources, Pool);
                 //TODO: Should this be moved into a post-loop? It could permit some double work, but that's not terrible.
                 //It's not invalid from a multithreading perspective, either- setting the refine flag to zero is essentially an unlock.
                 //If other threads don't see it updated due to cache issues, it doesn't really matter- it's not a signal or anything like that.
-                nodes[refinementTargets.Elements[i]].RefineFlag = 0;
+                nodes[refinementTargets[i]].RefineFlag = 0;
 
             }
-
-
-            RemoveUnusedInternalNodes(ref spareNodes);
-            region.Dispose();
-            pool.GiveBack(buffer);
-            spareNodes.Dispose();
-            subtreeReferences.Count = 0;
-            subtreeReferences.Dispose();
-            treeletInternalNodes.Count = 0;
-            treeletInternalNodes.Dispose();
-            refinementTargets.Count = 0;
-            refinementTargets.Dispose();
+                        
+            Pool.Return(ref buffer);
+            subtreeReferences.Dispose(intPool);
+            treeletInternalNodes.Dispose(intPool);
+            refinementTargets.Dispose(intPool);
 
             var cacheOptimizeCount = GetCacheOptimizeTuning(maximumSubtrees, costChange, cacheOptimizeAggressivenessScale);
 
             var startIndex = (int)(((long)frameIndex * cacheOptimizeCount) % nodeCount);
 
             //We could wrap around. But we could also not do that because it doesn't really matter!
-            //var startTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
             var end = Math.Min(NodeCount, startIndex + cacheOptimizeCount);
             for (int i = startIndex; i < end; ++i)
             {
                 IncrementalCacheOptimize(i);
             }
-            //var endTime = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
-            //Console.WriteLine($"Cache optimize time: {endTime - startTime}");
-
-            return actualRefinementTargetsCount;
+            
         }
 
 

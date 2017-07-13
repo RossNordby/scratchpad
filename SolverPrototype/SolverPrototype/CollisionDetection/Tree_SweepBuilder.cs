@@ -1,12 +1,10 @@
-﻿using BEPUutilities.ResourceManagement;
+﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 
 namespace SolverPrototype.CollisionDetection
@@ -16,7 +14,6 @@ namespace SolverPrototype.CollisionDetection
         internal unsafe struct SweepResources
         {
             public BoundingBox* Bounds;
-            public int* Ids;
             public int* IndexMap;
             public int* IndexMapX;
             public int* IndexMapY;
@@ -32,9 +29,17 @@ namespace SolverPrototype.CollisionDetection
             out int splitIndex, out float cost, out BoundingBox a, out BoundingBox b, out int leafCountA, out int leafCountB)
         {
             Debug.Assert(count > 1);
-
-
-            Quicksort(centroids, indexMap, 0, count - 1);
+            //TODO: Note that sorting at every level isn't necessary. Like in one of the much older spatial splitting implementations we did, you can just sort once, and thereafter
+            //just do an O(n) operation to shuffle leaf data to the relevant location on each side of the partition. That allows us to punt all sort work to a prestep.
+            //There, we could throw an optimized parallel sort at it. Or just do the three axes independently, hidden alongside some other work maybe.
+            //I suspect the usual problems with parallel sorts would be mitigated somewhat by having three of them going on at the same time- more chances for load balancing.
+            //Also note that, at each step, both the above partitioning scheme and the sort result in a contiguous block of data to work on.
+            //If you're already doing a gather like that, you might as well throw wider SIMD at the problem. This version only goes up to 3 wide, which is unfortunate for AVX2 and AVX512.
+            //With those changes, we can probably get the sweep builder to be faster than v1's insertion builder- it's almost there already.
+            //(You'll also want to bench it against similarly simd accelerated binned approaches for use in incremental refinement. If it's not much slower, the extra quality benefits
+            //might make it faster on net by virtue of speeding up self-tests, which are a dominant cost.)
+            var comparer = new PrimitiveComparer<float>();
+            QuickSort.Sort(ref centroids[0], ref indexMap[0], 0, count - 1, ref comparer);
 
             //Search for the best split.
             //Sweep across from low to high, caching the merged size and leaf count at each point.
@@ -45,7 +50,7 @@ namespace SolverPrototype.CollisionDetection
             for (int i = 1; i < lastIndex; ++i)
             {
                 var index = indexMap[i];
-                BoundingBox.Merge(ref aMerged[i - 1], ref boundingBoxes[index], out aMerged[i]);
+                BoundingBox.CreateMerged(ref aMerged[i - 1], ref boundingBoxes[index], out aMerged[i]);
             }
 
             //Sweep from high to low.
@@ -60,7 +65,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 int aIndex = i - 1;
                 var subtreeIndex = indexMap[i];
-                BoundingBox.Merge(ref bMerged, ref boundingBoxes[subtreeIndex], out bMerged);
+                BoundingBox.CreateMerged(ref bMerged, ref boundingBoxes[subtreeIndex], out bMerged);
 
                 var aCost = i * ComputeBoundsMetric(ref aMerged[aIndex]);
                 var bCost = (count - i) * ComputeBoundsMetric(ref bMerged);
@@ -94,12 +99,12 @@ namespace SolverPrototype.CollisionDetection
                 leaves.IndexMapZ[i] = originalValue;
             }
 
-            int xSplitIndex, xLeafCountA, xLeafCountB, ySplitIndex, yLeafCountA, yLeafCountB, zSplitIndex, zLeafCountA, zLeafCountB;
-            BoundingBox xA, xB, yA, yB, zA, zB;
-            float xCost, yCost, zCost;
-            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsX, leaves.IndexMapX, count, out xSplitIndex, out xCost, out xA, out xB, out xLeafCountA, out xLeafCountB);
-            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsY, leaves.IndexMapY, count, out ySplitIndex, out yCost, out yA, out yB, out yLeafCountA, out yLeafCountB);
-            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsZ, leaves.IndexMapZ, count, out zSplitIndex, out zCost, out zA, out zB, out zLeafCountA, out zLeafCountB);
+            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsX, leaves.IndexMapX, count,
+                out int xSplitIndex, out float xCost, out BoundingBox xA, out BoundingBox xB, out int xLeafCountA, out int xLeafCountB);
+            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsY, leaves.IndexMapY, count,
+                out int ySplitIndex, out float yCost, out BoundingBox yA, out BoundingBox yB, out int yLeafCountA, out int yLeafCountB);
+            FindPartitionForAxis(leaves.Bounds, leaves.Merged, leaves.CentroidsZ, leaves.IndexMapZ, count,
+                out int zSplitIndex, out float zCost, out BoundingBox zA, out BoundingBox zB, out int zLeafCountA, out int zLeafCountB);
 
             int* bestIndexMap;
             if (xCost <= yCost && xCost <= zCost)
@@ -139,67 +144,49 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        unsafe void SplitLeavesIntoChildren(int depthRemaining, ref SweepResources leaves,
-            int start, int count, int nodeIndex)
+        unsafe void SplitLeavesIntoChildren(ref SweepResources leaves, int start, int count, int nodeIndex)
         {
             if (count > 1)
             {
 
-                BoundingBox a, b;
-                int leafCountA, leafCountB;
-                int splitIndex;
-                FindPartition(ref leaves, start, count, out splitIndex, out a, out b, out leafCountA, out leafCountB);
+                FindPartition(ref leaves, start, count, out int splitIndex, out BoundingBox aBounds, out BoundingBox bBounds, out int leafCountA, out int leafCountB);
 
-                if (depthRemaining > 0)
+                var node = nodes + nodeIndex;
+                var childIndexA = node->ChildCount++;
+                var childIndexB = node->ChildCount++;
+                Debug.Assert(node->ChildCount <= 2);
+
+                ref var a = ref node->A;
+                ref var b = ref node->B;
+                a.Min = aBounds.Min;
+                a.Max = aBounds.Max;
+                b.Min = bBounds.Min;
+                b.Max = bBounds.Max;
+
+                a.LeafCount = leafCountA;
+                b.LeafCount = leafCountB;
+
+                if (leafCountA > 1)
                 {
-                    --depthRemaining;
-                    SplitLeavesIntoChildren(depthRemaining, ref leaves, start, splitIndex - start, nodeIndex);
-                    SplitLeavesIntoChildren(depthRemaining, ref leaves, splitIndex, start + count - splitIndex, nodeIndex);
+                    a.Index = CreateSweepBuilderNode(nodeIndex, childIndexA, ref leaves, start, leafCountA);
                 }
                 else
                 {
-                    //Recursion bottomed out. 
-                    var node = nodes + nodeIndex;
-                    var childIndexA = node->ChildCount++;
-                    var childIndexB = node->ChildCount++;
-                    Debug.Assert(node->ChildCount <= ChildrenCapacity);
-
-                    var bounds = &node->A;
-                    var children = &node->ChildA;
-                    var leafCounts = &node->LeafCountA;
-
-                    bounds[childIndexA] = a;
-                    bounds[childIndexB] = b;
-
-                    leafCounts[childIndexA] = leafCountA;
-                    leafCounts[childIndexB] = leafCountB;
-
-                    if (leafCountA > 1)
-                    {
-                        children[childIndexA] = CreateSweepBuilderNode(nodeIndex, childIndexA, ref leaves, start, leafCountA);
-                    }
-                    else
-                    {
-                        Debug.Assert(leafCountA == 1);
-                        //Only one leaf. Don't create another node.
-                        bool leavesInvalidated;
-                        var leafIndex = AddLeaf(leaves.Ids[leaves.IndexMap[start]], nodeIndex, childIndexA, out leavesInvalidated);
-                        Debug.Assert(!leavesInvalidated);
-                        children[childIndexA] = Encode(leafIndex);
-                    }
-                    if (leafCountB > 1)
-                    {
-                        children[childIndexB] = CreateSweepBuilderNode(nodeIndex, childIndexB, ref leaves, splitIndex, leafCountB);
-                    }
-                    else
-                    {
-                        Debug.Assert(leafCountB == 1);
-                        //Only one leaf. Don't create another node.
-                        bool leavesInvalidated;
-                        var leafIndex = AddLeaf(leaves.Ids[leaves.IndexMap[splitIndex]], nodeIndex, childIndexB, out leavesInvalidated);
-                        Debug.Assert(!leavesInvalidated);
-                        children[childIndexB] = Encode(leafIndex);
-                    }
+                    Debug.Assert(leafCountA == 1);
+                    //Only one leaf. Don't create another node.
+                    var leafIndex = AddLeaf(nodeIndex, childIndexA);
+                    a.Index = Encode(leafIndex);
+                }
+                if (leafCountB > 1)
+                {
+                    b.Index = CreateSweepBuilderNode(nodeIndex, childIndexB, ref leaves, splitIndex, leafCountB);
+                }
+                else
+                {
+                    Debug.Assert(leafCountB == 1);
+                    //Only one leaf. Don't create another node.
+                    var leafIndex = AddLeaf(nodeIndex, childIndexB);
+                    b.Index = Encode(leafIndex);
                 }
             }
             else
@@ -208,14 +195,14 @@ namespace SolverPrototype.CollisionDetection
                 //Only one leaf. Just stick it directly into the node.
                 var node = nodes + nodeIndex;
                 var childIndex = node->ChildCount++;
-                Debug.Assert(node->ChildCount <= ChildrenCapacity);
-                bool leavesInvalidated;
+                Debug.Assert(node->ChildCount <= 2);
                 var index = leaves.IndexMap[start];
-                var leafIndex = AddLeaf(leaves.Ids[index], nodeIndex, childIndex, out leavesInvalidated);
-                Debug.Assert(!leavesInvalidated);
-                (&node->A)[childIndex] = leaves.Bounds[index];
-                (&node->ChildA)[childIndex] = Encode(leafIndex);
-                (&node->LeafCountA)[childIndex] = 1;
+                var leafIndex = AddLeaf(nodeIndex, childIndex);
+                ref var child = ref (&node->A)[childIndex];
+                child.Min = leaves.Bounds[index].Min;
+                child.Max = leaves.Bounds[index].Max;
+                child.Index = Encode(leafIndex);
+                child.LeafCount = 1;
 
             }
         }
@@ -223,37 +210,32 @@ namespace SolverPrototype.CollisionDetection
         unsafe int CreateSweepBuilderNode(int parentIndex, int indexInParent,
             ref SweepResources leaves, int start, int count)
         {
-            bool nodesInvalidated;
-            var nodeIndex = AllocateNode(out nodesInvalidated);
-            Debug.Assert(!nodesInvalidated, "The sweep builder should have allocated enough nodes ahead of time.");
+            var nodeIndex = AllocateNode();
             var node = nodes + nodeIndex;
             node->Parent = parentIndex;
             node->IndexInParent = indexInParent;
 
-            if (count <= ChildrenCapacity)
+            if (count <= 2)
             {
                 //No need to do any sorting. This node can fit every remaining subtree.
                 node->ChildCount = count;
-                var bounds = &node->A;
-                var children = &node->ChildA;
-                var leafCounts = &node->LeafCountA;
+                var children = &node->A;
                 for (int i = 0; i < count; ++i)
                 {
                     var index = leaves.IndexMap[i + start];
-                    bool leavesInvalidated;
-                    var leafIndex = AddLeaf(leaves.Ids[index], nodeIndex, i, out leavesInvalidated);
-                    Debug.Assert(!leavesInvalidated);
-                    bounds[i] = leaves.Bounds[index];
-                    children[i] = Encode(leafIndex);
-                    leafCounts[i] = 1;
+                    var leafIndex = AddLeaf(nodeIndex, i);
+                    ref var child = ref children[i];
+                    child.Min = leaves.Bounds[index].Min;
+                    child.Max = leaves.Bounds[index].Max;
+                    child.Index = Encode(leafIndex);
+                    child.LeafCount = 1;
                 }
                 return nodeIndex;
             }
 
-            const int recursionDepth = ChildrenCapacity == 32 ? 4 : ChildrenCapacity == 16 ? 3 : ChildrenCapacity == 8 ? 2 : ChildrenCapacity == 4 ? 1 : 0;
 
 
-            SplitLeavesIntoChildren(recursionDepth, ref leaves, start, count, nodeIndex);
+            SplitLeavesIntoChildren(ref leaves, start, count, nodeIndex);
 
 
             return nodeIndex;
@@ -261,19 +243,17 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        public unsafe void SweepBuild(int[] leafIds, BoundingBox[] leafBounds, int start = 0, int length = -1, BufferPool<int> intPool = null, BufferPool<float> floatPool = null)
+        public unsafe void SweepBuild(BoundingBox[] leafBounds, int[] outputLeafIndices, int start = 0, int length = -1)
         {
-            if (leafIds.Length != leafBounds.Length)
-                throw new ArgumentException("leafIds and leafBounds lengths must be equal.");
-            if (start + length > leafIds.Length)
-                throw new ArgumentException("Start + length must be smaller than the leaves array length.");
-            if (start < 0)
-                throw new ArgumentException("Start must be nonnegative.");
             if (length == 0)
                 throw new ArgumentException("Length must be positive.");
             if (length < 0)
-                length = leafIds.Length;
-            if (nodes[0].ChildCount != 0)
+                length = leafBounds.Length - start;
+            if (start + length > outputLeafIndices.Length || start + length > leafBounds.Length)
+                throw new ArgumentException("Start + length must be smaller than the leaves array lengths.");
+            if (start < 0)
+                throw new ArgumentException("Start must be nonnegative.");
+            if (LeafCount != 0)
                 throw new InvalidOperationException("Cannot build a tree that already contains nodes.");
             //The tree is built with an empty node at the root to make insertion work more easily.
             //As long as that is the case (and as long as this is not a constructor),
@@ -281,51 +261,38 @@ namespace SolverPrototype.CollisionDetection
             nodeCount = 0;
 
             //Guarantee that no resizes will occur during the build.
-            if (LeafCapacity < leafBounds.Length)
+            if (Leaves.Length < length)
             {
-                LeafCapacity = leafBounds.Length;
-            }
-            var preallocatedNodeCount = leafBounds.Length * 2 - 1;
-            if (NodeCapacity < preallocatedNodeCount)
-            {
-                NodeCapacity = preallocatedNodeCount;
+                Resize(leafBounds.Length);
             }
 
             //Gather necessary information and put it into a convenient format.
 
-            var indexMap = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
-            var indexMapX = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
-            var indexMapY = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
-            var indexMapZ = intPool == null ? new int[leafIds.Length] : intPool.Take(leafIds.Length);
-            var centroidsX = floatPool == null ? new float[leafIds.Length] : floatPool.Take(leafIds.Length);
-            var centroidsY = floatPool == null ? new float[leafIds.Length] : floatPool.Take(leafIds.Length);
-            var centroidsZ = floatPool == null ? new float[leafIds.Length] : floatPool.Take(leafIds.Length);
-            var mergedSize = leafIds.Length * (sizeof(BoundingBox) / sizeof(float));
-            var merged = floatPool == null ? new float[mergedSize] : floatPool.Take(mergedSize);
-            fixed (BoundingBox* leafBoundsPointer = leafBounds)
-            fixed (int* leafIdsPointer = leafIds)
-            fixed (int* indexMapPointer = indexMap)
-            fixed (int* indexMapXPointer = indexMapX)
-            fixed (int* indexMapYPointer = indexMapY)
-            fixed (int* indexMapZPointer = indexMapZ)
-            fixed (float* centroidsXPointer = centroidsX)
-            fixed (float* centroidsYPointer = centroidsY)
-            fixed (float* centroidsZPointer = centroidsZ)
-            fixed (float* mergedPointer = merged)
+            var intPool = Pool.SpecializeFor<int>();
+            var floatPool = Pool.SpecializeFor<float>();
+            intPool.Take(length, out var indexMapX);
+            intPool.Take(length, out var indexMapY);
+            intPool.Take(length, out var indexMapZ);
+            floatPool.Take(length, out var centroidsX);
+            floatPool.Take(length, out var centroidsY);
+            floatPool.Take(length, out var centroidsZ);
+            Pool.SpecializeFor<BoundingBox>().Take(length, out var merged);
+            //TODO: Would ideally use spans here, rather than assuming managed input. We could check generic type parameters to efficiently get pointers out.
+            fixed (BoundingBox* leafBoundsPointer = &leafBounds[start])
+            fixed (int* indexMapPointer = &outputLeafIndices[start])
             {
                 SweepResources leaves;
                 leaves.Bounds = leafBoundsPointer;
-                leaves.Ids = leafIdsPointer;
                 leaves.IndexMap = indexMapPointer;
-                leaves.IndexMapX = indexMapXPointer;
-                leaves.IndexMapY = indexMapYPointer;
-                leaves.IndexMapZ = indexMapZPointer;
-                leaves.CentroidsX = centroidsXPointer;
-                leaves.CentroidsY = centroidsYPointer;
-                leaves.CentroidsZ = centroidsZPointer;
-                leaves.Merged = (BoundingBox*)mergedPointer;
+                leaves.IndexMapX = (int*)indexMapX.Memory;
+                leaves.IndexMapY = (int*)indexMapY.Memory;
+                leaves.IndexMapZ = (int*)indexMapZ.Memory;
+                leaves.CentroidsX = (float*)centroidsX.Memory;
+                leaves.CentroidsY = (float*)centroidsY.Memory;
+                leaves.CentroidsZ = (float*)centroidsZ.Memory;
+                leaves.Merged = (BoundingBox*)merged.Memory;
 
-                for (int i = 0; i < leafIds.Length; ++i)
+                for (int i = 0; i < length; ++i)
                 {
                     var bounds = leaves.Bounds[i];
                     leaves.IndexMap[i] = i;
@@ -337,36 +304,20 @@ namespace SolverPrototype.CollisionDetection
                     centroidsZ[i] = centroid.Z;
                 }
 
-
                 //Now perform a top-down sweep build.
-                CreateSweepBuilderNode(-1, -1, ref leaves, 0, leafIds.Length);
+                CreateSweepBuilderNode(-1, -1, ref leaves, 0, length);
 
             }
 
 
-            //Return resources.
-            if (floatPool != null)
-            {
-                Array.Clear(centroidsX, 0, leafIds.Length);
-                Array.Clear(centroidsY, 0, leafIds.Length);
-                Array.Clear(centroidsZ, 0, leafIds.Length);
-                Array.Clear(merged, 0, mergedSize);
-                floatPool.GiveBack(centroidsX);
-                floatPool.GiveBack(centroidsY);
-                floatPool.GiveBack(centroidsZ);
-                floatPool.GiveBack(merged);
-            }
-            if (intPool != null)
-            {
-                Array.Clear(indexMap, 0, leafIds.Length);
-                Array.Clear(indexMapX, 0, leafIds.Length);
-                Array.Clear(indexMapY, 0, leafIds.Length);
-                Array.Clear(indexMapZ, 0, leafIds.Length);
-                intPool.GiveBack(indexMap);
-                intPool.GiveBack(indexMapX);
-                intPool.GiveBack(indexMapY);
-                intPool.GiveBack(indexMapZ);
-            }
+            //Return resources.            
+            floatPool.Return(ref centroidsX);
+            floatPool.Return(ref centroidsY);
+            floatPool.Return(ref centroidsZ);            
+            intPool.Return(ref indexMapX);
+            intPool.Return(ref indexMapY);
+            intPool.Return(ref indexMapZ);
+            Pool.SpecializeFor<BoundingBox>().Return(ref merged);
 
         }
     }
