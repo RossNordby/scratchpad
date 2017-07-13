@@ -7,7 +7,7 @@
 //using System.Numerics;
 //using System.Runtime.CompilerServices;
 
-//namespace SolverPrototypeTests
+//namespace SolverPrototypeTests.SpecializedTests
 //{
 //    static class PenetrationConvergenceTests
 //    {
@@ -22,7 +22,7 @@
 //            int constraintCount = bodyCount - 1;
 //            int constraintBundleCount = (int)Math.Ceiling(constraintCount / (double)Vector<float>.Count);
 //            int[] constraintHandles = new int[constraintCount];
-            
+
 //            for (int i = 0; i < constraintCount; ++i)
 //            {
 //                var bodyAIndex = bodies.BodyHandles[handleIndices[i]];

@@ -4,11 +4,11 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 
-namespace SolverPrototypeTests
+namespace SolverPrototypeTests.SpecializedTests
 {
     public static class IslandCacheConvergence
     {
-        struct IslandBlob : SwapHeuristic
+        struct IslandBlob : ISwapHeuristic
         {
             public void Reset()
             {
@@ -44,7 +44,7 @@ namespace SolverPrototypeTests
             }
         }
 
-        struct BlindLocal : SwapHeuristic
+        struct BlindLocal : ISwapHeuristic
         {
             public void Reset()
             {
@@ -75,7 +75,7 @@ namespace SolverPrototypeTests
             }
         }
 
-        interface SwapHeuristic
+        interface ISwapHeuristic
         {
             void Swap(int[] bodies, int islandCount);
             void Reset();
@@ -94,7 +94,7 @@ namespace SolverPrototypeTests
                 Swap(ref bodies[i], ref bodies[random.Next(i)]);
             }
         }
-        private static void Test<T>(int testCount, int islandCount, int islandMaximumBodyCount, int maximumIterationCount, ref T swapHeuristic) where T : SwapHeuristic
+        private static void Test<T>(int testCount, int islandCount, int islandMaximumBodyCount, int maximumIterationCount, ref T swapHeuristic) where T : ISwapHeuristic
         {
             var random = new Random(5);
             int[] islandBodyCounts = new int[islandCount];

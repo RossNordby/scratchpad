@@ -10,7 +10,7 @@ using System.Threading;
 using static SolverPrototype.Solver;
 using Quaternion = BEPUutilities2.Quaternion;
 
-namespace SolverPrototypeTests
+namespace SolverPrototypeTests.SpecializedTests
 {
     static class ConstraintCacheOptimizationTests
     {

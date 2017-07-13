@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Threading;
 
-namespace SolverPrototypeTests
+namespace SolverPrototypeTests.SpecializedTests
 {
     public static class InterlockedOverheadTests
     {

@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using Quaternion = BEPUutilities2.Quaternion;
 
-namespace SolverPrototypeTests
+namespace SolverPrototypeTests.SpecializedTests
 {
     public static class MathTests
     {

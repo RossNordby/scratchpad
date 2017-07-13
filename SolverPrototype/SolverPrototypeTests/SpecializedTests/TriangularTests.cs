@@ -7,7 +7,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace SolverPrototypeTests
+namespace SolverPrototypeTests.SpecializedTests
 {
     public static class TriangularTests
     {

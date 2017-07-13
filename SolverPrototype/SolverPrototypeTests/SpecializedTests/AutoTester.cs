@@ -7,7 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 
-namespace SolverPrototypeTests
+namespace SolverPrototypeTests.SpecializedTests
 {
     public static class AutoTester
     {
