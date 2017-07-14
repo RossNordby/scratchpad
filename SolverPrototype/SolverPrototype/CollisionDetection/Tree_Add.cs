@@ -125,7 +125,7 @@ namespace SolverPrototype.CollisionDetection
                 if (leafCount < 2)
                 {
                     //The best slot will, at best, be tied with inserting it in a leaf node because the change in heuristic cost for filling an empty slot is zero.
-                    InsertLeafIntoEmptySlot(ref box, nodeIndex, leafCount, node);
+                    return InsertLeafIntoEmptySlot(ref box, nodeIndex, leafCount, node);
                 }
                 else
                 {

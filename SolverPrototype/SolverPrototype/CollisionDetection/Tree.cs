@@ -33,7 +33,6 @@ namespace SolverPrototype.CollisionDetection
                 return leafCount;
             }
         }
-        public IdPool<Buffer<int>, BufferPool<int>> LeafSlotsPool;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         int AllocateNode()
@@ -50,9 +49,7 @@ namespace SolverPrototype.CollisionDetection
                 "Any attempt to allocate a leaf should not overrun the allocated leaves. For all operations that allocate leaves, capacity should be preallocated.");
             var leaf = leaves + leafCount;
             *leaf = new Leaf(nodeIndex, childIndex);
-            //While we do track the leaf count for convenience purposes, there is no guarantee 
-            ++leafCount;
-            return LeafSlotsPool.Take();
+            return leafCount++;
         }
 
 
@@ -66,7 +63,6 @@ namespace SolverPrototype.CollisionDetection
                 throw new ArgumentException("Initial leaf capacity must be positive.");
 
             Pool = pool;
-            LeafSlotsPool = new IdPool<Buffer<int>, BufferPool<int>>(pool.SpecializeFor<int>());
             Resize(initialLeafCapacity);
 
         }
@@ -99,13 +95,15 @@ namespace SolverPrototype.CollisionDetection
         public void Resize(int targetLeafSlotCount)
         {
             //Note that it's not safe to resize below the size of potentially used leaves. If the user wants to go smaller, they'll need to explicitly deal with the leaves somehow first.
-            var leafCapacityForTarget = BufferPool<Leaf>.GetLowestContainingElementCount(Math.Max(LeafSlotsPool.HighestPossiblyClaimedId, targetLeafSlotCount));
-            var nodeCapacityForTarget = BufferPool<Node>.GetLowestContainingElementCount(Math.Max(nodeCount, targetLeafSlotCount - 1));
+            var leafCapacityForTarget = BufferPool<Leaf>.GetLowestContainingElementCount(Math.Max(leafCount, targetLeafSlotCount));
+            //Adding incrementally checks the capacity of leaves, and issues a resize if there isn't enough space. But it doesn't check nodes.
+            //You could change that, but for now, we simply ensure that the node array has sufficient room to hold everything in the resized leaf array.
+            var nodeCapacityForTarget = BufferPool<Node>.GetLowestContainingElementCount(Math.Max(nodeCount, leafCapacityForTarget - 1));
             bool wasAllocated = Leaves.Allocated;
             Debug.Assert(Leaves.Allocated == Nodes.Allocated);
             if (leafCapacityForTarget != Leaves.Length)
             {
-                Pool.SpecializeFor<Leaf>().Resize(ref Leaves, leafCapacityForTarget, LeafSlotsPool.HighestPossiblyClaimedId);
+                Pool.SpecializeFor<Leaf>().Resize(ref Leaves, leafCapacityForTarget, leafCount);
                 leaves = (Leaf*)Leaves.Memory;
             }
             if (nodeCapacityForTarget != Nodes.Length)

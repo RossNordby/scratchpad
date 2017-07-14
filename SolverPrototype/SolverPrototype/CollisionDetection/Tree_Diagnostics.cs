@@ -149,10 +149,9 @@ namespace SolverPrototype.CollisionDetection
                 throw new Exception($"Invalid parent pointers on root.");
             }
 
-            int foundLeafCount;
             var standInBounds = new BoundingBox();
 
-            Validate(0, -1, -1, ref standInBounds.Min, ref standInBounds.Max, out foundLeafCount);
+            Validate(0, -1, -1, ref standInBounds.Min, ref standInBounds.Max, out int foundLeafCount);
             if (foundLeafCount != leafCount)
                 throw new Exception($"{foundLeafCount} leaves found in tree, expected {leafCount}.");
 
@@ -171,8 +170,7 @@ namespace SolverPrototype.CollisionDetection
                 ref var child = ref children[i];
                 if (child.Index >= 0)
                 {
-                    int childNodeCount, childChildCount;
-                    MeasureNodeOccupancy(nodes + child.Index, out childNodeCount, out childChildCount);
+                    MeasureNodeOccupancy(nodes + child.Index, out int childNodeCount, out int childChildCount);
                     nodeCount += childNodeCount;
                     childCount += childChildCount;
                 }
@@ -248,9 +246,7 @@ namespace SolverPrototype.CollisionDetection
         }
         public unsafe float MeasureCacheQuality()
         {
-            float nodeScore;
-            int foundNodes, scorableNodeCount;
-            MeasureCacheQuality(0, out foundNodes, out nodeScore, out scorableNodeCount);
+            MeasureCacheQuality(0, out int foundNodes, out float nodeScore, out int scorableNodeCount);
             return scorableNodeCount > 0 ? nodeScore / scorableNodeCount : 1;
 
         }
@@ -259,9 +255,7 @@ namespace SolverPrototype.CollisionDetection
         {
             if (nodeIndex < 0 || nodeIndex >= nodeCount)
                 throw new ArgumentException("Measurement target index must be nonnegative and less than node count.");
-            float nodeScore;
-            int foundNodes, scorableNodeCount;
-            MeasureCacheQuality(nodeIndex, out foundNodes, out nodeScore, out scorableNodeCount);
+            MeasureCacheQuality(nodeIndex, out int foundNodes, out float nodeScore, out int scorableNodeCount);
             return scorableNodeCount > 0 ? nodeScore / scorableNodeCount : 1;
         }
 

@@ -6,6 +6,7 @@ using OpenTK;
 using OpenTK.Input;
 using SolverPrototype;
 using SolverPrototypeTests.Properties;
+using SolverPrototypeTests.SpecializedTests;
 using System;
 using System.IO;
 
@@ -15,6 +16,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            TreeTest.AddRemove();
             Console.ReadKey();
             DefaultTypes.Register();
             var window = new Window("pretty cool multicolored window",
