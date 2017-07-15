@@ -4,6 +4,7 @@ using BEPUutilities2.Memory;
 using SolverPrototype.CollisionDetection;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 
@@ -16,8 +17,10 @@ namespace SolverPrototypeTests.SpecializedTests
             var pool = new BufferPool();
             var tree = new Tree(pool, 128);
 
-            const int leafCountAlongAxis = 12;
-            var leafCount = leafCountAlongAxis * leafCountAlongAxis * leafCountAlongAxis;
+            const int leafCountAlongXAxis = 3;
+            const int leafCountAlongYAxis = 1;
+            const int leafCountAlongZAxis = 1;
+            var leafCount = leafCountAlongXAxis * leafCountAlongYAxis * leafCountAlongZAxis;
             var leafBounds = new BoundingBox[leafCount];
             var handleToLeafIndex = new int[leafCount];
             var leafIndexToHandle = new int[leafCount];
@@ -26,22 +29,35 @@ namespace SolverPrototypeTests.SpecializedTests
             const float spanRange = 2;
             const float boundsSpacing = 3;
             var random = new Random(5);
-            int nextLeafSlotIndex = 0;
-            for (int i = 0; i < leafCountAlongAxis; ++i)
+            for (int i = 0; i < leafCountAlongXAxis; ++i)
             {
-                for (int j = 0; j < leafCountAlongAxis; ++j)
+                for (int j = 0; j < leafCountAlongYAxis; ++j)
                 {
-                    for (int k = 0; k < leafCountAlongAxis; ++k)
+                    for (int k = 0; k < leafCountAlongZAxis; ++k)
                     {
-                        var index = leafCountAlongAxis * leafCountAlongAxis * i + leafCountAlongAxis * j + k;
+                        var index = leafCountAlongXAxis * leafCountAlongYAxis * k + leafCountAlongXAxis * j + i;
                         leafBounds[index].Min = new Vector3(i, j, k) * boundsSpacing;
                         leafBounds[index].Max = leafBounds[index].Min + new Vector3(boundsSpan) +
                             spanRange * new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
-                        var handleIndex = nextLeafSlotIndex++;
-                        handleToLeafIndex[handleIndex] = tree.Add(ref leafBounds[index]);
-                        leafIndexToHandle[handleToLeafIndex[handleIndex]] = handleIndex;
+
                     }
                 }
+            }
+
+            var prebuiltCount = Math.Max(leafCount / 2, 1);
+            tree.SweepBuild(leafBounds, handleToLeafIndex, 0, prebuiltCount);
+            for (int i = 0; i < prebuiltCount; ++i)
+            {
+                leafIndexToHandle[handleToLeafIndex[i]] = i;
+            }
+            tree.Validate();
+
+            
+            for (int i = prebuiltCount; i < leafCount; ++i)
+            {         
+                handleToLeafIndex[i] = tree.Add(ref leafBounds[i]);
+                leafIndexToHandle[handleToLeafIndex[i]] = i;
+
             }
             tree.Validate();
 
@@ -88,7 +104,15 @@ namespace SolverPrototypeTests.SpecializedTests
 
                     tree.Validate();
                 }
+
+                tree.Refit();
+                tree.Validate();
+                
+                //tree.RefitAndRefine(i);
+                tree.Validate();
             }
+
+            pool.Clear();
 
 
         }

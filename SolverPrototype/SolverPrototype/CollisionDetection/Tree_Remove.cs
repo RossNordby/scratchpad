@@ -95,7 +95,7 @@ namespace SolverPrototype.CollisionDetection
             //Further, if a child is moved and if it is a leaf, that leaf's ChildIndex must be updated.
             //If a child is moved and it is an internal node, all immediate children of that node must have their parent nodes updated.
 
-            var survivingChildIndexInNode = leaf.ChildIndex == 0 ? 1 : 0;
+            var survivingChildIndexInNode = leaf.ChildIndex ^ 1;
             ref var survivingChild = ref nodeChildren[survivingChildIndexInNode];
 
             //Check to see if this node should collapse.
@@ -148,11 +148,27 @@ namespace SolverPrototype.CollisionDetection
                     if (survivingChild.Index >= 0)
                     {
                         //The surviving child is an internal node and it should replace the root node.
-                        *nodes = nodes[survivingChild.Index]; //Note that this overwrites the memory pointed to by the otherChild reference.
+                        var pulledNodeIndex = survivingChild.Index;
+                        //TODO: This node movement logic could be unified with other instances of node moving. Nothing too special about the fact that it's the root.
+                        *nodes = nodes[pulledNodeIndex]; //Note that this overwrites the memory pointed to by the otherChild reference.
                         nodes->Parent = -1;
                         nodes->IndexInParent = -1;
-                        nodes[nodes->A.Index].Parent = 0;
-                        nodes[nodes->B.Index].Parent = 0;
+                        //Update the parent pointers of the children of the moved internal node.
+                        for (int i = 0; i < 2; ++i)
+                        {
+                            ref var child = ref (&nodes->A)[i];
+                            if (child.Index >= 0)
+                            {
+                                //Child is an internal node. Note that the index in child doesn't change; we copied the children directly.
+                                nodes[child.Index].Parent = 0;
+                            }
+                            else
+                            {
+                                //Child is a leaf node.
+                                leaves[Encode(child.Index)] = new Leaf(0, i);
+                            }
+                        }
+                        RemoveNodeAt(pulledNodeIndex);
                     }
                     else
                     {

@@ -222,9 +222,11 @@ namespace SolverPrototype.CollisionDetection
             //The root builder would write out its nodes into a new block of memory rather than working in place.
             //If the root builder terminates with a set of subtrees of known leaf counts and known positions, then multithreaded refines will execute on contiguous regions.
             //In other words, at no point is a sort of target nodes required, because they're all computed analytically and they are known to be in cache optimal locations.
-            var comparer = new PrimitiveComparer<int>();
-            QuickSort.Sort(ref internalNodes[0], 0, internalNodes.Count - 1, ref comparer);
-
+            if (internalNodes.Count > 0) //It's possible for there to be no internal nodes if both children of the target node were leaves.
+            {
+                var comparer = new PrimitiveComparer<int>();
+                QuickSort.Sort(ref internalNodes[0], 0, internalNodes.Count - 1, ref comparer);
+            }
         }
 
         

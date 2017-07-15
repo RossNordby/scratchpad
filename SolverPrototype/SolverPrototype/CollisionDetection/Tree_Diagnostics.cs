@@ -148,6 +148,10 @@ namespace SolverPrototype.CollisionDetection
             {
                 throw new Exception($"Invalid parent pointers on root.");
             }
+            if((nodeCount != 1 && leafCount < 2) || (nodeCount != LeafCount - 1 && leafCount >= 2))
+            {
+                throw new Exception($"Invalid node count versus leaf count.");
+            }
 
             var standInBounds = new BoundingBox();
 
