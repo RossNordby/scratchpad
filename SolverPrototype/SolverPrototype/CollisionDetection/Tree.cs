@@ -34,7 +34,7 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         int AllocateNode()
         {
             Debug.Assert(Nodes.Length > nodeCount,
@@ -42,7 +42,7 @@ namespace SolverPrototype.CollisionDetection
             return nodeCount++;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         int AddLeaf(int nodeIndex, int childIndex)
         {
             Debug.Assert(leafCount < Leaves.Length,
@@ -70,7 +70,7 @@ namespace SolverPrototype.CollisionDetection
         //TODO: Could use a constructor or factory that can make it easy to take deserialized tree data without having to rerun a builder or hack with the backing memory.
 
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         static int Encode(int index)
         {
             return -1 - index;
@@ -109,6 +109,9 @@ namespace SolverPrototype.CollisionDetection
             if (nodeCapacityForTarget != Nodes.Length)
             {
                 Pool.SpecializeFor<Node>().Resize(ref Nodes, nodeCapacityForTarget, nodeCount);
+                //A node's RefineFlag must be 0, so just clear out the node set. 
+                //TODO: You could avoid the bulk of this by either a) getting rid of refine flags as a concept or b) using a separate array for the node metadata (a good idea anyway).
+                Nodes.Clear(nodeCount, Nodes.Length - nodeCount);
                 nodes = (Node*)Nodes.Memory;
             }
             if (!wasAllocated)

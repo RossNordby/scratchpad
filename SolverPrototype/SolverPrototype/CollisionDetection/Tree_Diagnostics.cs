@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 
@@ -61,7 +62,7 @@ namespace SolverPrototype.CollisionDetection
             return 0;
 
         }
-
+        
         unsafe void Validate(int nodeIndex, int expectedParentIndex, int expectedIndexInParent, ref Vector3 expectedMin, ref Vector3 expectedMax, out int foundLeafCount)
         {
             var node = nodes + nodeIndex;
@@ -69,6 +70,8 @@ namespace SolverPrototype.CollisionDetection
                 throw new Exception($"Bad parent index on node {nodeIndex}");
             if (node->IndexInParent != expectedIndexInParent)
                 throw new Exception($"Bad index in parent on node {nodeIndex}");
+            if (node->RefineFlag != 0)
+                throw new Exception($"Nonzero refine flag on node {nodeIndex}");
             var children = &node->A;
             foundLeafCount = 0;
             var badMinValue = new Vector3(float.MaxValue);
@@ -133,7 +136,7 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
         }
-
+        
         public unsafe void Validate()
         {
             if (nodeCount < 0)

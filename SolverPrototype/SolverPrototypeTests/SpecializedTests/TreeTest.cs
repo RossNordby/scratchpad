@@ -13,14 +13,15 @@ namespace SolverPrototypeTests.SpecializedTests
 {
     public static class TreeTest
     {
+        [MethodImpl(MethodImplOptions.NoOptimization)]
         public static void AddRemove()
         {
             var pool = new BufferPool();
             var tree = new Tree(pool, 128);
 
-            const int leafCountAlongXAxis = 10;
-            const int leafCountAlongYAxis = 10;
-            const int leafCountAlongZAxis = 10;
+            const int leafCountAlongXAxis = 7;
+            const int leafCountAlongYAxis = 9;
+            const int leafCountAlongZAxis = 11;
             var leafCount = leafCountAlongXAxis * leafCountAlongYAxis * leafCountAlongZAxis;
             var leafBounds = new BoundingBox[leafCount];
             var handleToLeafIndex = new int[leafCount];
@@ -46,12 +47,24 @@ namespace SolverPrototypeTests.SpecializedTests
             }
 
             var prebuiltCount = Math.Max(leafCount / 2, 1);
-            tree.SweepBuild(leafBounds, handleToLeafIndex, 0, prebuiltCount);
+
             for (int i = 0; i < prebuiltCount; ++i)
             {
+                if(i == 7)
+                {
+                    Console.WriteLine("ASDF");
+                }
+                handleToLeafIndex[i] = tree.Add(ref leafBounds[i]);
+                tree.Validate();
                 leafIndexToHandle[handleToLeafIndex[i]] = i;
+
             }
-            tree.Validate();
+            //tree.SweepBuild(leafBounds, handleToLeafIndex, 0, prebuiltCount);
+            //for (int i = 0; i < prebuiltCount; ++i)
+            //{
+            //    leafIndexToHandle[handleToLeafIndex[i]] = i;
+            //}
+            //tree.Validate();
 
 
             for (int i = prebuiltCount; i < leafCount; ++i)
@@ -64,6 +77,11 @@ namespace SolverPrototypeTests.SpecializedTests
 
             const int iterations = 100000;
             const int maximumChangesPerIteration = 20;
+
+            var threadDispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
+            var refineContext = new Tree.RefitAndRefineMultithreadedContext();
+            var selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
+            pool.SpecializeFor<OverlapHandler>().Take(threadDispatcher.ThreadCount, out var overlapHandlers);
             QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), leafCount, out var removedLeafHandles);
             for (int i = 0; i < iterations; ++i)
             {
@@ -120,6 +138,15 @@ namespace SolverPrototypeTests.SpecializedTests
                 tree.GetSelfOverlaps(ref handler);
                 tree.Validate();
 
+                refineContext.RefitAndRefine(tree, threadDispatcher, i);
+                tree.Validate();
+                for (int k = 0; k < threadDispatcher.ThreadCount; ++k)
+                {
+                    overlapHandlers[k] = new OverlapHandler();
+                }
+                selfTestContext.SelfTest(tree, ref overlapHandlers, pool, threadDispatcher);
+                tree.Validate();
+
                 if (i % 50 == 0)
                 {
                     Console.WriteLine($"Cost: {tree.MeasureCostMetric()}");
@@ -128,6 +155,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 }
             }
 
+            threadDispatcher.Dispose();
             pool.Clear();
 
 

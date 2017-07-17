@@ -23,7 +23,6 @@ namespace SolverPrototype.CollisionDetection
             float RefitCostChange;
 
             int RefinementLeafCountThreshold;
-            int EstimatedRefinementCandidateCount;
             Buffer<QuickList<int, Buffer<int>>> RefinementCandidates;
             Action<int> RefitAndMarkAction;
 
@@ -60,19 +59,22 @@ namespace SolverPrototype.CollisionDetection
                 //Note that we create per-thread refinement candidates. That's because candidates are found during the multithreaded refit and mark phase, and 
                 //we don't want to spend the time doing sync work. The candidates are then pruned down to a target single target set for the refine pass.
                 Tree.Pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(threadDispatcher.ThreadCount, out RefinementCandidates);
-                tree.GetRefitAndMarkTuning(out MaximumSubtrees, out EstimatedRefinementCandidateCount, out RefinementLeafCountThreshold);
+                tree.GetRefitAndMarkTuning(out MaximumSubtrees, out var estimatedRefinementCandidateCount, out RefinementLeafCountThreshold);
                 //Note that the number of refit nodes is not necessarily bound by MaximumSubtrees. It is just a heuristic estimate. Resizing has to be supported.
                 QuickList<int, Buffer<int>>.Create(tree.Pool.SpecializeFor<int>(), MaximumSubtrees, out RefitNodes);
-                //Note that we haven't rigorously guaranteed a refinement count maximum, so it's possible that the other threads will need to resize the per-thread refinement candidate lists.
-                //So we don't create the refinement candidate thread lists here; we let the worker do it.
-
-
+                //Note that we haven't rigorously guaranteed a refinement count maximum, so it's possible that the workers will need to resize the per-thread refinement candidate lists.
+                for (int i =0; i < threadDispatcher.ThreadCount; ++i)
+                {
+                    QuickList<int, Buffer<int>>.Create(threadDispatcher.GetThreadMemoryPool(i).SpecializeFor<int>(), estimatedRefinementCandidateCount, out RefinementCandidates[i]);
+                }
+                
                 int multithreadingLeafCountThreshold = Tree.leafCount / (threadDispatcher.ThreadCount * 2);
                 if (multithreadingLeafCountThreshold < RefinementLeafCountThreshold)
                     multithreadingLeafCountThreshold = RefinementLeafCountThreshold;
                 CollectNodesForMultithreadedRefit(0, multithreadingLeafCountThreshold, ref RefitNodes, RefinementLeafCountThreshold, ref RefinementCandidates[0],
                     threadDispatcher.GetThreadMemoryPool(0).SpecializeFor<int>());
 
+                RefitNodeIndex = -1;
                 threadDispatcher.DispatchWorkers(RefitAndMarkAction);
 
                 //Condense the set of candidates into a set of targets.
@@ -116,6 +118,7 @@ namespace SolverPrototype.CollisionDetection
                 }
 
 
+                RefineIndex = -1;
                 threadDispatcher.DispatchWorkers(RefineAction);
 
                 //To multithread this, give each worker a contiguous chunk of nodes. You want to do the biggest chunks possible to chain decent cache behavior as far as possible.
@@ -151,8 +154,6 @@ namespace SolverPrototype.CollisionDetection
 
                 threadDispatcher.DispatchWorkers(CacheOptimizeAction);
 
-                RefitNodeIndex = -1;
-                RefineIndex = -1;
                 for (int i = 0; i < threadDispatcher.ThreadCount; ++i)
                 {
                     //Note the use of the thread memory pool. Each thread allocated their own memory for the list since resizes were possible.
@@ -206,8 +207,8 @@ namespace SolverPrototype.CollisionDetection
             unsafe void RefitAndMark(int workerIndex)
             {
                 //Since resizes may occur, we have to use the thread's buffer pool.
+                //The main thread already created the refinement candidate list using the worker's pool.
                 var threadIntPool = threadDispatcher.GetThreadMemoryPool(workerIndex).SpecializeFor<int>();
-                QuickList<int, Buffer<int>>.Create(threadIntPool, EstimatedRefinementCandidateCount, out RefinementCandidates[workerIndex]);
                 int refitIndex;
                 while ((refitIndex = Interlocked.Increment(ref RefitNodeIndex)) < RefitNodes.Count)
                 {
@@ -343,6 +344,7 @@ namespace SolverPrototype.CollisionDetection
 
                 subtreeReferences.Dispose(threadIntPool);
                 treeletInternalNodes.Dispose(threadIntPool);
+                threadPool.Return(ref buffer);
 
 
             }

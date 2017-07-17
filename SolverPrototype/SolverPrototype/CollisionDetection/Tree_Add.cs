@@ -15,8 +15,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="indexInParent">Index of the child wtihin the parent node that the existing leaf belongs to.</param>
         /// <param name="merged">Bounding box holding both the new and existing leaves.</param>
         /// <returns>Index of the leaf </returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-
+        [MethodImpl(MethodImplOptions.NoInlining)]
         unsafe int MergeLeafNodes(ref BoundingBox newLeafBounds, int parentIndex, int indexInParent, ref BoundingBox merged)
         {
             //It's a leaf node.
@@ -40,7 +39,7 @@ namespace SolverPrototype.CollisionDetection
             b.Index = Encode(leafIndex);
             b.Max = newLeafBounds.Max;
             b.LeafCount = 1;
-
+            
             //Update the old leaf node with the new index information.
             var oldLeafIndex = Encode(newNode->A.Index);
             leaves[oldLeafIndex] = new Leaf(newNodeIndex, 0);
@@ -53,7 +52,7 @@ namespace SolverPrototype.CollisionDetection
             return leafIndex;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         unsafe int InsertLeafIntoEmptySlot(ref BoundingBox leafBox, int nodeIndex, int childIndex, Node* node)
         {
             ++node->ChildCount;
@@ -71,7 +70,7 @@ namespace SolverPrototype.CollisionDetection
             Traverse
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         static void CreateMerged(ref Vector3 minA, ref Vector3 maxA, ref Vector3 minB, ref Vector3 maxB, out BoundingBox merged)
         {
             merged.Min = Vector3.Min(minA, minB);
@@ -79,7 +78,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         private static unsafe BestInsertionChoice ComputeBestInsertionChoice(ref BoundingBox box, ref NodeChild child, out BoundingBox mergedCandidate, out float costChange)
         {
             CreateMerged(ref child.Min, ref child.Max, ref box.Min, ref box.Max, out mergedCandidate);
@@ -102,6 +101,7 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         /// <param name="box">Bounding box of the leaf to add.</param>
         /// <returns>Index of the leaf allocated in the tree's leaf array.</returns>
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public unsafe int Add(ref BoundingBox box)
         {
             //The rest of the function assumes we have sufficient room. We don't want to deal with invalidated pointers mid-add.
@@ -133,6 +133,7 @@ namespace SolverPrototype.CollisionDetection
                     ref var b = ref node->B;
                     var choiceA = ComputeBestInsertionChoice(ref box, ref a, out var mergedA, out var costChangeA);
                     var choiceB = ComputeBestInsertionChoice(ref box, ref b, out var mergedB, out var costChangeB);
+                    Console.WriteLine($"costchangeA: {costChangeA}, b: {costChangeB}");
                     if(costChangeA <= costChangeB)
                     {
                         if(choiceA == BestInsertionChoice.NewInternal)
@@ -166,14 +167,14 @@ namespace SolverPrototype.CollisionDetection
 
             }
         }
-        
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
         internal static float ComputeBoundsMetric(ref BoundingBox bounds)
         {
             return ComputeBoundsMetric(ref bounds.Min, ref bounds.Max);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.NoInlining)]
         internal static float ComputeBoundsMetric(ref Vector3 min, ref Vector3 max)
         {
             //Note that we just use the SAH. While we are primarily interested in volume queries for the purposes of collision detection, the topological difference

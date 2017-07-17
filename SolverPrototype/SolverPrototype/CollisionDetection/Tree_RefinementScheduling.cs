@@ -212,7 +212,7 @@ namespace SolverPrototype.CollisionDetection
 
 
             QuickList<int, Buffer<int>>.Create(intPool, targetRefinementCount, out var refinementTargets);
-            
+
             int index = offset;
             for (int i = 0; i < targetRefinementCount - 1; ++i)
             {
@@ -233,7 +233,7 @@ namespace SolverPrototype.CollisionDetection
 
 
             //Refine all marked targets.
-            
+
             QuickList<int, Buffer<int>>.Create(intPool, maximumSubtrees, out var subtreeReferences);
             QuickList<int, Buffer<int>>.Create(intPool, maximumSubtrees, out var treeletInternalNodes);
 
@@ -251,7 +251,7 @@ namespace SolverPrototype.CollisionDetection
                 nodes[refinementTargets[i]].RefineFlag = 0;
 
             }
-                        
+
             Pool.Return(ref buffer);
             subtreeReferences.Dispose(intPool);
             treeletInternalNodes.Dispose(intPool);
@@ -267,7 +267,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 IncrementalCacheOptimize(i);
             }
-            
+
         }
 
 

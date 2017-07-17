@@ -15,7 +15,7 @@
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <Optimize>True</Optimize>
+    <Optimize>true</Optimize>
     <DefineConstants>TRACE;RELEASE;NETSTANDARD1_4;PROFILE;RELEASE;NETSTANDARD1_4</DefineConstants>
   </PropertyGroup>
 
