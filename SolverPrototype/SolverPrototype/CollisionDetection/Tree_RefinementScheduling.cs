@@ -183,6 +183,9 @@ namespace SolverPrototype.CollisionDetection
 
         public int GetCacheOptimizeTuning(int maximumSubtrees, float costChange, float cacheOptimizeAggressivenessScale)
         {
+            //TODO: Using cost change as the heuristic for cache optimization isn't a great idea. They don't always or even frequently correlate.
+            //The best heuristic would be directly measuring the degree of adjacency. We could do that in the refit. I'm not addressing this yet
+            //because there's a good chance the cache optimization approach will change significantly (for example, refit outputting into a new tree with heuristically perfect layout).
             var cacheOptimizeAggressiveness = Math.Max(0, costChange * cacheOptimizeAggressivenessScale);
             float cacheOptimizePortion = Math.Min(1, 0.03f + 85f * (maximumSubtrees / (float)leafCount) * cacheOptimizeAggressiveness);
             //float cacheOptimizePortion = Math.Min(1, 0.03f + cacheOptimizeAggressiveness * 0.5f);

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace SolverPrototypeTests.SpecializedTests
@@ -17,9 +18,9 @@ namespace SolverPrototypeTests.SpecializedTests
             var pool = new BufferPool();
             var tree = new Tree(pool, 128);
 
-            const int leafCountAlongXAxis = 3;
-            const int leafCountAlongYAxis = 1;
-            const int leafCountAlongZAxis = 1;
+            const int leafCountAlongXAxis = 10;
+            const int leafCountAlongYAxis = 10;
+            const int leafCountAlongZAxis = 10;
             var leafCount = leafCountAlongXAxis * leafCountAlongYAxis * leafCountAlongZAxis;
             var leafBounds = new BoundingBox[leafCount];
             var handleToLeafIndex = new int[leafCount];
@@ -52,9 +53,9 @@ namespace SolverPrototypeTests.SpecializedTests
             }
             tree.Validate();
 
-            
+
             for (int i = prebuiltCount; i < leafCount; ++i)
-            {         
+            {
                 handleToLeafIndex[i] = tree.Add(ref leafBounds[i]);
                 leafIndexToHandle[handleToLeafIndex[i]] = i;
 
@@ -62,59 +63,86 @@ namespace SolverPrototypeTests.SpecializedTests
             tree.Validate();
 
             const int iterations = 100000;
+            const int maximumChangesPerIteration = 20;
             QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), leafCount, out var removedLeafHandles);
             for (int i = 0; i < iterations; ++i)
             {
-                var addedFraction = tree.LeafCount / (float)leafCount;
-                
-                if (random.NextDouble() < addedFraction)
+                var changeCount = random.Next(maximumChangesPerIteration);
+                for (int j = 0; j <= changeCount; ++j)
                 {
-                    //Remove a leaf.
-                    var leafIndexToRemove = random.Next(tree.LeafCount);
-                    var handleToRemove = leafIndexToHandle[leafIndexToRemove];
-                    var movedLeafIndex = tree.RemoveAt(leafIndexToRemove);
-                    if (movedLeafIndex >= 0)
+                    var addedFraction = tree.LeafCount / (float)leafCount;
+                    if (random.NextDouble() < addedFraction)
                     {
-                        //A leaf was moved from the end into the removed leaf's slot.
-                        var movedHandle = leafIndexToHandle[movedLeafIndex];
-                        handleToLeafIndex[movedHandle] = leafIndexToRemove;
-                        leafIndexToHandle[leafIndexToRemove] = movedHandle;
-                        leafIndexToHandle[movedLeafIndex] = -1;
+                        //Remove a leaf.
+                        var leafIndexToRemove = random.Next(tree.LeafCount);
+                        var handleToRemove = leafIndexToHandle[leafIndexToRemove];
+                        var movedLeafIndex = tree.RemoveAt(leafIndexToRemove);
+                        if (movedLeafIndex >= 0)
+                        {
+                            //A leaf was moved from the end into the removed leaf's slot.
+                            var movedHandle = leafIndexToHandle[movedLeafIndex];
+                            handleToLeafIndex[movedHandle] = leafIndexToRemove;
+                            leafIndexToHandle[leafIndexToRemove] = movedHandle;
+                            leafIndexToHandle[movedLeafIndex] = -1;
+                        }
+                        else
+                        {
+                            //The removed leaf was the last one. This leaf index is no longer associated with any existing leaf.
+                            leafIndexToHandle[leafIndexToRemove] = -1;
+                        }
+                        handleToLeafIndex[handleToRemove] = -1;
+
+                        removedLeafHandles.AddUnsafely(handleToRemove);
+
+                        tree.Validate();
                     }
                     else
                     {
-                        //The removed leaf was the last one. This leaf index is no longer associated with any existing leaf.
-                        leafIndexToHandle[leafIndexToRemove] = -1;
+                        //Add a leaf.
+                        var indexInRemovedList = random.Next(removedLeafHandles.Count);
+                        var handleToAdd = removedLeafHandles[indexInRemovedList];
+                        removedLeafHandles.FastRemoveAt(indexInRemovedList);
+                        var leafIndex = tree.Add(ref leafBounds[handleToAdd]);
+                        leafIndexToHandle[leafIndex] = handleToAdd;
+                        handleToLeafIndex[handleToAdd] = leafIndex;
+
+                        tree.Validate();
                     }
-                    handleToLeafIndex[handleToRemove] = -1;
-
-                    removedLeafHandles.AddUnsafely(handleToRemove);
-
-                    tree.Validate();
-                }
-                else
-                {
-                    //Add a leaf.
-                    var indexInRemovedList = random.Next(removedLeafHandles.Count);
-                    var handleToAdd = removedLeafHandles[indexInRemovedList];
-                    removedLeafHandles.FastRemoveAt(indexInRemovedList);
-                    var leafIndex = tree.Add(ref leafBounds[handleToAdd]);
-                    leafIndexToHandle[leafIndex] = handleToAdd;
-                    handleToLeafIndex[handleToAdd] = leafIndex;
-
-                    tree.Validate();
                 }
 
                 tree.Refit();
                 tree.Validate();
-                
-                //tree.RefitAndRefine(i);
+
+                tree.RefitAndRefine(i);
                 tree.Validate();
+
+                var handler = new OverlapHandler();
+                tree.GetSelfOverlaps(ref handler);
+                tree.Validate();
+
+                if (i % 50 == 0)
+                {
+                    Console.WriteLine($"Cost: {tree.MeasureCostMetric()}");
+                    Console.WriteLine($"Cache Quality: {tree.MeasureCacheQuality()}");
+                    Console.WriteLine($"Overlap Count: {handler.OverlapCount}");
+                }
             }
 
             pool.Clear();
 
 
         }
+
+        struct OverlapHandler : IOverlapHandler
+        {
+            public int OverlapCount;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Handle(int indexA, int indexB)
+            {
+                ++OverlapCount;
+            }
+        }
+
     }
 }
