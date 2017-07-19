@@ -133,7 +133,6 @@ namespace SolverPrototype.CollisionDetection
                     ref var b = ref node->B;
                     var choiceA = ComputeBestInsertionChoice(ref box, ref a, out var mergedA, out var costChangeA);
                     var choiceB = ComputeBestInsertionChoice(ref box, ref b, out var mergedB, out var costChangeB);
-                    Console.WriteLine($"costchangeA: {costChangeA}, b: {costChangeB}");
                     if(costChangeA <= costChangeB)
                     {
                         if(choiceA == BestInsertionChoice.NewInternal)

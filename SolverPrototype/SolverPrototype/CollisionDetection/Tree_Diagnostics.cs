@@ -62,7 +62,7 @@ namespace SolverPrototype.CollisionDetection
             return 0;
 
         }
-        
+
         unsafe void Validate(int nodeIndex, int expectedParentIndex, int expectedIndexInParent, ref Vector3 expectedMin, ref Vector3 expectedMax, out int foundLeafCount)
         {
             var node = nodes + nodeIndex;
@@ -77,6 +77,7 @@ namespace SolverPrototype.CollisionDetection
             var badMinValue = new Vector3(float.MaxValue);
             var badMaxValue = new Vector3(float.MinValue);
             BoundingBox merged = new BoundingBox { Min = badMinValue, Max = badMaxValue };
+            Debug.Assert(node->ChildCount == Math.Min(leafCount, 2));
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 ref var child = ref children[i];
@@ -101,11 +102,11 @@ namespace SolverPrototype.CollisionDetection
                     }
                 }
             }
-
+            
             if (expectedParentIndex >= 0 && //Not a root node,
                 (merged.Min != expectedMin || merged.Max != expectedMax))
             {
-                throw new Exception($"Bounds {merged.ToString()}, expected ({expectedMin}, {expectedMax}).");
+                throw new Exception($"{nodeIndex} bounds {merged.ToString()}, expected ({expectedMin}, {expectedMax}).");
             }
         }
 
@@ -136,7 +137,7 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
         }
-        
+
         public unsafe void Validate()
         {
             if (nodeCount < 0)
@@ -151,7 +152,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 throw new Exception($"Invalid parent pointers on root.");
             }
-            if((nodeCount != 1 && leafCount < 2) || (nodeCount != LeafCount - 1 && leafCount >= 2))
+            if ((nodeCount != 1 && leafCount < 2) || (nodeCount != LeafCount - 1 && leafCount >= 2))
             {
                 throw new Exception($"Invalid node count versus leaf count.");
             }

@@ -17,23 +17,23 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             TreeTest.AddRemove();
-            Console.ReadKey();
-            DefaultTypes.Register();
-            var window = new Window("pretty cool multicolored window",
-                new Int2((int)(DisplayDevice.Default.Width * 0.75f), (int)(DisplayDevice.Default.Height * 0.75f)), WindowMode.Windowed);
-            var loop = new GameLoop(window);
-            ContentArchive content;
-            using (var stream = new MemoryStream(Resources.SolverPrototypeTestsContent))
-            {
-                content = ContentArchive.Load(stream);
-            }
-            //var fontContent = content.Load<FontContent>(@"Content\Courier Prime Sans.ttf");
-            var fontContent = content.Load<FontContent>(@"Content\Carlito-Regular.ttf");
-            var font = new Font(loop.Surface.Device, loop.Surface.Context, fontContent);
-            var demo = new DemoHarness(window, loop.Input, loop.Camera, font);
-            loop.Run(demo);
-            loop.Dispose();
-            window.Dispose();
+            //Console.ReadKey();
+            //DefaultTypes.Register();
+            //var window = new Window("pretty cool multicolored window",
+            //    new Int2((int)(DisplayDevice.Default.Width * 0.75f), (int)(DisplayDevice.Default.Height * 0.75f)), WindowMode.Windowed);
+            //var loop = new GameLoop(window);
+            //ContentArchive content;
+            //using (var stream = new MemoryStream(Resources.SolverPrototypeTestsContent))
+            //{
+            //    content = ContentArchive.Load(stream);
+            //}
+            ////var fontContent = content.Load<FontContent>(@"Content\Courier Prime Sans.ttf");
+            //var fontContent = content.Load<FontContent>(@"Content\Carlito-Regular.ttf");
+            //var font = new Font(loop.Surface.Device, loop.Surface.Context, fontContent);
+            //var demo = new DemoHarness(window, loop.Input, loop.Camera, font);
+            //loop.Run(demo);
+            //loop.Dispose();
+            //window.Dispose();
 
             //ReinterpretVectorRepro.Test();
             //TriangularTests.Test();
