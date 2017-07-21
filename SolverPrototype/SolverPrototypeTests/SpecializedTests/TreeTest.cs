@@ -14,176 +14,145 @@ namespace SolverPrototypeTests.SpecializedTests
 {
     public static class TreeTest
     {
-        struct BoundingBoxTest
-        {
-            public Vector3 Min;
-            public Vector3 Max;
-
-            public override int GetHashCode()
-            {
-                return Min.GetHashCode() + Max.GetHashCode();
-            }
-        }
-        public static void Test()
-        {
-            var box = new BoundingBoxTest();
-            box.Min = Vector3.Min(box.Min, box.Min);
-            var hmm = box.GetHashCode();
-        }
-
-
-        //[MethodImpl(MethodImplOptions.NoOptimization)]
         public static void AddRemove()
         {
-            //var pool = new BufferPool();
-            //var tree = new Tree(pool, 128);
-            var someMemory = new int[1];
-            var someMoreMemory = new int[1];
-            Test();
-            someMoreMemory[someMemory[0]] = 0;
+            var pool = new BufferPool();
+            var tree = new Tree(pool, 128);
 
-            //Console.WriteLine("hmm.");
-            //var pool = new BufferPool();
-            //var tree = new Tree(pool, 128);
+            const int leafCountAlongXAxis = 11;
+            const int leafCountAlongYAxis = 13;
+            const int leafCountAlongZAxis = 15;
+            var leafCount = leafCountAlongXAxis * leafCountAlongYAxis * leafCountAlongZAxis;
+            var leafBounds = new BoundingBox[leafCount];
+            var handleToLeafIndex = new int[leafCount];
+            var leafIndexToHandle = new int[leafCount];
 
-            //const int leafCountAlongXAxis = 7;
-            //const int leafCountAlongYAxis = 9;
-            //const int leafCountAlongZAxis = 11;
-            //var leafCount = leafCountAlongXAxis * leafCountAlongYAxis * leafCountAlongZAxis;
-            //var leafBounds = new BoundingBox[leafCount];
-            //var handleToLeafIndex = new int[leafCount];
-            //var leafIndexToHandle = new int[leafCount];
+            const float boundsSpan = 2;
+            const float spanRange = 2;
+            const float boundsSpacing = 3;
+            var random = new Random(5);
+            for (int i = 0; i < leafCountAlongXAxis; ++i)
+            {
+                for (int j = 0; j < leafCountAlongYAxis; ++j)
+                {
+                    for (int k = 0; k < leafCountAlongZAxis; ++k)
+                    {
+                        var index = leafCountAlongXAxis * leafCountAlongYAxis * k + leafCountAlongXAxis * j + i;
+                        leafBounds[index].Min = new Vector3(i, j, k) * boundsSpacing;
+                        leafBounds[index].Max = leafBounds[index].Min + new Vector3(boundsSpan) +
+                            spanRange * new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
 
-            //const float boundsSpan = 2;
-            //const float spanRange = 2;
-            //const float boundsSpacing = 3;
-            //var random = new Random(5);
-            //for (int i = 0; i < leafCountAlongXAxis; ++i)
-            //{
-            //    for (int j = 0; j < leafCountAlongYAxis; ++j)
-            //    {
-            //        for (int k = 0; k < leafCountAlongZAxis; ++k)
-            //        {
-            //            var index = leafCountAlongXAxis * leafCountAlongYAxis * k + leafCountAlongXAxis * j + i;
-            //            leafBounds[index].Min = new Vector3(i, j, k) * boundsSpacing;
-            //            leafBounds[index].Max = leafBounds[index].Min + new Vector3(boundsSpan) +
-            //                spanRange * new Vector3((float)random.NextDouble(), (float)random.NextDouble(), (float)random.NextDouble());
+                    }
+                }
+            }
 
-            //        }
-            //    }
-            //}
-
-            //var prebuiltCount = Math.Max(leafCount / 2, 1);
+            var prebuiltCount = Math.Max(leafCount / 2, 1);
 
             //for (int i = 0; i < prebuiltCount; ++i)
-            //{
-            //    //if (i == 2)
-            //    //{
-            //    //    Console.WriteLine("ASDF");
-            //    //}
-            //    //handleToLeafIndex[i] = tree.Add(ref leafBounds[i]);
-            //    Test();
-            //    leafIndexToHandle[handleToLeafIndex[i]] = i;
-
-            //}
-            //tree.SweepBuild(leafBounds, handleToLeafIndex, 0, prebuiltCount);
-            //for (int i = 0; i < prebuiltCount; ++i)
-            //{
-            //    leafIndexToHandle[handleToLeafIndex[i]] = i;
-            //}
-            //tree.Validate();
-
-
-            //for (int i = prebuiltCount; i < leafCount; ++i)
             //{
             //    handleToLeafIndex[i] = tree.Add(ref leafBounds[i]);
+            //    tree.Validate();
             //    leafIndexToHandle[handleToLeafIndex[i]] = i;
 
             //}
-            //Validate(tree);
+            tree.SweepBuild(leafBounds, handleToLeafIndex, 0, prebuiltCount);
+            for (int i = 0; i < prebuiltCount; ++i)
+            {
+                leafIndexToHandle[handleToLeafIndex[i]] = i;
+            }
+            tree.Validate();
 
-            //const int iterations = 100000;
-            //const int maximumChangesPerIteration = 20;
 
-            //var threadDispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
-            //var refineContext = new Tree.RefitAndRefineMultithreadedContext();
-            //var selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
-            //pool.SpecializeFor<OverlapHandler>().Take(threadDispatcher.ThreadCount, out var overlapHandlers);
-            //QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), leafCount, out var removedLeafHandles);
-            //for (int i = 0; i < iterations; ++i)
-            //{
-            //    var changeCount = random.Next(maximumChangesPerIteration);
-            //    for (int j = 0; j <= changeCount; ++j)
-            //    {
-            //        var addedFraction = tree.LeafCount / (float)leafCount;
-            //        if (random.NextDouble() < addedFraction)
-            //        {
-            //            //Remove a leaf.
-            //            var leafIndexToRemove = random.Next(tree.LeafCount);
-            //            var handleToRemove = leafIndexToHandle[leafIndexToRemove];
-            //            var movedLeafIndex = tree.RemoveAt(leafIndexToRemove);
-            //            if (movedLeafIndex >= 0)
-            //            {
-            //                //A leaf was moved from the end into the removed leaf's slot.
-            //                var movedHandle = leafIndexToHandle[movedLeafIndex];
-            //                handleToLeafIndex[movedHandle] = leafIndexToRemove;
-            //                leafIndexToHandle[leafIndexToRemove] = movedHandle;
-            //                leafIndexToHandle[movedLeafIndex] = -1;
-            //            }
-            //            else
-            //            {
-            //                //The removed leaf was the last one. This leaf index is no longer associated with any existing leaf.
-            //                leafIndexToHandle[leafIndexToRemove] = -1;
-            //            }
-            //            handleToLeafIndex[handleToRemove] = -1;
+            for (int i = prebuiltCount; i < leafCount; ++i)
+            {
+                handleToLeafIndex[i] = tree.Add(ref leafBounds[i]);
+                leafIndexToHandle[handleToLeafIndex[i]] = i;
 
-            //            removedLeafHandles.AddUnsafely(handleToRemove);
+            }
+            tree.Validate();
 
-            //            Validate(tree);
-            //        }
-            //        else
-            //        {
-            //            //Add a leaf.
-            //            var indexInRemovedList = random.Next(removedLeafHandles.Count);
-            //            var handleToAdd = removedLeafHandles[indexInRemovedList];
-            //            removedLeafHandles.FastRemoveAt(indexInRemovedList);
-            //            var leafIndex = tree.Add(ref leafBounds[handleToAdd]);
-            //            leafIndexToHandle[leafIndex] = handleToAdd;
-            //            handleToLeafIndex[handleToAdd] = leafIndex;
+            const int iterations = 100000;
+            const int maximumChangesPerIteration = 20;
 
-            //            Validate(tree);
-            //        }
-            //    }
+            var threadDispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
+            var refineContext = new Tree.RefitAndRefineMultithreadedContext();
+            var selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
+            pool.SpecializeFor<OverlapHandler>().Take(threadDispatcher.ThreadCount, out var overlapHandlers);
+            QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), leafCount, out var removedLeafHandles);
+            for (int i = 0; i < iterations; ++i)
+            {
+                var changeCount = random.Next(maximumChangesPerIteration);
+                for (int j = 0; j <= changeCount; ++j)
+                {
+                    var addedFraction = tree.LeafCount / (float)leafCount;
+                    if (random.NextDouble() < addedFraction)
+                    {
+                        //Remove a leaf.
+                        var leafIndexToRemove = random.Next(tree.LeafCount);
+                        var handleToRemove = leafIndexToHandle[leafIndexToRemove];
+                        var movedLeafIndex = tree.RemoveAt(leafIndexToRemove);
+                        if (movedLeafIndex >= 0)
+                        {
+                            //A leaf was moved from the end into the removed leaf's slot.
+                            var movedHandle = leafIndexToHandle[movedLeafIndex];
+                            handleToLeafIndex[movedHandle] = leafIndexToRemove;
+                            leafIndexToHandle[leafIndexToRemove] = movedHandle;
+                            leafIndexToHandle[movedLeafIndex] = -1;
+                        }
+                        else
+                        {
+                            //The removed leaf was the last one. This leaf index is no longer associated with any existing leaf.
+                            leafIndexToHandle[leafIndexToRemove] = -1;
+                        }
+                        handleToLeafIndex[handleToRemove] = -1;
 
-            //    tree.Refit();
-            //    Validate(tree);
+                        removedLeafHandles.AddUnsafely(handleToRemove);
 
-            //    tree.RefitAndRefine(i);
-            //    Validate(tree);
+                        tree.Validate();
+                    }
+                    else
+                    {
+                        //Add a leaf.
+                        var indexInRemovedList = random.Next(removedLeafHandles.Count);
+                        var handleToAdd = removedLeafHandles[indexInRemovedList];
+                        removedLeafHandles.FastRemoveAt(indexInRemovedList);
+                        var leafIndex = tree.Add(ref leafBounds[handleToAdd]);
+                        leafIndexToHandle[leafIndex] = handleToAdd;
+                        handleToLeafIndex[handleToAdd] = leafIndex;
 
-            //    var handler = new OverlapHandler();
-            //    tree.GetSelfOverlaps(ref handler);
-            //    Validate(tree);
+                        tree.Validate();
+                    }
+                }
 
-            //    refineContext.RefitAndRefine(tree, threadDispatcher, i);
-            //    Validate(tree);
-            //    for (int k = 0; k < threadDispatcher.ThreadCount; ++k)
-            //    {
-            //        overlapHandlers[k] = new OverlapHandler();
-            //    }
-            //    selfTestContext.SelfTest(tree, ref overlapHandlers, pool, threadDispatcher);
-            //    Validate(tree);
+                tree.Refit();
+                tree.Validate();
 
-            //    if (i % 50 == 0)
-            //    {
-            //        Console.WriteLine($"Cost: {tree.MeasureCostMetric()}");
-            //        Console.WriteLine($"Cache Quality: {tree.MeasureCacheQuality()}");
-            //        Console.WriteLine($"Overlap Count: {handler.OverlapCount}");
-            //    }
-            //}
+                tree.RefitAndRefine(i);
+                tree.Validate();
 
-            //threadDispatcher.Dispose();
-            //pool.Clear();
+                var handler = new OverlapHandler();
+                tree.GetSelfOverlaps(ref handler);
+                tree.Validate();
+
+                refineContext.RefitAndRefine(tree, threadDispatcher, i);
+                tree.Validate();
+                for (int k = 0; k < threadDispatcher.ThreadCount; ++k)
+                {
+                    overlapHandlers[k] = new OverlapHandler();
+                }
+                selfTestContext.SelfTest(tree, ref overlapHandlers, pool, threadDispatcher);
+                tree.Validate();
+
+                if (i % 50 == 0)
+                {
+                    Console.WriteLine($"Cost: {tree.MeasureCostMetric()}");
+                    Console.WriteLine($"Cache Quality: {tree.MeasureCacheQuality()}");
+                    Console.WriteLine($"Overlap Count: {handler.OverlapCount}");
+                }
+            }
+
+            threadDispatcher.Dispose();
+            pool.Clear();
 
 
         }

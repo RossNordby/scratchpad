@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -76,14 +77,15 @@ namespace SolverPrototype.CollisionDetection
             foundLeafCount = 0;
             var badMinValue = new Vector3(float.MaxValue);
             var badMaxValue = new Vector3(float.MinValue);
-            BoundingBox merged = new BoundingBox { Min = badMinValue, Max = badMaxValue };
+            var mergedMin = badMinValue; //Note- using isolated vectors instead of actual BoundingBox here to avoid a compiler bug: https://github.com/dotnet/coreclr/issues/12950
+            var mergedMax = badMaxValue;
             Debug.Assert(node->ChildCount == Math.Min(leafCount, 2));
             for (int i = 0; i < node->ChildCount; ++i)
             {
                 ref var child = ref children[i];
                 if (child.Min == badMinValue || child.Max == badMaxValue)
                     throw new Exception($"Node {nodeIndex} child {i} has a bad bounding box.");
-                BoundingBox.CreateMerged(ref merged.Min, ref merged.Max, ref child.Min, ref child.Max, out merged.Min, out merged.Max);
+                BoundingBox.CreateMerged(ref mergedMin, ref mergedMax, ref child.Min, ref child.Max, out mergedMin, out mergedMax);
                 if (child.Index >= 0)
                 {
                     if (child.Index >= nodeCount)
@@ -104,9 +106,9 @@ namespace SolverPrototype.CollisionDetection
             }
             
             if (expectedParentIndex >= 0 && //Not a root node,
-                (merged.Min != expectedMin || merged.Max != expectedMax))
+                (mergedMin != expectedMin || mergedMax != expectedMax))
             {
-                throw new Exception($"{nodeIndex} bounds {merged.ToString()}, expected ({expectedMin}, {expectedMax}).");
+                throw new Exception($"{nodeIndex} bounds {mergedMin}, {mergedMax}, expected ({expectedMin}, {expectedMax}).");
             }
         }
 

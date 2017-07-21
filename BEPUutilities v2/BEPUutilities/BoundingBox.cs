@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace BEPUutilities2
@@ -10,16 +11,20 @@ namespace BEPUutilities2
     /// <summary>
     /// Provides XNA-like axis-aligned bounding box functionality.
     /// </summary>
+    //NOTE: The explicit size avoids https://github.com/dotnet/coreclr/issues/12950
+    [StructLayout(LayoutKind.Explicit, Size = 32)] 
     public struct BoundingBox
     {
         /// <summary>
         /// Location with the lowest X, Y, and Z coordinates in the axis-aligned bounding box.
         /// </summary>
+        [FieldOffset(0)]
         public Vector3 Min;
 
         /// <summary>
         /// Location with the highest X, Y, and Z coordinates in the axis-aligned bounding box.
         /// </summary>
+        [FieldOffset(16)]
         public Vector3 Max;
 
         /// <summary>
