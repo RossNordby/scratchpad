@@ -50,7 +50,7 @@ namespace SolverPrototype
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
-            BroadPhase = new BroadPhase();
+            BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
         }
 
@@ -84,9 +84,10 @@ namespace SolverPrototype
                 var typeIndex = bodyDescription.Collidable.Shape.Type;
                 var shapeIndex = bodyDescription.Collidable.Shape.Index;
                 //Note: the min and max here are in absolute coordinates, which means this is a spot that has to be updated in the event that positions use a higher precision representation.
-                Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out var min, out var max);
+                BoundingBox bodyBounds;
+                Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out bodyBounds.Min, out bodyBounds.Max);
                 Bodies.Collidables[Bodies.HandleToIndex[handle]].BroadPhaseIndex =
-                    BroadPhase.Add(new CollidableReference(true, typeIndex, shapeIndex), ref min, ref max);
+                    BroadPhase.Add(new CollidableReference(true, typeIndex, shapeIndex), ref bodyBounds);
             }
             return handle;
         }
@@ -304,7 +305,7 @@ namespace SolverPrototype
             Bodies.Dispose();
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();
-            //TODO: shapes/collidables
+            //TODO: shapes/broadphase
         }
     }
 }

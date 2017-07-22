@@ -79,7 +79,7 @@ namespace DemoRenderer.Constraints
         {
             //Note that not every leaf index is occupied. Leaf indices are designed to be like handles, so that user code doesn't need to be aware of memory layout changes
             //when a collidable is removed. That means we'll be scanning some leaves that do not exist, but that's fine.
-            var possibleLeafCount = simulation.BroadPhase.HighestPossibleLeafIndex + 1;
+            var possibleLeafCount = simulation.BroadPhase.ActiveTree.LeafCount;
             lines.EnsureCapacity(lines.Count + 12 * possibleLeafCount, new PassthroughArrayPool<LineInstance>());
             var maximumJobCount = jobsPerThread * Environment.ProcessorCount;
             var possibleLeavesPerJob = possibleLeafCount / maximumJobCount;

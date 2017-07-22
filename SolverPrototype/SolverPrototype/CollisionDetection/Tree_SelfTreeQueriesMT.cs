@@ -61,32 +61,32 @@ namespace SolverPrototype.CollisionDetection
                 pairTestAction = PairTest;
             }
 
-            Buffer<TOverlapHandler> overlapHandlers;
+            TOverlapHandler[] overlapHandlers;
 
-            public void SelfTest(Tree tree, ref Buffer<TOverlapHandler> overlapHandlers, BufferPool pool, IThreadDispatcher threadDispatcher)
+            public void SelfTest(Tree tree, TOverlapHandler[] overlapHandlers, IThreadDispatcher threadDispatcher)
             {
                 //If there are not multiple children, there's no need to recurse.
                 //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
                 if (tree.leafCount < 2)
                     return;
 
-                Debug.Assert(overlapHandlers.Allocated && overlapHandlers.Length >= threadDispatcher.ThreadCount);
+                Debug.Assert(overlapHandlers.Length >= threadDispatcher.ThreadCount);
                 const float jobMultiplier = 1.5f;
                 var targetJobCount = Math.Max(1, jobMultiplier * threadDispatcher.ThreadCount);
                 leafThreshold = (int)(tree.leafCount / targetJobCount);
                 this.overlapHandlers = overlapHandlers;
                 this.tree = tree;
-                this.overlapPool = pool.SpecializeFor<Overlap>();
-                QuickList<Overlap, Buffer<Overlap>>.Create(pool.SpecializeFor<Overlap>(), (int)(targetJobCount * 2), out nodePairsToTest);
+                this.overlapPool = tree.Pool.SpecializeFor<Overlap>();
+                QuickList<Overlap, Buffer<Overlap>>.Create(tree.Pool.SpecializeFor<Overlap>(), (int)(targetJobCount * 2), out nodePairsToTest);
                 NextNodePair = -1;
                 //Collect jobs.
                 CollectJobsInNode(0, tree.leafCount, ref overlapHandlers[0]);
                 //Do the jobs!
                 threadDispatcher.DispatchWorkers(pairTestAction);
-                nodePairsToTest.Dispose(pool.SpecializeFor<Overlap>());
+                nodePairsToTest.Dispose(tree.Pool.SpecializeFor<Overlap>());
                 this.tree = null;
                 this.overlapPool = default(BufferPool<Overlap>);
-                this.overlapHandlers = default(Buffer<TOverlapHandler>);
+                this.overlapHandlers = null;
             }
 
             unsafe void PairTest(int workerIndex)
@@ -199,7 +199,7 @@ namespace SolverPrototype.CollisionDetection
                     results.Handle(Encode(a.Index), Encode(b.Index));
                 }
             }
-            
+
             unsafe void GetJobsBetweenDifferentNodes(Node* a, Node* b, ref TOverlapHandler results)
             {
                 //There are no shared children, so test them all.
@@ -234,7 +234,7 @@ namespace SolverPrototype.CollisionDetection
 
             unsafe void CollectJobsInNode(int nodeIndex, int leafCount, ref TOverlapHandler results)
             {
-                if(leafCount <= leafThreshold)
+                if (leafCount <= leafThreshold)
                 {
                     nodePairsToTest.Add(new Overlap { A = nodeIndex, B = nodeIndex }, overlapPool);
                     return;
@@ -250,7 +250,7 @@ namespace SolverPrototype.CollisionDetection
                     CollectJobsInNode(a.Index, a.LeafCount, ref results);
                 if (b.Index >= 0)
                     CollectJobsInNode(b.Index, b.LeafCount, ref results);
-                
+
                 if (ab)
                 {
                     DispatchTestForNodes(ref a, ref b, ref results);

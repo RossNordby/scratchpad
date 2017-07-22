@@ -11,7 +11,7 @@ namespace SolverPrototype.CollisionDetection
         public BufferPool Pool;
         public Buffer<Node> Nodes;
         //We cache a raw pointer for now. Buffer indexing isn't completely free yet. Also, this implementation was originally developed on raw pointers, so changing it would require effort.
-        Node* nodes;
+        internal Node* nodes;
         int nodeCount;
         public int NodeCount
         {

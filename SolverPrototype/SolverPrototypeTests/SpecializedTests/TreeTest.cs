@@ -77,7 +77,7 @@ namespace SolverPrototypeTests.SpecializedTests
             var threadDispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
             var refineContext = new Tree.RefitAndRefineMultithreadedContext();
             var selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
-            pool.SpecializeFor<OverlapHandler>().Take(threadDispatcher.ThreadCount, out var overlapHandlers);
+            var overlapHandlers = new OverlapHandler[threadDispatcher.ThreadCount];
             QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), leafCount, out var removedLeafHandles);
             for (int i = 0; i < iterations; ++i)
             {
@@ -140,7 +140,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 {
                     overlapHandlers[k] = new OverlapHandler();
                 }
-                selfTestContext.SelfTest(tree, ref overlapHandlers, pool, threadDispatcher);
+                selfTestContext.SelfTest(tree, overlapHandlers, threadDispatcher);
                 tree.Validate();
 
                 if (i % 50 == 0)
