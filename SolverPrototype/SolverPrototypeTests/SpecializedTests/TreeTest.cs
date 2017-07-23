@@ -14,7 +14,7 @@ namespace SolverPrototypeTests.SpecializedTests
 {
     public static class TreeTest
     {
-        public static void AddRemove()
+        public static void Test()
         {
             var pool = new BufferPool();
             var tree = new Tree(pool, 128);

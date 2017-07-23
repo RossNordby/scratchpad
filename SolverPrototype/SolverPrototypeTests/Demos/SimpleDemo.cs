@@ -1,6 +1,8 @@
 ﻿using DemoRenderer;
 using SolverPrototype;
 using SolverPrototype.Collidables;
+using SolverPrototype.Constraints;
+using SolverPrototypeTests.SpecializedTests;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
@@ -23,6 +25,7 @@ namespace SolverPrototypeTests
                 new BallSocketConstraintBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
+            SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100000, bodyHandles, constraintHandles);
             //BodyVelocity velocity;
             //velocity.Linear = new Vector3(1, 0, 0);
             //velocity.Angular = new Vector3();

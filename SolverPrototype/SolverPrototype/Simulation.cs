@@ -47,10 +47,10 @@ namespace SolverPrototype
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
-            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, ConstraintGraph, Solver, bufferPool);
+            BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
+            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
-            BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
         }
 
@@ -75,7 +75,8 @@ namespace SolverPrototype
         public int Add(ref BodyDescription bodyDescription)
         {
             var handle = Bodies.Add(ref bodyDescription);
-            ConstraintGraph.AddBodyList(Bodies.HandleToIndex[handle]);
+            var bodyIndex = Bodies.HandleToIndex[handle];
+            ConstraintGraph.AddBodyList(bodyIndex);
             if (bodyDescription.Collidable.Shape.Exists)
             {
                 //This body has a collidable; stick it in the broadphase.
@@ -87,7 +88,7 @@ namespace SolverPrototype
                 BoundingBox bodyBounds;
                 Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out bodyBounds.Min, out bodyBounds.Max);
                 Bodies.Collidables[Bodies.HandleToIndex[handle]].BroadPhaseIndex =
-                    BroadPhase.Add(new CollidableReference(true, typeIndex, shapeIndex), ref bodyBounds);
+                    BroadPhase.Add(new CollidableReference(true, typeIndex, bodyIndex), ref bodyBounds);
             }
             return handle;
         }
@@ -102,13 +103,30 @@ namespace SolverPrototype
             if (collidable.Shape.Exists)
             {
                 //The collidable exists, so it should be removed from the broadphase.
-                BroadPhase.RemoveAt(collidable.BroadPhaseIndex);
+                var removedBroadPhaseIndex = collidable.BroadPhaseIndex;
+                if (BroadPhase.RemoveAt(removedBroadPhaseIndex, out var movedLeaf))
+                {
+                    //When a leaf is removed from the broad phase, another leaf will move to take its place in the leaf set.
+                    //We must update the collidable->leaf index pointer to match the new position of the leaf in the broadphase.
+                    //There are three possible cases for the moved leaf:
+                    //1) it is an active body collidable,
+                    //2) it is an inactive body collidable,
+                    //3) it is a static collidable.
+                    //The collidable reference we retrieved tells us whether it's a body or a static.
+                    //In the event that it's a body, we can infer the activity state from the body we just removed. Any body within the same 'leaf space' as the removed body
+                    //shares its activity state. This involves some significant conceptual coupling with the broad phase's implementation, but that's a price we're willing to pay
+                    //if it avoids extraneous data storage.
+                    //TODO: When deactivation exists, this will need to be updated to accommodate it.
+                    //TODO: When non-body static collidables exist, this will need to be updated.
+                    Bodies.Collidables[movedLeaf.CollidableIndex].BroadPhaseIndex = removedBroadPhaseIndex;
+                }
+
             }
             if (Bodies.RemoveAt(bodyIndex, out var movedBodyOriginalIndex))
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, ConstraintGraph, Solver);
+                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BroadPhase, ConstraintGraph, Solver);
             }
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);

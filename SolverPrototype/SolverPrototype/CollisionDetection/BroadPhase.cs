@@ -15,7 +15,7 @@ namespace SolverPrototype.CollisionDetection
     {
         //For now, we only have an active tree. Later on, we'll need two trees- the second one represents all objects that do not move.
         //That one would cover static or inactive collidables.
-        Buffer<CollidableReference> activeLeaves;
+        internal Buffer<CollidableReference> activeLeaves;
         public Tree ActiveTree;
         Tree.MultithreadedSelfTest<OverlapHandler> selfTestContext;
         Tree.RefitAndRefineMultithreadedContext refineContext;
@@ -38,10 +38,18 @@ namespace SolverPrototype.CollisionDetection
             return leafIndex;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void RemoveAt(int index)
+        public bool RemoveAt(int index, out CollidableReference movedLeaf)
         {
             Debug.Assert(index >= 0);
-
+            var movedLeafIndex = ActiveTree.RemoveAt(index);
+            if (movedLeafIndex >= 0)
+            {
+                movedLeaf = activeLeaves[movedLeafIndex];
+                activeLeaves[index] = movedLeaf;
+                return true;
+            }
+            movedLeaf = new CollidableReference();
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -52,6 +60,12 @@ namespace SolverPrototype.CollisionDetection
             minPointer = &nodeChild->Min.X;
             maxPointer = &nodeChild->Max.X;
         }
+
+        internal void UpdateForCollidableMemoryMove(int broadPhaseIndex, int newCollidableIndex)
+        {
+            activeLeaves[broadPhaseIndex].CollidableIndex = newCollidableIndex;
+        }
+
         //Note that some systems (like the demos renderer bounding box line extractor) iterate over the leaves. However, they're not contiguously stored.
         //So, the user needs a way to know if the leaf index exists. Hence, a 'try' variant. If there happen to be more use cases for checking existence, a
         //dedicated 'leafexists' method would probably be a better idea.

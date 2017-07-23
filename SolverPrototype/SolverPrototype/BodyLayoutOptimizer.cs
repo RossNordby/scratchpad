@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using BEPUutilities2;
 using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
 
 namespace SolverPrototype
 {
@@ -17,6 +18,7 @@ namespace SolverPrototype
     public partial class BodyLayoutOptimizer
     {
         Bodies bodies;
+        BroadPhase broadPhase;
         ConstraintConnectivityGraph graph;
         Solver solver;
 
@@ -39,9 +41,10 @@ namespace SolverPrototype
         }
 
         Action<int> incrementalOptimizeWorkDelegate;
-        public BodyLayoutOptimizer(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
+        public BodyLayoutOptimizer(Bodies bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
         {
             this.bodies = bodies;
+            this.broadPhase = broadPhase;
             this.graph = graph;
             this.solver = solver;
             OptimizationFraction = optimizationFraction;
@@ -50,7 +53,7 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void UpdateForBodyMemoryMove(int bodyIndex, int newBodyIndex, Bodies bodies, ConstraintConnectivityGraph graph, Solver solver)
+        public static void UpdateForBodyMemoryMove(int bodyIndex, int newBodyIndex, Bodies bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver)
         {
             ref var list = ref graph.GetConstraintList(bodyIndex);
             for (int i = 0; i < list.Count; ++i)
@@ -58,17 +61,17 @@ namespace SolverPrototype
                 ref var constraint = ref list[i];
                 solver.UpdateForBodyMemoryMove(constraint.ConnectingConstraintHandle, constraint.BodyIndexInConstraint, newBodyIndex);
             }
-
+            broadPhase.UpdateForCollidableMemoryMove(bodies.Collidables[newBodyIndex].BroadPhaseIndex, newBodyIndex);
         }
 
-        public static void SwapBodyLocation(Bodies bodies, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
+        public static void SwapBodyLocation(Bodies bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
         {
             Debug.Assert(a != b, "Swapping a body with itself isn't meaningful. Whaddeyer doin?");
             //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
             //Note that references to both bodies must be changed- both bodies moved!
             //This function does not update the actual position of the list in the graph, so we can modify both without worrying about invalidating indices.
-            UpdateForBodyMemoryMove(a, b, bodies, graph, solver);
-            UpdateForBodyMemoryMove(b, a, bodies, graph, solver);
+            UpdateForBodyMemoryMove(a, b, bodies, broadPhase, graph, solver);
+            UpdateForBodyMemoryMove(b, a, bodies, broadPhase, graph, solver);
 
             //Update the body and graph locations.
             bodies.Swap(a, b);
@@ -80,6 +83,7 @@ namespace SolverPrototype
         struct IncrementalEnumerator : IForEach<int>
         {
             public Bodies bodies;
+            public BroadPhase broadPhase;
             public ConstraintConnectivityGraph graph;
             public Solver solver;
             public int slotIndex;
@@ -103,7 +107,7 @@ namespace SolverPrototype
                     //Note that graph.EnumerateConnectedBodies explicitly excludes the body whose constraints we are enumerating, 
                     //so we don't have to worry about having the rug pulled by this list swap.
                     //(Also, !(x > x) for many values of x.)
-                    SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
+                    SwapBodyLocation(bodies, broadPhase, graph, solver, connectedBodyIndex, newLocation);
                 }
             }
         }
@@ -127,6 +131,7 @@ namespace SolverPrototype
 
                 var enumerator = new IncrementalEnumerator();
                 enumerator.bodies = bodies;
+                enumerator.broadPhase = broadPhase;
                 enumerator.graph = graph;
                 enumerator.solver = solver;
                 enumerator.slotIndex = nextBodyIndex + 1;
@@ -180,6 +185,7 @@ namespace SolverPrototype
         struct ClaimConnectedBodiesEnumerator : IForEach<int>
         {
             public Bodies Bodies;
+            public BroadPhase BroadPhase;
             public ConstraintConnectivityGraph Graph;
             public Solver Solver;
             /// <summary>
@@ -295,7 +301,7 @@ namespace SolverPrototype
 
                     //Note that we update the memory location immediately. This could affect the next loop iteration.
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
-                    SwapBodyLocation(ClaimEnumerator.Bodies, ClaimEnumerator.Graph, ClaimEnumerator.Solver, connectedBodyIndex, newLocation);
+                    SwapBodyLocation(ClaimEnumerator.Bodies, ClaimEnumerator.BroadPhase, ClaimEnumerator.Graph, ClaimEnumerator.Solver, connectedBodyIndex, newLocation);
 
                     //Unclaim all the bodies associated with this swap pair. Don't relinquish the claim origin.
                     ClaimEnumerator.Unclaim(ClaimEnumerator.WorkerClaims.Count - previousClaimCount);
@@ -312,6 +318,7 @@ namespace SolverPrototype
             enumerator.ClaimEnumerator = new ClaimConnectedBodiesEnumerator
             {
                 Bodies = bodies,
+                BroadPhase = broadPhase,
                 Graph = graph,
                 Solver = solver,
                 ClaimStates = claims,
