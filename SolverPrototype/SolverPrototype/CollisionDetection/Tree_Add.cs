@@ -111,7 +111,7 @@ namespace SolverPrototype.CollisionDetection
                 //Since we're already at capacity, that will be ~double the size.
                 Resize(leafCount + 1);
             }
-
+            
             //Assumption: Index 0 is always the root if it exists, and an empty tree will have a 'root' with a child count of 0.
             int nodeIndex = 0;
             while (true)

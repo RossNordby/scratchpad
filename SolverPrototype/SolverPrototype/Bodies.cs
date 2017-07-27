@@ -16,13 +16,6 @@ namespace SolverPrototype
     /// </summary>
     public class Bodies
     {
-        //TODO: there is a somewhat weak argument suggesting we should use bufferpooled memory always.
-        //That would mean tearing down a simulation would result in only a few objects being thrown away- constraint batches, the individual class stages, and so on.
-        //In other words, the amount of garbage generated would be miniscule.
-        //A slightly stronger argument is that array resizing can create fairly significant garbage blobs in the current setup.
-        //If we kept that memory around, we could use it for other stuff. But it's questionable how often you'd actually have use for a megabyte long ephemeral array...
-        //Maybe in the constraint batches or something. As long as you're able to compact the BufferPool, there's not much of an issue.
-
         /// <summary>
         /// Remaps a body handle to the actual array index of the body.
         /// The backing array index may change in response to cache optimization.
@@ -96,7 +89,7 @@ namespace SolverPrototype
             //The idpool's internal queue will often be nowhere near as large as the actual body size except in corner cases, so in the usual case, being lazy saves a little space.
             //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.
         }
-
+        
         public unsafe int Add(ref BodyDescription bodyDescription)
         {
             if (BodyCount == HandleToIndex.Length)
@@ -122,7 +115,6 @@ namespace SolverPrototype
             SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
             SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
             //TODO: Should the world inertias be updated on add? That would suggest a convention of also updating world inertias on any orientation change, which might not be wise given the API.
-
             return handle;
         }
 
@@ -193,7 +185,7 @@ namespace SolverPrototype
                 "If a handle exists, both directions should match.");
         }
         [Conditional("DEBUG")]
-        internal void ValidateExistingHandle(int handle)
+        public void ValidateExistingHandle(int handle)
         {
             Debug.Assert(handle >= 0, "Handles must be nonnegative.");
             Debug.Assert(handle < HandleToIndex.Length && HandleToIndex[handle] >= 0 && IndexToHandle[HandleToIndex[handle]] == handle,
@@ -367,7 +359,7 @@ namespace SolverPrototype
             //TODO: If users are hitting this with any frequency, supporting the path out of the box would be a good idea.
             //In fact, this function existing at all in the bodies set (where it lacks direct broadphase access) is questionable because of its lack of generality.
             //Something to consider for later.
-            Debug.Assert(description.Collidable.Shape.Exists == collidable.Shape.Exists, 
+            Debug.Assert(description.Collidable.Shape.Exists == collidable.Shape.Exists,
                 "Setting the description should not be used to add or remove collidables, only to change their shape and properties. " +
                 "The broad phase requires notification when a collidable is added or removed. " +
                 "You can remove and re-add the body to the simulation, manually notify the broadphase, or create a variant of this function that is broadphase aware.");

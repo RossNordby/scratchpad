@@ -13,7 +13,7 @@ namespace SolverPrototype.Collidables
         public bool IsStatic
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (packed & 31) > 0; }
+            get { return (packed & 0x80000000) > 0; }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set { packed = (packed & 0x7FFFFFFF) | (value ? 1u << 31 : 0); }
         }

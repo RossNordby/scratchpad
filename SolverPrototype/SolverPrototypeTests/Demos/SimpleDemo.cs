@@ -5,6 +5,7 @@ using SolverPrototype.Constraints;
 using SolverPrototypeTests.SpecializedTests;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 
@@ -17,15 +18,24 @@ namespace SolverPrototypeTests
             Simulation = new Simulation(BufferPool);
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 12;
-            const int height = 12;
-            const int length = 12;
+            const int width = 32;
+            const int height = 32;
+            const int length = 32;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(3), new Vector3(), 1f, shapeIndex),
                 new BallSocketConstraintBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
             SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100000, bodyHandles, constraintHandles);
+            var start = Stopwatch.GetTimestamp();
+            var removeCount = constraintHandles.Length / 4;
+            for (int i =0; i < removeCount; ++i)
+            {
+                Simulation.RemoveConstraint(constraintHandles[i]);
+            }
+
+            var end = Stopwatch.GetTimestamp();
+            Console.WriteLine($"Remove time (us): {1e6 * (end - start) / (Stopwatch.Frequency * removeCount)}");
             //BodyVelocity velocity;
             //velocity.Linear = new Vector3(1, 0, 0);
             //velocity.Angular = new Vector3();

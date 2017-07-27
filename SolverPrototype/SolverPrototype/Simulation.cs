@@ -87,7 +87,7 @@ namespace SolverPrototype
                 //Note: the min and max here are in absolute coordinates, which means this is a spot that has to be updated in the event that positions use a higher precision representation.
                 BoundingBox bodyBounds;
                 Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out bodyBounds.Min, out bodyBounds.Max);
-                Bodies.Collidables[Bodies.HandleToIndex[handle]].BroadPhaseIndex =
+                Bodies.Collidables[bodyIndex].BroadPhaseIndex =
                     BroadPhase.Add(new CollidableReference(true, typeIndex, bodyIndex), ref bodyBounds);
             }
             return handle;

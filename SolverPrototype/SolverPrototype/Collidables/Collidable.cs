@@ -97,22 +97,6 @@ namespace SolverPrototype.Collidables
     public struct Collidable
     {
         /// <summary>
-        /// Index of the shape used by the body.
-        /// </summary>
-        public TypedIndex Shape;
-        /// <summary>
-        /// Index of the collidable in the broad phase. Used to look up the target location for bounding box scatters.
-        /// </summary>
-        public int BroadPhaseIndex;
-        /// <summary>
-        /// Size of the margin around the surface of the shape in which contacts can be generated. These contacts will have negative depth and only contribute if the frame's velocities
-        /// would push the shapes of a pair into overlap. This should be positive to avoid jittering. It can also be used as a form of continuous collision detection, but excessively 
-        /// high values combined with fast motion may result in visible 'ghost collision' artifacts. 
-        /// <para>For continuous collision detection with less chance of ghost collisions, use the dedicated continuous collision detection modes.</para>
-        /// </summary>
-        public float SpeculativeMargin;
-
-        /// <summary>
         /// Continuous collision detection settings for this collidable. Includes the collision detection mode to use and tuning variables associated with those modes.
         /// </summary>
         public ContinuousDetectionSettings Continuity;
@@ -120,5 +104,28 @@ namespace SolverPrototype.Collidables
         //1) They do a little packing to avoid pointless memory overhead,
         //2) It's possible that we'll want to split them out later if data access patterns suggest that it's a good idea,
         //3) Don't really want to pollute this structure's members with CCD-conditional tuning variables.
+        
+        //Note that the order of these members is intentional: the narrowphase tends to access Continuity and Shape together when dispatching narrow phase work.
+        //Later on, the narrowphase will access the speculative margin when generating contacts. It never accesses the broad phase index.
+        //The AABB updater, in contrast, uses all of the properties.
+        //So, this order gives both systems contiguous access to their desired properties, increasing the chance that they'll all be in the same cache line.
+        //(Splitting this structure would stop the narrow phase from loading the unnecessary broad phase index, but that's a pretty small benefit for redundant memory.)
+
+        /// <summary>
+        /// Index of the shape used by the body.
+        /// </summary>
+        public TypedIndex Shape;
+        /// <summary>
+        /// Size of the margin around the surface of the shape in which contacts can be generated. These contacts will have negative depth and only contribute if the frame's velocities
+        /// would push the shapes of a pair into overlap. This should be positive to avoid jittering. It can also be used as a form of continuous collision detection, but excessively 
+        /// high values combined with fast motion may result in visible 'ghost collision' artifacts. 
+        /// <para>For continuous collision detection with less chance of ghost collisions, use the dedicated continuous collision detection modes.</para>
+        /// </summary>
+        public float SpeculativeMargin;
+        /// <summary>
+        /// Index of the collidable in the broad phase. Used to look up the target location for bounding box scatters.
+        /// </summary>
+        public int BroadPhaseIndex;
+
     }
 }

@@ -2,12 +2,8 @@
 using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Text;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -34,6 +30,10 @@ namespace SolverPrototype.CollisionDetection
         {
             //TODO: when there is a static tree, we'll need to distinguish between the two trees in the index that we return to the user.
             var leafIndex = ActiveTree.Add(ref bounds);
+            if (leafIndex >= activeLeaves.Length)
+            {
+                ActiveTree.Pool.SpecializeFor<CollidableReference>().Resize(ref activeLeaves, ActiveTree.LeafCount + 1, activeLeaves.Length);
+            }
             activeLeaves[leafIndex] = collidable;
             return leafIndex;
         }
@@ -90,7 +90,7 @@ namespace SolverPrototype.CollisionDetection
                     threadHandlers = new OverlapHandler[threadDispatcher.ThreadCount];
                     for (int i = 0; i < threadHandlers.Length; ++i)
                     {
-                        threadHandlers[i] = new OverlapHandler { narrowPhase = narrowPhase };
+                        threadHandlers[i] = new OverlapHandler(activeLeaves, narrowPhase);
                     }
                 }
                 refineContext.RefitAndRefine(ActiveTree, threadDispatcher, frameIndex);
@@ -99,7 +99,7 @@ namespace SolverPrototype.CollisionDetection
             else
             {
                 ActiveTree.RefitAndRefine(frameIndex);
-                var handler = new OverlapHandler { narrowPhase = narrowPhase };
+                var handler = new OverlapHandler(activeLeaves, narrowPhase);
                 ActiveTree.GetSelfOverlaps(ref handler);
             }
 
@@ -107,15 +107,26 @@ namespace SolverPrototype.CollisionDetection
 
         struct OverlapHandler : IOverlapHandler
         {
-            public NarrowPhase narrowPhase;
+            //TODO: Once we have a second tree, we'll need to have a second handler type which can pull from two different leaf sources.
+            //No reason to try to make one type do both- that would just result in a bunch of last second branches that could be avoided by using the proper
+            //handler upon dispatch. 
+            public NarrowPhase NarrowPhase;
+            public Buffer<CollidableReference> Leaves;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public OverlapHandler(Buffer<CollidableReference> leaves, NarrowPhase narrowPhase)
+            {
+                Leaves = leaves;
+                NarrowPhase = narrowPhase;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Handle(int indexA, int indexB)
             {
-                throw new NotImplementedException();
+                NarrowPhase.HandleOverlap(Leaves[indexA], Leaves[indexB]);
             }
         }
 
-        //TODO: EnsureCapacity and so on. Seems like we should just expose the underlying tree structures- otherwise, we'll have two passthrough functions for every tree version.
-        //Plus, it's potentially useful to only raycast active objects or something- no reason to hide the trees.
+        //TODO: EnsureCapacity and so on. Need them for the broadphase's own leaves sets. We COULD expose the underlying trees and let their sizes be managed separately,
+        //or we can handle them at the level of the broadphase too. 
 
         public void Dispose()
         {
