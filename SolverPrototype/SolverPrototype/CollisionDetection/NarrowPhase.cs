@@ -1,4 +1,9 @@
-﻿using SolverPrototype.Collidables;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
+using SolverPrototype.Collidables;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -58,30 +63,150 @@ namespace SolverPrototype.CollisionDetection
      * 2) Any accumulated impulse from the previous frame's contact solve should be distributed over the new set of contacts for warm starting this frame's solve.
      * 3) Any change in contact count should result in the removal of the previous constraint (if present) and the addition of the new constraint (if above zero contacts).
      * This mapping is stored in a single dictionary. The previous frame's mapping is treated as read-only by the new frame, so no synchronization is required to read it. The current frame builds
-     * a new dictionary incrementally. It starts from scratch, so only actually-needed 
+     * a new dictionary incrementally. It starts from scratch, so only actually-needed overlaps will exist in the new dictionary.
+     * 
+     * Constraints associated with 'stale' overlaps (those which were not updated during the current frame) are removed in a postpass.
+     * 
      */
-    /// <summary>
-    /// Receives the result of a single discrete convex pair and modifies constraints as necessary.
-    /// </summary>
-    struct DiscreteConvexPair
+
+    [StructLayout(LayoutKind.Explicit, Size = 8)]
+    public struct CollidablePair
     {
-        public void Handle() { }
+        [FieldOffset(0)]
+        public CollidableReference A;
+        [FieldOffset(4)]
+        public CollidableReference B;
     }
 
+    struct CollidablePairComparer : IEqualityComparerRef<CollidablePair>
+    {
+        //The order of collidables in the pair should not affect equality or hashing. The broad phase is not guaranteed to provide a reliable order.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ref CollidablePair a, ref CollidablePair b)
+        {
+            return Unsafe.As<CollidablePair, ulong>(ref a) == Unsafe.As<CollidablePair, ulong>(ref b);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Hash(ref CollidablePair item)
+        {
+            return (int)(item.A.packed ^ item.B.packed);
+        }
+    }
+
+    /// <summary>
+    /// Performs a collision test on a set of collidable pairs as a batch.
+    /// </summary>
+    public interface ICollidablePairTester
+    {
+        int BatchSize { get; }
+        void Test(ref QuickList<CollidablePair, Buffer<CollidablePair>> pairs);
+    }
+
+    //Individual pair testers are designed to be used outside of the narrow phase. They need to be usable for queries and such, so all necessary data must be gathered externally.
+    public struct SpherePairTester
+    {
+        public int BatchSize { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return Vector<float>.Count; } }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Test(
+            ref Vector<float> radiiA, ref Vector<float> radiiB,
+            ref Vector<float> minimumDepth, 
+            ref Vector3Wide relativePositionB,
+            out Vector3Wide relativeContactPosition, out Vector3Wide contactNormal, out Vector<float> depth, out Vector<int> contactCount)
+        {
+            Vector3Wide.Length(ref relativePositionB, out var centerDistance);
+            var inverseDistance = Vector<float>.One / centerDistance;
+            Vector3Wide.Scale(ref relativePositionB, ref inverseDistance, out contactNormal);
+            var normalIsValid = Vector.GreaterThan(centerDistance, Vector<float>.Zero);
+            //Arbitrarily choose the (0,1,0) if the two spheres are in the same position. Any unit length vector is equally valid.
+            contactNormal.X = Vector.ConditionalSelect(normalIsValid, contactNormal.X, Vector<float>.Zero);
+            contactNormal.Y = Vector.ConditionalSelect(normalIsValid, contactNormal.Y, Vector<float>.One);
+            contactNormal.Z = Vector.ConditionalSelect(normalIsValid, contactNormal.Z, Vector<float>.Zero);
+            depth = radiiA + radiiB - centerDistance;
+            //The position should be placed at the average of the extremePoint(a, a->b) and extremePoint(b, b->a). That puts it in the middle of the overlapping or nonoverlapping interval.
+            //The contact normal acts as the direction from a to b.
+            Vector3Wide.Scale(ref contactNormal, ref radiiA, out var extremeA);
+            Vector3Wide.Scale(ref contactNormal, ref radiiB, out var extremeB);
+            //note the following subtraction: contactNormal goes from a to b, so the negation pushes the extreme point in the proper direction from b to a.
+            Vector3Wide.Subtract(ref relativePositionB, ref extremeB, out extremeB);
+            Vector3Wide.Add(ref extremeA, ref extremeB, out relativeContactPosition);
+            var scale = new Vector<float>(0.5f);
+            Vector3Wide.Scale(ref relativeContactPosition, ref scale, out relativeContactPosition);
+            contactCount = Vector.ConditionalSelect(Vector.GreaterThanOrEqual(depth, minimumDepth), Vector<int>.One, Vector<int>.Zero); 
+        }
+    }
+
+    public struct SpherePairGatherer
+    {
+
+    }
+
+
+    /// <summary>
+    /// Handles collision detection for a batch of collidable pairs together once filled or forced.
+    /// </summary>
+    /// <remarks>This is used by a single thread to accumulate collidable pairs over time until enough have been found to justify a wide execution.</remarks>
+    public struct PairBatch<TTester> where TTester : ICollidablePairTester
+    {
+        public QuickList<CollidablePair, Buffer<CollidablePair>> PendingPairs;
+        public TTester Tester;
+
+        public PairBatch(TTester tester, BufferPool pool) : this()
+        {
+            Tester = tester;
+            QuickList<CollidablePair, Buffer<CollidablePair>>.Create(pool.SpecializeFor<CollidablePair>(), tester.BatchSize, out PendingPairs);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(ref CollidablePair pair)
+        {
+            PendingPairs.AddUnsafely(pair);
+            if (PendingPairs.Count == Tester.BatchSize)
+            {
+                Tester.Test(ref PendingPairs);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Flush()
+        {
+            if (PendingPairs.Count > 0)
+                Tester.Test(ref PendingPairs);
+
+        }
+    }
 
     public class NarrowPhase
     {
         public Bodies Bodies;
+        public BufferPool Pool;
+        //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
+        //The majority of type pairs, however, only require a constraint handle.
+        QuickDictionary<CollidablePair, int, Buffer<CollidablePair>, Buffer<int>, Buffer<int>, CollidablePairComparer> constraintHandles;
 
-        public NarrowPhase(Bodies bodies)
+        public NarrowPhase(Bodies bodies, BufferPool pool, int initialOverlapCapacity = 32768)
         {
             Bodies = bodies;
+            Pool = pool;
+            QuickDictionary<CollidablePair, int, Buffer<CollidablePair>, Buffer<int>, Buffer<int>, CollidablePairComparer>.Create(
+                pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<int>(), pool.SpecializeFor<int>(), SpanHelper.GetContainingPowerOf2(initialOverlapCapacity), 3, out constraintHandles);
+
         }
+
+        public void EnsureCapacity(int overlapCapacity)
+        {
+            //TODO: If there are type specialized overlap dictionaries, this must be updated.
+            constraintHandles.EnsureCapacity(overlapCapacity, Pool.SpecializeFor<CollidablePair>(), Pool.SpecializeFor<int>(), Pool.SpecializeFor<int>());
+
+        }
+
+
 
         public void HandleOverlap(CollidableReference a, CollidableReference b)
         {
             var staticness = (a.packed >> 31) | ((b.packed & 0x7FFFFFFF) >> 30);
-            switch(staticness)
+            switch (staticness)
             {
                 case 0:
                     {

@@ -9,7 +9,7 @@ namespace SolverPrototype
     /// <summary>
     /// Collects body handles associated with a constraint.
     /// </summary>
-    unsafe struct ConstraintBodyHandleCollector : IForEach<int>
+    public unsafe struct ConstraintBodyHandleCollector : IForEach<int>
     {
         public Bodies Bodies;
         public int* Handles;

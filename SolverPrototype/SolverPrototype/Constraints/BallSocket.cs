@@ -68,7 +68,7 @@ namespace SolverPrototype.Constraints
         public BodyInertias InertiaA;
         public BodyInertias InertiaB;
     }
-
+    
     public struct BallSocketFunctions : IConstraintFunctions<BallSocketPrestepData, BallSocketProjection, Vector3Wide>
     {
         //TODO: There may be an argument for some extra level of abstraction here. If we gave the prestep function the data it needed (i.e. pose and inertia)
@@ -184,7 +184,7 @@ namespace SolverPrototype.Constraints
             Vector3Wide.CrossWithoutOverlap(ref projection.OffsetB, ref velocityB.AngularVelocity, out angularCSV);
             Vector3Wide.Add(ref csv, ref angularCSV, out csv);
             Vector3Wide.Subtract(ref projection.BiasVelocity, ref csv, out csv);
-            
+
             Triangular3x3Wide.TransformBySymmetricWithoutOverlap(ref csv, ref projection.EffectiveMass, out var csi);
             Vector3Wide.Scale(ref accumulatedImpulse, ref projection.SoftnessImpulseScale, out var softness);
             Vector3Wide.Subtract(ref csi, ref softness, out csi);

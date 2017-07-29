@@ -20,7 +20,7 @@ namespace SolverPrototype.Collidables
 
         //Note that spheres are sufficiently simple that no explicit bundle is required. A single vector<float> suffices.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Gather(ref Buffer<Sphere> shapes, ref Vector<int> shapeIndices, int count, out Vector<float> radii)
+        public static void Gather(ref Buffer<Sphere> shapes, ref Vector<int> shapeIndices, int count, out Vector<float> radii)
         {
             ref var radiiBase = ref Unsafe.As<Vector<float>, float>(ref radii);
             ref var shapeIndicesBase = ref Unsafe.As<Vector<int>, int>(ref shapeIndices);
