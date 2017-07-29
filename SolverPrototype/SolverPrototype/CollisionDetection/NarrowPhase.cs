@@ -111,7 +111,7 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Test(
             ref Vector<float> radiiA, ref Vector<float> radiiB,
-            ref Vector<float> minimumDepth, 
+            ref Vector<float> minimumDepth,
             ref Vector3Wide relativePositionB,
             out Vector3Wide relativeContactPosition, out Vector3Wide contactNormal, out Vector<float> depth, out Vector<int> contactCount)
         {
@@ -133,13 +133,89 @@ namespace SolverPrototype.CollisionDetection
             Vector3Wide.Add(ref extremeA, ref extremeB, out relativeContactPosition);
             var scale = new Vector<float>(0.5f);
             Vector3Wide.Scale(ref relativeContactPosition, ref scale, out relativeContactPosition);
-            contactCount = Vector.ConditionalSelect(Vector.GreaterThanOrEqual(depth, minimumDepth), Vector<int>.One, Vector<int>.Zero); 
+            contactCount = Vector.ConditionalSelect(Vector.GreaterThanOrEqual(depth, minimumDepth), Vector<int>.One, Vector<int>.Zero);
         }
     }
 
+    public struct CollidableDataSource
+    {
+        public Shapes Shapes;
+        public Bodies Bodies;
+
+        public CollidableDataSource(Bodies bodies, Shapes shapes)
+        {
+            Shapes = shapes;
+            Bodies = bodies;
+        }
+        public void GatherRigidPair(ref CollidablePair pair,
+            int laneIndex, ref Vector<float> minimumDepth, ref Vector3Wide localPositionB, out QuaternionWide orientationA, out QuaternionWide orientationB)
+        {
+            ref var minimumDepthLane = ref GatherScatter.Get(ref minimumDepth, laneIndex);
+            BodyPose poseA, poseB;
+            if (pair.A.IsStatic)
+            {
+                //TODO: When non-body collidables exist, this needs to seek out the proper data source.
+                poseA = new BodyPose();
+                minimumDepthLane = 0;
+            }
+            else
+            {
+                var bodyIndex = Bodies.HandleToIndex[pair.A.CollidableIndex];
+                Bodies.GetPoseByIndex(bodyIndex, out poseA);
+                minimumDepthLane = -Bodies.Collidables[bodyIndex].SpeculativeMargin;
+            }
+            if (pair.B.IsStatic)
+            {
+                poseB = new BodyPose();
+            }
+            else
+            {
+                var bodyIndex = Bodies.HandleToIndex[pair.B.CollidableIndex];
+                Bodies.GetPoseByIndex(bodyIndex, out poseB);
+                minimumDepthLane -= Bodies.Collidables[bodyIndex].SpeculativeMargin;
+            }
+            BodyPose.GetRelativePosition(ref poseA, ref poseB, out var localB);
+            GatherScatter.SetLane(ref localPositionB, laneIndex, ref localB, 3);
+            GatherScatter.SetLane(ref orientationA.X, laneIndex, ref poseA.Orientation.X, 4);
+            GatherScatter.SetLane(ref orientationB.X, laneIndex, ref poseB.Orientation.X, 4);
+        }
+        //We special case the position-only version for the sake of sphere-sphere tests. Kinda questionable from a maintainability standpoint, but hey, super minor speedup!
+        public void GatherRigidPair(ref CollidablePair pair,
+            int laneIndex, ref Vector<float> minimumDepth, ref Vector3Wide localPositionB)
+        {
+            ref var minimumDepthLane = ref GatherScatter.Get(ref minimumDepth, laneIndex);
+            BodyPose poseA, poseB;
+            if (pair.A.IsStatic)
+            {
+                //TODO: When non-body collidables exist, this needs to seek out the proper data source.
+                poseA = new BodyPose();
+                minimumDepthLane = 0;
+            }
+            else
+            {
+                var bodyIndex = Bodies.HandleToIndex[pair.A.CollidableIndex];
+                Bodies.GetLane((bodyIndex, out poseA);
+                minimumDepthLane = -Bodies.Collidables[bodyIndex].SpeculativeMargin;
+            }
+            if (pair.B.IsStatic)
+            {
+                poseB = new BodyPose();
+            }
+            else
+            {
+                var bodyIndex = Bodies.HandleToIndex[pair.B.CollidableIndex];
+                Bodies.GetPoseByIndex(bodyIndex, out poseB);
+                minimumDepthLane -= Bodies.Collidables[bodyIndex].SpeculativeMargin;
+            }
+            BodyPose.GetRelativePosition(ref poseA, ref poseB, out var localB);
+            GatherScatter.SetLane(ref localPositionB, laneIndex, ref localB, 3);
+        }
+    }
+
+
     public struct SpherePairGatherer
     {
-
+        public
     }
 
 

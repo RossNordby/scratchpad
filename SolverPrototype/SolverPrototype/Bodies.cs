@@ -287,6 +287,7 @@ namespace SolverPrototype
                 Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count));
         }
 
+
         //TODO: Filling this out would likely be helpful.
         public void GetPoseByIndex(int index, out BodyPose pose)
         {
