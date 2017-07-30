@@ -114,7 +114,7 @@ namespace SolverPrototype.Collidables
     public class ShapeBatch<TShape> : ShapeBatch where TShape : struct, IShape//TODO: When blittable is supported, shapes should be made blittable. We store them in buffers.
     {
 
-        Buffer<TShape> shapes;
+        internal Buffer<TShape> shapes;
         protected IdPool<Buffer<int>, BufferPool<int>> idPool;
 
         public ShapeBatch(BufferPool pool, int initialShapeCount)

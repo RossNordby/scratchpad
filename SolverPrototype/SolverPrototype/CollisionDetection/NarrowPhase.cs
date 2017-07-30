@@ -4,6 +4,7 @@ using SolverPrototype.Collidables;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -94,22 +95,12 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    /// <summary>
-    /// Performs a collision test on a set of collidable pairs as a batch.
-    /// </summary>
-    public interface ICollidablePairTester
-    {
-        int BatchSize { get; }
-        void Test(ref QuickList<CollidablePair, Buffer<CollidablePair>> pairs);
-    }
 
     //Individual pair testers are designed to be used outside of the narrow phase. They need to be usable for queries and such, so all necessary data must be gathered externally.
     public struct SpherePairTester
     {
-        public int BatchSize { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return Vector<float>.Count; } }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Test(
+        public static void Test(
             ref Vector<float> radiiA, ref Vector<float> radiiB,
             ref Vector<float> minimumDepth,
             ref Vector3Wide relativePositionB,
@@ -147,75 +138,185 @@ namespace SolverPrototype.CollisionDetection
             Shapes = shapes;
             Bodies = bodies;
         }
-        public void GatherRigidPair(ref CollidablePair pair,
-            int laneIndex, ref Vector<float> minimumDepth, ref Vector3Wide localPositionB, out QuaternionWide orientationA, out QuaternionWide orientationB)
-        {
-            ref var minimumDepthLane = ref GatherScatter.Get(ref minimumDepth, laneIndex);
-            BodyPose poseA, poseB;
-            if (pair.A.IsStatic)
-            {
-                //TODO: When non-body collidables exist, this needs to seek out the proper data source.
-                poseA = new BodyPose();
-                minimumDepthLane = 0;
-            }
-            else
-            {
-                var bodyIndex = Bodies.HandleToIndex[pair.A.CollidableIndex];
-                Bodies.GetPoseByIndex(bodyIndex, out poseA);
-                minimumDepthLane = -Bodies.Collidables[bodyIndex].SpeculativeMargin;
-            }
-            if (pair.B.IsStatic)
-            {
-                poseB = new BodyPose();
-            }
-            else
-            {
-                var bodyIndex = Bodies.HandleToIndex[pair.B.CollidableIndex];
-                Bodies.GetPoseByIndex(bodyIndex, out poseB);
-                minimumDepthLane -= Bodies.Collidables[bodyIndex].SpeculativeMargin;
-            }
-            BodyPose.GetRelativePosition(ref poseA, ref poseB, out var localB);
-            GatherScatter.SetLane(ref localPositionB, laneIndex, ref localB, 3);
-            GatherScatter.SetLane(ref orientationA.X, laneIndex, ref poseA.Orientation.X, 4);
-            GatherScatter.SetLane(ref orientationB.X, laneIndex, ref poseB.Orientation.X, 4);
-        }
+        //public void GatherRigidPair(ref CollidablePair pair,
+        //    out int shapeIndexA, out int shapeIndexB,
+        //    int laneIndex, ref Vector<float> minimumDepth, ref Vector3Wide localPositionB, out QuaternionWide orientationA, out QuaternionWide orientationB)
+        //{
+        //    ref var minimumDepthLane = ref GatherScatter.Get(ref minimumDepth, laneIndex);
+        //    BodyPose poseA, poseB;
+        //    if (pair.A.IsStatic)
+        //    {
+        //        //TODO: When non-body collidables exist, this needs to seek out the proper data source.
+        //        poseA = new BodyPose();
+        //        minimumDepthLane = 0;
+        //    }
+        //    else
+        //    {
+        //        var bodyIndex = Bodies.HandleToIndex[pair.A.CollidableIndex];
+        //        Bodies.GetPoseByIndex(bodyIndex, out poseA);
+        //        minimumDepthLane = -Bodies.Collidables[bodyIndex].SpeculativeMargin;
+        //    }
+        //    if (pair.B.IsStatic)
+        //    {
+        //        poseB = new BodyPose();
+        //    }
+        //    else
+        //    {
+        //        var bodyIndex = Bodies.HandleToIndex[pair.B.CollidableIndex];
+        //        Bodies.GetPoseByIndex(bodyIndex, out poseB);
+        //        minimumDepthLane -= Bodies.Collidables[bodyIndex].SpeculativeMargin;
+        //    }
+        //    BodyPose.GetRelativePosition(ref poseA, ref poseB, out var localB);
+        //    GatherScatter.SetLane(ref localPositionB, laneIndex, ref localB, 3);
+        //    GatherScatter.SetLane(ref orientationA.X, laneIndex, ref poseA.Orientation.X, 4);
+        //    GatherScatter.SetLane(ref orientationB.X, laneIndex, ref poseB.Orientation.X, 4);
+        //}
         //We special case the position-only version for the sake of sphere-sphere tests. Kinda questionable from a maintainability standpoint, but hey, super minor speedup!
         public void GatherRigidPair(ref CollidablePair pair,
+            out int shapeIndexA, out int shapeIndexB,
             int laneIndex, ref Vector<float> minimumDepth, ref Vector3Wide localPositionB)
         {
-            ref var minimumDepthLane = ref GatherScatter.Get(ref minimumDepth, laneIndex);
-            BodyPose poseA, poseB;
-            if (pair.A.IsStatic)
-            {
-                //TODO: When non-body collidables exist, this needs to seek out the proper data source.
-                poseA = new BodyPose();
-                minimumDepthLane = 0;
-            }
-            else
-            {
-                var bodyIndex = Bodies.HandleToIndex[pair.A.CollidableIndex];
-                Bodies.GetLane((bodyIndex, out poseA);
-                minimumDepthLane = -Bodies.Collidables[bodyIndex].SpeculativeMargin;
-            }
-            if (pair.B.IsStatic)
-            {
-                poseB = new BodyPose();
-            }
-            else
-            {
-                var bodyIndex = Bodies.HandleToIndex[pair.B.CollidableIndex];
-                Bodies.GetPoseByIndex(bodyIndex, out poseB);
-                minimumDepthLane -= Bodies.Collidables[bodyIndex].SpeculativeMargin;
-            }
-            BodyPose.GetRelativePosition(ref poseA, ref poseB, out var localB);
-            GatherScatter.SetLane(ref localPositionB, laneIndex, ref localB, 3);
+            shapeIndexA = 0;
+            shapeIndexB = 0;
+            //ref var minimumDepthLane = ref GatherScatter.Get(ref minimumDepth, laneIndex);
+            //BodyPose poseA, poseB;
+            //if (pair.A.IsStatic)
+            //{
+            //    //TODO: When non-body collidables exist, this needs to seek out the proper data source.
+            //    poseA = new BodyPose();
+            //    minimumDepthLane = 0;
+            //}
+            //else
+            //{
+            //    var bodyIndex = Bodies.HandleToIndex[pair.A.CollidableIndex];
+            //    Bodies.GetLane(bodyIndex, out poseA);
+            //    minimumDepthLane = -Bodies.Collidables[bodyIndex].SpeculativeMargin;
+            //}
+            //if (pair.B.IsStatic)
+            //{
+            //    poseB = new BodyPose();
+            //}
+            //else
+            //{
+            //    var bodyIndex = Bodies.HandleToIndex[pair.B.CollidableIndex];
+            //    Bodies.GetPoseByIndex(bodyIndex, out poseB);
+            //    minimumDepthLane -= Bodies.Collidables[bodyIndex].SpeculativeMargin;
+            //}
+            //BodyPose.GetRelativePosition(ref poseA, ref poseB, out var localB);
+            //GatherScatter.SetLane(ref localPositionB, laneIndex, ref localB, 3);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void GetShapeBuffer<TShape>(out Buffer<TShape> shapesBuffer) where TShape : struct, IShape
+        {
+            var untypedBatch = Shapes[TypeIds<IShape>.GetId<TShape>()];
+            shapesBuffer = Unsafe.As<ShapeBatch, ShapeBatch<TShape>>(ref untypedBatch).shapes;
         }
     }
 
-
-    public struct SpherePairGatherer
+    /// <summary>
+    /// Performs a collision test on a set of collidable pairs as a batch. Responsible for gathering necessary state, executing batches, and reporting results to pair owners.
+    /// </summary>
+    public abstract class CollidablePairTester
     {
-        public
+        public int BatchSize { get; protected set; }
+        public abstract void Test(ref QuickList<CollidablePair, Buffer<CollidablePair>> pairs, ref Continuations owners, ref CollidableDataSource collidableSource);
+    }
+
+
+    public enum ContinuationType
+    {
+        /// <summary>
+        /// Convex-convex pair which will directly produce constraints.
+        /// </summary>
+        ConvexConstraintGenerator = 0,
+        /// <summary>
+        /// One of potentially multiple substeps produced by a collidable pair using substepped continuous collision detection.
+        /// </summary>
+        Substep = 1,
+        /// <summary>
+        /// Inner sphere test associated with a collidable pair using inner sphere continuous collision detection.
+        /// </summary>
+        InnerSphere = 2,
+        /// <summary>
+        /// Compound-convex or compound-compound subpair.
+        /// </summary>
+        Compound = 3,
+        /// <summary>
+        /// The pair belongs to a mesh-convex pair.
+        /// </summary>
+        Mesh = 3,
+        /// <summary>
+        /// Marks a pair as being owned by a mesh-mesh pair.
+        /// </summary>
+        MeshMesh = 4,
+        /// <summary>
+        /// Marks a pair as being owned by a mesh-compound pair.
+        /// </summary>
+        MeshCompound = 5,
+
+
+    }
+    public struct Continuation
+    {
+        uint packed;
+        const int IndexBitCount = 28;
+        public ContinuationType Type { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (ContinuationType)(packed >> IndexBitCount); } }
+
+        public int Index { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (int)(packed & ((1 << IndexBitCount) - 1)); } }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public Continuation(ContinuationType type, int index)
+        {
+            packed = ((uint)type << 28) | (uint)index;
+        }
+        
+    }
+    public struct Continuations
+    {
+
+
+    }
+    public class SpherePairGatherExecuteReport : CollidablePairTester
+    {
+        public SpherePairGatherExecuteReport()
+        {
+            BatchSize = 32;
+        }
+
+        //Note that the collidable pair tester itself has no dynamic state.
+        //This will be called from many threads. The caller is responsible for maintaining the necessary state in a thread safe way.
+        public override void Test(ref QuickList<CollidablePair, Buffer<CollidablePair>> pairs, ref Continuations owners, ref CollidableDataSource collidableSource)
+        {
+            collidableSource.GetShapeBuffer(out Buffer<Sphere> shapes);
+            Vector<float> radiiA, radiiB;
+            Vector3Wide localPositionB;
+            Vector<float> minimumDepth;
+            ref var radiiStartA = ref Unsafe.As<Vector<float>, float>(ref radiiA);
+            ref var radiiStartB = ref Unsafe.As<Vector<float>, float>(ref radiiB);
+            for (int pairIndex = 0; pairIndex < pairs.Count; pairIndex += Vector<float>.Count)
+            {
+                var count = pairs.Count - pairIndex;
+                if (count > Vector<float>.Count)
+                    count = Vector<float>.Count;
+                //Gather everything necessary for the pair.
+                for (int innerIndex = 0; innerIndex < count; ++innerIndex)
+                {
+                    ref var pair = ref pairs[pairIndex + innerIndex];
+                    collidableSource.GatherRigidPair(ref pair, out var shapeIndexA, out var shapeIndexB, innerIndex, ref minimumDepth, ref localPositionB);
+                    Unsafe.Add(ref radiiStartA, innerIndex) = shapes[shapeIndexA].Radius;
+                    Unsafe.Add(ref radiiStartB, innerIndex) = shapes[shapeIndexB].Radius;
+                }
+                //TODO: Check type punning impact on codegen. Had bugs and perf issues with that in the past.
+                SpherePairTester.Test(ref radiiA, ref radiiB, ref minimumDepth, ref localPositionB, out var localContactPosition, out var contactNormal, out var depth, out var contactCount);
+                //Scatter results to owners.
+                for (int innerIndex = 0; innerIndex < count; ++innerIndex)
+                {
+                    ref var pair = ref pairs[pairIndex + innerIndex];
+                    //pair.A.CollidableIndex
+                }
+            }
+        }
     }
 
 
@@ -223,7 +324,7 @@ namespace SolverPrototype.CollisionDetection
     /// Handles collision detection for a batch of collidable pairs together once filled or forced.
     /// </summary>
     /// <remarks>This is used by a single thread to accumulate collidable pairs over time until enough have been found to justify a wide execution.</remarks>
-    public struct PairBatch<TTester> where TTester : ICollidablePairTester
+    public struct PairBatch<TTester> where TTester : CollidablePairTester
     {
         public QuickList<CollidablePair, Buffer<CollidablePair>> PendingPairs;
         public TTester Tester;
@@ -240,15 +341,15 @@ namespace SolverPrototype.CollisionDetection
             PendingPairs.AddUnsafely(pair);
             if (PendingPairs.Count == Tester.BatchSize)
             {
-                Tester.Test(ref PendingPairs);
+                //Tester.Test(ref PendingPairs);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Flush()
         {
-            if (PendingPairs.Count > 0)
-                Tester.Test(ref PendingPairs);
+            //if (PendingPairs.Count > 0)
+            //    Tester.Test(ref PendingPairs);
 
         }
     }

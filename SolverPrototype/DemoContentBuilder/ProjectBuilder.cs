@@ -1,5 +1,6 @@
 ﻿using DemoContentLoader;
 using Microsoft.Build.Evaluation;
+using Microsoft.VisualStudio.Setup.Configuration;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -23,16 +24,45 @@ namespace DemoContentBuilder
         }
 
 
-        static void CollectContentPaths(string projectPath, out string workingPath,
+        struct InstalledBuildTools
+        {
+            public string Version;
+            public string Path;
+        }
+
+        unsafe static void CollectContentPaths(string projectPath, out string workingPath,
             out List<string> shaderPaths,
             out List<string> fontPaths)
         {
+            var query = new SetupConfiguration();
+            var enumerator = query.EnumInstances();
+            ISetupInstance[] instances = new ISetupInstance[1];
+            var buildToolsCandidates = new List<InstalledBuildTools>();
+            while (true)
+            {
+                enumerator.Next(1, instances, out var fetchedCountIntPointer);
+                if (fetchedCountIntPointer == 0)
+                    break;
+                buildToolsCandidates.Add(new InstalledBuildTools
+                {
+                    Version = instances[0].GetInstallationVersion(),
+                    Path = instances[0].GetInstallationPath()
+                });
+            }
+            buildToolsCandidates.Sort((a, b) => b.Version.CompareTo(a.Version));
+            var buildTools = buildToolsCandidates[0];
             using (var projectCollection = new ProjectCollection())
             {
                 //TODO: Watch out, this takes a dependency on a specific version of the ms build tools, requiring a user to have it installed.
                 //Would be nice to have a better way to do this. Preferably that doesn't rely on registry, since a registry issue is why this got added in the first place.
                 //Maybe a modification to the projects to specify a wildcarded version or something.
-                projectCollection.DefaultToolsVersion = "14.0";
+                var toolsets = projectCollection.Toolsets;
+                var buildProperties = new Dictionary<string, string>();
+                buildProperties.Add("MSBuildExtensionsPath", "asdf");
+                var toolset = new Toolset(buildTools.Version, buildTools.Path, buildProperties, projectCollection, null);
+      
+                projectCollection.AddToolset(toolset);
+                projectCollection.DefaultToolsVersion = buildTools.Version;
                 var project = projectCollection.LoadProject(projectPath);
                 workingPath = project.DirectoryPath + Path.DirectorySeparatorChar;
 
