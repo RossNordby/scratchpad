@@ -2,6 +2,7 @@
 using Microsoft.Build.Evaluation;
 using Microsoft.VisualStudio.Setup.Configuration;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -34,35 +35,55 @@ namespace DemoContentBuilder
             out List<string> shaderPaths,
             out List<string> fontPaths)
         {
-            var query = new SetupConfiguration();
-            var enumerator = query.EnumInstances();
-            ISetupInstance[] instances = new ISetupInstance[1];
-            var buildToolsCandidates = new List<InstalledBuildTools>();
-            while (true)
-            {
-                enumerator.Next(1, instances, out var fetchedCountIntPointer);
-                if (fetchedCountIntPointer == 0)
-                    break;
-                buildToolsCandidates.Add(new InstalledBuildTools
-                {
-                    Version = instances[0].GetInstallationVersion(),
-                    Path = instances[0].GetInstallationPath()
-                });
-            }
-            buildToolsCandidates.Sort((a, b) => b.Version.CompareTo(a.Version));
-            var buildTools = buildToolsCandidates[0];
+            //NOTE:
+            //This project builder takes dependencies on a lot of things which really should not be depended upon.
+            //It would be nice to figure out a more solid way to do it. Is there are better way to query the dotnet build tools?
+            //A fallback option is to just create our own 'project'- just a little file with references alongside the csproj that triggered this build step.
+            //We would have complete control over the format.
+
+
+
             using (var projectCollection = new ProjectCollection())
             {
-                //TODO: Watch out, this takes a dependency on a specific version of the ms build tools, requiring a user to have it installed.
-                //Would be nice to have a better way to do this. Preferably that doesn't rely on registry, since a registry issue is why this got added in the first place.
-                //Maybe a modification to the projects to specify a wildcarded version or something.
+                //This is very fragile. If the true dotnet path doesn't include dotnet, we won't find it and the build will fail.
+                //For now, we'll bite the bullet on this and assume that people probably don't change the default dotnet path too often.
+                var environmentVariables = Environment.GetEnvironmentVariables();
+                string dotnetPath = null;
+                var paths = ((string)environmentVariables["Path"]).Split(';');
+
+                foreach (var candidatePath in paths)
+                {
+                    if (candidatePath.Contains("dotnet") && File.Exists(candidatePath + "dotnet.exe"))
+                    {
+                        dotnetPath = candidatePath;
+                        break;
+                    }
+                }
+                if (dotnetPath == null)
+                {
+                    throw new InvalidOperationException("No path in the Path environment variable includes dotnet, or the ones that do don't include the dotnet executable.");
+                }
+                //This is also fragile. We're relying on the file structure to remain the same, which isn't a good bet in the long term.
+                var sdkPaths = new List<string>(Directory.EnumerateDirectories(dotnetPath + "sdk"));
+                sdkPaths.Remove(dotnetPath + @"sdk\NuGetFallbackFolder");
+                if (sdkPaths.Count == 0)
+                {
+                    throw new InvalidOperationException("No dotnet versions available.");
+                }
+                sdkPaths.Sort();
+                var sdkPath = sdkPaths[sdkPaths.Count - 1];
                 var toolsets = projectCollection.Toolsets;
                 var buildProperties = new Dictionary<string, string>();
-                buildProperties.Add("MSBuildExtensionsPath", "asdf");
-                var toolset = new Toolset(buildTools.Version, buildTools.Path, buildProperties, projectCollection, null);
-      
+                //This, too, is fragile. Assumes that the required properties are the same and that they'll keep pointing in the same places in the folder structure.
+                //Oh well, we'll probably have to fix this multiple times.
+                buildProperties.Add("MSBuildExtensionsPath", sdkPath);
+                buildProperties.Add("RoslynTargetsPath", sdkPath + @"\Roslyn");
+                //And this is also fragile!
+                const string toolsVersion = "15.0";
+                var toolset = new Toolset(toolsVersion, sdkPath, buildProperties, projectCollection, null);
+
                 projectCollection.AddToolset(toolset);
-                projectCollection.DefaultToolsVersion = buildTools.Version;
+                projectCollection.DefaultToolsVersion = toolsVersion;
                 var project = projectCollection.LoadProject(projectPath);
                 workingPath = project.DirectoryPath + Path.DirectorySeparatorChar;
 
