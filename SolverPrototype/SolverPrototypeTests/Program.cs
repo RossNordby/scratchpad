@@ -16,6 +16,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            //VirtualOverheadTest.Test();
             //TreeTest.Test();
             //ReinterpretVectorRepro.Test();
             //TriangularTests.Test();
