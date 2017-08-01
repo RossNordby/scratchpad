@@ -6,12 +6,7 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Constraints
 {
-    public struct ManifoldContactData
-    {
-        public Vector3Wide OffsetA;
-        public Vector3Wide OffsetB;
-        public Vector<float> PenetrationDepth;
-    }
+
     public struct ContactManifold4PrestepData
     {
         //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.

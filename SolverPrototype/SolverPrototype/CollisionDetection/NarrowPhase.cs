@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System;
+using SolverPrototype.Constraints;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -274,6 +275,35 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
+
+    public struct ConvexContactManifoldWide
+    {
+        public Vector3Wide OffsetA0;
+        public Vector3Wide OffsetB0;
+        public Vector3Wide OffsetA1;
+        public Vector3Wide OffsetB1;
+        public Vector3Wide OffsetA2;
+        public Vector3Wide OffsetB2;
+        public Vector3Wide OffsetA3;
+        public Vector3Wide OffsetB3;
+        /// <summary>
+        /// Surface basis for the manifolds, defining both normal and tangents.
+        /// </summary>
+        public QuaternionWide Basis;
+        /// <summary>
+        /// The number of contacts in the manifolds.
+        /// </summary>
+        public Vector<int> Count;
+        /// <summary>
+        /// The maximum number of contacts that this pair type could ever generate.
+        /// </summary>
+        public int MaximumCount;
+    }
+
+    //TODO: If we have any pair types that compute manifolds in a non-simd batched way, you'll need an overload of the continuations executor which is able to take them.
+    //This is pretty likely- going wide on hull-hull is going to be tricky, and there's a lot of opportunity for internal SIMD usage.
+
+
     public struct Continuations
     {
         public Solver Solver;
@@ -285,7 +315,7 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        public void Execute(CollidablePair pair, Continuation continuation)
+        public unsafe void Execute(Buffer<PairJob> jobs, int jobStart, int jobCount, ref ConvexContactManifoldWide manifold)
         {
             //Given the use of virtuals elsewhere, it may seem a bit odd to use a hardcoded switch here.
             //Especially because these are not guaranteed to be the only types ever supported. Some extensions may demand new entries here.
@@ -300,19 +330,33 @@ namespace SolverPrototype.CollisionDetection
 
             //(This choice is something to monitor over time in terms of virtual/switch codegen, batching, and extensibility. We already do a virtual dispatch at the 
             //batch level, so if it turns out pairType x continuationType batching is okay in practice and the hardcodedness is getting in the way, we can switch.)
-            switch (continuation.Type)
+            var pairBase = (PairJob*)jobs.Memory + jobStart;
+            for (int i = 0; i < jobCount; ++i)
             {
-                case ContinuationType.ConvexConstraintGenerator:
-                    if(PairCache.TryGetValue(ref pair, out var constraintHandle))
-                    {
-                        //This pair is associated with a constraint. 
-                    }
-                    break;
-            }
+                ref var job = ref *(pairBase + i);
+                switch (job.Continuation.Type)
+                {
+                    case ContinuationType.ConvexConstraintGenerator:
+                        if (PairCache.TryGetValue(ref job.Pair, out var constraintHandle))
+                        {
+                            //This pair is associated with a constraint. 
+                            Solver.GetConstraintReference(constraintHandle, out var reference);
+                            if (reference.TypeBatch.TypeId == TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>())
+                            {
+                                var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref reference.TypeBatch);
+                                
+                            }
 
+                        }
+                        break;
+
+                }
+            }
         }
 
     }
+
+
 
     public struct PairJob
     {
@@ -327,6 +371,13 @@ namespace SolverPrototype.CollisionDetection
         {
             BatchSize = 32;
         }
+        //TODO: Compound children don't have a collidable reference, so they cannot be gathered in the same way.
+        //Mesh children don't have a collidable reference, nor do they have a shape reference, so they can't be gathered in the same way.
+        //We'll need to refactor this interface. 
+        //Compound-Convex would decompose into a series of ChildConvex-Convex that know to gather the pose from the compound pose + child relative pose.
+        //Mesh-Convex would decompose into a series of MeshTriangle-Convex pairs that gather vertex data from the mesh transform + local vertex positions.
+        //Ideally we could find a good layout that shares as much as possible- it's not required that we have a separate batch for ChildSphere-Box, for example.
+        //(However, in the mesh case, it's unlikely that we will support a standalone triangle shape, so there will likely be a MeshTriangle-Box and so on.)
 
         //Note that the collidable pair tester itself has no dynamic state.
         //This will be called from many threads. The caller is responsible for maintaining the necessary state in a thread safe way.
