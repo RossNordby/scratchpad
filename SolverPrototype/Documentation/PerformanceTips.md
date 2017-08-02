@@ -1,4 +1,4 @@
-#Performance Tips
+# Performance Tips
 
 *This is an early work in progress. More will show up over time as I remember to write them down.*
 ## Shape Optimization

@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System;
 using SolverPrototype.Constraints;
+using System.Diagnostics;
+using System.Threading;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -71,7 +73,7 @@ namespace SolverPrototype.CollisionDetection
      */
 
     //toooo many generics
-    using PairCache = QuickDictionary<CollidablePair, int, Buffer<CollidablePair>, Buffer<int>, Buffer<int>, CollidablePairComparer>;
+    using PairCache = QuickDictionary<CollidablePair, PairConstraintReference, Buffer<CollidablePair>, Buffer<PairConstraintReference>, Buffer<int>, CollidablePairComparer>;
 
     [StructLayout(LayoutKind.Explicit, Size = 8)]
     public struct CollidablePair
@@ -303,15 +305,138 @@ namespace SolverPrototype.CollisionDetection
     //TODO: If we have any pair types that compute manifolds in a non-simd batched way, you'll need an overload of the continuations executor which is able to take them.
     //This is pretty likely- going wide on hull-hull is going to be tricky, and there's a lot of opportunity for internal SIMD usage.
 
+    public enum PairConstraintType
+    {
+        Convex1 = 0, Convex2 = 1, Convex3 = 2, Convex4 = 3,
+        Nonconvex1 = 4, Nonconvex2 = 5, Nonconvex3 = 6, Nonconvex4 = 7
+    }
+    public struct PairConstraintReference
+    {
+        uint packed;
+        public PairConstraintType Type { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (PairConstraintType)(packed >> 29); } }
+        public int Handle { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (int)(packed & ((1 << 29) - 1)); } }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public PairConstraintReference(PairConstraintType type, int constraintHandle)
+        {
+            Debug.Assert(constraintHandle < (1 << 29), "Constraint handles are assumed to be contiguous, positive, and not absurdly large.");
+            packed = ((uint)type << 29) | (uint)constraintHandle;
+        }
+    }
 
     public struct Continuations
     {
         public Solver Solver;
-        public PairCache PairCache;
-        public Continuations(Solver solver, ref PairCache pairCache)
+        public NarrowPhase NarrowPhase;
+        public Continuations(Solver solver, NarrowPhase narrowPhase)
         {
             Solver = solver;
-            PairCache = pairCache;
+            NarrowPhase = narrowPhase;
+        }
+
+        //We're basically just using a fixed size stack allocation. We could use stackalloc instead (it'll likely result in the same amount of localsinit), but shrug.
+        struct CachedImpulses
+        {
+            //By convention, we only ever create manifolds with at most 4 contacts.
+            public Vector4 PositionAndImpulse0;
+            public Vector4 PositionAndImpulse1;
+            public Vector4 PositionAndImpulse2;
+            public Vector4 PositionAndImpulse3;
+            public int Count;
+
+        }
+        /// <summary>
+        /// Gathers and heuristically redistributes accumulated impulses from the previous frame's constraint data.
+        /// </summary>
+        /// <param name="constraintHandle">Handle to the constraint to look up.</param>
+        /// <param name="impulses">Impulses and associated data required to perform accumulated impulse redistribution.</param>
+        void RedistributeAccumulatedImpulses(PairConstraintReference constraint, PairConstraintType targetType)
+        {
+            //This establishes a hardcoded relationship between narrow phase pairs and solver types. This could cause some awkwardness, but it is a relatively simple approach
+            //that avoids the need for virtual invocation when gathering and scattering accumulated impulses.
+            //TODO: If greater extensibility is required later, you could consider storing data which allow the direct calculation of accumulated impulse pointers without knowing the type.
+            //There's a little complexity there in that we still have to be mindful of the convex vs nonconvex constraint split, but it could be made to work. The data would likely already
+            //get pulled into cache because the type batch's accumulated impulses and prestep data pointers have to be pulled in.
+
+            //This callback is responsible for both determining if the constraint should exist at all and for filling any necessary material properties.
+            //It also acts as user notification of the manifold. An event system could be built on top of this.
+            if (NarrowPhase.ConstraintCallback.ShouldAllowConstraint(collidableReferenceA, collidableReferenceB, ref constraintDescription))
+            {
+                //So now we assume that the material properties are set and this constraint is ready to be put into the solver itself.
+                if (targetType == constraint.Type)
+                {
+                    //We can directly change the accumulated impulses within the constraint.
+                    //No new constraint needs to be created.
+                    Solver.GetConstraintReference(constraint.Handle, out var reference);
+                    switch (constraint.Type)
+                    {
+                        case PairConstraintType.Convex1:
+                            break;
+                        case PairConstraintType.Convex2:
+                            break;
+                        case PairConstraintType.Convex3:
+                            break;
+                        case PairConstraintType.Convex4:
+                            {
+                                var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref reference.TypeBatch);
+                                batch.AccumulatedImpulses[reference.IndexInTypeBatch];
+                            }
+                            break;
+                        case PairConstraintType.Nonconvex1:
+                            break;
+                        case PairConstraintType.Nonconvex2:
+                            break;
+                        case PairConstraintType.Nonconvex3:
+                            break;
+                        case PairConstraintType.Nonconvex4:
+                            break;
+                    }
+                }
+                else
+                {
+                    //The constraint type is changing, so we need to prepare a removal for the old constraint while setting up a new constraint.
+                    //This requires two parts:
+                    //1) Add the new constraint. For now, we use a simple spinlock to directly add the new constraint. Adding constraints to the solver is guaranteed to not change
+                    //any existing constraint index, so it's fine to do it at the same time as other threads are still working on updating accumulated impulses.
+                    //Later on, we may want to look into batching adds. Even a spinlock is far from free, especially if there is any contest. If we could batch up a number of adds at a time,
+                    //we may be able to reduce synchronization overhead and get better throughput. On the other hand, such a batching process would require that we store the pending 
+                    //constraints, which will add cache pressure and lead to more stalls, and it could be that the spinlock is sufficiently rarely contested that it is a trivial cost.
+                    //Experimentation will be required.
+                    //2) Add the old constraint to a 'to remove' set. This is not just for the sake of synchronization efficiency. We can only trigger removals after all 
+                    //constraint modifications are complete. Removals can change the order of constraints in a type batch, so if removals were allowed during this phase,
+                    //even the case where the previous and current type are the same would require synchronization. That's really bad, since state transitions are actually relatively rare.
+                    //The good news is that we can handle constraint removals in parallel in the same way that we do for deactivation, so even if there is a ton of constraint churn,
+                    //multithread utilization will still be high.
+
+                    bool taken = false;
+                    NarrowPhase.AddLock.TryEnter(ref taken);
+                    switch (targetType)
+                    {
+                        case PairConstraintType.Convex1:
+                            break;
+                        case PairConstraintType.Convex2:
+                            break;
+                        case PairConstraintType.Convex3:
+                            break;
+                        case PairConstraintType.Convex4:
+                            {
+                                ContactManifold4Constraint description;
+                                description.
+                            }
+                            break;
+                        case PairConstraintType.Nonconvex1:
+                            break;
+                        case PairConstraintType.Nonconvex2:
+                            break;
+                        case PairConstraintType.Nonconvex3:
+                            break;
+                        case PairConstraintType.Nonconvex4:
+                            break;
+                    }
+                    NarrowPhase.AddLock.Exit();
+                }
+            }
+
+
 
         }
 
@@ -337,17 +462,16 @@ namespace SolverPrototype.CollisionDetection
                 switch (job.Continuation.Type)
                 {
                     case ContinuationType.ConvexConstraintGenerator:
+
                         if (PairCache.TryGetValue(ref job.Pair, out var constraintHandle))
                         {
                             //This pair is associated with a constraint. 
-                            Solver.GetConstraintReference(constraintHandle, out var reference);
-                            if (reference.TypeBatch.TypeId == TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>())
-                            {
-                                var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref reference.TypeBatch);
-                                
-                            }
+                            GatherAccumulatedImpulses(constraintHandle, out var previousImpulses)
+
+
 
                         }
+                        //TODO: When we support non-constraint manifold storage targets for coldet-only use cases, we'll need to avoid attempting to make changes to the solver.
                         break;
 
                 }
@@ -457,21 +581,25 @@ namespace SolverPrototype.CollisionDetection
         public BufferPool Pool;
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
-        PairCache pairCache;
+        public PairCache PairCache;
+        /// <summary>
+        /// Lock used by the narrow phase when adding new contact constraints in parallel.
+        /// </summary>
+        public SpinLock AddLock;
 
         public NarrowPhase(Bodies bodies, BufferPool pool, int initialOverlapCapacity = 32768)
         {
             Bodies = bodies;
             Pool = pool;
-            PairCache.Create(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<int>(), pool.SpecializeFor<int>(),
-                SpanHelper.GetContainingPowerOf2(initialOverlapCapacity), 3, out pairCache);
+            PairCache.Create(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<PairConstraintReference>(), pool.SpecializeFor<int>(),
+                SpanHelper.GetContainingPowerOf2(initialOverlapCapacity), 3, out PairCache);
 
         }
 
         public void EnsureCapacity(int overlapCapacity)
         {
             //TODO: If there are type specialized overlap dictionaries, this must be updated.
-            pairCache.EnsureCapacity(overlapCapacity, Pool.SpecializeFor<CollidablePair>(), Pool.SpecializeFor<int>(), Pool.SpecializeFor<int>());
+            PairCache.EnsureCapacity(overlapCapacity, Pool.SpecializeFor<CollidablePair>(), Pool.SpecializeFor<PairConstraintReference>(), Pool.SpecializeFor<int>());
 
         }
 
@@ -479,6 +607,8 @@ namespace SolverPrototype.CollisionDetection
 
         public void HandleOverlap(CollidableReference a, CollidableReference b)
         {
+            if (!OverlapFilter.ShouldAllow(a, b))
+                return;
             var staticness = (a.packed >> 31) | ((b.packed & 0x7FFFFFFF) >> 30);
             switch (staticness)
             {
