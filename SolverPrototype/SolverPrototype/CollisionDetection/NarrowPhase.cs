@@ -333,24 +333,203 @@ namespace SolverPrototype.CollisionDetection
             NarrowPhase = narrowPhase;
         }
 
-        //We're basically just using a fixed size stack allocation. We could use stackalloc instead (it'll likely result in the same amount of localsinit), but shrug.
-        struct CachedImpulses
+        struct Manifold
         {
-            //By convention, we only ever create manifolds with at most 4 contacts.
-            public Vector4 PositionAndImpulse0;
-            public Vector4 PositionAndImpulse1;
-            public Vector4 PositionAndImpulse2;
-            public Vector4 PositionAndImpulse3;
-            public int Count;
+            //Positions and depths.
+            public Vector3 Local0;
+            public float Depth0;
+            public Vector4 Local1;
+            public float Depth1;
+            public Vector4 Local2;
+            public float Depth2;
+            public Vector4 Local3;
+            public float Depth3;
+            public Vector3 LocalB;
+            public Vector3 Normal0;
+            //Note that normals beyond the first are only used for nonconvex manifolds.
+            public Vector3 Normal1;
+            public Vector3 Normal2;
+            public Vector3 Normal3;
+            public int ContactCount;
+            public bool Convex;
+
+            public static void Fill(Vector3Wide position, Vector3)
 
         }
-        /// <summary>
-        /// Gathers and heuristically redistributes accumulated impulses from the previous frame's constraint data.
-        /// </summary>
-        /// <param name="constraintHandle">Handle to the constraint to look up.</param>
-        /// <param name="impulses">Impulses and associated data required to perform accumulated impulse redistribution.</param>
-        void RedistributeAccumulatedImpulses(PairConstraintReference constraint, PairConstraintType targetType)
+
+
+        struct CachedPairData
         {
+            public int FeatureId0;
+            public int FeatureId1;
+            public int FeatureId2;
+            public int FeatureId3;
+            uint packed;
+
+            public bool Convex { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (packed & (1 << 31)) == (1 << 31); } }
+            public int ContactCount { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 1 + (int)((packed >> 29) & 0x3); } }
+            public int Handle { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (int)(packed & ((1 << 29) - 1)); } }
+
+            public static ref int GetFeatureId(ref CachedPairData data, int i)
+            {
+                return ref Unsafe.Add(ref data.FeatureId0, i);
+            }
+
+            [Conditional("DEBUG")]
+            private static void Validate(int constraintHandle)
+            {
+                Debug.Assert(constraintHandle < (1 << 29), "Constraint handles are assumed to be contiguous, positive, and not absurdly large.");
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, int featureId2, int featureId3, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = ((1u << 31) | (3u << 29)) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = featureId1;
+                cachedPairData.FeatureId2 = featureId2;
+                cachedPairData.FeatureId3 = featureId3;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, int featureId2, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = ((1u << 31) | (2u << 29)) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = featureId1;
+                cachedPairData.FeatureId2 = featureId2;
+                cachedPairData.FeatureId3 = 0;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = ((1u << 31) | (1u << 29)) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = featureId1;
+                cachedPairData.FeatureId2 = 0;
+                cachedPairData.FeatureId3 = 0;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateConvex(int constraintHandle, int featureId0, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = ((1u << 31) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = 0;
+                cachedPairData.FeatureId2 = 0;
+                cachedPairData.FeatureId3 = 0;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, int featureId2, int featureId3, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = (3u << 29) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = featureId1;
+                cachedPairData.FeatureId2 = featureId2;
+                cachedPairData.FeatureId3 = featureId3;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, int featureId2, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = (2u << 29) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = featureId1;
+                cachedPairData.FeatureId2 = featureId2;
+                cachedPairData.FeatureId3 = 0;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = (1u << 29) | (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = featureId1;
+                cachedPairData.FeatureId2 = 0;
+                cachedPairData.FeatureId3 = 0;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void CreateNonconvex(int constraintHandle, int featureId0, out CachedPairData cachedPairData)
+            {
+                Validate(constraintHandle);
+                cachedPairData.packed = (uint)constraintHandle;
+                cachedPairData.FeatureId0 = featureId0;
+                cachedPairData.FeatureId1 = 0;
+                cachedPairData.FeatureId2 = 0;
+                cachedPairData.FeatureId3 = 0;
+            }
+        }
+
+
+        unsafe void UpdateConstraintsForPair(CollidablePair pair, ref Manifold manifold)
+        {
+            if (NarrowPhase.PairCache.TryGetValue(pair, out CachedPairData cachedPairData))
+            {
+                Solver.GetConstraintReference(cachedPairData.Handle, out var reference);
+                if (cachedPairData.Convex)
+                {
+                    var oldContactCount = cachedPairData.ContactCount;
+                    var oldAccumulatedImpulses = stackalloc float[oldContactCount];
+                    switch (cachedPairData.ContactCount)
+                    {
+                        case 1:
+                            break;
+                        case 2:
+                            break;
+                        case 3:
+                            break;
+                        case 4:
+                            var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref reference.TypeBatch);
+                            ref var accumulatedImpulsesBundle = ref batch.AccumulatedImpulses[reference.IndexInTypeBatch];
+                            BundleIndexing.GetBundleIndices(reference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
+
+                            //TODO: Check codegen. Backing memory is pinned, so we could take pointers to improve it if necessary.
+                            oldAccumulatedImpulses[0] = accumulatedImpulsesBundle.Penetration0[innerIndex];
+                            oldAccumulatedImpulses[1] = accumulatedImpulsesBundle.Penetration1[innerIndex];
+                            oldAccumulatedImpulses[2] = accumulatedImpulsesBundle.Penetration2[innerIndex];
+                            oldAccumulatedImpulses[3] = accumulatedImpulsesBundle.Penetration3[innerIndex];
+                            break;
+                    }
+
+                    //Redistribute the accumulated impulse from the old manifold to the new one based on the feature ids of contacts.
+                    var sourceIndices = stackalloc[manifold.Count];
+                    for (int i = 0; i < manifold.Count; ++i)
+                    {
+                        sourceIndices[i] = -1;
+                        for (int j = 0; j < oldContactCount; ++j)
+                        {
+                            if (oldFeatureIds[j] == Manifold.GetFeatureId(ref manifold, i);
+                            {
+                                sourceIndices[i] = j;
+                            }
+                        }
+                    }
+
+                    //For convex manifolds, we leave the central friction untouched. The positions of contacts in the manifold may actually have changed the best guess, but
+                    //twist friction is rarely such a critical factor in accumulated impulses that a 10% change in manifold radius has any perceivable impact.
+                    for (int i = 0; i < manifold.Count; ++i)
+                    {
+                        oldAccumulatedImpulses[sourceIndices[i]];
+                    }
+
+                    //TODO: You may want to try redistributing any 'unclaimed' accumulated impulse over contacts that had no match. This could cause overshoot, but 
+                    //it might also improve stacking in some cases. Simple to add- just try it out once you have a the ability to test stability meaningfully.
+                }
+                else
+                {
+                    if (manifold.Convex)
+                    {
+
+                    }
+                    else
+                    {
+
+                    }
+                }
+            }
+
             //This establishes a hardcoded relationship between narrow phase pairs and solver types. This could cause some awkwardness, but it is a relatively simple approach
             //that avoids the need for virtual invocation when gathering and scattering accumulated impulses.
             //TODO: If greater extensibility is required later, you could consider storing data which allow the direct calculation of accumulated impulse pointers without knowing the type.
@@ -359,9 +538,11 @@ namespace SolverPrototype.CollisionDetection
 
             //This callback is responsible for both determining if the constraint should exist at all and for filling any necessary material properties.
             //It also acts as user notification of the manifold. An event system could be built on top of this.
-            if (NarrowPhase.ConstraintCallback.ShouldAllowConstraint(collidableReferenceA, collidableReferenceB, ref constraintDescription))
+            if (NarrowPhase.Callbacks.AllowConstraint(collidableReferenceA, collidableReferenceB, ref constraintDescription))
             {
                 //So now we assume that the material properties are set and this constraint is ready to be put into the solver itself.
+                OldManifold oldManifold;
+                var oldAccumulatedImpulses = &oldManifold.Penetration0;
                 if (targetType == constraint.Type)
                 {
                     //We can directly change the accumulated impulses within the constraint.
@@ -377,8 +558,9 @@ namespace SolverPrototype.CollisionDetection
                             break;
                         case PairConstraintType.Convex4:
                             {
-                                var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref reference.TypeBatch);
-                                batch.AccumulatedImpulses[reference.IndexInTypeBatch];
+                                oldManifold.Count = 4;
+
+
                             }
                             break;
                         case PairConstraintType.Nonconvex1:
@@ -607,7 +789,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void HandleOverlap(CollidableReference a, CollidableReference b)
         {
-            if (!OverlapFilter.ShouldAllow(a, b))
+            if (!Callbacks.AllowContactGeneration(a, b))
                 return;
             var staticness = (a.packed >> 31) | ((b.packed & 0x7FFFFFFF) >> 30);
             switch (staticness)
