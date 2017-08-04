@@ -73,7 +73,7 @@ namespace SolverPrototype.CollisionDetection
      */
 
     //toooo many generics
-    using PairCache = QuickDictionary<CollidablePair, PairConstraintReference, Buffer<CollidablePair>, Buffer<PairConstraintReference>, Buffer<int>, CollidablePairComparer>;
+    using PairCache = QuickDictionary<CollidablePair, CachedPairData, Buffer<CollidablePair>, Buffer<CachedPairData>, Buffer<int>, CollidablePairComparer>;
 
     [StructLayout(LayoutKind.Explicit, Size = 8)]
     public struct CollidablePair
@@ -323,345 +323,213 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    public struct Continuations
+    /// <summary>
+    /// Information about a single contact in a nonconvex collidable pair.
+    /// Nonconvex pairs can have different surface bases at each contact point, since the contact surface is not guaranteed to be a plane.
+    /// </summary>
+    public struct NonconvexContact
     {
-        public Solver Solver;
-        public NarrowPhase NarrowPhase;
-        public Continuations(Solver solver, NarrowPhase narrowPhase)
-        {
-            Solver = solver;
-            NarrowPhase = narrowPhase;
-        }
-
-        struct Manifold
-        {
-            //Positions and depths.
-            public Vector3 Local0;
-            public float Depth0;
-            public Vector4 Local1;
-            public float Depth1;
-            public Vector4 Local2;
-            public float Depth2;
-            public Vector4 Local3;
-            public float Depth3;
-            public Vector3 LocalB;
-            public Vector3 Normal0;
-            //Note that normals beyond the first are only used for nonconvex manifolds.
-            public Vector3 Normal1;
-            public Vector3 Normal2;
-            public Vector3 Normal3;
-            public int ContactCount;
-            public bool Convex;
-
-            public static void Fill(Vector3Wide position, Vector3)
-
-        }
-
-
-        struct CachedPairData
-        {
-            public int FeatureId0;
-            public int FeatureId1;
-            public int FeatureId2;
-            public int FeatureId3;
-            uint packed;
-
-            public bool Convex { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (packed & (1 << 31)) == (1 << 31); } }
-            public int ContactCount { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 1 + (int)((packed >> 29) & 0x3); } }
-            public int Handle { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (int)(packed & ((1 << 29) - 1)); } }
-
-            public static ref int GetFeatureId(ref CachedPairData data, int i)
-            {
-                return ref Unsafe.Add(ref data.FeatureId0, i);
-            }
-
-            [Conditional("DEBUG")]
-            private static void Validate(int constraintHandle)
-            {
-                Debug.Assert(constraintHandle < (1 << 29), "Constraint handles are assumed to be contiguous, positive, and not absurdly large.");
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, int featureId2, int featureId3, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = ((1u << 31) | (3u << 29)) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = featureId1;
-                cachedPairData.FeatureId2 = featureId2;
-                cachedPairData.FeatureId3 = featureId3;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, int featureId2, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = ((1u << 31) | (2u << 29)) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = featureId1;
-                cachedPairData.FeatureId2 = featureId2;
-                cachedPairData.FeatureId3 = 0;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = ((1u << 31) | (1u << 29)) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = featureId1;
-                cachedPairData.FeatureId2 = 0;
-                cachedPairData.FeatureId3 = 0;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateConvex(int constraintHandle, int featureId0, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = ((1u << 31) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = 0;
-                cachedPairData.FeatureId2 = 0;
-                cachedPairData.FeatureId3 = 0;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, int featureId2, int featureId3, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = (3u << 29) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = featureId1;
-                cachedPairData.FeatureId2 = featureId2;
-                cachedPairData.FeatureId3 = featureId3;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, int featureId2, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = (2u << 29) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = featureId1;
-                cachedPairData.FeatureId2 = featureId2;
-                cachedPairData.FeatureId3 = 0;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = (1u << 29) | (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = featureId1;
-                cachedPairData.FeatureId2 = 0;
-                cachedPairData.FeatureId3 = 0;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static void CreateNonconvex(int constraintHandle, int featureId0, out CachedPairData cachedPairData)
-            {
-                Validate(constraintHandle);
-                cachedPairData.packed = (uint)constraintHandle;
-                cachedPairData.FeatureId0 = featureId0;
-                cachedPairData.FeatureId1 = 0;
-                cachedPairData.FeatureId2 = 0;
-                cachedPairData.FeatureId3 = 0;
-            }
-        }
-
-
-        unsafe void UpdateConstraintsForPair(CollidablePair pair, ref Manifold manifold)
-        {
-            if (NarrowPhase.PairCache.TryGetValue(pair, out CachedPairData cachedPairData))
-            {
-                Solver.GetConstraintReference(cachedPairData.Handle, out var reference);
-                if (cachedPairData.Convex)
-                {
-                    var oldContactCount = cachedPairData.ContactCount;
-                    var oldAccumulatedImpulses = stackalloc float[oldContactCount];
-                    switch (cachedPairData.ContactCount)
-                    {
-                        case 1:
-                            break;
-                        case 2:
-                            break;
-                        case 3:
-                            break;
-                        case 4:
-                            var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref reference.TypeBatch);
-                            ref var accumulatedImpulsesBundle = ref batch.AccumulatedImpulses[reference.IndexInTypeBatch];
-                            BundleIndexing.GetBundleIndices(reference.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-
-                            //TODO: Check codegen. Backing memory is pinned, so we could take pointers to improve it if necessary.
-                            oldAccumulatedImpulses[0] = accumulatedImpulsesBundle.Penetration0[innerIndex];
-                            oldAccumulatedImpulses[1] = accumulatedImpulsesBundle.Penetration1[innerIndex];
-                            oldAccumulatedImpulses[2] = accumulatedImpulsesBundle.Penetration2[innerIndex];
-                            oldAccumulatedImpulses[3] = accumulatedImpulsesBundle.Penetration3[innerIndex];
-                            break;
-                    }
-
-                    //Redistribute the accumulated impulse from the old manifold to the new one based on the feature ids of contacts.
-                    var sourceIndices = stackalloc[manifold.Count];
-                    for (int i = 0; i < manifold.Count; ++i)
-                    {
-                        sourceIndices[i] = -1;
-                        for (int j = 0; j < oldContactCount; ++j)
-                        {
-                            if (oldFeatureIds[j] == Manifold.GetFeatureId(ref manifold, i);
-                            {
-                                sourceIndices[i] = j;
-                            }
-                        }
-                    }
-
-                    //For convex manifolds, we leave the central friction untouched. The positions of contacts in the manifold may actually have changed the best guess, but
-                    //twist friction is rarely such a critical factor in accumulated impulses that a 10% change in manifold radius has any perceivable impact.
-                    for (int i = 0; i < manifold.Count; ++i)
-                    {
-                        oldAccumulatedImpulses[sourceIndices[i]];
-                    }
-
-                    //TODO: You may want to try redistributing any 'unclaimed' accumulated impulse over contacts that had no match. This could cause overshoot, but 
-                    //it might also improve stacking in some cases. Simple to add- just try it out once you have a the ability to test stability meaningfully.
-                }
-                else
-                {
-                    if (manifold.Convex)
-                    {
-
-                    }
-                    else
-                    {
-
-                    }
-                }
-            }
-
-            //This establishes a hardcoded relationship between narrow phase pairs and solver types. This could cause some awkwardness, but it is a relatively simple approach
-            //that avoids the need for virtual invocation when gathering and scattering accumulated impulses.
-            //TODO: If greater extensibility is required later, you could consider storing data which allow the direct calculation of accumulated impulse pointers without knowing the type.
-            //There's a little complexity there in that we still have to be mindful of the convex vs nonconvex constraint split, but it could be made to work. The data would likely already
-            //get pulled into cache because the type batch's accumulated impulses and prestep data pointers have to be pulled in.
-
-            //This callback is responsible for both determining if the constraint should exist at all and for filling any necessary material properties.
-            //It also acts as user notification of the manifold. An event system could be built on top of this.
-            if (NarrowPhase.Callbacks.AllowConstraint(collidableReferenceA, collidableReferenceB, ref constraintDescription))
-            {
-                //So now we assume that the material properties are set and this constraint is ready to be put into the solver itself.
-                OldManifold oldManifold;
-                var oldAccumulatedImpulses = &oldManifold.Penetration0;
-                if (targetType == constraint.Type)
-                {
-                    //We can directly change the accumulated impulses within the constraint.
-                    //No new constraint needs to be created.
-                    Solver.GetConstraintReference(constraint.Handle, out var reference);
-                    switch (constraint.Type)
-                    {
-                        case PairConstraintType.Convex1:
-                            break;
-                        case PairConstraintType.Convex2:
-                            break;
-                        case PairConstraintType.Convex3:
-                            break;
-                        case PairConstraintType.Convex4:
-                            {
-                                oldManifold.Count = 4;
-
-
-                            }
-                            break;
-                        case PairConstraintType.Nonconvex1:
-                            break;
-                        case PairConstraintType.Nonconvex2:
-                            break;
-                        case PairConstraintType.Nonconvex3:
-                            break;
-                        case PairConstraintType.Nonconvex4:
-                            break;
-                    }
-                }
-                else
-                {
-                    //The constraint type is changing, so we need to prepare a removal for the old constraint while setting up a new constraint.
-                    //This requires two parts:
-                    //1) Add the new constraint. For now, we use a simple spinlock to directly add the new constraint. Adding constraints to the solver is guaranteed to not change
-                    //any existing constraint index, so it's fine to do it at the same time as other threads are still working on updating accumulated impulses.
-                    //Later on, we may want to look into batching adds. Even a spinlock is far from free, especially if there is any contest. If we could batch up a number of adds at a time,
-                    //we may be able to reduce synchronization overhead and get better throughput. On the other hand, such a batching process would require that we store the pending 
-                    //constraints, which will add cache pressure and lead to more stalls, and it could be that the spinlock is sufficiently rarely contested that it is a trivial cost.
-                    //Experimentation will be required.
-                    //2) Add the old constraint to a 'to remove' set. This is not just for the sake of synchronization efficiency. We can only trigger removals after all 
-                    //constraint modifications are complete. Removals can change the order of constraints in a type batch, so if removals were allowed during this phase,
-                    //even the case where the previous and current type are the same would require synchronization. That's really bad, since state transitions are actually relatively rare.
-                    //The good news is that we can handle constraint removals in parallel in the same way that we do for deactivation, so even if there is a ton of constraint churn,
-                    //multithread utilization will still be high.
-
-                    bool taken = false;
-                    NarrowPhase.AddLock.TryEnter(ref taken);
-                    switch (targetType)
-                    {
-                        case PairConstraintType.Convex1:
-                            break;
-                        case PairConstraintType.Convex2:
-                            break;
-                        case PairConstraintType.Convex3:
-                            break;
-                        case PairConstraintType.Convex4:
-                            {
-                                ContactManifold4Constraint description;
-                                description.
-                            }
-                            break;
-                        case PairConstraintType.Nonconvex1:
-                            break;
-                        case PairConstraintType.Nonconvex2:
-                            break;
-                        case PairConstraintType.Nonconvex3:
-                            break;
-                        case PairConstraintType.Nonconvex4:
-                            break;
-                    }
-                    NarrowPhase.AddLock.Exit();
-                }
-            }
-
-
-
-        }
-
-        public unsafe void Execute(Buffer<PairJob> jobs, int jobStart, int jobCount, ref ConvexContactManifoldWide manifold)
-        {
-            //Given the use of virtuals elsewhere, it may seem a bit odd to use a hardcoded switch here.
-            //Especially because these are not guaranteed to be the only types ever supported. Some extensions may demand new entries here.
-            //As usual, this comes down to performance:
-            //1) Continuation types vary on a per-pair basis, rather than on a per-batch basis. This was a tradeoff:
-            //the greater the degree of batch segmentation, the less work could be batched together, and the more pending pairs sit around in L1 cache.
-            //Since the contact manifold calculation is the dominant cost on nontrivial pairs, the more full-occupancy SIMD dispatches we can do, the better.
-
-            //2) Having established per-pair invocation, virtual invocations tend to be slower than contiguous switch statements by about 8-15 cycles.
-            //For 100000 pairs on a 3770K-like CPU, we'd expect a virtual implementation to run 50-100us slower than a switch implementation.
-            //That's pretty small, but this kind of thing adds up. 
-
-            //(This choice is something to monitor over time in terms of virtual/switch codegen, batching, and extensibility. We already do a virtual dispatch at the 
-            //batch level, so if it turns out pairType x continuationType batching is okay in practice and the hardcodedness is getting in the way, we can switch.)
-            var pairBase = (PairJob*)jobs.Memory + jobStart;
-            for (int i = 0; i < jobCount; ++i)
-            {
-                ref var job = ref *(pairBase + i);
-                switch (job.Continuation.Type)
-                {
-                    case ContinuationType.ConvexConstraintGenerator:
-
-                        if (PairCache.TryGetValue(ref job.Pair, out var constraintHandle))
-                        {
-                            //This pair is associated with a constraint. 
-                            GatherAccumulatedImpulses(constraintHandle, out var previousImpulses)
-
-
-
-                        }
-                        //TODO: When we support non-constraint manifold storage targets for coldet-only use cases, we'll need to avoid attempting to make changes to the solver.
-                        break;
-
-                }
-            }
-        }
-
+        /// <summary>
+        /// Offset from the position of collidable A to the contact position. 
+        /// </summary>
+        public Vector3 Offset;
+        /// <summary>
+        /// Penetration depth between the two collidables at this contact. Negative values represent separation.
+        /// </summary>
+        public float Depth;
+        /// <summary>
+        /// Surface basis of the contact. If transformed into a rotation matrix, X and Z represent tangent directions and Y represents the contact normal.
+        /// </summary>
+        public BEPUutilities2.Quaternion SurfaceBasis;
+        /// <summary>
+        /// Id of the features involved in the collision that generated this contact. If a contact has the same feature id as in a previous frame, it is an indication that the
+        /// same parts of the shape contributed to its creation. This is useful for carrying information from frame to frame.
+        /// </summary>
+        public int FeatureId;
+    }
+    /// <summary>
+    /// Information about a single contact in a convex collidable pair. Convex collidable pairs share one surface basis across the manifold, since the contact surface is guaranteed to be a plane.
+    /// </summary>
+    public struct ConvexContact
+    {
+        /// <summary>
+        /// Offset from the position of collidable A to the contact position. 
+        /// </summary>
+        public Vector3 Offset;
+        /// <summary>
+        /// Penetration depth between the two collidables at this contact. Negative values represent separation.
+        /// </summary>
+        public float Depth;
+        /// <summary>
+        /// Id of the features involved in the collision that generated this contact. If a contact has the same feature id as in a previous frame, it is an indication that the
+        /// same parts of the shape contributed to its creation. This is useful for carrying information from frame to frame.
+        /// </summary>
+        public int FeatureId;
     }
 
+    public unsafe struct NonconvexContactManifold
+    {
+        internal NonconvexContact* Contacts;
+        /// <summary>
+        /// Gets a reference to a contact in the manifold.
+        /// </summary>
+        /// <param name="contactIndex">Index of the contact to get.</param>
+        /// <returns>Reference to the indexed contact.</returns>
+        public ref NonconvexContact this[int contactIndex]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                Debug.Assert(contactIndex >= 0 && contactIndex < ContactCount);
+                return ref Contacts[contactIndex];
+            }
+        }
+        /// <summary>
+        /// Offset from collidable A to collidable B.
+        /// </summary>
+        public Vector3 OffsetB;
+        public int ContactCount;
+
+    }
+    public unsafe struct ConvexContactManifold
+    {
+        internal ConvexContact* Contacts;
+        /// <summary>
+        /// Gets a reference to a contact in the manifold.
+        /// </summary>
+        /// <param name="contactIndex">Index of the contact to get.</param>
+        /// <returns>Reference to the indexed contact.</returns>
+        public ref ConvexContact this[int contactIndex]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                Debug.Assert(contactIndex >= 0 && contactIndex < ContactCount);
+                return ref Contacts[contactIndex];
+            }
+        }
+        /// <summary>
+        /// Surface basis of the manifold. If transformed into a rotation matrix, X and Z represent tangent directions and Y represents the surface normal.
+        /// </summary>
+        public BEPUutilities2.Quaternion SurfaceBasis;
+        /// <summary>
+        /// Offset from collidable A to collidable B.
+        /// </summary>
+        public Vector3 OffsetB;
+        public int ContactCount;
+    }
+    public struct CachedPairData
+    {
+        public int FeatureId0;
+        public int FeatureId1;
+        public int FeatureId2;
+        public int FeatureId3;
+        uint packed;
+
+        public bool Convex { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (packed & (1 << 31)) == (1 << 31); } }
+        public int ContactCount { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 1 + (int)((packed >> 29) & 0x3); } }
+        public int Handle { [MethodImpl(MethodImplOptions.AggressiveInlining)]get { return (int)(packed & ((1 << 29) - 1)); } }
+
+        public static ref int GetFeatureId(ref CachedPairData data, int i)
+        {
+            return ref Unsafe.Add(ref data.FeatureId0, i);
+        }
+
+        [Conditional("DEBUG")]
+        private static void Validate(int constraintHandle)
+        {
+            Debug.Assert(constraintHandle < (1 << 29), "Constraint handles are assumed to be contiguous, positive, and not absurdly large.");
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, int featureId2, int featureId3, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = ((1u << 31) | (3u << 29)) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = featureId1;
+            cachedPairData.FeatureId2 = featureId2;
+            cachedPairData.FeatureId3 = featureId3;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, int featureId2, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = ((1u << 31) | (2u << 29)) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = featureId1;
+            cachedPairData.FeatureId2 = featureId2;
+            cachedPairData.FeatureId3 = 0;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateConvex(int constraintHandle, int featureId0, int featureId1, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = ((1u << 31) | (1u << 29)) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = featureId1;
+            cachedPairData.FeatureId2 = 0;
+            cachedPairData.FeatureId3 = 0;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateConvex(int constraintHandle, int featureId0, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = (1u << 31) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = 0;
+            cachedPairData.FeatureId2 = 0;
+            cachedPairData.FeatureId3 = 0;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, int featureId2, int featureId3, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = (3u << 29) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = featureId1;
+            cachedPairData.FeatureId2 = featureId2;
+            cachedPairData.FeatureId3 = featureId3;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, int featureId2, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = (2u << 29) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = featureId1;
+            cachedPairData.FeatureId2 = featureId2;
+            cachedPairData.FeatureId3 = 0;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateNonconvex(int constraintHandle, int featureId0, int featureId1, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = (1u << 29) | (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = featureId1;
+            cachedPairData.FeatureId2 = 0;
+            cachedPairData.FeatureId3 = 0;
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void CreateNonconvex(int constraintHandle, int featureId0, out CachedPairData cachedPairData)
+        {
+            Validate(constraintHandle);
+            cachedPairData.packed = (uint)constraintHandle;
+            cachedPairData.FeatureId0 = featureId0;
+            cachedPairData.FeatureId1 = 0;
+            cachedPairData.FeatureId2 = 0;
+            cachedPairData.FeatureId3 = 0;
+        }
+    }
+
+    public struct PairMaterialProperties
+    {
+        public float FrictionCoefficient;
+        public float MaximumRecoveryVelocity;
+        public SpringSettingsAOS SpringSettings;
+    }
+
+    
 
 
     public struct PairJob
@@ -757,7 +625,7 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    public class NarrowPhase
+    public partial class NarrowPhase<TNarrowPhaseCallbacks> where TNarrowPhaseCallbacks : INarrowPhaseCallbacks
     {
         public Bodies Bodies;
         public BufferPool Pool;
@@ -768,12 +636,13 @@ namespace SolverPrototype.CollisionDetection
         /// Lock used by the narrow phase when adding new contact constraints in parallel.
         /// </summary>
         public SpinLock AddLock;
+        public TNarrowPhaseCallbacks Callbacks;
 
         public NarrowPhase(Bodies bodies, BufferPool pool, int initialOverlapCapacity = 32768)
         {
             Bodies = bodies;
             Pool = pool;
-            PairCache.Create(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<PairConstraintReference>(), pool.SpecializeFor<int>(),
+            PairCache.Create(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CachedPairData>(), pool.SpecializeFor<int>(),
                 SpanHelper.GetContainingPowerOf2(initialOverlapCapacity), 3, out PairCache);
 
         }
@@ -781,10 +650,9 @@ namespace SolverPrototype.CollisionDetection
         public void EnsureCapacity(int overlapCapacity)
         {
             //TODO: If there are type specialized overlap dictionaries, this must be updated.
-            PairCache.EnsureCapacity(overlapCapacity, Pool.SpecializeFor<CollidablePair>(), Pool.SpecializeFor<PairConstraintReference>(), Pool.SpecializeFor<int>());
+            PairCache.EnsureCapacity(overlapCapacity, Pool.SpecializeFor<CollidablePair>(), Pool.SpecializeFor<CachedPairData>(), Pool.SpecializeFor<int>());
 
         }
-
 
 
         public void HandleOverlap(CollidableReference a, CollidableReference b)
@@ -799,8 +667,8 @@ namespace SolverPrototype.CollisionDetection
                         //Both references are bodies.
                         //This is a body. In order to dispatch it properly, we need to know some metadata.
                         //TODO: Once inactive bodies exist, this will need to be updated.
-                        ref var aCollidable = ref Bodies.Collidables[a.CollidableIndex];
-                        ref var bCollidable = ref Bodies.Collidables[b.CollidableIndex];
+                        ref var aCollidable = ref Bodies.Collidables[a.Collidable];
+                        ref var bCollidable = ref Bodies.Collidables[b.Collidable];
                         if (aCollidable.Continuity.UseSubstepping || bCollidable.Continuity.UseSubstepping)
                         {
                             //Pull the velocity information for all involved bodies. We will request a number of steps that will cover the motion path.

@@ -118,7 +118,7 @@ namespace SolverPrototype
                     //if it avoids extraneous data storage.
                     //TODO: When deactivation exists, this will need to be updated to accommodate it.
                     //TODO: When non-body static collidables exist, this will need to be updated.
-                    Bodies.Collidables[movedLeaf.CollidableIndex].BroadPhaseIndex = removedBroadPhaseIndex;
+                    Bodies.Collidables[movedLeaf.Collidable].BroadPhaseIndex = removedBroadPhaseIndex;
                 }
 
             }

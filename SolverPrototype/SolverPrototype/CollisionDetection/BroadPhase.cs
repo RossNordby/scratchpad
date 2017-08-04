@@ -63,7 +63,7 @@ namespace SolverPrototype.CollisionDetection
 
         internal void UpdateForCollidableMemoryMove(int broadPhaseIndex, int newCollidableIndex)
         {
-            activeLeaves[broadPhaseIndex].CollidableIndex = newCollidableIndex;
+            activeLeaves[broadPhaseIndex].Collidable = newCollidableIndex;
         }
 
         //Note that some systems (like the demos renderer bounding box line extractor) iterate over the leaves. However, they're not contiguously stored.

@@ -30,9 +30,9 @@ namespace SolverPrototype.Collidables
         }
 
         /// <summary>
-        /// Gets or sets the index of the collidable referred to by this instance.
+        /// Gets or sets the handle of the collidable referred to by this instance.
         /// </summary>
-        public int CollidableIndex
+        public int Collidable
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get { return (int)(packed & 0x00FFFFFF); }
