@@ -27,6 +27,15 @@ namespace BEPUutilities2.Memory
             Id = id;
         }
 
+        public bool Allocated
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return Memory != null;
+            }
+        }
+
         public ref byte this[int index]
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]

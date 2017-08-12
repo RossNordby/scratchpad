@@ -8,6 +8,7 @@ using System;
 using SolverPrototype.Constraints;
 using System.Diagnostics;
 using System.Threading;
+using BEPUutilities2;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -72,8 +73,6 @@ namespace SolverPrototype.CollisionDetection
      * 
      */
 
-    //toooo many generics
-    using PairCache = QuickDictionary<CollidablePair, CachedPairData, Buffer<CollidablePair>, Buffer<CachedPairData>, Buffer<int>, CollidablePairComparer>;
 
     [StructLayout(LayoutKind.Explicit, Size = 8)]
     public struct CollidablePair
@@ -529,7 +528,7 @@ namespace SolverPrototype.CollisionDetection
         public SpringSettingsAOS SpringSettings;
     }
 
-    
+
 
 
     public struct PairJob
@@ -625,39 +624,44 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    public partial class NarrowPhase<TNarrowPhaseCallbacks> where TNarrowPhaseCallbacks : INarrowPhaseCallbacks
+    /// <summary>
+    /// Turns broad phase overlaps into contact manifolds and uses them to manage constraints in the solver.
+    /// </summary>
+    /// <typeparam name="TFilters">Type of the filter callbacks to use.</typeparam>
+    /// <typeparam name="TConstraintAdder">Type fo the constraint adder to use.</typeparam>
+    /// <typeparam name="TConstraintRemover">Type of the constraint remover to use.</typeparam>
+    public class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover>
+        where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover
     {
         public Bodies Bodies;
         public BufferPool Pool;
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
-        /// <summary>
-        /// Lock used by the narrow phase when adding new contact constraints in parallel.
-        /// </summary>
-        public SpinLock AddLock;
-        public TNarrowPhaseCallbacks Callbacks;
+        public TFilters Filters;
+        public TConstraintAdder ConstraintAdder;
+        public TConstraintRemover ConstraintRemover;
 
-        public NarrowPhase(Bodies bodies, BufferPool pool, int initialOverlapCapacity = 32768)
+        //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
+        public NarrowPhase(Bodies bodies, BufferPool pool)
         {
             Bodies = bodies;
             Pool = pool;
-            PairCache.Create(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CachedPairData>(), pool.SpecializeFor<int>(),
-                SpanHelper.GetContainingPowerOf2(initialOverlapCapacity), 3, out PairCache);
+            var emptyPairCache = new PairCache();
+            PairCache = new PairCache(pool, ref emptyPairCache);
 
         }
 
-        public void EnsureCapacity(int overlapCapacity)
+        public void Flush(IThreadDispatcher threadDispatcher = null)
         {
-            //TODO: If there are type specialized overlap dictionaries, this must be updated.
-            PairCache.EnsureCapacity(overlapCapacity, Pool.SpecializeFor<CollidablePair>(), Pool.SpecializeFor<CachedPairData>(), Pool.SpecializeFor<int>());
-
+            Filters.Flush(threadDispatcher);
+            ConstraintAdder.Flush(threadDispatcher);
+            ConstraintRemover.Flush(threadDispatcher);
         }
 
-
-        public void HandleOverlap(CollidableReference a, CollidableReference b)
+        public void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
-            if (!Callbacks.AllowContactGeneration(a, b))
+            if (!Filters.AllowContactGeneration(workerIndex, a, b))
                 return;
             var staticness = (a.packed >> 31) | ((b.packed & 0x7FFFFFFF) >> 30);
             switch (staticness)
