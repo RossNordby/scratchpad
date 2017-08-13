@@ -624,16 +624,22 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
+    public interface INarrowPhase
+    {
+        ref PairCache PairCache { get; }
+    }
+
+
     /// <summary>
     /// Turns broad phase overlaps into contact manifolds and uses them to manage constraints in the solver.
     /// </summary>
     /// <typeparam name="TFilters">Type of the filter callbacks to use.</typeparam>
-    /// <typeparam name="TConstraintAdder">Type fo the constraint adder to use.</typeparam>
+    /// <typeparam name="TConstraintAdder">Type of the constraint adder to use.</typeparam>
     /// <typeparam name="TConstraintRemover">Type of the constraint remover to use.</typeparam>
-    public class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover>
-        where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover
+    public class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> 
+        where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover where TCollidableData : struct
     {
-        public Bodies Bodies;
+        public Bodies<TCollidableData> Bodies;
         public BufferPool Pool;
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.

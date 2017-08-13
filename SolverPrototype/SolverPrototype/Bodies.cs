@@ -14,7 +14,8 @@ namespace SolverPrototype
     /// <summary>
     /// Collection of allocated bodies.
     /// </summary>
-    public class Bodies
+    /// <typeparam name="TCollidableData">The type of supplementary data associated with each collidable.</typeparam>
+    public class Bodies<TCollidableData> : IBodyDataSource where TCollidableData : struct //TODO: Blittable
     {
         /// <summary>
         /// Remaps a body handle to the actual array index of the body.
@@ -30,10 +31,15 @@ namespace SolverPrototype
         /// Shape indices cannot transition between pointing at a shape and pointing at nothing or vice versa without notifying the broad phase of the collidable addition or removal.
         /// </summary>
         public Buffer<Collidable> Collidables;
+        /// <summary>
+        /// The supplementary data associated with each collidable. Usually accessed by narrow phase callbacks for collision filtering and material calculations.
+        /// </summary>
+        public Buffer<TCollidableData> CollidableData;
 
         public Buffer<BodyPoses> Poses;
-        public Buffer<BodyVelocities> Velocities;
+        Buffer<BodyVelocities> velocities;
         public Buffer<BodyInertias> LocalInertias;
+        public ref Buffer<BodyVelocities> Velocities { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return ref velocities; } }
         /// <summary>
         /// The world transformed inertias of bodies as of the last update. Note that this is not automatically updated for direct orientation changes or for body memory moves.
         /// It is only updated once during the frame. It should be treated as ephemeral information.
@@ -41,7 +47,7 @@ namespace SolverPrototype
         public Buffer<BodyInertias> Inertias;
         public IdPool<Buffer<int>, BufferPool<int>> IdPool;
         BufferPool pool;
-        public int BodyCount;
+        public int BodyCount { get; private set; }
         /// <summary>
         /// Gets the number of body bundles. Any trailing partial bundle is counted as a full bundle.
         /// </summary>
@@ -74,12 +80,13 @@ namespace SolverPrototype
             Debug.Assert(Poses.Length != BufferPool<BodyPoses>.GetLowestContainingElementCount(targetBundleCapacity), "Should not try to use internal resize of the result won't change the size.");
             var bodyBundleCount = BodyBundleCount;
             pool.SpecializeFor<BodyPoses>().Resize(ref Poses, targetBundleCapacity, bodyBundleCount);
-            pool.SpecializeFor<BodyVelocities>().Resize(ref Velocities, targetBundleCapacity, bodyBundleCount);
+            pool.SpecializeFor<BodyVelocities>().Resize(ref velocities, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<BodyInertias>().Resize(ref LocalInertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<BodyInertias>().Resize(ref Inertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, BodyCount);
             pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, BodyCount);
             pool.SpecializeFor<Collidable>().Resize(ref Collidables, targetBodyCapacity, BodyCount);
+            pool.SpecializeFor<TCollidableData>().Resize(ref CollidableData, targetBodyCapacity, BodyCount);
             //Initialize all the indices beyond the copied region to -1.
             Unsafe.InitBlock(((int*)HandleToIndex.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - BodyCount)));
             Unsafe.InitBlock(((int*)IndexToHandle.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - BodyCount)));
@@ -90,7 +97,7 @@ namespace SolverPrototype
             //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.
         }
         
-        public unsafe int Add(ref BodyDescription bodyDescription)
+        public unsafe int Add(ref BodyDescription<TCollidableData> bodyDescription)
         {
             if (BodyCount == HandleToIndex.Length)
             {
@@ -112,7 +119,7 @@ namespace SolverPrototype
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
             SetLane(ref Poses[bundleIndex], indexInBundle, ref bodyDescription.Pose);
-            SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
+            SetLane(ref velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
             SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
             //TODO: Should the world inertias be updated on add? That would suggest a convention of also updating world inertias on any orientation change, which might not be wise given the API.
             return handle;
@@ -141,10 +148,11 @@ namespace SolverPrototype
                 BundleIndexing.GetBundleIndices(bodyIndex, out var targetBundle, out var targetInner);
                 BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
                 GatherScatter.CopyLane(ref Poses[sourceBundle], sourceInner, ref Poses[targetBundle], targetInner);
-                GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref velocities[sourceBundle], sourceInner, ref velocities[targetBundle], targetInner);
                 GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
                 //Note that if you ever treat the world inertias as 'always updated', it would need to be copied here.
                 Collidables[bodyIndex] = Collidables[movedBodyOriginalIndex];
+                CollidableData[bodyIndex] = CollidableData[movedBodyOriginalIndex];
                 //Point the body handles at the new location.
                 var lastHandle = IndexToHandle[movedBodyOriginalIndex];
                 HandleToIndex[lastHandle] = bodyIndex;
@@ -312,13 +320,13 @@ namespace SolverPrototype
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            SetLane(ref Velocities[bundleIndex], innerIndex, ref velocity);
+            SetLane(ref velocities[bundleIndex], innerIndex, ref velocity);
         }
         public void GetVelocity(int handle, out BodyVelocity velocity)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GetLane(ref Velocities[bundleIndex], innerIndex, out velocity);
+            GetLane(ref velocities[bundleIndex], innerIndex, out velocity);
         }
         public void SetLocalInertia(int handle, ref BodyInertia inertia)
         {
@@ -333,27 +341,28 @@ namespace SolverPrototype
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
 
-        public void GetDescription(int handle, out BodyDescription description)
+        public void GetDescription(int handle, out BodyDescription<TCollidableData> description)
         {
             ValidateExistingHandle(handle);
             var index = HandleToIndex[handle];
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             GetLane(ref Poses[bundleIndex], innerIndex, out description.Pose);
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out description.LocalInertia);
-            GetLane(ref Velocities[bundleIndex], innerIndex, out description.Velocity);
+            GetLane(ref velocities[bundleIndex], innerIndex, out description.Velocity);
             ref var collidable = ref Collidables[index];
             description.Collidable.Continuity = collidable.Continuity;
             description.Collidable.Shape = collidable.Shape;
             description.Collidable.SpeculativeMargin = collidable.SpeculativeMargin;
+            description.CollidableData = CollidableData[index];
         }
-        public void SetDescription(int handle, ref BodyDescription description)
+        public void SetDescription(int handle, ref BodyDescription<TCollidableData> description)
         {
             ValidateExistingHandle(handle);
             var index = HandleToIndex[handle];
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             SetLane(ref Poses[bundleIndex], innerIndex, ref description.Pose);
             SetLane(ref LocalInertias[bundleIndex], innerIndex, ref description.LocalInertia);
-            SetLane(ref Velocities[bundleIndex], innerIndex, ref description.Velocity);
+            SetLane(ref velocities[bundleIndex], innerIndex, ref description.Velocity);
             ref var collidable = ref Collidables[index];
             collidable.Continuity = description.Collidable.Continuity;
             collidable.SpeculativeMargin = description.Collidable.SpeculativeMargin;
@@ -365,6 +374,7 @@ namespace SolverPrototype
                 "The broad phase requires notification when a collidable is added or removed. " +
                 "You can remove and re-add the body to the simulation, manually notify the broadphase, or create a variant of this function that is broadphase aware.");
             collidable.Shape = description.Collidable.Shape;
+            CollidableData[index] = description.CollidableData;
         }
 
 
@@ -401,7 +411,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherVelocityForBody(ref float targetLinearVelocityBase, ref float targetAngularVelocityBase, int targetLaneIndex, int bundleIndex, int innerIndex)
         {
-            ref var sourceLinear = ref GatherScatter.Get(ref Velocities[bundleIndex].LinearVelocity.X, innerIndex);
+            ref var sourceLinear = ref GatherScatter.Get(ref velocities[bundleIndex].LinearVelocity.X, innerIndex);
             ref var sourceAngular = ref Unsafe.Add(ref sourceLinear, 3 * Vector<float>.Count);
             ref var targetLinearSlot = ref Unsafe.Add(ref targetLinearVelocityBase, targetLaneIndex);
             ref var targetAngularSlot = ref Unsafe.Add(ref targetAngularVelocityBase, targetLaneIndex);
@@ -521,13 +531,13 @@ namespace SolverPrototype
             var zeroVelocity = new BodyVelocity();
             for (int i = lastBundleCount; i < Vector<float>.Count; ++i)
             {
-                SetLane(ref Velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
+                SetLane(ref velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
             }
             Vector<float> accumulated = Vector<float>.Zero;
             for (int bundleIndex = 0; bundleIndex <= lastBundleIndex; ++bundleIndex)
             {
-                Vector3Wide.Dot(ref Velocities[bundleIndex].LinearVelocity, ref Velocities[bundleIndex].LinearVelocity, out var linearDot);
-                Vector3Wide.Dot(ref Velocities[bundleIndex].AngularVelocity, ref Velocities[bundleIndex].AngularVelocity, out var angularDot);
+                Vector3Wide.Dot(ref velocities[bundleIndex].LinearVelocity, ref velocities[bundleIndex].LinearVelocity, out var linearDot);
+                Vector3Wide.Dot(ref velocities[bundleIndex].AngularVelocity, ref velocities[bundleIndex].AngularVelocity, out var angularDot);
                 accumulated += linearDot + angularDot;
             }
             return Vector.Dot(accumulated, Vector<float>.One);
@@ -550,10 +560,13 @@ namespace SolverPrototype
             var oldCollidableA = Collidables[slotA];
             Collidables[slotA] = Collidables[slotB];
             Collidables[slotB] = oldCollidableA;
+            var oldCollidableDataA = CollidableData[slotA];
+            CollidableData[slotA] = CollidableData[slotB];
+            CollidableData[slotB] = oldCollidableDataA;
             BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
             BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
             GatherScatter.SwapLanes(ref Poses[bundleA], innerA, ref Poses[bundleB], innerB);
-            GatherScatter.SwapLanes(ref Velocities[bundleA], innerA, ref Velocities[bundleB], innerB);
+            GatherScatter.SwapLanes(ref velocities[bundleA], innerA, ref velocities[bundleB], innerB);
             GatherScatter.SwapLanes(ref LocalInertias[bundleA], innerA, ref LocalInertias[bundleB], innerB);
         }
 
@@ -609,14 +622,14 @@ namespace SolverPrototype
         public void Dispose()
         {
             pool.SpecializeFor<BodyPoses>().Return(ref Poses);
-            pool.SpecializeFor<BodyVelocities>().Return(ref Velocities);
+            pool.SpecializeFor<BodyVelocities>().Return(ref velocities);
             pool.SpecializeFor<BodyInertias>().Return(ref LocalInertias);
             pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
             pool.SpecializeFor<int>().Return(ref HandleToIndex);
             pool.SpecializeFor<int>().Return(ref IndexToHandle);
             //Zeroing the lengths is useful for reuse- resizes know not to copy old invalid data.
             Poses = new Buffer<BodyPoses>();
-            Velocities = new Buffer<BodyVelocities>();
+            velocities = new Buffer<BodyVelocities>();
             LocalInertias = new Buffer<BodyInertias>();
             Inertias = new Buffer<BodyInertias>();
             HandleToIndex = new Buffer<int>();

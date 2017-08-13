@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using BEPUutilities2.Memory;
+using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,7 +9,7 @@ using System.Threading;
 
 namespace SolverPrototype
 {
-    public partial class Solver
+    public partial class Solver<TBodies> where TBodies : IBodyDataSource
     {
 
         public Buffer<int> StageIndices; //Used by the intermediate dispatcher.

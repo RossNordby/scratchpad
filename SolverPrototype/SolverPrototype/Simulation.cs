@@ -12,17 +12,17 @@ namespace SolverPrototype
     /// <summary>
     /// Orchestrates the bookkeeping and execution of a full dynamic simulation.
     /// </summary>
-    public partial class Simulation : IDisposable
+    partial class Simulation<TNarrowPhase, TCollidableData> : IDisposable where TNarrowPhase : INarrowPhase where TCollidableData : struct
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
-        public Bodies Bodies { get; private set; }
+        public Bodies<TCollidableData> Bodies { get; private set; }
         public Shapes Shapes { get; private set; }
         public PoseIntegrator PoseIntegrator { get; private set; }
         public BroadPhase BroadPhase { get; private set; }
         public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
         public BatchCompressor SolverBatchCompressor { get; private set; }
-        public Solver Solver { get; private set; }
+        public Solver<Bodies<TCollidableData>> Solver { get; private set; }
 
 
         /// <summary>
@@ -41,9 +41,9 @@ namespace SolverPrototype
         public Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
             BufferPool = bufferPool;
-            Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
+            Bodies = new Bodies<TCollidableData>(bufferPool, initialAllocationSizes.Bodies);
             Shapes = new Shapes(bufferPool, initialAllocationSizes.ShapesPerType);
-            Solver = new Solver(Bodies, BufferPool,
+            Solver = new Solver<Bodies<TCollidableData>>(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);

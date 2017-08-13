@@ -9,6 +9,7 @@ namespace SolverPrototype.CollisionDetection
 {
     public interface INarrowPhaseFilters
     {
+        void Initialize(Simulation<TNarrowPhase, TSupplementData> simulation);
         /// <summary>
         /// Chooses whether to allow contact generation to proceed for two overlapping collidables.
         /// </summary>
@@ -60,6 +61,11 @@ namespace SolverPrototype.CollisionDetection
     public interface INarrowPhaseConstraintAdder
     {
         /// <summary>
+        /// Initializes the constraint adder with the target solver.
+        /// </summary>
+        /// <param name="solver">Solver to add constraints to.</param>
+        void Initialize(Solver solver);
+        /// <summary>
         /// Requests that a constraint be added to the solver between two bodies.
         /// Implementers must notify the NarrowPhase.PairCache of the constraint handle using NarrowPhase.PairCache.FillConstraintHandle.
         /// </summary>
@@ -92,6 +98,12 @@ namespace SolverPrototype.CollisionDetection
 
     public interface INarrowPhaseConstraintRemover
     {
+        /// <summary>
+        /// Initializes the constraint adder with the target solver.
+        /// </summary>
+        /// <param name="solver">Solver to remove constraints from.</param>
+        void Initialize(Solver solver);
+
         /// <summary>
         /// Enqueues a constraint for removal from the solver. The implementer must wait until after the narrow phase's contact generation phase completes;
         /// the prestep data and accumulated impulses of existing constraints are modified in parallel, and constraint removes can move memory around.

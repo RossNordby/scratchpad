@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SolverPrototype.Constraints;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,13 +10,13 @@ namespace SolverPrototype
     /// <summary>
     /// Collects body handles associated with a constraint.
     /// </summary>
-    public unsafe struct ConstraintBodyHandleCollector : IForEach<int>
+    public unsafe struct ConstraintBodyHandleCollector<TBodies> : IForEach<int> where TBodies : IBodyDataSource
     {
-        public Bodies Bodies;
+        public TBodies Bodies;
         public int* Handles;
         public int Index;
 
-        public ConstraintBodyHandleCollector(Bodies bodies, int* handles)
+        public ConstraintBodyHandleCollector(TBodies bodies, int* handles)
         {
             Bodies = bodies;
             Handles = handles;

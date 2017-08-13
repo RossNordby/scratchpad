@@ -29,7 +29,7 @@ namespace SolverPrototype
         public int IndexInTypeBatch;
     }
 
-    public partial class Solver
+    public partial class Solver<TBodies> where TBodies : IBodyDataSource
     {
         public QuickList<ConstraintBatch, Array<ConstraintBatch>> Batches;
 
@@ -50,7 +50,7 @@ namespace SolverPrototype
             }
         }
 
-        Bodies bodies;
+        TBodies bodies;
 
         IdPool<Buffer<int>, BufferPool<int>> handlePool;
         BufferPool bufferPool;
@@ -100,7 +100,7 @@ namespace SolverPrototype
         Action<int> workDelegate;
         const int TypeCountEstimate = 32;
         const int BatchCountEstimate = 32;
-        public Solver(Bodies bodies, BufferPool bufferPool, int iterationCount = 5,
+        public Solver(TBodies bodies, BufferPool bufferPool, int iterationCount = 5,
             int initialCapacity = 1024,
             int minimumCapacityPerTypeBatch = 64)
         {

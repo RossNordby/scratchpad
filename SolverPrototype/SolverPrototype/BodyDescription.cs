@@ -20,12 +20,13 @@ namespace SolverPrototype
         public float InverseMass;
     }
 
-    public struct BodyDescription
+    public struct BodyDescription<TCollidableData> where TCollidableData : struct
     {
         public BodyPose Pose;
         public BodyInertia LocalInertia;
         public BodyVelocity Velocity;
         public CollidableDescription Collidable;
+        public TCollidableData CollidableData;
     }
 
     public struct BodyPoses

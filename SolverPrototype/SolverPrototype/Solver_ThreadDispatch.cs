@@ -12,7 +12,7 @@ using System.Threading;
 
 namespace SolverPrototype
 {
-    public partial class Solver
+    public partial class Solver<TBodies>
     {
 
         //This is going to look a bit more complicated than would be expected for a series of forloops.
@@ -280,7 +280,7 @@ namespace SolverPrototype
         struct PrestepStageFunction : IStageFunction 
         {
             public float Dt;
-            public Bodies Bodies;
+            public TBodies Bodies;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
