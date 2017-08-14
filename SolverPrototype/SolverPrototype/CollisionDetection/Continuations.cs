@@ -26,22 +26,20 @@ public struct PendingTwoBodyConvex4Constraint : IPendingContactConstraint
 
 
 namespace SolverPrototype.CollisionDetection
-{
-    //toooo many generics
-    using PairCache = QuickDictionary<CollidablePair, CachedPairData, Buffer<CollidablePair>, Buffer<CachedPairData>, Buffer<int>, CollidablePairComparer>;
-
-    public struct Continuations<TNarrowPhaseCallbacks> where TNarrowPhaseCallbacks : INarrowPhaseCallbacks
+{ 
+    public struct Continuations<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData>
+        where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover where TCollidableData : struct
     {
         public Solver Solver;
-        public NarrowPhase<TNarrowPhaseCallbacks> NarrowPhase;
-        public Continuations(Solver solver, NarrowPhase<TNarrowPhaseCallbacks> narrowPhase)
+        public NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> NarrowPhase;
+        public Continuations(Solver solver, NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> narrowPhase)
         {
             Solver = solver;
             NarrowPhase = narrowPhase;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void AddConstraint4(int bodyHandleA, int bodyHandleB, ref ConvexContactManifold manifold, ref PairMaterialProperties pairMaterial)
+        unsafe void AddConstraint4(int workerIndex, TypedIndex constraintCacheIndex, int bodyHandleA, int bodyHandleB, ref ConvexContactManifold manifold, ref PairMaterialProperties pairMaterial)
         {
             ContactManifold4Constraint description;
             var constraintContactData = &description.Contact0;
@@ -59,7 +57,7 @@ namespace SolverPrototype.CollisionDetection
             description.FrictionCoefficient = pairMaterial.FrictionCoefficient;
 
             //TODO: Check codegen on that little anti-init hack. If it's worse than directly passing a pointer, directly pass a pointer.
-            NarrowPhase.Callbacks.AddConstraint(bodyHandleA, bodyHandleB, ref *&description);
+            NarrowPhase.ConstraintAdder.AddConstraint(workerIndex, constraintCacheIndex, bodyHandleA, bodyHandleB, ref *&description);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -84,7 +82,7 @@ namespace SolverPrototype.CollisionDetection
         {
             //TODO: To support efficient static-body constraints, we'll need to create permutations of this function.
             Debug.Assert(!pair.A.IsStatic && !pair.B.IsStatic, "When using the two body constraint update, both involved collidables should belong to bodies!");
-            if (NarrowPhase.Callbacks.ConfigureContactManifold(workerIndex, pair, ref manifold, out var pairMaterial))
+            if (NarrowPhase.Filters.ConfigureContactManifold(workerIndex, pair, ref manifold, out var pairMaterial))
             {
                 switch (manifold.ContactCount)
                 {
@@ -97,8 +95,12 @@ namespace SolverPrototype.CollisionDetection
                     case 4:
                         {
                             //Is this constraint new?
-                            if (NarrowPhase.PairCache.TryGetValue(pair, out var cachedPairData))
+                            if (NarrowPhase.PairCache.TryGetPointers(ref pair, out var pointers))
                             {
+                                //TODO: Probably worth using an explicit non-TypedIndex type for this encoding.
+                                //8 types, 0-3 convex, 4-7 nonconvex.
+                                var isNonconvex = pointers.ConstraintCache.Type & 4;
+                                NarrowPhase.PairCache.GetConstraintCache(pointers.ConstraintCache.Index);
                                 const int newContactCount = 4;
                                 if (cachedPairData.Convex && cachedPairData.ContactCount == newContactCount)
                                 {
@@ -341,15 +343,15 @@ namespace SolverPrototype.CollisionDetection
                 {
                     case ContinuationType.ConvexConstraintGenerator:
 
-                        if (PairCache.TryGetValue(ref job.Pair, out var constraintHandle))
-                        {
-                            //This pair is associated with a constraint. 
-                            GatherAccumulatedImpulses(constraintHandle, out var previousImpulses)
+                        //if (PairCache.TryGetValue(ref job.Pair, out var constraintHandle))
+                        //{
+                        //    //This pair is associated with a constraint. 
+                        //    GatherAccumulatedImpulses(constraintHandle, out var previousImpulses)
 
 
 
 
-                        }
+                        //}
                         //TODO: When we support non-constraint manifold storage targets for coldet-only use cases, we'll need to avoid attempting to make changes to the solver.
                         break;
 

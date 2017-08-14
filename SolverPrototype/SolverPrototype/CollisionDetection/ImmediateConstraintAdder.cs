@@ -13,10 +13,12 @@ namespace SolverPrototype.CollisionDetection
     public struct ImmediateConstraintAdder : INarrowPhaseConstraintAdder
     {
         Solver solver;
-        public ImmediateConstraintAdder(Solver solver)
-        {
 
+        public void Initialize(Solver solver)
+        {
+            throw new NotImplementedException();
         }
+
         public void AddConstraint<TDescription>(int workerIndex, TypedIndex constraintCacheIndex, int bodyHandleA, int bodyHandleB, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
         {
             throw new NotImplementedException();
@@ -31,5 +33,6 @@ namespace SolverPrototype.CollisionDetection
         {
             throw new NotImplementedException();
         }
+
     }
 }

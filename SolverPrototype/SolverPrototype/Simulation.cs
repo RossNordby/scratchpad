@@ -22,7 +22,7 @@ namespace SolverPrototype
         public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
         public BatchCompressor SolverBatchCompressor { get; private set; }
-        public Solver<Bodies<TCollidableData>> Solver { get; private set; }
+        public Solver Solver { get; private set; }
 
 
         /// <summary>
@@ -43,7 +43,7 @@ namespace SolverPrototype
             BufferPool = bufferPool;
             Bodies = new Bodies<TCollidableData>(bufferPool, initialAllocationSizes.Bodies);
             Shapes = new Shapes(bufferPool, initialAllocationSizes.ShapesPerType);
-            Solver = new Solver<Bodies<TCollidableData>>(Bodies, BufferPool,
+            Solver = new Solver(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
@@ -72,7 +72,7 @@ namespace SolverPrototype
         }
 
 
-        public int Add(ref BodyDescription bodyDescription)
+        public int Add(ref BodyDescription<TCollidableData> bodyDescription)
         {
             var handle = Bodies.Add(ref bodyDescription);
             var bodyIndex = Bodies.HandleToIndex[handle];

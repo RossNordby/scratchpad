@@ -11,7 +11,7 @@ namespace SolverPrototype
     /// <summary>
     /// Handles the movement of constraints from higher indexed batches into lower indexed batches to avoid accumulating a bunch of unnecessary ConstraintBatches.
     /// </summary>
-    public class BatchCompressor<TBodies> where 
+    public class BatchCompressor 
     {
         //We want to keep removes as fast as possible. So, when removing constraints, no attempt is made to pull constraints from higher constraint batches into the revealed slot.
         //Over time, this could result in lots of extra constraint batches that ruin multithreading performance.

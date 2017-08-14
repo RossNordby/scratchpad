@@ -12,53 +12,11 @@ namespace SolverPrototype
 {
 
     /// <summary>
-    /// Collection of allocated bodies.
+    /// Collection of allocated bodies with supplemental collidable data.
     /// </summary>
     /// <typeparam name="TCollidableData">The type of supplementary data associated with each collidable.</typeparam>
-    public class Bodies<TCollidableData> : IBodyDataSource where TCollidableData : struct //TODO: Blittable
+    public class Bodies<TCollidableData> : Bodies where TCollidableData : struct //TODO: Blittable
     {
-        /// <summary>
-        /// Remaps a body handle to the actual array index of the body.
-        /// The backing array index may change in response to cache optimization.
-        /// </summary>
-        public Buffer<int> HandleToIndex;
-        /// <summary>
-        /// Remaps a body index to its handle.
-        /// </summary>
-        public Buffer<int> IndexToHandle;
-        /// <summary>
-        /// The set of collidables owned by each body. Speculative margins, continuity settings, and shape indices can be changed directly.
-        /// Shape indices cannot transition between pointing at a shape and pointing at nothing or vice versa without notifying the broad phase of the collidable addition or removal.
-        /// </summary>
-        public Buffer<Collidable> Collidables;
-        /// <summary>
-        /// The supplementary data associated with each collidable. Usually accessed by narrow phase callbacks for collision filtering and material calculations.
-        /// </summary>
-        public Buffer<TCollidableData> CollidableData;
-
-        public Buffer<BodyPoses> Poses;
-        Buffer<BodyVelocities> velocities;
-        public Buffer<BodyInertias> LocalInertias;
-        public ref Buffer<BodyVelocities> Velocities { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return ref velocities; } }
-        /// <summary>
-        /// The world transformed inertias of bodies as of the last update. Note that this is not automatically updated for direct orientation changes or for body memory moves.
-        /// It is only updated once during the frame. It should be treated as ephemeral information.
-        /// </summary>
-        public Buffer<BodyInertias> Inertias;
-        public IdPool<Buffer<int>, BufferPool<int>> IdPool;
-        BufferPool pool;
-        public int BodyCount { get; private set; }
-        /// <summary>
-        /// Gets the number of body bundles. Any trailing partial bundle is counted as a full bundle.
-        /// </summary>
-        public int BodyBundleCount
-        {
-            get
-            {
-                return BundleIndexing.GetBundleCount(BodyCount);
-            }
-        }
-
         public unsafe Bodies(BufferPool pool, int initialCapacity = 4096)
         {
             this.pool = pool;
@@ -68,6 +26,10 @@ namespace SolverPrototype
             IdPool = new IdPool<Buffer<int>, BufferPool<int>>(pool.SpecializeFor<int>(), initialCapacity);
         }
 
+        /// <summary>
+        /// The supplementary data associated with each collidable. Usually accessed by narrow phase callbacks for collision filtering and material calculations.
+        /// </summary>
+        public Buffer<TCollidableData> CollidableData;
         unsafe void InternalResize(int targetBodyCapacity)
         {
             //There's no point in going smaller than the bundle size. That would result in resizes that don't resize any of the bundle structures.
@@ -80,7 +42,7 @@ namespace SolverPrototype
             Debug.Assert(Poses.Length != BufferPool<BodyPoses>.GetLowestContainingElementCount(targetBundleCapacity), "Should not try to use internal resize of the result won't change the size.");
             var bodyBundleCount = BodyBundleCount;
             pool.SpecializeFor<BodyPoses>().Resize(ref Poses, targetBundleCapacity, bodyBundleCount);
-            pool.SpecializeFor<BodyVelocities>().Resize(ref velocities, targetBundleCapacity, bodyBundleCount);
+            pool.SpecializeFor<BodyVelocities>().Resize(ref Velocities, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<BodyInertias>().Resize(ref LocalInertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<BodyInertias>().Resize(ref Inertias, targetBundleCapacity, bodyBundleCount);
             pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, BodyCount);
@@ -96,7 +58,7 @@ namespace SolverPrototype
             //The idpool's internal queue will often be nowhere near as large as the actual body size except in corner cases, so in the usual case, being lazy saves a little space.
             //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.
         }
-        
+
         public unsafe int Add(ref BodyDescription<TCollidableData> bodyDescription)
         {
             if (BodyCount == HandleToIndex.Length)
@@ -119,7 +81,7 @@ namespace SolverPrototype
 
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var indexInBundle);
             SetLane(ref Poses[bundleIndex], indexInBundle, ref bodyDescription.Pose);
-            SetLane(ref velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
+            SetLane(ref Velocities[bundleIndex], indexInBundle, ref bodyDescription.Velocity);
             SetLane(ref LocalInertias[bundleIndex], indexInBundle, ref bodyDescription.LocalInertia);
             //TODO: Should the world inertias be updated on add? That would suggest a convention of also updating world inertias on any orientation change, which might not be wise given the API.
             return handle;
@@ -148,7 +110,7 @@ namespace SolverPrototype
                 BundleIndexing.GetBundleIndices(bodyIndex, out var targetBundle, out var targetInner);
                 BundleIndexing.GetBundleIndices(movedBodyOriginalIndex, out var sourceBundle, out var sourceInner);
                 GatherScatter.CopyLane(ref Poses[sourceBundle], sourceInner, ref Poses[targetBundle], targetInner);
-                GatherScatter.CopyLane(ref velocities[sourceBundle], sourceInner, ref velocities[targetBundle], targetInner);
+                GatherScatter.CopyLane(ref Velocities[sourceBundle], sourceInner, ref Velocities[targetBundle], targetInner);
                 GatherScatter.CopyLane(ref LocalInertias[sourceBundle], sourceInner, ref LocalInertias[targetBundle], targetInner);
                 //Note that if you ever treat the world inertias as 'always updated', it would need to be copied here.
                 Collidables[bodyIndex] = Collidables[movedBodyOriginalIndex];
@@ -171,6 +133,7 @@ namespace SolverPrototype
             HandleToIndex[handle] = -1;
             return bodyMoved;
         }
+
         /// <summary>
         /// Removes a body from the set and returns whether a move occurred. If another body took its place, the move is output.
         /// </summary>
@@ -184,6 +147,185 @@ namespace SolverPrototype
             removedIndex = HandleToIndex[handle];
             return RemoveAt(removedIndex, out movedBodyOriginalIndex);
         }
+
+        public void GetDescription(int handle, out BodyDescription<TCollidableData> description)
+        {
+            ValidateExistingHandle(handle);
+            var index = HandleToIndex[handle];
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            GetLane(ref Poses[bundleIndex], innerIndex, out description.Pose);
+            GetLane(ref LocalInertias[bundleIndex], innerIndex, out description.LocalInertia);
+            GetLane(ref Velocities[bundleIndex], innerIndex, out description.Velocity);
+            ref var collidable = ref Collidables[index];
+            description.Collidable.Continuity = collidable.Continuity;
+            description.Collidable.Shape = collidable.Shape;
+            description.Collidable.SpeculativeMargin = collidable.SpeculativeMargin;
+            description.CollidableData = CollidableData[index];
+        }
+        public void SetDescription(int handle, ref BodyDescription<TCollidableData> description)
+        {
+            ValidateExistingHandle(handle);
+            var index = HandleToIndex[handle];
+            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
+            SetLane(ref Poses[bundleIndex], innerIndex, ref description.Pose);
+            SetLane(ref LocalInertias[bundleIndex], innerIndex, ref description.LocalInertia);
+            SetLane(ref Velocities[bundleIndex], innerIndex, ref description.Velocity);
+            ref var collidable = ref Collidables[index];
+            collidable.Continuity = description.Collidable.Continuity;
+            collidable.SpeculativeMargin = description.Collidable.SpeculativeMargin;
+            //TODO: If users are hitting this with any frequency, supporting the path out of the box would be a good idea.
+            //In fact, this function existing at all in the bodies set (where it lacks direct broadphase access) is questionable because of its lack of generality.
+            //Something to consider for later.
+            Debug.Assert(description.Collidable.Shape.Exists == collidable.Shape.Exists,
+                "Setting the description should not be used to add or remove collidables, only to change their shape and properties. " +
+                "The broad phase requires notification when a collidable is added or removed. " +
+                "You can remove and re-add the body to the simulation, manually notify the broadphase, or create a variant of this function that is broadphase aware.");
+            collidable.Shape = description.Collidable.Shape;
+            CollidableData[index] = description.CollidableData;
+        }
+
+
+
+        /// <summary>
+        /// Swaps the memory of two bodies. Indexed by memory slot, not by handle index.
+        /// </summary>
+        /// <param name="slotA">Memory slot of the first body to swap.</param>
+        /// <param name="slotB">Memory slot of the second body to swap.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Swap(int slotA, int slotB)
+        {
+            HandleToIndex[IndexToHandle[slotA]] = slotB;
+            HandleToIndex[IndexToHandle[slotB]] = slotA;
+            var oldHandleA = IndexToHandle[slotA];
+            IndexToHandle[slotA] = IndexToHandle[slotB];
+            IndexToHandle[slotB] = oldHandleA;
+            var oldCollidableA = Collidables[slotA];
+            Collidables[slotA] = Collidables[slotB];
+            Collidables[slotB] = oldCollidableA;
+            var oldCollidableDataA = CollidableData[slotA];
+            CollidableData[slotA] = CollidableData[slotB];
+            CollidableData[slotB] = oldCollidableDataA;
+            BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
+            BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
+            GatherScatter.SwapLanes(ref Poses[bundleA], innerA, ref Poses[bundleB], innerB);
+            GatherScatter.SwapLanes(ref Velocities[bundleA], innerA, ref Velocities[bundleB], innerB);
+            GatherScatter.SwapLanes(ref LocalInertias[bundleA], innerA, ref LocalInertias[bundleB], innerB);
+        }
+
+
+        /// <summary>
+        /// Clears all bodies from the set without returning any memory to the pool.
+        /// </summary>
+        public unsafe void Clear()
+        {
+            BodyCount = 0;
+            //Empty out all the index-handle mappings.
+            Unsafe.InitBlock(HandleToIndex.Memory, 0xFF, (uint)(sizeof(int) * HandleToIndex.Length));
+            Unsafe.InitBlock(IndexToHandle.Memory, 0xFF, (uint)(sizeof(int) * IndexToHandle.Length));
+            IdPool.Clear();
+        }
+
+
+
+        public void EnsureCapacity(int bodyCapacity)
+        {
+            if (IndexToHandle.Length < bodyCapacity)
+            {
+                InternalResize(bodyCapacity);
+            }
+            //When ensuring capacity, we assume the user wants to avoid all related resizes.
+            //So we bump up the idpool's capacity, too. This is likely a massive overestimate, but it doesn't cost that much, and it does provide the necessary guarantee.
+            IdPool.EnsureCapacity(bodyCapacity);
+        }
+        public void Compact(int bodyCapacity)
+        {
+            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
+            if (IndexToHandle.Length > targetBodyCapacity)
+            {
+                InternalResize(targetBodyCapacity);
+            }
+            IdPool.Compact(bodyCapacity);
+        }
+
+        public void Resize(int bodyCapacity)
+        {
+            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
+            if (IndexToHandle.Length != targetBodyCapacity)
+            {
+                InternalResize(targetBodyCapacity);
+            }
+            IdPool.Resize(bodyCapacity);
+        }
+
+        /// <summary>
+        /// Returns all body resources to the pool used to create them.
+        /// </summary>
+        /// <remarks>The object can be reused if it is reinitialized by using EnsureCapacity or Resize.</remarks>
+        public void Dispose()
+        {
+            pool.SpecializeFor<BodyPoses>().Return(ref Poses);
+            pool.SpecializeFor<BodyVelocities>().Return(ref Velocities);
+            pool.SpecializeFor<BodyInertias>().Return(ref LocalInertias);
+            pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
+            pool.SpecializeFor<int>().Return(ref HandleToIndex);
+            pool.SpecializeFor<int>().Return(ref IndexToHandle);
+            pool.SpecializeFor<Collidable>().Return(ref Collidables);
+            pool.SpecializeFor<TCollidableData>().Return(ref CollidableData);
+            //Zeroing the lengths is useful for reuse- resizes know not to copy old invalid data.
+            Poses = new Buffer<BodyPoses>();
+            Velocities = new Buffer<BodyVelocities>();
+            LocalInertias = new Buffer<BodyInertias>();
+            Inertias = new Buffer<BodyInertias>();
+            HandleToIndex = new Buffer<int>();
+            IndexToHandle = new Buffer<int>();
+            IdPool.Dispose();
+        }
+
+    }
+
+
+    /// <summary>
+    /// Collection of allocated bodies.
+    /// </summary>
+    public class Bodies
+    {
+        /// <summary>
+        /// Remaps a body handle to the actual array index of the body.
+        /// The backing array index may change in response to cache optimization.
+        /// </summary>
+        public Buffer<int> HandleToIndex;
+        /// <summary>
+        /// Remaps a body index to its handle.
+        /// </summary>
+        public Buffer<int> IndexToHandle;
+        /// <summary>
+        /// The set of collidables owned by each body. Speculative margins, continuity settings, and shape indices can be changed directly.
+        /// Shape indices cannot transition between pointing at a shape and pointing at nothing or vice versa without notifying the broad phase of the collidable addition or removal.
+        /// </summary>
+        public Buffer<Collidable> Collidables;
+
+        public Buffer<BodyPoses> Poses;
+        public Buffer<BodyVelocities> Velocities;
+        public Buffer<BodyInertias> LocalInertias;
+        /// <summary>
+        /// The world transformed inertias of bodies as of the last update. Note that this is not automatically updated for direct orientation changes or for body memory moves.
+        /// It is only updated once during the frame. It should be treated as ephemeral information.
+        /// </summary>
+        public Buffer<BodyInertias> Inertias;
+        public IdPool<Buffer<int>, BufferPool<int>> IdPool;
+        protected BufferPool pool;
+        public int BodyCount;
+        /// <summary>
+        /// Gets the number of body bundles. Any trailing partial bundle is counted as a full bundle.
+        /// </summary>
+        public int BodyBundleCount
+        {
+            get
+            {
+                return BundleIndexing.GetBundleCount(BodyCount);
+            }
+        }
+
 
         [Conditional("DEBUG")]
         internal void ValidateHandle(int handle)
@@ -320,13 +462,13 @@ namespace SolverPrototype
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            SetLane(ref velocities[bundleIndex], innerIndex, ref velocity);
+            SetLane(ref Velocities[bundleIndex], innerIndex, ref velocity);
         }
         public void GetVelocity(int handle, out BodyVelocity velocity)
         {
             ValidateExistingHandle(handle);
             GetBundleIndices(handle, out var bundleIndex, out var innerIndex);
-            GetLane(ref velocities[bundleIndex], innerIndex, out velocity);
+            GetLane(ref Velocities[bundleIndex], innerIndex, out velocity);
         }
         public void SetLocalInertia(int handle, ref BodyInertia inertia)
         {
@@ -341,42 +483,7 @@ namespace SolverPrototype
             GetLane(ref LocalInertias[bundleIndex], innerIndex, out inertia);
         }
 
-        public void GetDescription(int handle, out BodyDescription<TCollidableData> description)
-        {
-            ValidateExistingHandle(handle);
-            var index = HandleToIndex[handle];
-            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            GetLane(ref Poses[bundleIndex], innerIndex, out description.Pose);
-            GetLane(ref LocalInertias[bundleIndex], innerIndex, out description.LocalInertia);
-            GetLane(ref velocities[bundleIndex], innerIndex, out description.Velocity);
-            ref var collidable = ref Collidables[index];
-            description.Collidable.Continuity = collidable.Continuity;
-            description.Collidable.Shape = collidable.Shape;
-            description.Collidable.SpeculativeMargin = collidable.SpeculativeMargin;
-            description.CollidableData = CollidableData[index];
-        }
-        public void SetDescription(int handle, ref BodyDescription<TCollidableData> description)
-        {
-            ValidateExistingHandle(handle);
-            var index = HandleToIndex[handle];
-            BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
-            SetLane(ref Poses[bundleIndex], innerIndex, ref description.Pose);
-            SetLane(ref LocalInertias[bundleIndex], innerIndex, ref description.LocalInertia);
-            SetLane(ref velocities[bundleIndex], innerIndex, ref description.Velocity);
-            ref var collidable = ref Collidables[index];
-            collidable.Continuity = description.Collidable.Continuity;
-            collidable.SpeculativeMargin = description.Collidable.SpeculativeMargin;
-            //TODO: If users are hitting this with any frequency, supporting the path out of the box would be a good idea.
-            //In fact, this function existing at all in the bodies set (where it lacks direct broadphase access) is questionable because of its lack of generality.
-            //Something to consider for later.
-            Debug.Assert(description.Collidable.Shape.Exists == collidable.Shape.Exists,
-                "Setting the description should not be used to add or remove collidables, only to change their shape and properties. " +
-                "The broad phase requires notification when a collidable is added or removed. " +
-                "You can remove and re-add the body to the simulation, manually notify the broadphase, or create a variant of this function that is broadphase aware.");
-            collidable.Shape = description.Collidable.Shape;
-            CollidableData[index] = description.CollidableData;
-        }
-
+        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherInertiaForBody(ref float targetInertiaBase, int targetLaneIndex, int bundleIndex, int innerIndex)
@@ -411,7 +518,7 @@ namespace SolverPrototype
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherVelocityForBody(ref float targetLinearVelocityBase, ref float targetAngularVelocityBase, int targetLaneIndex, int bundleIndex, int innerIndex)
         {
-            ref var sourceLinear = ref GatherScatter.Get(ref velocities[bundleIndex].LinearVelocity.X, innerIndex);
+            ref var sourceLinear = ref GatherScatter.Get(ref Velocities[bundleIndex].LinearVelocity.X, innerIndex);
             ref var sourceAngular = ref Unsafe.Add(ref sourceLinear, 3 * Vector<float>.Count);
             ref var targetLinearSlot = ref Unsafe.Add(ref targetLinearVelocityBase, targetLaneIndex);
             ref var targetAngularSlot = ref Unsafe.Add(ref targetAngularVelocityBase, targetLaneIndex);
@@ -531,111 +638,18 @@ namespace SolverPrototype
             var zeroVelocity = new BodyVelocity();
             for (int i = lastBundleCount; i < Vector<float>.Count; ++i)
             {
-                SetLane(ref velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
+                SetLane(ref Velocities[lastBundleIndex], lastBundleCount, ref zeroVelocity);
             }
             Vector<float> accumulated = Vector<float>.Zero;
             for (int bundleIndex = 0; bundleIndex <= lastBundleIndex; ++bundleIndex)
             {
-                Vector3Wide.Dot(ref velocities[bundleIndex].LinearVelocity, ref velocities[bundleIndex].LinearVelocity, out var linearDot);
-                Vector3Wide.Dot(ref velocities[bundleIndex].AngularVelocity, ref velocities[bundleIndex].AngularVelocity, out var angularDot);
+                Vector3Wide.Dot(ref Velocities[bundleIndex].LinearVelocity, ref Velocities[bundleIndex].LinearVelocity, out var linearDot);
+                Vector3Wide.Dot(ref Velocities[bundleIndex].AngularVelocity, ref Velocities[bundleIndex].AngularVelocity, out var angularDot);
                 accumulated += linearDot + angularDot;
             }
             return Vector.Dot(accumulated, Vector<float>.One);
         }
 
-
-        /// <summary>
-        /// Swaps the memory of two bodies. Indexed by memory slot, not by handle index.
-        /// </summary>
-        /// <param name="slotA">Memory slot of the first body to swap.</param>
-        /// <param name="slotB">Memory slot of the second body to swap.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Swap(int slotA, int slotB)
-        {
-            HandleToIndex[IndexToHandle[slotA]] = slotB;
-            HandleToIndex[IndexToHandle[slotB]] = slotA;
-            var oldHandleA = IndexToHandle[slotA];
-            IndexToHandle[slotA] = IndexToHandle[slotB];
-            IndexToHandle[slotB] = oldHandleA;
-            var oldCollidableA = Collidables[slotA];
-            Collidables[slotA] = Collidables[slotB];
-            Collidables[slotB] = oldCollidableA;
-            var oldCollidableDataA = CollidableData[slotA];
-            CollidableData[slotA] = CollidableData[slotB];
-            CollidableData[slotB] = oldCollidableDataA;
-            BundleIndexing.GetBundleIndices(slotA, out var bundleA, out var innerA);
-            BundleIndexing.GetBundleIndices(slotB, out var bundleB, out var innerB);
-            GatherScatter.SwapLanes(ref Poses[bundleA], innerA, ref Poses[bundleB], innerB);
-            GatherScatter.SwapLanes(ref velocities[bundleA], innerA, ref velocities[bundleB], innerB);
-            GatherScatter.SwapLanes(ref LocalInertias[bundleA], innerA, ref LocalInertias[bundleB], innerB);
-        }
-
-
-        /// <summary>
-        /// Clears all bodies from the set without returning any memory to the pool.
-        /// </summary>
-        public unsafe void Clear()
-        {
-            BodyCount = 0;
-            //Empty out all the index-handle mappings.
-            Unsafe.InitBlock(HandleToIndex.Memory, 0xFF, (uint)(sizeof(int) * HandleToIndex.Length));
-            Unsafe.InitBlock(IndexToHandle.Memory, 0xFF, (uint)(sizeof(int) * IndexToHandle.Length));
-            IdPool.Clear();
-        }
-
-
-
-        public void EnsureCapacity(int bodyCapacity)
-        {
-            if (IndexToHandle.Length < bodyCapacity)
-            {
-                InternalResize(bodyCapacity);
-            }
-            //When ensuring capacity, we assume the user wants to avoid all related resizes.
-            //So we bump up the idpool's capacity, too. This is likely a massive overestimate, but it doesn't cost that much, and it does provide the necessary guarantee.
-            IdPool.EnsureCapacity(bodyCapacity);
-        }
-        public void Compact(int bodyCapacity)
-        {
-            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
-            if (IndexToHandle.Length > targetBodyCapacity)
-            {
-                InternalResize(targetBodyCapacity);
-            }
-            IdPool.Compact(bodyCapacity);
-        }
-
-        public void Resize(int bodyCapacity)
-        {
-            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
-            if (IndexToHandle.Length != targetBodyCapacity)
-            {
-                InternalResize(targetBodyCapacity);
-            }
-            IdPool.Resize(bodyCapacity);
-        }
-
-        /// <summary>
-        /// Returns all body resources to the pool used to create them.
-        /// </summary>
-        /// <remarks>The object can be reused if it is reinitialized by using EnsureCapacity or Resize.</remarks>
-        public void Dispose()
-        {
-            pool.SpecializeFor<BodyPoses>().Return(ref Poses);
-            pool.SpecializeFor<BodyVelocities>().Return(ref velocities);
-            pool.SpecializeFor<BodyInertias>().Return(ref LocalInertias);
-            pool.SpecializeFor<BodyInertias>().Return(ref Inertias);
-            pool.SpecializeFor<int>().Return(ref HandleToIndex);
-            pool.SpecializeFor<int>().Return(ref IndexToHandle);
-            //Zeroing the lengths is useful for reuse- resizes know not to copy old invalid data.
-            Poses = new Buffer<BodyPoses>();
-            velocities = new Buffer<BodyVelocities>();
-            LocalInertias = new Buffer<BodyInertias>();
-            Inertias = new Buffer<BodyInertias>();
-            HandleToIndex = new Buffer<int>();
-            IndexToHandle = new Buffer<int>();
-            IdPool.Dispose();
-        }
 
     }
 }

@@ -6,6 +6,7 @@ using System.Numerics;
 using System.Threading.Tasks;
 using System.Threading;
 using BEPUutilities2;
+using SolverPrototype.CollisionDetection;
 
 namespace DemoRenderer.Constraints
 {
@@ -14,7 +15,7 @@ namespace DemoRenderer.Constraints
         const int jobsPerThread = 4;
         QuickList<ThreadJob, Array<ThreadJob>> jobs;
         Vector3 color = new Vector3(0, 1, 0);
-        Simulation simulation;
+        BroadPhase broadPhase;
         int masterLinesCount;
 
         struct ThreadJob
@@ -45,7 +46,7 @@ namespace DemoRenderer.Constraints
             job.JobLines.EnsureCapacity(job.LeafCount * 12, new PassthroughArrayPool<LineInstance>());
             for (int broadPhaseIndex = job.LeafStart; broadPhaseIndex < end; ++broadPhaseIndex)
             {
-                if (simulation.BroadPhase.TryGetBoundsPointers(broadPhaseIndex, out var minFloat, out var maxFloat))
+                if (broadPhase.TryGetBoundsPointers(broadPhaseIndex, out var minFloat, out var maxFloat))
                 {
                     var min = (Vector3*)minFloat;
                     var max = (Vector3*)maxFloat;
@@ -75,11 +76,11 @@ namespace DemoRenderer.Constraints
 
 
 
-        internal unsafe void AddInstances(Simulation simulation, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
+        internal unsafe void AddInstances(BroadPhase broadPhase, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
         {
             //Note that not every leaf index is occupied. Leaf indices are designed to be like handles, so that user code doesn't need to be aware of memory layout changes
             //when a collidable is removed. That means we'll be scanning some leaves that do not exist, but that's fine.
-            var possibleLeafCount = simulation.BroadPhase.ActiveTree.LeafCount;
+            var possibleLeafCount = broadPhase.ActiveTree.LeafCount;
             lines.EnsureCapacity(lines.Count + 12 * possibleLeafCount, new PassthroughArrayPool<LineInstance>());
             var maximumJobCount = jobsPerThread * Environment.ProcessorCount;
             var possibleLeavesPerJob = possibleLeafCount / maximumJobCount;
@@ -100,11 +101,11 @@ namespace DemoRenderer.Constraints
                 else
                     break;
             }
-            this.simulation = simulation;
+            this.broadPhase = broadPhase;
             masterLinesCount = lines.Count;
             looper.For(0, jobs.Count, workDelegate);
             lines.Count = masterLinesCount;
-            this.simulation = null;
+            this.broadPhase = null;
             jobs.Count = 0;
 
         }

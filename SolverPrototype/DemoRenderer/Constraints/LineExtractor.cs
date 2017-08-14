@@ -2,6 +2,7 @@
 using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype;
+using SolverPrototype.CollisionDetection;
 
 namespace DemoRenderer.Constraints
 {
@@ -20,13 +21,13 @@ namespace DemoRenderer.Constraints
             this.looper = looper;
         }
 
-        public void Extract(Simulation simulation, bool showConstraints = true, bool showContacts = false, bool showBoundingBoxes = false, IThreadDispatcher threadDispatcher = null)
+        public void Extract(Bodies bodies, Solver solver, BroadPhase broadPhase, bool showConstraints = true, bool showContacts = false, bool showBoundingBoxes = false, IThreadDispatcher threadDispatcher = null)
         {
             looper.Dispatcher = threadDispatcher;
             if (showConstraints)
-                constraints.AddInstances(simulation, showConstraints, showContacts, ref lines, looper);
+                constraints.AddInstances(bodies, solver, showConstraints, showContacts, ref lines, looper);
             if (showBoundingBoxes)
-                boundingBoxes.AddInstances(simulation, ref lines, looper);
+                boundingBoxes.AddInstances(broadPhase, ref lines, looper);
         }
         public void ClearInstances()
         {

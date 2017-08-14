@@ -12,7 +12,7 @@ namespace SolverPrototype.CollisionDetection
     //would you care for some generics
     using OverlapMapping = QuickDictionary<CollidablePair, CollidablePairPointers, Buffer<CollidablePair>, Buffer<CollidablePairPointers>, Buffer<int>, CollidablePairComparer>;
 
-    struct CollidablePairPointers
+    public struct CollidablePairPointers
     {
         /// <summary>
         /// A narrowphase-specific type and index into the pair cache's constraint data set. Collision pairs which have no associated constraint, either 
@@ -93,9 +93,9 @@ namespace SolverPrototype.CollisionDetection
             else
                 current = new QuickList<T, Buffer<T>>();
         }
-
+        
         //The previous cache always persists while building a new one. It has to be available for searching old cached data.
-        public PairCache(BufferPool pool, ref PairCache previousPairCache, int minimumMappingSize = 2048, 
+        public PairCache(BufferPool pool, ref PairCache previousPairCache, int minimumMappingSize = 2048,
             int minimumConstraintBatchSize = 128, int minimumCollisionDataBatchSize = 128, float previousBatchMultiplier = 1.25f)
         {
             this.pool = pool;
@@ -142,12 +142,19 @@ namespace SolverPrototype.CollisionDetection
                 constraintCache3.Dispose(pool.SpecializeFor<ConstraintCache3>());
             if (constraintCache4.Span.Allocated)
                 constraintCache4.Dispose(pool.SpecializeFor<ConstraintCache4>());
-            for (int i =0; i < collisionDataCache.Length; ++i)
+            for (int i = 0; i < collisionDataCache.Length; ++i)
             {
                 if (collisionDataCache[i].Buffer.Allocated)
                     pool.Return(ref collisionDataCache[i].Buffer);
             }
             cache.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryGetPointers(ref CollidablePair pair, out CollidablePairPointers pointers)
+        {
+            return cache.TryGetValue(ref pair, out pointers);
         }
 
         /// <summary>

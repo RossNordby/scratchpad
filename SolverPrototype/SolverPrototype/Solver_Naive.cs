@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace SolverPrototype
 {
-    public partial class Solver<TBodies> where TBodies : IBodyDataSource
+    public partial class Solver
     {
 
         int manualNaiveBlockIndex;

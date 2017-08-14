@@ -649,7 +649,7 @@ namespace SolverPrototype.CollisionDetection
         public TConstraintRemover ConstraintRemover;
 
         //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
-        public NarrowPhase(Bodies bodies, BufferPool pool)
+        public NarrowPhase(Bodies<TCollidableData> bodies, BufferPool pool)
         {
             Bodies = bodies;
             Pool = pool;

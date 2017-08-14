@@ -19,7 +19,7 @@ namespace DemoRenderer.Constraints
     abstract class TypeLineExtractor
     {
         public abstract int LinesPerConstraint { get; }
-        public abstract void ExtractLines(Simulation simulation, TypeBatch typeBatch, int constraintStart, int constraintCount, ref QuickList<LineInstance, Array<LineInstance>> lines);
+        public abstract void ExtractLines(Bodies bodies, TypeBatch typeBatch, int constraintStart, int constraintCount, ref QuickList<LineInstance, Array<LineInstance>> lines);
     }
 
     class TypeLineExtractor<T, TTypeBatch, TBodyReferences, TPrestep, TProjection, TAccumulatedImpulses> : TypeLineExtractor
@@ -27,7 +27,7 @@ namespace DemoRenderer.Constraints
         where TTypeBatch : TypeBatch<TBodyReferences, TPrestep, TProjection, TAccumulatedImpulses>
     {
         public override int LinesPerConstraint => default(T).LinesPerConstraint;
-        public override void ExtractLines(Simulation simulation, TypeBatch typeBatch, int constraintStart, int constraintCount,
+        public override void ExtractLines(Bodies bodies, TypeBatch typeBatch, int constraintStart, int constraintCount,
             ref QuickList<LineInstance, Array<LineInstance>> lines)
         {
             var batch = (TTypeBatch)typeBatch;
@@ -41,7 +41,7 @@ namespace DemoRenderer.Constraints
                 BundleIndexing.GetBundleIndices(i, out var bundleIndex, out var innerIndex);
                 ref var prestepBundle = ref Unsafe.Add(ref prestepStart, bundleIndex);
                 ref var referencesBundle = ref Unsafe.Add(ref referencesStart, bundleIndex);
-                extractor.ExtractLines(ref prestepBundle, ref referencesBundle, innerIndex, simulation.Bodies, ref lines);
+                extractor.ExtractLines(ref prestepBundle, ref referencesBundle, innerIndex, bodies, ref lines);
             }
         }
     }
@@ -76,13 +76,14 @@ namespace DemoRenderer.Constraints
             executeJobDelegate = ExecuteJob;
         }
 
-        Simulation simulation;
+        Bodies bodies;
+        Solver solver;
         private void ExecuteJob(int jobIndex)
         {
             ref var job = ref jobs[jobIndex];
-            var typeBatch = simulation.Solver.Batches[job.BatchIndex].TypeBatches[job.TypeBatchIndex];
+            var typeBatch = solver.Batches[job.BatchIndex].TypeBatches[job.TypeBatchIndex];
             Debug.Assert(lineExtractors[typeBatch.TypeId] != null, "Jobs should only be created for types which are available and active.");
-            lineExtractors[typeBatch.TypeId].ExtractLines(simulation, typeBatch, job.ConstraintStart, job.ConstraintCount, ref job.jobLines);
+            lineExtractors[typeBatch.TypeId].ExtractLines(bodies, typeBatch, job.ConstraintStart, job.ConstraintCount, ref job.jobLines);
         }
 
         bool IsContactBatch(TypeBatch typeBatch)
@@ -91,14 +92,14 @@ namespace DemoRenderer.Constraints
             return typeId == TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>();
         }
 
-        internal void AddInstances(Simulation simulation, bool showConstraints, bool showContacts, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
+        internal void AddInstances(Bodies bodies, Solver solver, bool showConstraints, bool showContacts, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
         {
             int neededLineCapacity = lines.Count;
             jobs.Count = 0;
             var jobPool = new PassthroughArrayPool<ThreadJob>();
-            for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
+            for (int batchIndex = 0; batchIndex < solver.Batches.Count; ++batchIndex)
             {
-                var batch = simulation.Solver.Batches[batchIndex];
+                var batch = solver.Batches[batchIndex];
                 for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
                 {
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
@@ -158,9 +159,11 @@ namespace DemoRenderer.Constraints
                 //By setting the count, we work around the fact that Array<T> doesn't support slicing.
                 jobs[i].jobLines.Count = jobs[i].LineStart;
             }
-            this.simulation = simulation;
+            this.bodies = bodies;
+            this.solver = solver;
             looper.For(0, jobs.Count, executeJobDelegate);
-            this.simulation = null;
+            this.bodies = null;
+            this.solver = solver;
         }
 
     }

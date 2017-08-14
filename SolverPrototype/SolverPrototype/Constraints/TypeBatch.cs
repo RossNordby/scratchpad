@@ -43,7 +43,7 @@ namespace SolverPrototype.Constraints
         /// <param name="solver">Solver that owns the batches.</param>
         /// <param name="bodies">Bodies set that owns all the constraint's bodies.</param>
         /// <param name="targetBatchIndex">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
-        public unsafe abstract void TransferConstraint<TBodies>(int sourceBatchIndex, int indexInTypeBatch, Solver<TBodies> solver, TBodies bodies, int targetBatchIndex) where TBodies : IBodyDataSource;
+        public unsafe abstract void TransferConstraint(int sourceBatchIndex, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex);
 
         public abstract void EnumerateConnectedBodyIndices<TEnumerator>(int indexInTypeBatch, ref TEnumerator enumerator) where TEnumerator : IForEach<int>;
         public abstract void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation);
@@ -82,12 +82,12 @@ namespace SolverPrototype.Constraints
         public abstract void Resize(TypeBatchAllocation typeBatchAllocation);
         public abstract void Dispose(BufferPool rawPool);
 
-        public abstract void Prestep<TBodies>(TBodies bodies, float dt, int startBundle, int exclusiveEndBundle) where TBodies : IBodyDataSource;
+        public abstract void Prestep(Bodies bodies, float dt, int startBundle, int exclusiveEndBundle);
         public abstract void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
         public abstract void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep<TBodies>(TBodies bodies, float dt) where TBodies : IBodyDataSource
+        public void Prestep(Bodies bodies, float dt)
         {
             Prestep(bodies, dt, 0, bundleCount);
         }
@@ -358,14 +358,14 @@ namespace SolverPrototype.Constraints
         /// <param name="solver">Solver that owns the batches.</param>
         /// <param name="bodies">Bodies set that owns all the constraint's bodies.</param>
         /// <param name="targetBatchIndex">Index of the ConstraintBatch in the solver to copy the constraint into.</param>
-        public unsafe override void TransferConstraint<TBodies>(int sourceBatchIndex, int indexInTypeBatch, Solver<TBodies> solver, TBodies bodies, int targetBatchIndex)
+        public unsafe override void TransferConstraint(int sourceBatchIndex, int indexInTypeBatch, Solver solver, Bodies bodies, int targetBatchIndex)
         {
             //Note that the following does some redundant work. It's technically possible to do better than this, but it requires bypassing a lot of bookkeeping.
             //It's not exactly trivial to keep everything straight, especially over time- it becomes a maintenance nightmare.
             //So instead, given that compressions should generally be extremely rare (relatively speaking) and highly deferrable, we'll accept some minor overhead.
             int bodiesPerConstraint = BodiesPerConstraint;
             var bodyHandles = stackalloc int[BodiesPerConstraint];
-            var bodyHandleCollector = new ConstraintBodyHandleCollector<TBodies>(bodies, bodyHandles);
+            var bodyHandleCollector = new ConstraintBodyHandleCollector(bodies, bodyHandles);
             EnumerateConnectedBodyIndices(indexInTypeBatch, ref bodyHandleCollector);
             var targetBatch = solver.Batches[targetBatchIndex];
             //Allocate a spot in the new batch. Note that it does not change the Handle->Constraint mapping in the Solver; that's important when we call Solver.Remove below.

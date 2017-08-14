@@ -10,13 +10,13 @@ namespace SolverPrototype
     /// <summary>
     /// Collects body handles associated with a constraint.
     /// </summary>
-    public unsafe struct ConstraintBodyHandleCollector<TBodies> : IForEach<int> where TBodies : IBodyDataSource
+    public unsafe struct ConstraintBodyHandleCollector : IForEach<int> 
     {
-        public TBodies Bodies;
+        public Bodies Bodies;
         public int* Handles;
         public int Index;
 
-        public ConstraintBodyHandleCollector(TBodies bodies, int* handles)
+        public ConstraintBodyHandleCollector(Bodies bodies, int* handles)
         {
             Bodies = bodies;
             Handles = handles;

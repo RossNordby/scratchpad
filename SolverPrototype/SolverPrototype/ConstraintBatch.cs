@@ -116,8 +116,7 @@ namespace SolverPrototype
             }
             return true;
         }
-        public unsafe void Allocate<TBodies>(int handle, ref int bodyHandles, int bodyCount, TBodies bodies, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
-            where TBodies : IBodyDataSource
+        public unsafe void Allocate(int handle, ref int bodyHandles, int bodyCount, Bodies bodies, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
         {
             Debug.Assert(CanFit(ref bodyHandles, bodyCount));
             //Add all the constraint's body handles to the batch we found (or created) to block future references to the same bodies.
@@ -142,13 +141,13 @@ namespace SolverPrototype
         }
 
 
-        unsafe struct BodyHandleRemover<TBodies> : IForEach<int> where TBodies : IBodyDataSource
+        unsafe struct BodyHandleRemover : IForEach<int> 
         {
-            public TBodies Bodies;
+            public Bodies Bodies;
             public ConstraintBatch Batch;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public BodyHandleRemover(TBodies bodies, ConstraintBatch batch)
+            public BodyHandleRemover(Bodies bodies, ConstraintBatch batch)
             {
                 Bodies = bodies;
                 Batch = batch;
@@ -162,8 +161,8 @@ namespace SolverPrototype
         }
 
 
-        public unsafe void Remove<TBodies>(int constraintTypeId, int indexInTypeBatch, TBodies bodies, ref Buffer<ConstraintLocation> handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
-            where TBodies : IBodyDataSource
+        public unsafe void Remove(int constraintTypeId, int indexInTypeBatch, Bodies bodies, ref Buffer<ConstraintLocation> handlesToConstraints, TypeBatchAllocation typeBatchAllocation)
+
         {
             Debug.Assert(TypeIndexToTypeBatchIndex[constraintTypeId] >= 0, "Type index must actually exist within this batch.");
 
@@ -172,7 +171,7 @@ namespace SolverPrototype
             //Before we remove the constraint, we should locate the set the body indices referenced by the constraint and convert them into handles so that
             //they can be removed from the constraint batch's body handle set.
             var bodiesPerConstraint = typeBatch.BodiesPerConstraint;
-            var handleRemover = new BodyHandleRemover<TBodies>(bodies, this);
+            var handleRemover = new BodyHandleRemover(bodies, this);
             typeBatch.EnumerateConnectedBodyIndices(indexInTypeBatch, ref handleRemover);
 
             typeBatch.Remove(indexInTypeBatch, ref handlesToConstraints);
@@ -226,7 +225,7 @@ namespace SolverPrototype
                     TypeBatches.Resize(constraintTypeCount, new PassthroughArrayPool<TypeBatch>());
             }
         }
-        public void Compact<TBodies>(TypeBatchAllocation typeBatchAllocation, TBodies bodies, int bodiesCount) where TBodies : IBodyDataSource
+        public void Compact(TypeBatchAllocation typeBatchAllocation, Bodies bodies, int bodiesCount) 
         {
             for (int i = 0; i < TypeBatches.Count; ++i)
             {
@@ -236,7 +235,7 @@ namespace SolverPrototype
             BodyHandles.Compact(Math.Max(bodies.IndexToHandle.Length, bodiesCount), typeBatchAllocation.BufferPool);
             //Compaction just doesn't change the type batch array sizes. It's a bit complicated and practically irrelevant.
         }
-        public void Resize<TBodies>(TypeBatchAllocation typeBatchAllocation, TBodies bodies, int bodiesCount, int constraintTypeCount) where TBodies : IBodyDataSource
+        public void Resize(TypeBatchAllocation typeBatchAllocation, Bodies bodies, int bodiesCount, int constraintTypeCount) 
         {
             for (int i = 0; i < TypeBatches.Count; ++i)
             {
