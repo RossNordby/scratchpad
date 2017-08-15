@@ -136,7 +136,7 @@ namespace SolverPrototype.CollisionDetection
             this.broadPhase = broadPhase;
         }
 
-        public void FindOverlaps<TOverlapHandler>(IThreadDispatcher threadDispatcher = null) where TOverlapHandler : IOverlapHandler
+        public void FindOverlaps(IThreadDispatcher threadDispatcher = null)
         {
             if (threadDispatcher != null)
             {

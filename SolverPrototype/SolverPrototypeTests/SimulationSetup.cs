@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
 using System.Collections.Generic;
 using System.Numerics;
@@ -9,74 +10,76 @@ using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
-    public interface IBodyBuilder
+    
+
+    static partial class SimulationSetup<TNarrowPhase, TCollidableData> where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
     {
-        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription);
-    }
-    public interface IConstraintBuilder
-    {
-        void RegisterConstraintTypes();
-        void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
-    }
-    public struct LatticeBodyGetter
-    {
-        int width, height, length;
-        int[] bodyHandles;
-        Simulation simulation;
-        public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Simulation simulation)
+        //Most users can get away with just creating a Simulation-derived type that hides the generic implementation details. Here, we're just gonna bite the bullet.
+        public interface IBodyBuilder
         {
-            this.width = width;
-            this.height = height;
-            this.length = length;
-            this.bodyHandles = bodyHandles;
-            this.simulation = simulation;
+            void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription<TCollidableData> bodyDescription);
         }
-        public bool TryGetId(int columnIndex, int rowIndex, int sliceIndex, out int id)
+        public interface IConstraintBuilder
         {
-            if (columnIndex < 0 || columnIndex >= width || rowIndex < 0 || rowIndex >= height || sliceIndex < 0 || sliceIndex >= length)
+            void RegisterConstraintTypes();
+            void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
+                ref BodyDescription<TCollidableData> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
+        }
+        public struct LatticeBodyGetter
+        {
+            int width, height, length;
+            int[] bodyHandles;
+            Bodies<TCollidableData> bodies;
+            public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Bodies<TCollidableData> bodies)
             {
-                id = -1;
-                return false;
+                this.width = width;
+                this.height = height;
+                this.length = length;
+                this.bodyHandles = bodyHandles;
+                this.bodies = bodies;
             }
-            id = sliceIndex * (height * width) + rowIndex * width + columnIndex;
-            return true;
-        }
-        public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription bodyDescription)
-        {
-            if (!TryGetId(columnIndex, rowIndex, sliceIndex, out var id))
+            public bool TryGetId(int columnIndex, int rowIndex, int sliceIndex, out int id)
             {
-                handle = -1;
-                bodyDescription = new BodyDescription();
-                return false;
+                if (columnIndex < 0 || columnIndex >= width || rowIndex < 0 || rowIndex >= height || sliceIndex < 0 || sliceIndex >= length)
+                {
+                    id = -1;
+                    return false;
+                }
+                id = sliceIndex * (height * width) + rowIndex * width + columnIndex;
+                return true;
             }
-            handle = bodyHandles[id];
-            simulation.Bodies.GetDescription(handle, out bodyDescription);
-            return true;
+            public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription<TCollidableData> bodyDescription)
+            {
+                if (!TryGetId(columnIndex, rowIndex, sliceIndex, out var id))
+                {
+                    handle = -1;
+                    bodyDescription = new BodyDescription<TCollidableData>();
+                    return false;
+                }
+                handle = bodyHandles[id];
+                bodies.GetDescription(handle, out bodyDescription);
+                return true;
+            }
         }
-    }
-    public struct ConstraintAdder
-    {
-        public int LocalBodyHandle;
-        Simulation simulation;
-        public List<int> ConstraintHandles;
-        public ConstraintAdder(Simulation simulation, List<int> constraintHandles)
+
+        public struct ConstraintAdder
         {
-            this.simulation = simulation;
-            this.ConstraintHandles = constraintHandles;
-            LocalBodyHandle = 0;
+            public int LocalBodyHandle;
+            Simulation<TNarrowPhase, TCollidableData> simulation;
+            public List<int> ConstraintHandles;
+            public ConstraintAdder(Simulation<TNarrowPhase, TCollidableData> simulation, List<int> constraintHandles)
+            {
+                this.simulation = simulation;
+                this.ConstraintHandles = constraintHandles;
+                LocalBodyHandle = 0;
+            }
+
+            public void Add<T>(ref T description, int otherBodyHandle) where T : IConstraintDescription<T>
+            {
+                var constraintHandle = simulation.Add(LocalBodyHandle, otherBodyHandle, ref description);
+                ConstraintHandles.Add(constraintHandle);
+            }
         }
-
-        public void Add<T>(ref T description, int otherBodyHandle) where T : IConstraintDescription<T>
-        {
-            var constraintHandle = simulation.Add(LocalBodyHandle, otherBodyHandle, ref description);
-            ConstraintHandles.Add(constraintHandle);
-        }
-    }
-
-    static partial class SimulationSetup
-    {
-
 
         public static void BuildBasis(ref BodyPose a, ref BodyPose b, out Vector3 x, out Vector3 y, out Vector3 z)
         {
@@ -96,13 +99,13 @@ namespace SolverPrototypeTests
             z = Vector3.Cross(x, y);
         }
 
-        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, Simulation simulation,
+        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, Simulation<TNarrowPhase, TCollidableData> simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
             var bodyCount = width * height * length;
             bodyHandles = new int[bodyCount];
 
-            var bodyGetter = new LatticeBodyGetter(width, height, length, bodyHandles, simulation);
+            var bodyGetter = new LatticeBodyGetter(width, height, length, bodyHandles, simulation.Bodies);
 
             for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
             {
@@ -137,11 +140,12 @@ namespace SolverPrototypeTests
         }
 
 
-        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, out Simulation simulation,
+        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, 
+            out Simulation<TNarrowPhase, TCollidableData> simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
             var bodyCount = width * height * length;
-            simulation = new Simulation(
+            simulation = new Simulation<TNarrowPhase, TCollidableData>(
                 new BufferPool(),
                 new SimulationAllocationSizes
                 {

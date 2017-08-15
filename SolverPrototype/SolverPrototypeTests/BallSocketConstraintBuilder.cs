@@ -10,7 +10,7 @@ using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
-    public struct BallSocketConstraintBuilder : IConstraintBuilder
+    public struct BallSocketConstraintBuilder<TCollidableData> : IConstraintBuilder<TCollidableData> 
     {
         public void RegisterConstraintTypes()
         {
@@ -27,8 +27,8 @@ namespace SolverPrototypeTests
                 DampingRatio = 1f
             };
         }
-        static void TryConnectTo(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder)
+        static void TryConnectTo<TCollidableData>(int sliceIndex, int rowIndex, int columnIndex,
+            ref BodyDescription<TCollidableData> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder) where TCollidableData : struct
         {
             if (ids.GetBody(columnIndex, rowIndex, sliceIndex, out var otherHandle, out var otherDescription) &&
                 (bodyDescription.LocalInertia.InverseMass > 0 || otherDescription.LocalInertia.InverseMass > 0))
@@ -37,8 +37,8 @@ namespace SolverPrototypeTests
                 constraintAdder.Add(ref description, otherHandle);
             }
         }
-        public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder)
+        public void BuildConstraintsForBody<TCollidableData>(int sliceIndex, int rowIndex, int columnIndex,
+            ref BodyDescription<TCollidableData> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder) where TCollidableData : struct
         {
             //For each lesser neighbor along each main axis, create a connection.
             TryConnectTo(sliceIndex - 1, rowIndex, columnIndex, ref bodyDescription, ref ids, ref constraintAdder);

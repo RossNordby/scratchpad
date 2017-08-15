@@ -647,6 +647,8 @@ namespace SolverPrototype.CollisionDetection
 
         protected abstract void OnInitialize(Bodies bodies);
 
+        public abstract void Flush(IThreadDispatcher threadDispatcher = null);
+
         //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
 
     }
@@ -671,7 +673,7 @@ namespace SolverPrototype.CollisionDetection
             Debug.Assert(bodies.GetType() == typeof(Bodies<TCollidableData>), "We jumped through some type unsafe hoops here. Simulation should guarantee that whatever it's using has valid types.");
             Bodies = (Bodies<TCollidableData>)bodies;
         }
-        public void Flush(IThreadDispatcher threadDispatcher = null)
+        public override void Flush(IThreadDispatcher threadDispatcher = null)
         {
             Filters.Flush(threadDispatcher);
             ConstraintAdder.Flush(threadDispatcher);

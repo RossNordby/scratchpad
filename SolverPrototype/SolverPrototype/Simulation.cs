@@ -12,7 +12,7 @@ namespace SolverPrototype
     /// <summary>
     /// Orchestrates the bookkeeping and execution of a full dynamic simulation.
     /// </summary>
-    public partial class Simulation<TNarrowPhase, TCollidableData> : IDisposable where TNarrowPhase : new(), NarrowPhase where TCollidableData : struct
+    public partial class Simulation<TNarrowPhase, TCollidableData> : IDisposable where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
         public Bodies<TCollidableData> Bodies { get; private set; }
@@ -207,6 +207,8 @@ namespace SolverPrototype
         {
             ProfilerClear();
             ProfilerStart(this);
+            //TODO: There are a couple of stages where the multithreaded and single threaded implementations differ by more than merely a null thread dispatcher.
+            //All other stages internally handle the availability of threading in an case-by-case way. It would be nice if every stage did so so we didn't need a dual implementation out here.
             if (threadDispatcher != null)
             {
                 //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
@@ -223,13 +225,35 @@ namespace SolverPrototype
                 SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
                 ProfilerEnd(SolverBatchCompressor);
 
-                ProfilerStart(PoseIntegrator);
-                PoseIntegrator.Update(dt, BufferPool, threadDispatcher);
-                ProfilerEnd(PoseIntegrator);
+                //Note that the first behavior-affecting stage is actually the solver. This is a shift from v1, where collision detection went first.
+                //This is a tradeoff: by running the solver first, any existing constraints are able to handle new velocities. However, any contact constraints will still be from the
+                //previous frame. Since the pose integrator runs immediately after the solver, arbitrary external velocity changes could result in undetected penetration.
+                //That's not great and puts some burden on the user, but by doing this, generated contact positions are in sync with the integrated poses. 
+                //That's often helpful for gameplay purposes- you don't have to reinterpret contact data when creating graphical effects or positioning sound sources.
+                //TODO: This is something that is possibly worth exposing as one of the generic type parameters. Users could just choose the order arbitrarily.
+                //Or, since you're talking about something that happens once per frame instead of once per collision pair, just provide a simple callback.
+                //(Or maybe an enum even?)
 
                 ProfilerStart(Solver);
                 Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt);
                 ProfilerEnd(Solver);
+
+                ProfilerStart(PoseIntegrator);
+                PoseIntegrator.Update(dt, BufferPool, threadDispatcher);
+                ProfilerEnd(PoseIntegrator);
+
+                ProfilerStart(BroadPhase);
+                BroadPhase.Update(threadDispatcher);
+                ProfilerEnd(BroadPhase);
+
+                ProfilerStart(BroadPhaseOverlapFinder);
+                BroadPhaseOverlapFinder.FindOverlaps(threadDispatcher);
+                ProfilerEnd(BroadPhaseOverlapFinder);
+
+                ProfilerStart(NarrowPhase);
+                NarrowPhase.Flush(threadDispatcher);
+                ProfilerEnd(NarrowPhase);
+
             }
             else
             {
@@ -245,13 +269,25 @@ namespace SolverPrototype
                 SolverBatchCompressor.Compress(BufferPool);
                 ProfilerEnd(SolverBatchCompressor);
 
+                ProfilerStart(Solver);
+                Solver.Update(dt);
+                ProfilerEnd(Solver);
+
                 ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt, BufferPool);
                 ProfilerEnd(PoseIntegrator);
 
-                ProfilerStart(Solver);
-                Solver.Update(dt);
-                ProfilerEnd(Solver);
+                ProfilerStart(BroadPhase);
+                BroadPhase.Update();
+                ProfilerEnd(BroadPhase);
+
+                ProfilerStart(BroadPhaseOverlapFinder);
+                BroadPhaseOverlapFinder.FindOverlaps();
+                ProfilerEnd(BroadPhaseOverlapFinder);
+
+                ProfilerStart(NarrowPhase);
+                NarrowPhase.Flush();
+                ProfilerEnd(NarrowPhase);
             }
             ProfilerEnd(this);
         }
