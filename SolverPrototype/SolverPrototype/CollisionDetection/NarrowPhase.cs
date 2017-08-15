@@ -624,9 +624,31 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    public interface INarrowPhase
+    public abstract class NarrowPhase
     {
-        ref PairCache PairCache { get; }
+        public BufferPool Pool;
+        //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
+        //The majority of type pairs, however, only require a constraint handle.
+        public PairCache PairCache;
+        //TODO: Need to check codegen on this. In some cases when everything involved is a reference type, the JIT won't devirtualize- or at least, that was how it used to be.
+        public abstract void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b);
+
+        public static TNarrowPhase Create<TNarrowPhase>(Bodies bodies, BufferPool pool) where TNarrowPhase : NarrowPhase, new()
+        {
+            var emptyPairCache = new PairCache();
+            var narrowPhase = new TNarrowPhase
+            {
+                Pool = pool,
+                PairCache = new PairCache(pool, ref emptyPairCache)
+            };
+            narrowPhase.OnInitialize(bodies);
+            return narrowPhase;
+        }
+
+        protected abstract void OnInitialize(Bodies bodies);
+
+        //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
+
     }
 
 
@@ -636,28 +658,19 @@ namespace SolverPrototype.CollisionDetection
     /// <typeparam name="TFilters">Type of the filter callbacks to use.</typeparam>
     /// <typeparam name="TConstraintAdder">Type of the constraint adder to use.</typeparam>
     /// <typeparam name="TConstraintRemover">Type of the constraint remover to use.</typeparam>
-    public class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> 
+    public class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> : NarrowPhase
         where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover where TCollidableData : struct
     {
         public Bodies<TCollidableData> Bodies;
-        public BufferPool Pool;
-        //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
-        //The majority of type pairs, however, only require a constraint handle.
-        public PairCache PairCache;
         public TFilters Filters;
         public TConstraintAdder ConstraintAdder;
         public TConstraintRemover ConstraintRemover;
 
-        //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
-        public NarrowPhase(Bodies<TCollidableData> bodies, BufferPool pool)
+        protected override void OnInitialize(Bodies bodies)
         {
-            Bodies = bodies;
-            Pool = pool;
-            var emptyPairCache = new PairCache();
-            PairCache = new PairCache(pool, ref emptyPairCache);
-
+            Debug.Assert(bodies.GetType() == typeof(Bodies<TCollidableData>), "We jumped through some type unsafe hoops here. Simulation should guarantee that whatever it's using has valid types.");
+            Bodies = (Bodies<TCollidableData>)bodies;
         }
-
         public void Flush(IThreadDispatcher threadDispatcher = null)
         {
             Filters.Flush(threadDispatcher);
@@ -665,7 +678,7 @@ namespace SolverPrototype.CollisionDetection
             ConstraintRemover.Flush(threadDispatcher);
         }
 
-        public void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
+        public override void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
             if (!Filters.AllowContactGeneration(workerIndex, a, b))
                 return;

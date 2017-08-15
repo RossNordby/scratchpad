@@ -23,13 +23,7 @@ namespace DemoContentBuilder
             var directoryUri = new Uri(baseDirectory);
             return Uri.UnescapeDataString(directoryUri.MakeRelativeUri(pathUri).ToString().Replace('/', Path.DirectorySeparatorChar));
         }
-
-
-        struct InstalledBuildTools
-        {
-            public string Version;
-            public string Path;
-        }
+                      
 
         unsafe static void CollectContentPaths(string projectPath, out string workingPath,
             out List<string> shaderPaths,

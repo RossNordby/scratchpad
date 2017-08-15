@@ -13,15 +13,13 @@ namespace SolverPrototype.CollisionDetection
         //That one would cover static or inactive collidables.
         internal Buffer<CollidableReference> activeLeaves;
         public Tree ActiveTree;
-        Tree.MultithreadedSelfTest<OverlapHandler> selfTestContext;
         Tree.RefitAndRefineMultithreadedContext refineContext;
 
         public BroadPhase(BufferPool pool, int initialActiveLeafCapacity = 4096)
         {
             ActiveTree = new Tree(pool, initialActiveLeafCapacity);
             pool.SpecializeFor<CollidableReference>().Take(initialActiveLeafCapacity, out activeLeaves);
-
-            selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
+            
             refineContext = new Tree.RefitAndRefineMultithreadedContext();
         }
 
@@ -77,53 +75,21 @@ namespace SolverPrototype.CollisionDetection
         }
 
         int frameIndex;
-        OverlapHandler[] threadHandlers;
-        public void Update(IThreadDispatcher threadDispatcher, NarrowPhase narrowPhase)
+        public void Update(IThreadDispatcher threadDispatcher = null)
         {
             if (frameIndex == int.MaxValue)
                 frameIndex = 0;
             if (threadDispatcher != null)
             {
-                if (threadHandlers == null || threadHandlers.Length < threadDispatcher.ThreadCount)
-                {
-                    //This initialization/resize should occur extremely rarely.
-                    threadHandlers = new OverlapHandler[threadDispatcher.ThreadCount];
-                    for (int i = 0; i < threadHandlers.Length; ++i)
-                    {
-                        threadHandlers[i] = new OverlapHandler(activeLeaves, narrowPhase);
-                    }
-                }
                 refineContext.RefitAndRefine(ActiveTree, threadDispatcher, frameIndex);
-                selfTestContext.SelfTest(ActiveTree, threadHandlers, threadDispatcher);
             }
             else
             {
                 ActiveTree.RefitAndRefine(frameIndex);
-                var handler = new OverlapHandler(activeLeaves, narrowPhase);
-                ActiveTree.GetSelfOverlaps(ref handler);
-            }
-
-        }
-
-        struct OverlapHandler : IOverlapHandler
-        {
-            //TODO: Once we have a second tree, we'll need to have a second handler type which can pull from two different leaf sources.
-            //No reason to try to make one type do both- that would just result in a bunch of last second branches that could be avoided by using the proper
-            //handler upon dispatch. 
-            public NarrowPhase NarrowPhase;
-            public Buffer<CollidableReference> Leaves;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public OverlapHandler(Buffer<CollidableReference> leaves, NarrowPhase narrowPhase)
-            {
-                Leaves = leaves;
-                NarrowPhase = narrowPhase;
-            }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Handle(int indexA, int indexB)
-            {
-                NarrowPhase.HandleOverlap(Leaves[indexA], Leaves[indexB]);
             }
         }
+
+
 
         //TODO: EnsureCapacity and so on. Need them for the broadphase's own leaves sets. We COULD expose the underlying trees and let their sizes be managed separately,
         //or we can handle them at the level of the broadphase too. 
@@ -132,5 +98,67 @@ namespace SolverPrototype.CollisionDetection
         {
             ActiveTree.Dispose();
         }
+    }
+
+    //The overlap finder requires type knowledge about the narrow phase that the broad phase lacks. Don't really want to infect the broad phase with a bunch of narrow phase dependent 
+    //generic parameters, so instead we just explicitly create a type-aware overlap finder to help the broad phase.
+    public class BroadPhaseOverlapFinder<TNarrowPhase> where TNarrowPhase : NarrowPhase
+    {
+        struct OverlapHandler : IOverlapHandler
+        {
+            //TODO: Once we have a second tree, we'll need to have a second handler type which can pull from two different leaf sources.
+            //No reason to try to make one type do both- that would just result in a bunch of last second branches that could be avoided by using the proper
+            //handler upon dispatch. 
+            public TNarrowPhase NarrowPhase;
+            public Buffer<CollidableReference> Leaves;
+            public int WorkerIndex;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public OverlapHandler(Buffer<CollidableReference> leaves, TNarrowPhase narrowPhase, int workerIndex)
+            {
+                Leaves = leaves;
+                NarrowPhase = narrowPhase;
+                WorkerIndex = workerIndex;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Handle(int indexA, int indexB)
+            {
+                NarrowPhase.HandleOverlap(WorkerIndex, Leaves[indexA], Leaves[indexB]);
+            }
+        }
+        Tree.MultithreadedSelfTest<OverlapHandler> selfTestContext;
+        TNarrowPhase narrowPhase;
+        BroadPhase broadPhase;
+        OverlapHandler[] threadHandlers;
+        public BroadPhaseOverlapFinder(TNarrowPhase narrowPhase, BroadPhase broadPhase)
+        {
+            selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
+            this.narrowPhase = narrowPhase;
+            this.broadPhase = broadPhase;
+        }
+
+        public void FindOverlaps<TOverlapHandler>(IThreadDispatcher threadDispatcher = null) where TOverlapHandler : IOverlapHandler
+        {
+            if (threadDispatcher != null)
+            {
+                if (threadHandlers == null || threadHandlers.Length < threadDispatcher.ThreadCount)
+                {
+                    //This initialization/resize should occur extremely rarely.
+                    threadHandlers = new OverlapHandler[threadDispatcher.ThreadCount];
+                    for (int i = 0; i < threadHandlers.Length; ++i)
+                    {
+                        threadHandlers[i] = new OverlapHandler(broadPhase.activeLeaves, narrowPhase, i);
+                    }
+                }
+                Debug.Assert(threadHandlers.Length > threadDispatcher.ThreadCount);
+                selfTestContext.SelfTest(broadPhase.ActiveTree, threadHandlers, threadDispatcher);
+            }
+            else
+            {
+                var overlapHandler = new OverlapHandler { NarrowPhase = narrowPhase, Leaves = broadPhase.activeLeaves, WorkerIndex = 0 };
+                broadPhase.ActiveTree.GetSelfOverlaps(ref overlapHandler);
+            }
+
+        }
+
     }
 }

@@ -12,17 +12,20 @@ namespace SolverPrototype
     /// <summary>
     /// Orchestrates the bookkeeping and execution of a full dynamic simulation.
     /// </summary>
-    partial class Simulation<TNarrowPhase, TCollidableData> : IDisposable where TNarrowPhase : INarrowPhase where TCollidableData : struct
+    public partial class Simulation<TNarrowPhase, TCollidableData> : IDisposable where TNarrowPhase : new(), NarrowPhase where TCollidableData : struct
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
         public Bodies<TCollidableData> Bodies { get; private set; }
         public Shapes Shapes { get; private set; }
-        public PoseIntegrator PoseIntegrator { get; private set; }
-        public BroadPhase BroadPhase { get; private set; }
-        public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
+        public BodyLayoutOptimizer<TCollidableData> BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
         public BatchCompressor SolverBatchCompressor { get; private set; }
         public Solver Solver { get; private set; }
+        public PoseIntegrator PoseIntegrator { get; private set; }
+        public BroadPhase BroadPhase { get; private set; }
+        public BroadPhaseOverlapFinder<TNarrowPhase> BroadPhaseOverlapFinder { get; private set; }
+        public TNarrowPhase NarrowPhase { get; private set; }
+
 
 
         /// <summary>
@@ -43,15 +46,17 @@ namespace SolverPrototype
             BufferPool = bufferPool;
             Bodies = new Bodies<TCollidableData>(bufferPool, initialAllocationSizes.Bodies);
             Shapes = new Shapes(bufferPool, initialAllocationSizes.ShapesPerType);
+            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
+            BodyLayoutOptimizer = new BodyLayoutOptimizer<TCollidableData>(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
+            ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
+            SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
             Solver = new Solver(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
-            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
-            BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
-            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
-            ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
-            SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
+            BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
+            NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, BufferPool);
+            BroadPhaseOverlapFinder = new BroadPhaseOverlapFinder<TNarrowPhase>(NarrowPhase, BroadPhase);
         }
 
         /// <summary>
@@ -126,7 +131,7 @@ namespace SolverPrototype
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BroadPhase, ConstraintGraph, Solver);
+                BodyLayoutOptimizer<TCollidableData>.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BroadPhase, ConstraintGraph, Solver);
             }
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);

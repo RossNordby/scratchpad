@@ -9,7 +9,7 @@ namespace SolverPrototype.CollisionDetection
 {
     public interface INarrowPhaseFilters
     {
-        void Initialize(Simulation<TNarrowPhase, TSupplementData> simulation);
+        void Initialize<TNarrowPhase, TSupplementData>(Simulation<TNarrowPhase, TSupplementData> simulation) where TNarrowPhase : INarrowPhase where TSupplementData : struct;
         /// <summary>
         /// Chooses whether to allow contact generation to proceed for two overlapping collidables.
         /// </summary>
