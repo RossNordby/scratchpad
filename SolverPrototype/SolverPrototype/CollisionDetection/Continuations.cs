@@ -100,7 +100,7 @@ namespace SolverPrototype.CollisionDetection
                                 //TODO: Probably worth using an explicit non-TypedIndex type for this encoding.
                                 //8 types, 0-3 convex, 4-7 nonconvex.
                                 var isNonconvex = pointers.ConstraintCache.Type & 4;
-                                NarrowPhase.PairCache.GetConstraintCache(pointers.ConstraintCache.Index);
+                                ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache4>(pointers.ConstraintCache.Index);
                                 const int newContactCount = 4;
                                 if (cachedPairData.Convex && cachedPairData.ContactCount == newContactCount)
                                 {
@@ -141,7 +141,7 @@ namespace SolverPrototype.CollisionDetection
 
                                     //Any existing constraint should be 
 
-                                    NarrowPhase.Callbacks.EnqueueConstraintRemoval(cachedPairData.Handle);
+                                    NarrowPhase.ConstraintRemover.EnqueueConstraintRemoval(cachedPairData.Handle);
 
                                 }
                             }

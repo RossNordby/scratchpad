@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using SolverPrototype;
+using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
@@ -10,7 +11,8 @@ using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
-    public struct BallSocketConstraintBuilder<TCollidableData> : IConstraintBuilder<TCollidableData> 
+    public struct BallSocketConstraintBuilder<TNarrowPhase, TCollidableData> : SimulationSetup<TNarrowPhase, TCollidableData>.IConstraintBuilder
+        where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
     {
         public void RegisterConstraintTypes()
         {
@@ -27,8 +29,10 @@ namespace SolverPrototypeTests
                 DampingRatio = 1f
             };
         }
-        static void TryConnectTo<TCollidableData>(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription<TCollidableData> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder) where TCollidableData : struct
+        static void TryConnectTo(int sliceIndex, int rowIndex, int columnIndex,
+            ref BodyDescription<TCollidableData> bodyDescription,
+            ref SimulationSetup<TNarrowPhase, TCollidableData>.LatticeBodyGetter ids, 
+            ref SimulationSetup<TNarrowPhase, TCollidableData>.ConstraintAdder constraintAdder)
         {
             if (ids.GetBody(columnIndex, rowIndex, sliceIndex, out var otherHandle, out var otherDescription) &&
                 (bodyDescription.LocalInertia.InverseMass > 0 || otherDescription.LocalInertia.InverseMass > 0))
@@ -37,8 +41,10 @@ namespace SolverPrototypeTests
                 constraintAdder.Add(ref description, otherHandle);
             }
         }
-        public void BuildConstraintsForBody<TCollidableData>(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription<TCollidableData> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder) where TCollidableData : struct
+        public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
+            ref BodyDescription<TCollidableData> bodyDescription,
+            ref SimulationSetup<TNarrowPhase, TCollidableData>.LatticeBodyGetter ids,
+            ref SimulationSetup<TNarrowPhase, TCollidableData>.ConstraintAdder constraintAdder)
         {
             //For each lesser neighbor along each main axis, create a connection.
             TryConnectTo(sliceIndex - 1, rowIndex, columnIndex, ref bodyDescription, ref ids, ref constraintAdder);

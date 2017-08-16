@@ -64,7 +64,7 @@ namespace SolverPrototype.CollisionDetection
         /// Initializes the constraint adder with the target solver.
         /// </summary>
         /// <param name="solver">Solver to add constraints to.</param>
-        void Initialize(Solver solver);
+        void Initialize(NarrowPhase narrowPhase, Solver solver);
         /// <summary>
         /// Requests that a constraint be added to the solver between two bodies.
         /// Implementers must notify the NarrowPhase.PairCache of the constraint handle using NarrowPhase.PairCache.FillConstraintHandle.

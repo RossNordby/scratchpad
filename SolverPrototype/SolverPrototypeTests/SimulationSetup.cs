@@ -10,9 +10,7 @@ using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
-    
-
-    static partial class SimulationSetup<TNarrowPhase, TCollidableData> where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
+    public static class SimulationSetup<TNarrowPhase, TCollidableData> where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
     {
         //Most users can get away with just creating a Simulation-derived type that hides the generic implementation details. Here, we're just gonna bite the bullet.
         public interface IBodyBuilder
@@ -140,7 +138,7 @@ namespace SolverPrototypeTests
         }
 
 
-        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, 
+        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length,
             out Simulation<TNarrowPhase, TCollidableData> simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
