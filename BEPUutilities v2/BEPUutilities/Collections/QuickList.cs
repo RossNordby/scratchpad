@@ -76,6 +76,7 @@ namespace BEPUutilities2.Collections
 
         }
 
+
         /// <summary>
         /// Swaps out the list's backing memory span for a new span.
         /// If the new span is smaller, the list's count is truncated and the extra elements are dropped. 
@@ -109,7 +110,6 @@ namespace BEPUutilities2.Collections
             var oldList = this;
             pool.TakeForPower(newSizePower, out var newSpan);
             Resize(ref newSpan, out var oldSpan);
-            oldSpan.CopyTo(0, ref Span, 0, Count);
 
             oldList.Dispose(pool);
         }
