@@ -322,101 +322,8 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    /// <summary>
-    /// Information about a single contact in a nonconvex collidable pair.
-    /// Nonconvex pairs can have different surface bases at each contact point, since the contact surface is not guaranteed to be a plane.
-    /// </summary>
-    public struct NonconvexContact
-    {
-        /// <summary>
-        /// Offset from the position of collidable A to the contact position. 
-        /// </summary>
-        public Vector3 Offset;
-        /// <summary>
-        /// Penetration depth between the two collidables at this contact. Negative values represent separation.
-        /// </summary>
-        public float Depth;
-        /// <summary>
-        /// Surface basis of the contact. If transformed into a rotation matrix, X and Z represent tangent directions and Y represents the contact normal.
-        /// </summary>
-        public BEPUutilities2.Quaternion SurfaceBasis;
-        /// <summary>
-        /// Id of the features involved in the collision that generated this contact. If a contact has the same feature id as in a previous frame, it is an indication that the
-        /// same parts of the shape contributed to its creation. This is useful for carrying information from frame to frame.
-        /// </summary>
-        public int FeatureId;
-    }
-    /// <summary>
-    /// Information about a single contact in a convex collidable pair. Convex collidable pairs share one surface basis across the manifold, since the contact surface is guaranteed to be a plane.
-    /// </summary>
-    public struct ConvexContact
-    {
-        /// <summary>
-        /// Offset from the position of collidable A to the contact position. 
-        /// </summary>
-        public Vector3 Offset;
-        /// <summary>
-        /// Penetration depth between the two collidables at this contact. Negative values represent separation.
-        /// </summary>
-        public float Depth;
-        /// <summary>
-        /// Id of the features involved in the collision that generated this contact. If a contact has the same feature id as in a previous frame, it is an indication that the
-        /// same parts of the shape contributed to its creation. This is useful for carrying information from frame to frame.
-        /// </summary>
-        public int FeatureId;
-    }
 
-    public unsafe struct NonconvexContactManifold
-    {
-        internal NonconvexContact* Contacts;
-        /// <summary>
-        /// Gets a reference to a contact in the manifold.
-        /// </summary>
-        /// <param name="contactIndex">Index of the contact to get.</param>
-        /// <returns>Reference to the indexed contact.</returns>
-        public ref NonconvexContact this[int contactIndex]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                Debug.Assert(contactIndex >= 0 && contactIndex < ContactCount);
-                return ref Contacts[contactIndex];
-            }
-        }
-        /// <summary>
-        /// Offset from collidable A to collidable B.
-        /// </summary>
-        public Vector3 OffsetB;
-        public int ContactCount;
 
-    }
-    public unsafe struct ConvexContactManifold
-    {
-        internal ConvexContact* Contacts;
-        /// <summary>
-        /// Gets a reference to a contact in the manifold.
-        /// </summary>
-        /// <param name="contactIndex">Index of the contact to get.</param>
-        /// <returns>Reference to the indexed contact.</returns>
-        public ref ConvexContact this[int contactIndex]
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                Debug.Assert(contactIndex >= 0 && contactIndex < ContactCount);
-                return ref Contacts[contactIndex];
-            }
-        }
-        /// <summary>
-        /// Surface basis of the manifold. If transformed into a rotation matrix, X and Z represent tangent directions and Y represents the surface normal.
-        /// </summary>
-        public BEPUutilities2.Quaternion SurfaceBasis;
-        /// <summary>
-        /// Offset from collidable A to collidable B.
-        /// </summary>
-        public Vector3 OffsetB;
-        public int ContactCount;
-    }
     public struct CachedPairData
     {
         public int FeatureId0;
@@ -660,7 +567,7 @@ namespace SolverPrototype.CollisionDetection
     /// <typeparam name="TFilters">Type of the filter callbacks to use.</typeparam>
     /// <typeparam name="TConstraintAdder">Type of the constraint adder to use.</typeparam>
     /// <typeparam name="TConstraintRemover">Type of the constraint remover to use.</typeparam>
-    public class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> : NarrowPhase
+    public partial class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> : NarrowPhase
         where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover where TCollidableData : struct
     {
         public Bodies<TCollidableData> Bodies;
@@ -687,13 +594,13 @@ namespace SolverPrototype.CollisionDetection
         public struct ContinuationCache
         {
             public BufferPool Pool;
-            QuickList<LinearAndSubstep, Buffer<LinearAndSubstep>> linearAndSubstep;
+            QuickList<Substeps, Buffer<Substeps>> substeps;
             int initialCapacityPerType;
             public ContinuationCache(BufferPool pool, int initialCapacityPerType = 32)
             {
                 Pool = pool;
                 this.initialCapacityPerType = initialCapacityPerType;
-                linearAndSubstep = new QuickList<LinearAndSubstep, Buffer<LinearAndSubstep>>();
+                substeps = new QuickList<Substeps, Buffer<Substeps>>();
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -711,40 +618,49 @@ namespace SolverPrototype.CollisionDetection
                 return ref list[index];
             }
 
-            public void AddLinearAndSubstep()
+            public void AddSubstep()
             {
-                ref var slot = ref Add(ref linearAndSubstep);
+                ref var slot = ref Add(ref substeps);
             }
         }
 
         Buffer<ContinuationCache> continuationCaches;
 
-        struct LinearAndSubstep
+
+
+        struct Substeps
         {
             //Manifolds generated by substeps can be different sizes and types. We don't want to write the worst case for every single manifold (4 contact nonconvex manifold)-
             //that would be 128 bytes per (12 bytes position, 4 bytes depth, 16 bytes surface basis, 4 contacts), and an 8-substep continuation would end up consuming 3% of the 
             //L1 cache by itself. Instead, we'll instead use an indirection buffer. That way, we can store the smallest representation of the manifold possible. 
             public int SubstepCount;
+            public int CompletedSubsteps;
             public int NextSubstepStart;
-            public Buffer<int> SubstepIndices;
+            public Buffer<TypedIndex> SubstepIndices;
             public RawBuffer SubstepBuffer;
 
-            public LinearAndSubstep(BufferPool pool, int substepCount)
+            public Substeps(BufferPool pool, int substepCount)
             {
                 SubstepCount = substepCount;
                 const int worstCaseSizePerManifold = 128;
                 //We still *allocate* enough room for the worst case set of manifolds, but that doesn't mean we have to touch every bit of it.
                 pool.Take(substepCount * worstCaseSizePerManifold, out SubstepBuffer);
-                pool.SpecializeFor<int>().Take(substepCount, out SubstepIndices);
+                pool.SpecializeFor<TypedIndex>().Take(substepCount, out SubstepIndices);
                 NextSubstepStart = 0;
+                CompletedSubsteps = 0;
             }
-
-            public void Notify(int substepIndex, ref ConvexContactManifold manifold)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public unsafe bool Notify<TManifold>(int substepIndex, ref TManifold manifold) where TManifold : IContactManifold
             {
-                SubstepIndices[substepIndex] = NextSubstepStart;
-
-                //OffsetB + SurfaceBasis + ContactCount + (contact size * contactCount)
-                NextSubstepStart += Unsafe.SizeOf<Vector3>() + Unsafe.SizeOf<BEPUutilities2.Quaternion>() + Unsafe.SizeOf<int>() + manifold.ContactCount * Unsafe.SizeOf<ConvexContact>();
+                //Pack the convexity and contact count into the type so we can more easily interpret the results.
+                SubstepIndices[substepIndex] = new TypedIndex(manifold.TypeId, NextSubstepStart);
+                Unsafe.As<byte, TManifold>(ref SubstepBuffer.Memory[NextSubstepStart]) = manifold;
+                NextSubstepStart += Unsafe.SizeOf<TManifold>();
+                if (++CompletedSubsteps == SubstepCount)
+                {
+                    return true;
+                }
+                return false;
             }
         }
 
