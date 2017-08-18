@@ -26,8 +26,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <param name="pairMaterial">Material properties of the manifold.</param>
         /// <returns>True if a constraint should be created for the manifold, false otherwise.</returns>
-        /// <typeparam name="TManifold">Type of the underlying manifold. Either NonconvexContactManifold or ConvexContactManifold.</typeparam>
-        bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, ref ManifoldData<TManifold> manifold, out PairMaterialProperties pairMaterial);
+        bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, ref ContactManifold manifold, out PairMaterialProperties pairMaterial);
 
         /// <summary>
         /// Chooses whether to allow contact generation to proceed for the children of two overlapping collidables in a compound-including pair.
@@ -50,8 +49,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="childIndexB">Index of the child of collidable B in the pair. If collidable B is not compound, then this is always 0.</param>
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <returns>True if this manifold should be considered for constraint generation, false otherwise.</returns>
-        /// <typeparam name="TManifold">Type of the underlying manifold. Either NonconvexContactManifold or ConvexContactManifold.</typeparam>
-        bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ManifoldData<TManifold> manifold);
+        bool ConfigureContactManifold<TManifold>(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ContactManifold manifold);
 
         /// <summary>
         /// Performs any post-narrowphase execution tasks.
