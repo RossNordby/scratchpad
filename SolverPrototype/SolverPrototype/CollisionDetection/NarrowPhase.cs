@@ -651,7 +651,7 @@ namespace SolverPrototype.CollisionDetection
                 Debug.Assert(Substeps.CompletedSubsteps == Substeps.SubstepCount + 1);
                 //Attempt to create a single manifold which best represents all submanifolds.
                 Substeps.Trigger(out var substepManifold);
-                //We make use of the inner sphere contacts if 1) there is any room, or 2) an inner sphere contact has 
+                //We make use of the inner sphere contacts if 1) there is any room, or 2) an inner sphere contact has greater depth than any contact in the substepped manifold somehow.
 
             }
         }
@@ -665,8 +665,13 @@ namespace SolverPrototype.CollisionDetection
             public int CompletedSubsteps;
             public int NextSubstepStart;
             public Buffer<ContactManifold> Manifolds;
+            /// <summary>
+            /// Change in the offset from A's position to B's position from the current frame's pose at t=0 to the predicted pose at t=1.
+            /// Equal to the integrated relative linear velocity.
+            /// </summary>
+            public Vector3 RelativeOffsetChange;
 
-            public Substeps(CollidableReference a, CollidableReference b, BufferPool pool, int substepCount)
+            public Substeps(CollidableReference a, CollidableReference b, BufferPool pool, ref Vector3 startOffsetB, ref Vector3 endOffsetB, int substepCount)
             {
                 SubstepCount = substepCount;
                 pool.SpecializeFor<ContactManifold>().Take(substepCount, out Manifolds);
@@ -674,6 +679,7 @@ namespace SolverPrototype.CollisionDetection
                 CompletedSubsteps = 0;
                 A = a;
                 B = b;
+                RelativeOffsetChange = endOffsetB - startOffsetB;
             }
 
             public ContactManifold* GetManifoldForSubstep(int index)
@@ -695,6 +701,11 @@ namespace SolverPrototype.CollisionDetection
                 return false;
             }
 
+            public static float GetProgressionForSubstep(int substepIndex, int substepCount)
+            {
+                return substepIndex / (float)substepCount;
+            }
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Trigger(out ContactManifold substepManifold)
             {
@@ -709,15 +720,41 @@ namespace SolverPrototype.CollisionDetection
                 for (int i = 0; i < SubstepCount; ++i)
                 {
                     ref var manifold = ref Manifolds[i];
-                    if (manifold.ContactCount > 0)
+                    var contactCount = manifold.ContactCount;
+                    if (contactCount > 0)
                     {
                         substepManifold = manifold;
-                        break;
+                        //Once the best substep is selected, transform the contact positions and depths to be relative to the poses at t=0.
+                        //Since the contact position offsets are not rotated, all we have to do is add the offset from t=0 to the current time to each contact position
+                        //and modify the penetration depths according to that offset along the normal.
+                        var offset = RelativeOffsetChange * GetProgressionForSubstep(i, SubstepCount);
+                        if (substepManifold.Convex)
+                        {
+                            BEPUutilities2.Quaternion.TransformY(1, ref substepManifold.ConvexSurfaceBasis, out var manifoldNormal);
+                            var penetrationOffset = Vector3.Dot(offset, manifoldNormal);
+                            for (int j = 0; j < contactCount; ++j)
+                            {
+                                ref var contact = ref ContactManifold.GetConvexContact(ref substepManifold, j);
+                                contact.Offset += offset;
+                                contact.Depth += penetrationOffset;
+                            }
+                        }
+                        else
+                        {
+                            for (int j = 0; j < contactCount; ++j)
+                            {
+                                ref var contact = ref ContactManifold.GetNonconvexContact(ref substepManifold, j);
+                                BEPUutilities2.Quaternion.TransformY(1, ref contact.SurfaceBasis, out var manifoldNormal);
+                                var penetrationOffset = Vector3.Dot(offset, manifoldNormal);
+                                contact.Offset += offset;
+                                contact.Depth += penetrationOffset;
+                            }
+                        }
+                        return;
                     }
                 }
-
-                //Once the best substep is selected, transform the contact positions and depths to be relative to the poses at t=0.
-                substepManifold = new ContactManifold();
+                //If there are no contacts, then just return an empty manifold.
+                substepManifold = Manifolds[0];
             }
         }
 
