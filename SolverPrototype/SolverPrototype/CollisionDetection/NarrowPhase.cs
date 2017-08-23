@@ -631,8 +631,7 @@ namespace SolverPrototype.CollisionDetection
             //Note that we can't immediately dispatch constraint generation when only one of the substeps or inner sphere tests completes.
             //We have to wait for them all. So, we have to store the intermediate results.
             public Substeps Substeps;
-            public ContactManifold LinearManifoldA;
-            public ContactManifold LinearManifoldB;
+            public Linear Linear;
 
             public bool Notify()
             {
@@ -646,14 +645,116 @@ namespace SolverPrototype.CollisionDetection
                 return false;
             }
 
-            public void Trigger()
+            public void Trigger(out ContactManifold substepManifold)
             {
                 Debug.Assert(Substeps.CompletedSubsteps == Substeps.SubstepCount + 1);
                 //Attempt to create a single manifold which best represents all submanifolds.
-                Substeps.Trigger(out var substepManifold);
+                Substeps.Trigger(out substepManifold);
                 //We make use of the inner sphere contacts if 1) there is any room, or 2) an inner sphere contact has greater depth than any contact in the substepped manifold somehow.
 
             }
+        }
+
+        unsafe struct LinearNoSubsteps
+        {
+            public ContactManifold Manifold;
+            public ContactManifold Linear;
+            public int SubmanifoldsCompleted;
+
+            public bool Notify()
+            {
+                return ++SubmanifoldsCompleted == 3;
+            }
+
+            private void GetShallowestNonconvex(ref ContactManifold manifold, out int index, out float depth)
+            {
+                var count = manifold.ContactCount;
+                index = 0;
+                depth = float.MinValue;
+                for (int i = 0; i < count; ++i)
+                {
+                    ref var contact = ref ContactManifold.GetNonconvexContact(ref manifold, i);
+                    if (contact.Depth > depth)
+                    {
+                        depth = contact.Depth;
+                        index = i;
+                    }
+                }
+            }
+            private void GetDeepestConvex(ref ContactManifold manifold, out int index, out float depth)
+            {
+                var count = manifold.ContactCount;
+                index = 0;
+                depth = float.MinValue;
+                for (int i = 0; i < count; ++i)
+                {
+                    ref var contact = ref ContactManifold.GetConvexContact(ref manifold, i);
+                    if (contact.Depth > depth)
+                    {
+                        depth = contact.Depth;
+                        index = i;
+                    }
+                }
+            }
+            public void Trigger(ref ContactManifold outManifold)
+            {
+                var linearCount = Linear.ContactCount;
+                if (linearCount > 0)
+                {
+                    Debug.Assert(linearCount <= 2, "Inner sphere derived contacts should only ever contribute one contact per involved body.");
+
+                    var mainCount = Manifold.ContactCount;
+                    var totalCount = mainCount + linearCount;
+                    var contactsToPotentiallyReplaceCount = totalCount - 4;
+                    if (contactsToPotentiallyReplaceCount > 0)
+                    {
+                        //There are more contacts than slots. A subset must be prioritized.
+                    }
+                    else
+                    {
+                        //There is sufficient room in the manifold to include all the new contacts, so there is no need for prioritization.
+                        outManifold.SetConvexityAndCount(totalCount, false);
+                        //Add all existing contacts. Note that the use of inner sphere contacts forces the manifold to be nonconvex unconditionally.
+                        //While there are cases in which the normals could actually be planar, we don't spend the time figuring that out-
+                        //this state will be extremely brief regardless, and there isn't much value in trying to tease out convexity for one or two frames.
+                        if (Manifold.Convex)
+                        {
+                            for (int i = 0; i < mainCount; ++i)
+                            {
+                                ref var outContact = ref ContactManifold.GetNonconvexContact(ref outManifold, i);
+                                ref var inContact = ref ContactManifold.GetConvexContact(ref Manifold, i);
+                                outContact.Offset = inContact.Offset;
+                                outContact.Depth = inContact.Depth;
+                                outContact.SurfaceBasis = Manifold.ConvexSurfaceBasis;
+                                outContact.FeatureId = inContact.FeatureId;
+                            }
+                        }
+                        else
+                        {
+                            for (int i = 0; i < mainCount; ++i)
+                            {
+                                ContactManifold.GetNonconvexContact(ref outManifold, i) = ContactManifold.GetNonconvexContact(ref Manifold, i);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    outManifold = Manifold;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Stores the inner sphere manifolds associated with a linear-including pair.
+        /// </summary>
+        unsafe struct Linear
+        {
+            //TODO: This is a situation where a special case would be beneficial.
+            //These inner sphere reports can never contribute more than one contact (so this will only hold up to two contacts),
+            //but these manifolds preallocate enough room for a full 4 nonconvex contacts.
+            public ContactManifold Manifold;
+
         }
 
 

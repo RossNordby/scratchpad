@@ -90,7 +90,7 @@ namespace SolverPrototype.CollisionDetection
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                PackedConvexityAndContactCount = PackedConvexityAndContactCount | (*(int*)&value) << 3; //hack^__^ 
+                PackedConvexityAndContactCount = PackedConvexityAndContactCount | ((*(int*)&value) << 3); //hack^__^ 
             }
         }
         /// <summary>
@@ -108,6 +108,12 @@ namespace SolverPrototype.CollisionDetection
             {
                 PackedConvexityAndContactCount = (value - 1) | (PackedConvexityAndContactCount & 4);
             }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void SetConvexityAndCount(int count, bool convex)
+        {
+            PackedConvexityAndContactCount = (count - 1) | ((*(int*)&convex) << 3);
         }
 
         [FieldOffset(16)]
@@ -146,5 +152,5 @@ namespace SolverPrototype.CollisionDetection
         }
 
     }
-    
+
 }
