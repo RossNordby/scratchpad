@@ -713,6 +713,8 @@ namespace SolverPrototype.CollisionDetection
                             //Rather than shuffling the contact manifold memory around, just sort indices.
 
                             //TODO: This entire hardcoded sort is a bit gross and silly. You could do better.
+                            //TODO: It's not clear that this is actually even useful. It may be that just picking the deepest of the linear contacts and filling any open space
+                            //is the best and simplest option in the end.
                             var linearIndices = stackalloc int[linearCount];
                             var mainIndices = stackalloc int[mainCount];
                             if (linearCount == 2)

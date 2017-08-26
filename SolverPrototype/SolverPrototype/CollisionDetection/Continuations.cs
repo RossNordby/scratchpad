@@ -78,20 +78,62 @@ namespace SolverPrototype.CollisionDetection
             //TODO: 'Unclaimed' impulse from old unmatched contacts could be redistributed to try to conserve total impulse. Something to fiddle with once we have a test case running.
         }
 
-        unsafe void BuildDescriptionForManifold(ref ContactManifold manifold, ref PairMaterialProperties material, int existingConstraintHandle)
+        void UpdateConstraint<TDescription, TConstraintCache>(ref ContactManifold manifold, int manifoldTypeAsConstraintType, ref TDescription description, TypedIndex constraintCacheIndex) 
+            where TDescription : IConstraintDescription<TDescription>
+        {
+            if (constraintCacheIndex.Exists)
+            {
+                if (manifoldTypeAsConstraintType == constraintCacheIndex.Type)
+                {
+                    //There exists a constraint and it has the same type as the manifold. Directly apply the new description.
+                    int constraintHandle;
+                    if (typeof(TConstraintCache) == typeof(ConstraintCache1))
+                    {
+                        ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache1>(constraintCacheIndex.Index);
+                        constraintHandle = constraintCache.ConstraintHandle;
+                    }
+                    else if (typeof(TConstraintCache) == typeof(ConstraintCache2))
+                    {
+                        ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache2>(constraintCacheIndex.Index);
+                        constraintHandle = constraintCache.ConstraintHandle;
+                    }
+                    else if (typeof(TConstraintCache) == typeof(ConstraintCache3))
+                    {
+                        ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache3>(constraintCacheIndex.Index);
+                        constraintHandle = constraintCache.ConstraintHandle;
+                    }
+                    else if (typeof(TConstraintCache) == typeof(ConstraintCache4))
+                    {
+                        ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache4>(constraintCacheIndex.Index);
+                        constraintHandle = constraintCache.ConstraintHandle;
+                    }
+                    else
+                    {
+                        constraintHandle = 0;
+                        Debug.Fail("Invalid constraint cache type.");
+                    }
+                    Solver.ApplyDescription(constraintHandle, ref description);
+                }
+            }
+        }
+
+        unsafe void BuildDescriptionForManifold(ref ContactManifold manifold, ref PairMaterialProperties material, TypedIndex constraintCacheIndex)
         {
             //TODO: Should check codegen and alternatives here.
             //TODO: Descriptions will be changing to not have redundant B offsets, this will have to change to match.
-            switch (manifold.PackedConvexityAndContactCount)
+            Debug.Assert(manifold.ContactCount > 0);
+            //Constraint types only use 3 bits, since their contact count can never be zero.
+            var manifoldTypeAsConstraintType = ((manifold.PackedConvexityAndContactCount >> 1) & 4) | ((manifold.PackedConvexityAndContactCount & 7) - 1);
+            switch (manifoldTypeAsConstraintType)
             {
                 //Convex
+                case 0:
+                    break;
                 case 1:
                     break;
                 case 2:
                     break;
                 case 3:
-                    break;
-                case 4:
                     {
                         ContactManifold4Constraint description;
                         var descriptionContacts = &description.Contact0;
@@ -101,19 +143,25 @@ namespace SolverPrototype.CollisionDetection
                             ref var descriptionContact = ref descriptionContacts[i];
                             descriptionContact.OffsetA = contact.Offset;
                             descriptionContact.OffsetB = contact.Offset - manifold.OffsetB;
-                            description.
-
+                            descriptionContact.PenetrationDepth = contact.Depth;
                         }
+                        description.FrictionCoefficient = material.FrictionCoefficient;
+                        description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
+                        description.SpringSettings = material.SpringSettings;
+                        description.SurfaceBasis = manifold.ConvexSurfaceBasis;
+
+                        //TODO: Check init hack.
+                        UpdateConstraint<ContactManifold4Constraint, ConstraintCache4>(ref manifold, manifoldTypeAsConstraintType, ref * &description, constraintCacheIndex);
                     }
                     break;
                 //Nonconvex
-                case 7 + 1:
+                case 4 + 0:
                     break;
-                case 7 + 2:
+                case 4 + 1:
                     break;
-                case 7 + 3:
+                case 4 + 2:
                     break;
-                case 7 + 4:
+                case 4 + 3:
                     break;
 
             }

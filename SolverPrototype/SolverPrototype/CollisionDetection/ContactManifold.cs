@@ -152,9 +152,9 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref NonconvexContact GetConvexContact(ref ContactManifold manifold, int index)
+        public static ref ConvexContact GetConvexContact(ref ContactManifold manifold, int index)
         {
-            return ref Unsafe.Add(ref manifold.NonconvexContact0, index);
+            return ref Unsafe.Add(ref manifold.ConvexContact0, index);
         }
 
     }
