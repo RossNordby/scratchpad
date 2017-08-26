@@ -85,12 +85,12 @@ namespace SolverPrototype.CollisionDetection
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return (PackedConvexityAndContactCount & (1 << 3)) > 0;
+                return (PackedConvexityAndContactCount & (1 << 4)) > 0;
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                PackedConvexityAndContactCount = PackedConvexityAndContactCount | ((*(int*)&value) << 3); //hack^__^ 
+                PackedConvexityAndContactCount = (PackedConvexityAndContactCount & (~(1 << 4))) | ((*(int*)&value) << 4); //hack^__^ 
             }
         }
         /// <summary>
@@ -101,19 +101,19 @@ namespace SolverPrototype.CollisionDetection
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return 1 + (PackedConvexityAndContactCount & 3);
+                return PackedConvexityAndContactCount & 7;
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             set
             {
-                PackedConvexityAndContactCount = (value - 1) | (PackedConvexityAndContactCount & 4);
+                PackedConvexityAndContactCount = value | (PackedConvexityAndContactCount & 8);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetConvexityAndCount(int count, bool convex)
         {
-            PackedConvexityAndContactCount = (count - 1) | ((*(int*)&convex) << 3);
+            PackedConvexityAndContactCount = count | ((*(int*)&convex) << 4);
         }
 
         [FieldOffset(16)]
@@ -138,6 +138,12 @@ namespace SolverPrototype.CollisionDetection
         public ConvexContact ConvexContact2;
         [FieldOffset(92)]
         public ConvexContact ConvexContact3;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ContactManifold(int contactCount, bool convex) : this()
+        {
+            SetConvexityAndCount(contactCount, convex);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ref NonconvexContact GetNonconvexContact(ref ContactManifold manifold, int index)

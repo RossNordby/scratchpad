@@ -188,6 +188,7 @@ namespace SolverPrototype.CollisionDetection
             }
 
         }
+        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref TConstraintCache GetConstraintCache<TConstraintCache>(int constraintCacheIndex)

@@ -49,6 +49,8 @@ namespace BEPUutilities2.Collections
         //    }
         //}
 
+        //TODO: You could efficiently eliminate the redundant implementations of sorts by abstracting away the datasource.
+        //One implementation could cover keys-only, keys+values, and keys-but-only-memory-move-values.
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Sort<TKey, TValue, TComparer>

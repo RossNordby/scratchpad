@@ -645,13 +645,13 @@ namespace SolverPrototype.CollisionDetection
                 return false;
             }
 
-            public void Trigger(out ContactManifold substepManifold)
+            public void Trigger(out ContactManifold outManifold)
             {
                 Debug.Assert(Substeps.CompletedSubsteps == Substeps.SubstepCount + 1);
                 //Attempt to create a single manifold which best represents all submanifolds.
-                Substeps.Trigger(out substepManifold);
+                Substeps.Trigger(out var substepManifold);
                 //We make use of the inner sphere contacts if 1) there is any room, or 2) an inner sphere contact has greater depth than any contact in the substepped manifold somehow.
-
+                Linear.CombineManifolds(ref substepManifold, ref Linear.Manifold, out outManifold);
             }
         }
 
@@ -666,83 +666,7 @@ namespace SolverPrototype.CollisionDetection
                 return ++SubmanifoldsCompleted == 3;
             }
 
-            private void GetShallowestNonconvex(ref ContactManifold manifold, out int index, out float depth)
-            {
-                var count = manifold.ContactCount;
-                index = 0;
-                depth = float.MinValue;
-                for (int i = 0; i < count; ++i)
-                {
-                    ref var contact = ref ContactManifold.GetNonconvexContact(ref manifold, i);
-                    if (contact.Depth > depth)
-                    {
-                        depth = contact.Depth;
-                        index = i;
-                    }
-                }
-            }
-            private void GetDeepestConvex(ref ContactManifold manifold, out int index, out float depth)
-            {
-                var count = manifold.ContactCount;
-                index = 0;
-                depth = float.MinValue;
-                for (int i = 0; i < count; ++i)
-                {
-                    ref var contact = ref ContactManifold.GetConvexContact(ref manifold, i);
-                    if (contact.Depth > depth)
-                    {
-                        depth = contact.Depth;
-                        index = i;
-                    }
-                }
-            }
-            public void Trigger(ref ContactManifold outManifold)
-            {
-                var linearCount = Linear.ContactCount;
-                if (linearCount > 0)
-                {
-                    Debug.Assert(linearCount <= 2, "Inner sphere derived contacts should only ever contribute one contact per involved body.");
 
-                    var mainCount = Manifold.ContactCount;
-                    var totalCount = mainCount + linearCount;
-                    var contactsToPotentiallyReplaceCount = totalCount - 4;
-                    if (contactsToPotentiallyReplaceCount > 0)
-                    {
-                        //There are more contacts than slots. A subset must be prioritized.
-                    }
-                    else
-                    {
-                        //There is sufficient room in the manifold to include all the new contacts, so there is no need for prioritization.
-                        outManifold.SetConvexityAndCount(totalCount, false);
-                        //Add all existing contacts. Note that the use of inner sphere contacts forces the manifold to be nonconvex unconditionally.
-                        //While there are cases in which the normals could actually be planar, we don't spend the time figuring that out-
-                        //this state will be extremely brief regardless, and there isn't much value in trying to tease out convexity for one or two frames.
-                        if (Manifold.Convex)
-                        {
-                            for (int i = 0; i < mainCount; ++i)
-                            {
-                                ref var outContact = ref ContactManifold.GetNonconvexContact(ref outManifold, i);
-                                ref var inContact = ref ContactManifold.GetConvexContact(ref Manifold, i);
-                                outContact.Offset = inContact.Offset;
-                                outContact.Depth = inContact.Depth;
-                                outContact.SurfaceBasis = Manifold.ConvexSurfaceBasis;
-                                outContact.FeatureId = inContact.FeatureId;
-                            }
-                        }
-                        else
-                        {
-                            for (int i = 0; i < mainCount; ++i)
-                            {
-                                ContactManifold.GetNonconvexContact(ref outManifold, i) = ContactManifold.GetNonconvexContact(ref Manifold, i);
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    outManifold = Manifold;
-                }
-            }
         }
 
         /// <summary>
@@ -755,6 +679,185 @@ namespace SolverPrototype.CollisionDetection
             //but these manifolds preallocate enough room for a full 4 nonconvex contacts.
             public ContactManifold Manifold;
 
+            static void ConvertConvexToNonconvex(ref ContactManifold convex, int convexIndex, ref ContactManifold nonconvex, int nonconvexIndex)
+            {
+                Debug.Assert(convex.Convex && !nonconvex.Convex && convexIndex < convex.ContactCount && nonconvexIndex < nonconvex.ContactCount);
+                ref var outContact = ref ContactManifold.GetNonconvexContact(ref nonconvex, nonconvexIndex);
+                ref var inContact = ref ContactManifold.GetConvexContact(ref convex, convexIndex);
+                outContact.Offset = inContact.Offset;
+                outContact.Depth = inContact.Depth;
+                outContact.SurfaceBasis = convex.ConvexSurfaceBasis;
+                outContact.FeatureId = inContact.FeatureId;
+            }
+
+            public static void CombineManifolds(ref ContactManifold mainManifold, ref ContactManifold linearManifold, out ContactManifold outManifold)
+            {
+                var linearCount = linearManifold.ContactCount;
+                if (linearCount > 0)
+                {
+                    Debug.Assert(linearCount <= 2, "Inner sphere derived contacts should only ever contribute one contact per involved body.");
+
+                    var mainCount = mainManifold.ContactCount;
+                    if (mainCount > 0)
+                    {
+                        var totalCount = mainCount + linearCount;
+                        var contactsToPotentiallyReplaceCount = totalCount - 4;
+                        if (contactsToPotentiallyReplaceCount > 0)
+                        {
+                            //There are more contacts than slots. A subset must be prioritized.
+                            //We want the deepest set of contacts from all available manifolds. 
+                            //(This isn't necessarily an ideal heuristic- consider a bunch of deep  contacts all in the same place,
+                            //causing the removal of a distant but less redundant contact. In practice, though, it works okay.)
+
+                            //To find the deepest contacts, simply sort both sets and pop the minimums.
+                            //Rather than shuffling the contact manifold memory around, just sort indices.
+
+                            //TODO: This entire hardcoded sort is a bit gross and silly. You could do better.
+                            var linearIndices = stackalloc int[linearCount];
+                            var mainIndices = stackalloc int[mainCount];
+                            if (linearCount == 2)
+                            {
+                                if (linearManifold.NonconvexContact0.Depth < linearManifold.NonconvexContact1.Depth)
+                                {
+                                    linearIndices[0] = 0;
+                                    linearIndices[1] = 1;
+                                }
+                                else
+                                {
+                                    linearIndices[0] = 0;
+                                    linearIndices[1] = 1;
+                                }
+                            }
+                            else
+                            {
+                                linearIndices[0] = 0;
+                            }
+
+                            for (int i = 0; i < mainCount; ++i)
+                                mainIndices[i] = i;
+
+                            outManifold = new ContactManifold(totalCount, false);
+                            if (mainManifold.Convex)
+                            {
+                                for (int i = 1; i <= mainCount; ++i)
+                                {
+                                    var originalIndex = mainIndices[i];
+                                    var depth = ContactManifold.GetConvexContact(ref mainManifold, originalIndex).Depth;
+                                    int compareIndex;
+                                    for (compareIndex = i - 1; compareIndex >= 0; --compareIndex)
+                                    {
+                                        var compareDepth = ContactManifold.GetConvexContact(ref mainManifold, compareIndex).Depth;
+                                        if (compareDepth < depth)
+                                        {
+                                            //Move the element up one slot.
+                                            var upperSlotIndex = compareIndex + 1;
+                                            mainIndices[upperSlotIndex] = mainIndices[compareIndex];
+                                        }
+                                        else
+                                            break;
+                                    }
+                                    var targetIndex = compareIndex + 1;
+                                    if (targetIndex != i)
+                                    {
+                                        //Move the original index down.
+                                        mainIndices[targetIndex] = originalIndex;
+                                    }
+                                }
+
+                                var outIndex = 0;
+                                var mainIndex = 0;
+                                var linearIndex = 0;
+                                while (outIndex < 4)
+                                {
+                                    if (linearIndex == linearCount ||
+                                        (mainIndex < mainCount &&
+                                        ContactManifold.GetConvexContact(ref mainManifold, mainIndex).Depth > ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex).Depth))
+                                    {
+                                        ConvertConvexToNonconvex(ref mainManifold, mainIndex++, ref outManifold, outIndex++);
+                                    }
+                                    else
+                                    {
+                                        ContactManifold.GetNonconvexContact(ref outManifold, outIndex++) = ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex++);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                for (int i = 1; i <= mainCount; ++i)
+                                {
+                                    var originalIndex = mainIndices[i];
+                                    var depth = ContactManifold.GetNonconvexContact(ref mainManifold, originalIndex).Depth;
+                                    int compareIndex;
+                                    for (compareIndex = i - 1; compareIndex >= 0; --compareIndex)
+                                    {
+                                        var compareDepth = ContactManifold.GetNonconvexContact(ref mainManifold, compareIndex).Depth;
+                                        if (compareDepth < depth)
+                                        {
+                                            //Move the element up one slot.
+                                            var upperSlotIndex = compareIndex + 1;
+                                            mainIndices[upperSlotIndex] = mainIndices[compareIndex];
+                                        }
+                                        else
+                                            break;
+                                    }
+                                    var targetIndex = compareIndex + 1;
+                                    if (targetIndex != i)
+                                    {
+                                        //Move the original index down.
+                                        mainIndices[targetIndex] = originalIndex;
+                                    }
+                                }
+                                var outIndex = 0;
+                                var mainIndex = 0;
+                                var linearIndex = 0;
+                                while (outIndex < 4)
+                                {
+                                    if (linearIndex == linearCount ||
+                                        (mainIndex < mainCount &&
+                                        ContactManifold.GetNonconvexContact(ref mainManifold, mainIndex).Depth > ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex).Depth))
+                                    {
+                                        ContactManifold.GetNonconvexContact(ref outManifold, outIndex++) = ContactManifold.GetNonconvexContact(ref mainManifold, mainIndex++);
+                                    }
+                                    else
+                                    {
+                                        ContactManifold.GetNonconvexContact(ref outManifold, outIndex++) = ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex++);
+                                    }
+                                }
+                            }
+                        }
+                        else
+                        {
+                            //There is sufficient room in the manifold to include all the new contacts, so there is no need for prioritization.
+                            outManifold = new ContactManifold(totalCount, false);
+                            //Add all existing contacts. Note that the use of inner sphere contacts forces the manifold to be nonconvex unconditionally.
+                            //While there are cases in which the normals could actually be planar, we don't spend the time figuring that out-
+                            //this state will be extremely brief regardless, and there isn't much value in trying to tease out convexity for one or two frames.
+                            if (mainManifold.Convex)
+                            {
+                                for (int i = 0; i < mainCount; ++i)
+                                {
+                                    ConvertConvexToNonconvex(ref mainManifold, i, ref outManifold, i);
+                                }
+                            }
+                            else
+                            {
+                                for (int i = 0; i < mainCount; ++i)
+                                {
+                                    ContactManifold.GetNonconvexContact(ref outManifold, i) = ContactManifold.GetNonconvexContact(ref mainManifold, i);
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        outManifold = linearManifold;
+                    }
+                }
+                else
+                {
+                    outManifold = mainManifold;
+                }
+            }
         }
 
 
