@@ -77,8 +77,60 @@ namespace SolverPrototype.CollisionDetection
         public Vector3 OffsetB;
         [FieldOffset(12)]
         public int PackedConvexityAndContactCount;
+        
+        [FieldOffset(16)]
+        public Vector3 Offset0;
+        [FieldOffset(28)]
+        public Vector3 Offset1;
+        [FieldOffset(40)]
+        public Vector3 Offset2;
+        [FieldOffset(52)]
+        public Vector3 Offset3;
+        [FieldOffset(64)]
+        public float Depth0;
+        [FieldOffset(68)]
+        public float Depth1;
+        [FieldOffset(72)]
+        public float Depth2;
+        [FieldOffset(76)]
+        public float Depth3;
+        [FieldOffset(80)]
+        public int FeatureId0;
+        [FieldOffset(84)]
+        public int FeatureId1;
+        [FieldOffset(88)]
+        public int FeatureId2;
+        [FieldOffset(92)]
+        public int FeatureId3;
         /// <summary>
-        /// Gets or sets whether the manifold should be considered convex. Setting this requires properly configuring each used NonconvexContact in the manifold.
+        /// Surface basis of nonconvex contact 0. Value undefined if manifold is convex.
+        /// </summary>
+        [FieldOffset(96)]
+        public BEPUutilities2.Quaternion SurfaceBasis0;
+        /// <summary>
+        /// Surface basis of nonconvex contact 1. Value undefined if manifold is convex.
+        /// </summary>
+        [FieldOffset(112)]
+        public BEPUutilities2.Quaternion SurfaceBasis1;
+        /// <summary>
+        /// Surface basis of nonconvex contact 2. Value undefined if manifold is convex.
+        /// </summary>
+        [FieldOffset(128)]
+        public BEPUutilities2.Quaternion SurfaceBasis2;
+        /// <summary>
+        /// Surface basis of nonconvex contact 3. Value undefined if manifold is convex.
+        /// </summary>
+        [FieldOffset(144)]
+        public BEPUutilities2.Quaternion SurfaceBasis3;
+
+        /// <summary>
+        /// Surface basis of the convex manifold. Value undefined if manifold is nonconvex.
+        /// </summary>
+        [FieldOffset(96)]
+        public BEPUutilities2.Quaternion ConvexSurfaceBasis;
+
+        /// <summary>
+        /// Gets or sets whether the manifold should be considered convex.
         /// </summary>
         public bool Convex
         {
@@ -116,28 +168,6 @@ namespace SolverPrototype.CollisionDetection
             PackedConvexityAndContactCount = count | ((*(int*)&convex) << 4);
         }
 
-        [FieldOffset(16)]
-        public NonconvexContact NonconvexContact0;
-        [FieldOffset(52)]
-        public NonconvexContact NonconvexContact1;
-        [FieldOffset(88)]
-        public NonconvexContact NonconvexContact2;
-        [FieldOffset(124)]
-        public NonconvexContact NonconvexContact3;
-
-        /// <summary>
-        /// Surface basis of of the whole manifold when the manifold type is convex.
-        /// </summary>
-        [FieldOffset(16)]
-        public BEPUutilities2.Quaternion ConvexSurfaceBasis;
-        [FieldOffset(32)]
-        public ConvexContact ConvexContact0;
-        [FieldOffset(52)]
-        public ConvexContact ConvexContact1;
-        [FieldOffset(72)]
-        public ConvexContact ConvexContact2;
-        [FieldOffset(92)]
-        public ConvexContact ConvexContact3;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ContactManifold(int contactCount, bool convex) : this()
@@ -145,17 +175,7 @@ namespace SolverPrototype.CollisionDetection
             SetConvexityAndCount(contactCount, convex);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref NonconvexContact GetNonconvexContact(ref ContactManifold manifold, int index)
-        {
-            return ref Unsafe.Add(ref manifold.NonconvexContact0, index);
-        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref ConvexContact GetConvexContact(ref ContactManifold manifold, int index)
-        {
-            return ref Unsafe.Add(ref manifold.ConvexContact0, index);
-        }
 
     }
 

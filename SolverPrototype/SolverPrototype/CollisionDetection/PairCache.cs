@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
+using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -93,7 +94,7 @@ namespace SolverPrototype.CollisionDetection
             else
                 current = new QuickList<T, Buffer<T>>();
         }
-        
+
         //The previous cache always persists while building a new one. It has to be available for searching old cached data.
         public PairCache(BufferPool pool, ref PairCache previousPairCache, int minimumMappingSize = 2048,
             int minimumConstraintBatchSize = 128, int minimumCollisionDataBatchSize = 128, float previousBatchMultiplier = 1.25f)
@@ -157,38 +158,153 @@ namespace SolverPrototype.CollisionDetection
             return cache.TryGetValue(ref pair, out pointers);
         }
 
-        /// <summary>
-        /// When the narrow phase reports a desired constraint, it hands the description and associated bodies off to the adder implementation. That adder is responsible
-        /// for putting a constraint into the solver. It may do so in a deferred fashion; the narrow phase implementation is unaware.
-        /// Since a constraint handle doesn't exist until it's added to the solver, the adder has to call back into the pair cache and update the constraint handle.
-        /// </summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void FillConstraintHandle(TypedIndex constraintCacheIndex, int constraintHandle)
+
+        internal void ScatterNewImpulses(int constraintType, ref ConstraintReference constraintReference, ref ContactImpulses contactImpulses)
         {
-            Debug.Assert(constraintCacheIndex.Exists && constraintCacheIndex.Type >= 0 && constraintCacheIndex.Type < 4);
-            var index = constraintCacheIndex.Type;
-            switch (constraintCacheIndex.Type)
+            //Constraints cover 16 possible cases:
+            //1-4 contacts: 0x3
+            //convex vs nonconvex: 0x4
+            //1 body versus 2 body: 0x8
+            BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var inner);
+            switch (constraintType)
             {
+                //1 body
+                //Convex
                 case 0:
-                    Debug.Assert(constraintCache1.Span.Allocated && index < constraintCache1.Count);
-                    constraintCache1[index].ConstraintHandle = constraintHandle;
-                    return;
+                    {
+                        //1 contact
+                    }
+                    break;
                 case 1:
-                    Debug.Assert(constraintCache2.Span.Allocated && index < constraintCache2.Count);
-                    constraintCache2[index].ConstraintHandle = constraintHandle;
-                    return;
+                    {
+                        //2 contacts
+                    }
+                    break;
                 case 2:
-                    Debug.Assert(constraintCache3.Span.Allocated && index < constraintCache3.Count);
-                    constraintCache3[index].ConstraintHandle = constraintHandle;
-                    return;
+                    {
+                        //3 contacts
+                    }
+                    break;
                 case 3:
-                    Debug.Assert(constraintCache4.Span.Allocated && index < constraintCache4.Count);
-                    constraintCache4[index].ConstraintHandle = constraintHandle;
-                    return;
+                    {
+                        //4 contacts
+                    }
+                    break;
+                //Nonconvex
+                case 4 + 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 4 + 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 4 + 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 4 + 3:
+                    {
+                        //4 contacts
+                    }
+                    break;
+                //2 body
+                //Convex
+                case 8 + 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 8 + 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 8 + 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 8 + 3:
+                    {
+                        //4 contacts
+                        var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
+                        ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
+                        bundle.
+                    }
+                    break;
+                //Nonconvex
+                case 8 + 4 + 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 8 + 4 + 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 8 + 4 + 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 8 + 4 + 3:
+                    {
+                        //4 contacts
+                    }
+                    break;
             }
 
         }
-        
+
+
+        /// <summary>
+        /// Completes the addition of a constraint by filling in the narrowphase's pointer to the constraint and by distributing accumulated impulses.
+        /// </summary>
+        /// <param name="solver">Solver containing the constraint to set the impulses of.</param>
+        /// <param name="impulses"></param>
+        /// <param name="constraintCacheIndex"></param>
+        /// <param name="constraintHandle"></param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void CompleteConstraintAdd(Solver solver, ref ContactImpulses impulses, TypedIndex constraintCacheIndex, int constraintHandle)
+        {
+            var constraintContactCount = constraintCacheIndex.Type & 3;
+            var constraintIndex = constraintCacheIndex.Index;
+            switch (constraintContactCount)
+            {
+                case 0:
+                    Debug.Assert(constraintCache1.Span.Allocated && constraintContactCount < constraintCache1.Count);
+                    constraintCache1[constraintIndex].ConstraintHandle = constraintHandle;
+                    return;
+                case 1:
+                    Debug.Assert(constraintCache2.Span.Allocated && constraintContactCount < constraintCache2.Count);
+                    constraintCache2[constraintIndex].ConstraintHandle = constraintHandle;
+                    return;
+                case 2:
+                    Debug.Assert(constraintCache3.Span.Allocated && constraintContactCount < constraintCache3.Count);
+                    constraintCache3[constraintIndex].ConstraintHandle = constraintHandle;
+                    return;
+                case 3:
+                    Debug.Assert(constraintCache4.Span.Allocated && constraintContactCount < constraintCache4.Count);
+                    constraintCache4[constraintIndex].ConstraintHandle = constraintHandle;
+                    return;
+            }
+
+            solver.GetConstraintReference(constraintHandle, out var reference);
+            var type = constraintCacheIndex.Type;
+            var constraintContactCount = type & 3;
+            var convex = (type & 4) == 0;
+            var oneBody = (type & 8) == 0;
+            reference.
+            ScatterNewImpulses(solver, ref impulses, ref reference);
+
+        }
+
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref TConstraintCache GetConstraintCache<TConstraintCache>(int constraintCacheIndex)

@@ -556,6 +556,8 @@ namespace SolverPrototype.CollisionDetection
 
         public abstract void Flush(IThreadDispatcher threadDispatcher = null);
 
+
+
         //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
 
     }
