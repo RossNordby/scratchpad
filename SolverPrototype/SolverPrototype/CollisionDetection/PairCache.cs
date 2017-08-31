@@ -165,6 +165,10 @@ namespace SolverPrototype.CollisionDetection
             //1-4 contacts: 0x3
             //convex vs nonconvex: 0x4
             //1 body versus 2 body: 0x8
+            //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
+
+            //TODO: Note that we do not modify the friction accumulated impulses. This is just for simplicity- the impact of accumulated impulses on friction *should* be relatively
+            //hard to notice compared to penetration impulses. We should, however, test this assumption.
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var inner);
             switch (constraintType)
             {
@@ -233,7 +237,7 @@ namespace SolverPrototype.CollisionDetection
                         //4 contacts
                         var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        bundle.
+                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 4);
                     }
                     break;
                 //Nonconvex
@@ -295,13 +299,7 @@ namespace SolverPrototype.CollisionDetection
             }
 
             solver.GetConstraintReference(constraintHandle, out var reference);
-            var type = constraintCacheIndex.Type;
-            var constraintContactCount = type & 3;
-            var convex = (type & 4) == 0;
-            var oneBody = (type & 8) == 0;
-            reference.
-            ScatterNewImpulses(solver, ref impulses, ref reference);
-
+            ScatterNewImpulses(constraintCacheIndex.Type, ref reference, ref impulses);
         }
 
 
