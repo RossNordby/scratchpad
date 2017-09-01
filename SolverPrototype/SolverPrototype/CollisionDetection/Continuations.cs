@@ -37,6 +37,14 @@ namespace SolverPrototype.CollisionDetection
         public int B;
     }
 
+    /// <summary>
+    /// Special type for collision pairs that do not need to store any supplementary information.
+    /// </summary>
+    struct EmptyCollisionCache : IPairCacheEntry
+    {
+        public int TypeId => -1;
+    }
+
     public struct ContactImpulses
     {
         public float Impulse0;
@@ -78,7 +86,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void RequestAddConstraint<TDescription, TBodyHandles>(int workerIndex, TypedIndex constraintCacheIndex, ContactImpulses* newImpulses,
+        unsafe void RequestAddConstraint<TDescription, TBodyHandles>(int workerIndex, PairCacheIndex constraintCacheIndex, ContactImpulses* newImpulses,
            ref TDescription description, TBodyHandles bodyHandles) where TDescription : IConstraintDescription<TDescription>
         {
             if (typeof(TBodyHandles) == typeof(int))
@@ -98,13 +106,17 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        unsafe void UpdateConstraint<TDescription, TConstraintCache, TBodyHandles>(int workerIndex, CollidablePair pair,
-            ContactManifold* manifold, int manifoldTypeAsConstraintType, ref TDescription description, TBodyHandles bodyHandles)
+        unsafe void UpdateConstraint<TDescription, TCollisionCache, TConstraintCache, TBodyHandles>(int workerIndex, CollidablePair pair,
+            ContactManifold* manifold, int manifoldTypeAsConstraintType, ref TCollisionCache collisionCache, ref TDescription description, TBodyHandles bodyHandles)
+            where TConstraintCache : IPairCacheEntry
+            where TCollisionCache : IPairCacheEntry
             where TDescription : IConstraintDescription<TDescription>
         {
-            if (NarrowPhase.PairCache.TryGetPointers(ref pair, out var index, out var pointers))
+            var index = NarrowPhase.PairCache.IndexOf(ref pair);
+            if (index >= 0)
             {
                 //The previous frame had a constraint for this pair.
+                ref var pointers = ref NarrowPhase.PairCache.GetPointers(index);
                 Debug.Assert(pointers.ConstraintCache.Exists, "If a pair was persisted in the narrow phase, there should be a constraint associated with it.");
                 //TODO: Mark the entry as non-stale. 
 
@@ -156,6 +168,7 @@ namespace SolverPrototype.CollisionDetection
                     throw new InvalidOperationException("Invalid constraint cache type.");
                 }
 
+                NarrowPhase.PairCache.Update<TConstraintCache, TCollisionCache>(workerIndex, ref pointers, ref collisionCache, &manifold->FeatureId0);
                 if (manifoldTypeAsConstraintType == constraintCacheIndex.Type)
                 {
                     //There exists a constraint and it has the same type as the manifold. Directly apply the new description and impulses.
@@ -180,14 +193,17 @@ namespace SolverPrototype.CollisionDetection
             {
                 //No preexisting constraint; add a fresh constraint and pair cache entry.
                 //The pair cache entry has to be created first so that the adder has a place to put the result of the constraint add.
-                //
+                var constraintCacheIndex = NarrowPhase.PairCache.Add<TConstraintCache, TCollisionCache>(workerIndex, ref pair, ref collisionCache, &manifold->FeatureId0);
                 var newImpulses = new ContactImpulses();
                 //TODO: It would be nice to avoid the impulse scatter for fully new constraints; it's going to be all zeroes regardless. Worth investigating later.
                 RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
             }
         }
 
-
+        private unsafe void GatherOldImpulses(ref ConstraintReference reference, float* impulses)
+        {
+            reference.TypeBatch
+        }
 
         unsafe void UpdateConstraintForManifold<TBodyHandles>(int workerIndex, ContactManifold* manifold, ref PairMaterialProperties material, TypedIndex constraintCacheIndex, TBodyHandles bodyHandles)
         {
@@ -269,7 +285,7 @@ namespace SolverPrototype.CollisionDetection
                     {
                         //One of the two collidables is static.
                         //Ensure that the body is always in the first slot for the sake of constraint generation.
-                        if(bIsBody)
+                        if (bIsBody)
                         {
                             var tempA = pair.A;
                             pair.A = pair.B;

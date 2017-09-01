@@ -196,53 +196,31 @@ namespace SolverPrototype.CollisionDetection
         //Note that we have no-collision-data overloads. The vast majority of types don't actually have any collision data cached.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private unsafe void WorkerCacheAdd<TCollision, TConstraint>(ref TCollision collisionCache, ref TConstraint constraintCache, out CollidablePairPointers pointers)
-            where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
+            where TCollision : IPairCacheEntry where TConstraint : IPairCacheEntry
         {
-            pointers = new CollidablePairPointers
-            {
-                CollisionDetectionCache = new PairCacheIndex(workerIndex, collisionCache.TypeId, collisionCaches[collisionCache.TypeId].Add(ref collisionCache, minimumPerTypeCapacity, pool)),
-                ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumPerTypeCapacity, pool))
-            };
+            pointers.ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumPerTypeCapacity, pool));
+
+            if (typeof(TCollision) == typeof(EmptyCollisionCache))
+                pointers.CollisionDetectionCache = new PairCacheIndex();
+            else
+                pointers.CollisionDetectionCache = new PairCacheIndex(workerIndex, collisionCache.TypeId, collisionCaches[collisionCache.TypeId].Add(ref collisionCache, minimumPerTypeCapacity, pool));
+
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe void WorkerCacheAdd<TConstraint>(ref TConstraint constraintCache, out CollidablePairPointers pointers)
-            where TConstraint : IPairCacheEntry
-        {
-            pointers = new CollidablePairPointers
-            {
-                CollisionDetectionCache = new PairCacheIndex(),
-                ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumPerTypeCapacity, pool))
-            };
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TCollision, TConstraint>(ref CollidablePair pair, ref TCollision collisionCache, ref TConstraint constraintCache)
-            where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
+        public PairCacheIndex Add<TCollision, TConstraint>(ref CollidablePair pair, ref TCollision collisionCache, ref TConstraint constraintCache)
+            where TCollision : IPairCacheEntry where TConstraint : IPairCacheEntry
         {
             PendingAdd pendingAdd;
             WorkerCacheAdd(ref collisionCache, ref constraintCache, out pendingAdd.Pointers);
             pendingAdd.Pair = pair;
             PendingAdds.Add(ref pendingAdd, pool.SpecializeFor<PendingAdd>());
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TConstraint>(ref CollidablePair pair, ref TConstraint constraintCache)
-            where TConstraint : IPairCacheEntry
-        {
-            PendingAdd pendingAdd;
-            WorkerCacheAdd(ref constraintCache, out pendingAdd.Pointers);
-            pendingAdd.Pair = pair;
-            PendingAdds.Add(ref pendingAdd, pool.SpecializeFor<PendingAdd>());
+            return pendingAdd.Pointers.ConstraintCache;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Update<TCollision, TConstraint>(ref CollidablePairPointers pointers, ref TCollision collisionCache, ref TConstraint constraintCache)
-            where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
+            where TCollision : IPairCacheEntry where TConstraint : IPairCacheEntry
         {
             WorkerCacheAdd(ref collisionCache, ref constraintCache, out pointers);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Update<TConstraint>(ref CollidablePairPointers pointers, ref TConstraint constraintCache)
-            where TConstraint : IPairCacheEntry
-        {
-            WorkerCacheAdd(ref constraintCache, out pointers);
         }
 
 
@@ -391,9 +369,50 @@ namespace SolverPrototype.CollisionDetection
             //(You could use a single bit, but then you have to manage the atomicity of changes manually.)
         }
 
-        public void Update()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        unsafe void BuildNewConstraintCache<TConstraintCache>(int* featureIds, out TConstraintCache cache)
+        {
+            cache = default(TConstraintCache);
+            //1 contact constraint caches do not store a feature id; it's pointless.
+            if (typeof(TConstraintCache) == typeof(ConstraintCache2))
+            {
+                ref var typedCache = ref Unsafe.As<TConstraintCache, ConstraintCache2>(ref cache);
+                typedCache.FeatureId0 = featureIds[0];
+                typedCache.FeatureId1 = featureIds[1];
+            }
+            else if (typeof(TConstraintCache) == typeof(ConstraintCache3))
+            {
+                ref var typedCache = ref Unsafe.As<TConstraintCache, ConstraintCache3>(ref cache);
+                typedCache.FeatureId0 = featureIds[0];
+                typedCache.FeatureId1 = featureIds[1];
+                typedCache.FeatureId2 = featureIds[2];
+            }
+            else if (typeof(TConstraintCache) == typeof(ConstraintCache4))
+            {
+                ref var typedCache = ref Unsafe.As<TConstraintCache, ConstraintCache4>(ref cache);
+                typedCache.FeatureId0 = featureIds[0];
+                typedCache.FeatureId1 = featureIds[1];
+                typedCache.FeatureId2 = featureIds[2];
+                typedCache.FeatureId3 = featureIds[3];
+            }
+            //TODO: In the event that higher contact count manifolds exist for the purposes of nonconvexes, this will need to be expanded.
+        }
 
-        public void Add(int workerIndex, ref CollidablePair pair, )
+        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair, ref TCollisionCache collisionCache, int* featureIds)
+            where TConstraintCache : IPairCacheEntry
+            where TCollisionCache : IPairCacheEntry
+        {
+            BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
+            return nextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache);
+        }
+
+        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, int* featureIds)
+            where TConstraintCache : IPairCacheEntry
+            where TCollisionCache : IPairCacheEntry
+        {
+            BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
+            nextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache);
+        }
 
 
         internal void ScatterNewImpulses(int constraintType, ref ConstraintReference constraintReference, ref ContactImpulses contactImpulses)
@@ -576,7 +595,6 @@ namespace SolverPrototype.CollisionDetection
         {
             return ref Unsafe.As<byte, TCollisionData>(ref *collisionDataCache[default(TCollisionData).TypeId].Buffer.Memory);
         }
-
 
     }
 }
