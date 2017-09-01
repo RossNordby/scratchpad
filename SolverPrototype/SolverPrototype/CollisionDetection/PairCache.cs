@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.Collections;
+﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
 using SolverPrototype.Constraints;
@@ -19,12 +20,12 @@ namespace SolverPrototype.CollisionDetection
         /// A narrowphase-specific type and index into the pair cache's constraint data set. Collision pairs which have no associated constraint, either 
         /// because no contacts were generated or because the constraint was filtered, will have a nonexistent ConstraintCache.
         /// </summary>
-        public TypedIndex ConstraintCache;
+        public PairCacheIndex ConstraintCache;
         /// <summary>
         /// A narrowphase-specific type and index into a batch of custom data for the pair. Many types do not use any supplementary data, but some make use of temporal coherence
         /// to accelerate contact generation.
         /// </summary>
-        public TypedIndex CollisionDetectionCache;
+        public PairCacheIndex CollisionDetectionCache;
     }
 
     public struct ConstraintCache1
@@ -110,8 +111,10 @@ namespace SolverPrototype.CollisionDetection
                 return index;
             }
         }
+        //TODO: THIS TYPE IS STORED IN A BUFFER AT THE MOMENT, SO THIS REFERENCE TYPE CACHING IS INVALID!
         BufferPool pool;
-        int minimumTypeCapacity;
+        int minimumPerTypeCapacity;
+        int workerIndex;
         //Note that the per-type batches are untyped.
         //The caller will have the necessary type knowledge to interpret the buffer.
         Buffer<UntypedList> constraintCaches;
@@ -128,25 +131,26 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         public QuickList<PendingAdd, Buffer<PendingAdd>> PendingAdds;
 
-        public WorkerPairCache(BufferPool pool, ref QuickList<int, Buffer<int>> minimumSizesPerConstraintType, ref QuickList<int, Buffer<int>> minimumSizesPerCollisionType,
-            int pendingAddCapacity, int minimumTypeCapacity = 128)
+        public WorkerPairCache(int workerIndex, BufferPool pool, ref QuickList<int, Buffer<int>> minimumSizesPerConstraintType, ref QuickList<int, Buffer<int>> minimumSizesPerCollisionType,
+            int pendingAddCapacity, int minimumPerTypeCapacity = 128)
         {
+            this.workerIndex = workerIndex;
             this.pool = pool;
-            this.minimumTypeCapacity = minimumTypeCapacity;
-            const float previousTypeCountMultiplier = 1.25f;
-            pool.SpecializeFor<UntypedList>().Take((int)(minimumSizesPerConstraintType.Count * previousTypeCountMultiplier), out constraintCaches);
-            pool.SpecializeFor<UntypedList>().Take((int)(minimumSizesPerCollisionType.Count * previousTypeCountMultiplier), out collisionCaches);
+            this.minimumPerTypeCapacity = minimumPerTypeCapacity;
+            const float previousCountMultiplier = 1.25f;
+            pool.SpecializeFor<UntypedList>().Take((int)(minimumSizesPerConstraintType.Count * previousCountMultiplier), out constraintCaches);
+            pool.SpecializeFor<UntypedList>().Take((int)(minimumSizesPerCollisionType.Count * previousCountMultiplier), out collisionCaches);
             for (int i = 0; i < minimumSizesPerConstraintType.Count; ++i)
             {
                 if (minimumSizesPerConstraintType[i] > 0)
-                    constraintCaches[i] = new UntypedList(Math.Max(minimumTypeCapacity, minimumSizesPerConstraintType[i]), pool);
+                    constraintCaches[i] = new UntypedList(Math.Max(minimumPerTypeCapacity, (int)(previousCountMultiplier * minimumSizesPerConstraintType[i])), pool);
                 else
                     constraintCaches[i] = new UntypedList();
             }
             for (int i = 0; i < minimumSizesPerCollisionType.Count; ++i)
             {
                 if (minimumSizesPerCollisionType[i] > 0)
-                    collisionCaches[i] = new UntypedList(Math.Max(minimumTypeCapacity, minimumSizesPerCollisionType[i]), pool);
+                    collisionCaches[i] = new UntypedList(Math.Max(minimumPerTypeCapacity, (int)(previousCountMultiplier * minimumSizesPerCollisionType[i])), pool);
                 else
                     collisionCaches[i] = new UntypedList();
             }
@@ -155,14 +159,49 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
+        public void GetMaximumCacheTypeCounts(out int collision, out int constraint)
+        {
+            collision = 0;
+            constraint = 0;
+            for (int i = collisionCaches.Length - 1; i >= 0; --i)
+            {
+                if (collisionCaches[i].Count > 0)
+                {
+                    collision = i + 1;
+                    break;
+                }
+            }
+            for (int i = constraintCaches.Length - 1; i >= 0; --i)
+            {
+                if (constraintCaches[i].Count > 0)
+                {
+                    constraint = i + 1;
+                    break;
+                }
+            }
+        }
+
+        public void AccumulateMinimumSizes(ref QuickList<int, Buffer<int>> minimumSizesPerConstraintType, ref QuickList<int, Buffer<int>> minimumSizesPerCollisionType)
+        {
+            for (int i = 0; i < constraintCaches.Length; ++i)
+            {
+                minimumSizesPerConstraintType[i] = Math.Max(minimumSizesPerConstraintType[i], constraintCaches[i].Count);
+            }
+            for (int i = collisionCaches.Length - 1; i >= 0; --i)
+            {
+                minimumSizesPerCollisionType[i] = Math.Max(minimumSizesPerCollisionType[i], collisionCaches[i].Count);
+            }
+        }
+
+        //Note that we have no-collision-data overloads. The vast majority of types don't actually have any collision data cached.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private unsafe void WorkerCacheAdd<TCollision, TConstraint>(ref TCollision collisionCache, ref TConstraint constraintCache, out CollidablePairPointers pointers)
             where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
         {
             pointers = new CollidablePairPointers
             {
-                CollisionDetectionCache = new TypedIndex(collisionCache.TypeId, collisionCaches[collisionCache.TypeId].Add(ref collisionCache, minimumTypeCapacity, pool)),
-                ConstraintCache = new TypedIndex(constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumTypeCapacity, pool))
+                CollisionDetectionCache = new PairCacheIndex(workerIndex, collisionCache.TypeId, collisionCaches[collisionCache.TypeId].Add(ref collisionCache, minimumPerTypeCapacity, pool)),
+                ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumPerTypeCapacity, pool))
             };
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -171,8 +210,8 @@ namespace SolverPrototype.CollisionDetection
         {
             pointers = new CollidablePairPointers
             {
-                CollisionDetectionCache = new TypedIndex(),
-                ConstraintCache = new TypedIndex(constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumTypeCapacity, pool))
+                CollisionDetectionCache = new PairCacheIndex(),
+                ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumPerTypeCapacity, pool))
             };
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -205,7 +244,7 @@ namespace SolverPrototype.CollisionDetection
         {
             WorkerCacheAdd(ref constraintCache, out pointers);
         }
-        
+
 
         public void Dispose()
         {
@@ -219,81 +258,125 @@ namespace SolverPrototype.CollisionDetection
                 if (collisionCaches[i].Buffer.Allocated)
                     pool.Return(ref collisionCaches[i].Buffer);
             }
+            //note that the pending adds collection is not disposed here; it is disposed upon flushing immediately after the narrow phase completes.
         }
     }
 
-    public struct PairCache
+    public class PairCache
     {
-        OverlapMapping cache;
+        OverlapMapping mapping;
         BufferPool pool;
+        int minimumPendingSize;
+        int minimumPerTypeCapacity;
+        int previousPendingSize;
+
+        //While the current worker caches are read from, the next caches are written to.
+        //TODO: The worker pair caches contain a reference to a buffer pool, which is a reference type. The use of buffers here is invalid.
+        //You need to either work around that reference caching or use an array span here. Using an array span would have very little downside; worker counts are low and mostly fixed.
+        QuickList<WorkerPairCache, Buffer<WorkerPairCache>> workerCaches;
+        QuickList<WorkerPairCache, Buffer<WorkerPairCache>> nextWorkerCaches;
 
 
-
-        int minimumCollisionDataBatchSize, minimumConstraintBatchSize;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void InitializeConstraintCache<T>(ref QuickList<T, Buffer<T>> previous, BufferPool pool, float multiplier, out QuickList<T, Buffer<T>> current)
+        public PairCache(BufferPool pool, int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
         {
-            if (previous.Count > 0)
-                QuickList<T, Buffer<T>>.Create(pool.SpecializeFor<T>(), (int)(previous.Count * multiplier), out current);
-            else
-                current = new QuickList<T, Buffer<T>>();
-        }
-
-        //The previous cache always persists while building a new one. It has to be available for searching old cached data.
-        public PairCache(BufferPool pool, ref PairCache previousPairCache, int minimumMappingSize = 2048,
-            int minimumConstraintBatchSize = 128, int minimumCollisionDataBatchSize = 128, float previousBatchMultiplier = 1.25f)
-        {
+            this.minimumPendingSize = minimumPendingSize;
+            this.minimumPerTypeCapacity = minimumPerTypeCapacity;
             this.pool = pool;
             OverlapMapping.Create(
                 pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>(),
-                SpanHelper.GetContainingPowerOf2((int)(previousPairCache.cache.Count * previousBatchMultiplier)), 3, out cache);
+                SpanHelper.GetContainingPowerOf2(minimumMappingSize), 3, out mapping);
 
-            const int customDataTypeCount = 4;
-            pool.SpecializeFor<CollisionDataList>().Take(customDataTypeCount, out collisionDataCache);
-            //Preallocate any caches that were used in the previous frame. No reason to go through all the resize effort again.
-            for (int i = 0; i < previousPairCache.collisionDataCache.Length; ++i)
+
+        }
+
+        public void Prepare(IThreadDispatcher threadDispatcher = null)
+        {
+            int maximumConstraintTypeCount = 0, maximumCollisionTypeCount = 0;
+            for (int i = 0; i < workerCaches.Count; ++i)
             {
-                var previousSize = previousPairCache.collisionDataCache[i].ByteCount;
-                ref var typeCache = ref collisionDataCache[i];
-                if (previousSize > 0)
-                {
-                    pool.Take((int)(previousPairCache.collisionDataCache[i].ByteCount * previousBatchMultiplier), out typeCache.Buffer);
-                    typeCache.ByteCount = 0;
-                    typeCache.Count = 0;
-                }
-                else
-                {
-                    //We check the allocated state to know if a given cache exists, so we have to clear. Old data might otherwise corrupt.
-                    collisionDataCache[i] = new CollisionDataList();
-                }
+                workerCaches[i].GetMaximumCacheTypeCounts(out var collision, out var constraint);
+                if (collision > maximumCollisionTypeCount)
+                    maximumCollisionTypeCount = collision;
+                if (constraint > maximumConstraintTypeCount)
+                    maximumConstraintTypeCount = constraint;
             }
-            InitializeConstraintCache(ref previousPairCache.constraintCache1, pool, previousBatchMultiplier, out constraintCache1);
-            InitializeConstraintCache(ref previousPairCache.constraintCache2, pool, previousBatchMultiplier, out constraintCache2);
-            InitializeConstraintCache(ref previousPairCache.constraintCache3, pool, previousBatchMultiplier, out constraintCache3);
-            InitializeConstraintCache(ref previousPairCache.constraintCache4, pool, previousBatchMultiplier, out constraintCache4);
+            QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), maximumConstraintTypeCount, out var minimumSizesPerConstraintType);
+            QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), maximumCollisionTypeCount, out var minimumSizesPerCollisionType);
+            for (int i = 0; i < workerCaches.Count; ++i)
+            {
+                workerCaches[i].AccumulateMinimumSizes(ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType);
+            }
+            QuickList<WorkerPairCache, Buffer<WorkerPairCache>>.Create(pool.SpecializeFor<WorkerPairCache>(), threadDispatcher.ThreadCount, out nextWorkerCaches);
 
+            //TODO: Single threaded.
+            var pendingSize = Math.Max(minimumPendingSize, previousPendingSize);
+            for (int i = 0; i < threadDispatcher.ThreadCount; ++i)
+            {
+                nextWorkerCaches[i] = new WorkerPairCache(i, threadDispatcher.GetThreadMemoryPool(i), ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType,
+                    pendingSize, minimumPerTypeCapacity);
+            }
 
-            this.minimumCollisionDataBatchSize = minimumCollisionDataBatchSize;
-            this.minimumConstraintBatchSize = minimumConstraintBatchSize;
+            minimumSizesPerConstraintType.Dispose(pool.SpecializeFor<int>());
+            minimumSizesPerCollisionType.Dispose(pool.SpecializeFor<int>());
+        }
+
+        /// <summary>
+        /// Flush all deferred changes from the last narrow phase execution.
+        /// </summary>
+        public void Flush()
+        {
+            //Get rid of the now-unused worker caches.
+            for (int i = 0; i < workerCaches.Count; ++i)
+            {
+                workerCaches[i].Dispose();
+            }
+
+            //Flush all pending adds from the new set.
+            var pairPool = pool.SpecializeFor<CollidablePair>();
+            var pendingPool = pool.SpecializeFor<WorkerPairCache.PendingAdd>();
+            var pointerPool = pool.SpecializeFor<CollidablePairPointers>();
+            var intPool = pool.SpecializeFor<int>();
+            int largestPendingSize = 0;
+            for (int i = 0; i < nextWorkerCaches.Count; ++i)
+            {
+                ref var cache = ref nextWorkerCaches[i];
+                if (cache.PendingAdds.Count > largestPendingSize)
+                {
+                    largestPendingSize = cache.PendingAdds.Count;
+                }
+                for (int j = 0; j < cache.PendingAdds.Count; ++j)
+                {
+                    ref var pending = ref cache.PendingAdds[j];
+                    mapping.Add(ref pending.Pair, ref pending.Pointers, pairPool, pointerPool, intPool);
+                }
+                cache.PendingAdds.Dispose(pendingPool);
+            }
+            //Swap pointers.
+            var temp = nextWorkerCaches;
+            workerCaches = nextWorkerCaches;
+            nextWorkerCaches = temp;
         }
 
 
         public void Dispose()
         {
-            cache.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
+            for (int i = 0; i < workerCaches.Count; ++i)
+            {
+                workerCaches[i].Dispose();
+            }
+            mapping.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ref CollidablePair pair)
         {
-            return cache.IndexOf(ref pair);
+            return mapping.IndexOf(ref pair);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref CollidablePairPointers GetPointers(int index)
         {
-            return ref cache.Values[index];
+            return ref mapping.Values[index];
         }
         /// <summary>
         /// Marks a pair in the narrow phase as fresh. It is not a candidate for removal from the narrow phase during this frame.
