@@ -22,7 +22,7 @@ namespace SolverPrototype.CollisionDetection
             this.solver = solver;
         }
 
-        public void AddConstraint<TDescription>(int workerIndex, TypedIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandleA, int bodyHandleB, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
+        public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandleA, int bodyHandleB, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
         {
             //Quick and dirty immediate adder. You will likely want to change this to a spinlock, and you may also want to go further and batch multiple additions together eventually.
             //The possibility of deferral is the reason we have to call back into the pair cache.
@@ -30,7 +30,6 @@ namespace SolverPrototype.CollisionDetection
             lock (solver)
             {
                 var handles = (long)bodyHandleA | ((long)bodyHandleB << 32);
-
                 solver.Add(ref Unsafe.As<long, int>(ref handles), 2, ref constraintDescription, out constraintHandle);
             }
             //We have a guarantee that the pair cache will already have a slot allocated before this function is called.
@@ -38,10 +37,10 @@ namespace SolverPrototype.CollisionDetection
             //Could argue that the constraint add call should be invoked within the same lock with a guarantee of global sequential access.
             //This depends on the implementation of the pair cache. If it does subglobal locks, then 
             //(Notably, any ConstraintAdder implementation that defers adds could not share the lock, and extending the lock to cover AddConstraint would cause overhead.)
-            pairCache.CompleteAdd(solver, ref impulses, constraintCacheIndex, constraintHandle);
+            narrowPhase.PairCache.CompleteConstraintAdd(solver, ref impulses, constraintCacheIndex, constraintHandle);
         }
-
-        public void AddConstraint<TDescription>(int workerIndex, TypedIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
+        
+        public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
         {
             throw new NotImplementedException();
         }

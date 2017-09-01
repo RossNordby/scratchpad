@@ -106,7 +106,8 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        unsafe void UpdateConstraint<TDescription, TCollisionCache, TConstraintCache, TBodyHandles>(int workerIndex, CollidablePair pair,
+
+        unsafe void UpdateConstraint<TDescription, TCollisionCache, TConstraintCache, TBodyHandles>(int workerIndex, ref CollidablePair pair,
             ContactManifold* manifold, int manifoldTypeAsConstraintType, ref TCollisionCache collisionCache, ref TDescription description, TBodyHandles bodyHandles)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
@@ -131,7 +132,7 @@ namespace SolverPrototype.CollisionDetection
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     //If there's only one contact, assume we can directly reuse the old impulse even when the feature id wouldn't match.
-                    GatherOldImpulses(ref constraintReference, &newImpulses.Impulse0);
+                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, &newImpulses.Impulse0);
                 }
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache2))
                 {
@@ -140,7 +141,7 @@ namespace SolverPrototype.CollisionDetection
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
-                    GatherOldImpulses(ref constraintReference, oldImpulses);
+                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
                     RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
                 }
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache3))
@@ -150,7 +151,7 @@ namespace SolverPrototype.CollisionDetection
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
-                    GatherOldImpulses(ref constraintReference, oldImpulses);
+                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
                     RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
                 }
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache4))
@@ -160,7 +161,7 @@ namespace SolverPrototype.CollisionDetection
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
-                    GatherOldImpulses(ref constraintReference, oldImpulses);
+                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
                     RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
                 }
                 else
@@ -200,12 +201,9 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        private unsafe void GatherOldImpulses(ref ConstraintReference reference, float* impulses)
-        {
-            reference.TypeBatch
-        }
-
-        unsafe void UpdateConstraintForManifold<TBodyHandles>(int workerIndex, ContactManifold* manifold, ref PairMaterialProperties material, TypedIndex constraintCacheIndex, TBodyHandles bodyHandles)
+        unsafe void UpdateConstraintForManifold<TCollisionCache, TBodyHandles>(int workerIndex, ref CollidablePair pair, ContactManifold* manifold, ref TCollisionCache collisionCache,
+            ref PairMaterialProperties material, TBodyHandles bodyHandles)
+            where TCollisionCache : IPairCacheEntry
         {
             //Note that this function has two responsibilities:
             //1) Create the description of the constraint that should represent the new manifold.
@@ -246,8 +244,8 @@ namespace SolverPrototype.CollisionDetection
                         description.SurfaceBasis = manifold->ConvexSurfaceBasis;
 
                         //TODO: Check init hack.
-                        UpdateConstraint<ContactManifold4Constraint, ConstraintCache4, TBodyHandles>(
-                            workerIndex, manifold, manifoldTypeAsConstraintType, ref *&description, constraintCacheIndex, bodyHandles);
+                        UpdateConstraint<ContactManifold4Constraint, TCollisionCache, ConstraintCache4, TBodyHandles>(
+                            workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
                     }
                     break;
                 //Nonconvex

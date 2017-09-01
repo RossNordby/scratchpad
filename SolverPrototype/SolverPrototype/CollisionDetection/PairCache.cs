@@ -32,12 +32,15 @@ namespace SolverPrototype.CollisionDetection
     {
         public int ConstraintHandle;
         //No need for feature ids in 1 contact constraints. Just assume the old impulse can be reused regardless. Reasonably good guess.
+        public int TypeId => 0;
     }
     public struct ConstraintCache2
     {
         public int ConstraintHandle;
         public int FeatureId0;
         public int FeatureId1;
+
+        public int TypeId => 1;
     }
     public struct ConstraintCache3
     {
@@ -45,14 +48,18 @@ namespace SolverPrototype.CollisionDetection
         public int FeatureId0;
         public int FeatureId1;
         public int FeatureId2;
+
+        public int TypeId => 2;
     }
-    public struct ConstraintCache4
+    public struct ConstraintCache4 : IPairCacheEntry
     {
         public int ConstraintHandle;
         public int FeatureId0;
         public int FeatureId1;
         public int FeatureId2;
         public int FeatureId3;
+
+        public int TypeId => 3;
     }
 
     public interface IPairCacheEntry
@@ -86,15 +93,15 @@ namespace SolverPrototype.CollisionDetection
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public unsafe int Add<T>(ref T data, int minimumCount, BufferPool pool)
             {
+                var newSize = ByteCount + Unsafe.SizeOf<T>();
                 if (!Buffer.Allocated)
                 {
                     //This didn't exist at all before; create a new entry for this type.
-                    pool.Take(minimumCount * Unsafe.SizeOf<T>(), out Buffer);
+                    pool.Take(Math.Max(newSize, minimumCount * Unsafe.SizeOf<T>()), out Buffer);
                     Debug.Assert(Buffer.Length > 0);
                 }
                 else
                 {
-                    var newSize = Count * Unsafe.SizeOf<T>() + Unsafe.SizeOf<T>();
                     if (newSize > Buffer.Length)
                     {
                         //This will bump up to the next allocated block size, so we don't have to worry about constant micro-resizes.
@@ -102,13 +109,14 @@ namespace SolverPrototype.CollisionDetection
                         Unsafe.CopyBlockUnaligned(newBuffer.Memory, Buffer.Memory, (uint)Buffer.Length);
                     }
                 }
-                var index = Count++;
                 //If we store only byte count, we'd have to divide to get the element index.
                 //If we store only count, we would have to store per-type size somewhere since the PairCache constructor doesn't have an id->type mapping.
                 //So we just store both. It's pretty cheap and simple.
-                ByteCount += Unsafe.SizeOf<T>();
-                Unsafe.Add(ref Unsafe.As<byte, T>(ref *Buffer.Memory), index) = data;
-                return index;
+                Count++;
+                var byteIndex = ByteCount;
+                ByteCount = newSize;
+                Unsafe.As<byte, T>(ref Buffer.Memory[byteIndex]) = data;
+                return byteIndex;
             }
         }
         //TODO: THIS TYPE IS STORED IN A BUFFER AT THE MOMENT, SO THIS REFERENCE TYPE CACHING IS INVALID!
@@ -198,7 +206,10 @@ namespace SolverPrototype.CollisionDetection
         private unsafe void WorkerCacheAdd<TCollision, TConstraint>(ref TCollision collisionCache, ref TConstraint constraintCache, out CollidablePairPointers pointers)
             where TCollision : IPairCacheEntry where TConstraint : IPairCacheEntry
         {
-            pointers.ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumPerTypeCapacity, pool));
+            //Note that the constraint cache type id is masked to only the lower 2 bits. We only care about contact count for the purposes of constraint caches,
+            //even though the type contains more information- that's used for other purposes.
+            //TODO: If you bump the max contact count to 8, this will have to be changed.
+            pointers.ConstraintCache = new PairCacheIndex(workerIndex, constraintCache.TypeId, constraintCaches[constraintCache.TypeId & 3].Add(ref constraintCache, minimumPerTypeCapacity, pool));
 
             if (typeof(TCollision) == typeof(EmptyCollisionCache))
                 pointers.CollisionDetectionCache = new PairCacheIndex();
@@ -223,6 +234,19 @@ namespace SolverPrototype.CollisionDetection
             WorkerCacheAdd(ref collisionCache, ref constraintCache, out pointers);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal unsafe void* GetConstraintCachePointer(PairCacheIndex constraintCacheIndex)
+        {
+            //Note that only the count is used to index into the constraint caches.
+            //TODO: If you expand the number of contacts that can exist in a single entry, this will have to be updated.
+            return constraintCaches[constraintCacheIndex.Type & 3].Buffer.Memory + constraintCacheIndex.Index;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal unsafe void* GetCollisionCachePointer(PairCacheIndex collisionCacheIndex)
+        {
+            return constraintCaches[collisionCacheIndex.Type].Buffer.Memory + collisionCacheIndex.Index;
+        }
 
         public void Dispose()
         {
@@ -415,6 +439,112 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
+        internal unsafe void GatherOldImpulses(int constraintType, ref ConstraintReference constraintReference, float* impulses)
+        {
+            //Constraints cover 16 possible cases:
+            //1-4 contacts: 0x3
+            //convex vs nonconvex: 0x4
+            //1 body versus 2 body: 0x8
+            //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
+
+            //TODO: Note that we do not modify the friction accumulated impulses. This is just for simplicity- the impact of accumulated impulses on friction *should* be relatively
+            //hard to notice compared to penetration impulses. We should, however, test this assumption.
+            BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var inner);
+            switch (constraintType)
+            {
+                //1 body
+                //Convex
+                case 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 3:
+                    {
+                        //4 contacts
+                    }
+                    break;
+                //Nonconvex
+                case 4 + 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 4 + 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 4 + 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 4 + 3:
+                    {
+                        //4 contacts
+                    }
+                    break;
+                //2 body
+                //Convex
+                case 8 + 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 8 + 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 8 + 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 8 + 3:
+                    {
+                        //4 contacts
+                        var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
+                        ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
+                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *impulses, 4);
+                    }
+                    break;
+                //Nonconvex
+                case 8 + 4 + 0:
+                    {
+                        //1 contact
+                    }
+                    break;
+                case 8 + 4 + 1:
+                    {
+                        //2 contacts
+                    }
+                    break;
+                case 8 + 4 + 2:
+                    {
+                        //3 contacts
+                    }
+                    break;
+                case 8 + 4 + 3:
+                    {
+                        //4 contacts
+                    }
+                    break;
+            }
+
+        }
+
         internal void ScatterNewImpulses(int constraintType, ref ConstraintReference constraintReference, ref ContactImpulses contactImpulses)
         {
             //Constraints cover 16 possible cases:
@@ -530,30 +660,11 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="constraintCacheIndex"></param>
         /// <param name="constraintHandle"></param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void CompleteConstraintAdd(Solver solver, ref ContactImpulses impulses, TypedIndex constraintCacheIndex, int constraintHandle)
+        public unsafe void CompleteConstraintAdd(Solver solver, ref ContactImpulses impulses, PairCacheIndex constraintCacheIndex, int constraintHandle)
         {
-            var constraintContactCount = constraintCacheIndex.Type & 3;
-            var constraintIndex = constraintCacheIndex.Index;
-            switch (constraintContactCount)
-            {
-                case 0:
-                    Debug.Assert(constraintCache1.Span.Allocated && constraintContactCount < constraintCache1.Count);
-                    constraintCache1[constraintIndex].ConstraintHandle = constraintHandle;
-                    return;
-                case 1:
-                    Debug.Assert(constraintCache2.Span.Allocated && constraintContactCount < constraintCache2.Count);
-                    constraintCache2[constraintIndex].ConstraintHandle = constraintHandle;
-                    return;
-                case 2:
-                    Debug.Assert(constraintCache3.Span.Allocated && constraintContactCount < constraintCache3.Count);
-                    constraintCache3[constraintIndex].ConstraintHandle = constraintHandle;
-                    return;
-                case 3:
-                    Debug.Assert(constraintCache4.Span.Allocated && constraintContactCount < constraintCache4.Count);
-                    constraintCache4[constraintIndex].ConstraintHandle = constraintHandle;
-                    return;
-            }
-
+            //Note that the update is being directed to the *next* worker caches. We have not yet performed the flush that swaps references.
+            //Note that this assumes that the constraint handle is stored in the first 4 bytes of the constraint cache.
+            *(int*)nextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex) = constraintHandle;
             solver.GetConstraintReference(constraintHandle, out var reference);
             ScatterNewImpulses(constraintCacheIndex.Type, ref reference, ref impulses);
         }
@@ -561,39 +672,17 @@ namespace SolverPrototype.CollisionDetection
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe ref TConstraintCache GetConstraintCache<TConstraintCache>(int constraintCacheIndex)
+        public unsafe ref TConstraintCache GetConstraintCache<TConstraintCache>(PairCacheIndex constraintCacheIndex)
         {
-            //Note that the casts are nops. They're just there so that the compiler is okay with it.
-            //Also, given that the constraint cache types are all structs, this will type specialize.
-            if (typeof(TConstraintCache) == typeof(ConstraintCache1))
-            {
-                Debug.Assert(constraintCache1.Span.Allocated && constraintCacheIndex < constraintCache1.Count);
-                return ref Unsafe.As<ConstraintCache1, TConstraintCache>(ref constraintCache1[constraintCacheIndex]);
-            }
-            if (typeof(TConstraintCache) == typeof(ConstraintCache2))
-            {
-                Debug.Assert(constraintCache2.Span.Allocated && constraintCacheIndex < constraintCache2.Count);
-                return ref Unsafe.As<ConstraintCache2, TConstraintCache>(ref constraintCache2[constraintCacheIndex]);
-            }
-            if (typeof(TConstraintCache) == typeof(ConstraintCache3))
-            {
-                Debug.Assert(constraintCache3.Span.Allocated && constraintCacheIndex < constraintCache3.Count);
-                return ref Unsafe.As<ConstraintCache3, TConstraintCache>(ref constraintCache3[constraintCacheIndex]);
-            }
-            if (typeof(TConstraintCache) == typeof(ConstraintCache4))
-            {
-                Debug.Assert(constraintCache4.Span.Allocated && constraintCacheIndex < constraintCache4.Count);
-                return ref Unsafe.As<ConstraintCache4, TConstraintCache>(ref constraintCache4[constraintCacheIndex]);
-            }
-            Debug.Fail("The type of the constraint cache must actually be one of the hard coded constraint caches.");
-            return ref Unsafe.As<ConstraintCache1, TConstraintCache>(ref constraintCache1[0]);
+            //Note that these refer to the previous workerCaches, not the nextWorkerCaches. We read from these caches during the narrowphase to redistribute impulses.
+            return ref Unsafe.AsRef<TConstraintCache>(workerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex));
         }
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe ref TCollisionData GetCollisionData<TCollisionData>(int index) where TCollisionData : struct, IPairCacheEntry
+        public unsafe ref TCollisionData GetCollisionData<TCollisionData>(PairCacheIndex index) where TCollisionData : struct, IPairCacheEntry
         {
-            return ref Unsafe.As<byte, TCollisionData>(ref *collisionDataCache[default(TCollisionData).TypeId].Buffer.Memory);
+            return ref Unsafe.AsRef<TCollisionData>(workerCaches[index.Worker].GetCollisionCachePointer(index));
         }
 
     }

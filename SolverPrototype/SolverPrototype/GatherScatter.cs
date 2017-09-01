@@ -110,7 +110,7 @@ namespace SolverPrototype
             {
                 Unsafe.Add(ref targetBase, offset) = Unsafe.Add(ref sourceBase, offset);
             }
-        } 
+        }
 
         /// <summary>
         /// Swaps lanes between two bundles. The bundle type must be a contiguous block of Vector types.
@@ -268,7 +268,29 @@ namespace SolverPrototype
             }
         }
 
+        //AOSOA->AOS
+        /// <summary>
+        /// Gets a lane of a container of vectors, assuming that the vectors are contiguous.
+        /// </summary>
+        /// <typeparam name="T">Type of the values to copy out of the container lane.</typeparam>
+        /// <param name="startVector">First vector of the contiguous vector region to get a lane within.</param>
+        /// <param name="innerIndex">Index of the lane within the vectors.</param>
+        /// <param name="values">Reference to a contiguous set of values to hold the values copied out of the vector lane slots.</param>
+        /// <param name="valueCount">Number of values to iterate over.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void GetLane<T>(ref Vector<T> startVector, int innerIndex, ref T values, int valueCount) where T : struct
+        {
+            ref var lane = ref Get(ref startVector, innerIndex);
+            values = lane;
+            //Even if the jit recognizes the count as constant, it doesn't unroll anything. Could do it manually, like we did in CopyLane.
+            for (int vectorIndex = Vector<T>.Count; vectorIndex < valueCount; ++vectorIndex)
+            {
+                //The multiplication should become a shift; the jit recognizes the count as constant.
+                Unsafe.Add(ref values, vectorIndex) = Unsafe.Add(ref lane, vectorIndex * Vector<T>.Count);
+            }
+        }
 
+        //AOS->AOSOA
         /// <summary>
         /// Sets a lane of a container of vectors, assuming that the vectors are contiguous.
         /// </summary>
@@ -282,8 +304,7 @@ namespace SolverPrototype
         {
             ref var lane = ref Get(ref startVector, innerIndex);
             lane = values;
-            //Even if the jit recognizes the count as constant, it doesn't unroll anything. Could do it manually, like we did in CopyLane, but 
-            //SetLane is typically not as performance sensitive.
+            //Even if the jit recognizes the count as constant, it doesn't unroll anything. Could do it manually, like we did in CopyLane.
             for (int vectorIndex = Vector<T>.Count; vectorIndex < valueCount; ++vectorIndex)
             {
                 //The multiplication should become a shift; the jit recognizes the count as constant.
