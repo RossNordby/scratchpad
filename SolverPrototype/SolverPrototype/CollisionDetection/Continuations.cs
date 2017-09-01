@@ -29,12 +29,6 @@ public struct PendingTwoBodyConvex4Constraint : IPendingContactConstraint
 namespace SolverPrototype.CollisionDetection
 {
     /// <summary>
-    /// Associated with a pair of two static collidables. No constraint can be created.
-    /// </summary>
-    struct ZeroBodyHandles
-    {
-    }
-    /// <summary>
     /// Associated with a pair of two collidables that each are controlled by bodies.
     /// </summary>
     struct TwoBodyHandles
@@ -104,12 +98,17 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        unsafe void UpdateConstraint<TDescription, TConstraintCache, TBodyHandles>(int workerIndex,
-            ContactManifold* manifold, int manifoldTypeAsConstraintType, ref TDescription description, TypedIndex constraintCacheIndex, TBodyHandles bodyHandles)
+        unsafe void UpdateConstraint<TDescription, TConstraintCache, TBodyHandles>(int workerIndex, CollidablePair pair,
+            ContactManifold* manifold, int manifoldTypeAsConstraintType, ref TDescription description, TBodyHandles bodyHandles)
             where TDescription : IConstraintDescription<TDescription>
         {
-            if (constraintCacheIndex.Exists)
+            if (NarrowPhase.PairCache.TryGetPointers(ref pair, out var index, out var pointers))
             {
+                //The previous frame had a constraint for this pair.
+                Debug.Assert(pointers.ConstraintCache.Exists, "If a pair was persisted in the narrow phase, there should be a constraint associated with it.");
+                //TODO: Mark the entry as non-stale. 
+
+                var constraintCacheIndex = pointers.ConstraintCache;
                 //TODO: Check codegen; this if statement should JIT to a single path.
                 ConstraintReference constraintReference;
                 int constraintHandle;
@@ -172,21 +171,23 @@ namespace SolverPrototype.CollisionDetection
                     //can be used to guarantee that consistent order. We can also defer smaller batches for the sake of limiting sync overheads. 4-16 adds within a single lock
                     //means a 4-16x reduction in lock-related overhead, assuming no contests.)
                     //2) The old constraint must be removed.
-                    //TODO: Check init hacks.
-                    RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);       
+                    RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
                     NarrowPhase.ConstraintRemover.EnqueueConstraintRemoval(workerIndex, constraintHandle);
                 }
 
             }
             else
             {
-                //The constraint does not exist; just add it.
+                //No preexisting constraint; add a fresh constraint and pair cache entry.
+                //The pair cache entry has to be created first so that the adder has a place to put the result of the constraint add.
+                //
                 var newImpulses = new ContactImpulses();
+                //TODO: It would be nice to avoid the impulse scatter for fully new constraints; it's going to be all zeroes regardless. Worth investigating later.
                 RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
             }
         }
 
-       
+
 
         unsafe void UpdateConstraintForManifold<TBodyHandles>(int workerIndex, ContactManifold* manifold, ref PairMaterialProperties material, TypedIndex constraintCacheIndex, TBodyHandles bodyHandles)
         {
@@ -252,20 +253,30 @@ namespace SolverPrototype.CollisionDetection
             //Note that we do not check for the pair being between two statics before reporting it. The assumption is that, if the initial broadphase pair filter allowed such a pair
             //to reach this point, the user probably wants to receive some information about the resulting contact manifold.
             //That said, such a pair cannot generate constraints no matter what- constraints must involve at least one body, always.
-            var aStatic = pair.A.IsStatic;
-            var bStatic = pair.B.IsStatic;
-            if (NarrowPhase.Filters.ConfigureContactManifold(workerIndex, pair, ref *manifold, out var pairMaterial) && (!aStatic || !bStatic))
+            var aIsBody = !pair.A.IsStatic;
+            var bIsBody = !pair.B.IsStatic;
+            if (NarrowPhase.Filters.ConfigureContactManifold(workerIndex, pair, ref *manifold, out var pairMaterial) && (aIsBody || bIsBody))
             {
                 if (manifold->ContactCount > 0)
                 {
-                    if (NarrowPhase.PairCache.TryGetPointers(ref pair, out var pointers))
+                    if (aIsBody && bIsBody)
                     {
-                        //The previous frame had a constraint for this pair.
-                        Debug.Assert(pointers.ConstraintCache.Exists, "If a pair was persisted in the narrow phase, there should be a constraint associated with it.");
-                        //TODO: Mark the entry as non-stale. 
-
+                        //Two bodies.
+                        var bodyHandles = new TwoBodyHandles { A = pair.A.Collidable, B = pair.B.Collidable };
+                        UpdateConstraintForManifold(workerIndex, manifold, ref pairMaterial, pointers.ConstraintCache, bodyHandles);
                     }
-                    UpdateConstraintForManifold(workerIndex, manifold, ref pairMaterial, pointers.ConstraintCache, bodyHandles);
+                    else
+                    {
+                        //One of the two collidables is static.
+                        //Ensure that the body is always in the first slot for the sake of constraint generation.
+                        if(bIsBody)
+                        {
+                            var tempA = pair.A;
+                            pair.A = pair.B;
+                            pair.B = tempA;
+                        }
+                        UpdateConstraintForManifold(workerIndex, manifold, ref pairMaterial, pointers.ConstraintCache, pair.A.Collidable);
+                    }
                 }
                 //In the event that there are no contacts in the new manifold, the pair is left in a stale state. It will be removed by the stale removal post process. 
             }

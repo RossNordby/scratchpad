@@ -59,10 +59,12 @@ namespace SolverPrototype.CollisionDetection
         int TypeId { get; }
     }
 
-    public struct PairCache
+    /// <summary>
+    /// The cached pair data created by a single worker during the last execution of narrow phase pair processing.
+    /// </summary>
+    public struct WorkerPairCache
     {
-        OverlapMapping cache;
-        struct CollisionDataList
+        struct UntypedList
         {
             public RawBuffer Buffer;
             /// <summary>
@@ -71,18 +73,161 @@ namespace SolverPrototype.CollisionDetection
             public int Count;
             public int ByteCount;
 
-        }
 
-        //Since there is a low and fixed number of required constraint data caches, we just list them inline. Avoids a single (cheap) indirection.
-        QuickList<ConstraintCache1, Buffer<ConstraintCache1>> constraintCache1;
-        QuickList<ConstraintCache2, Buffer<ConstraintCache2>> constraintCache2;
-        QuickList<ConstraintCache3, Buffer<ConstraintCache3>> constraintCache3;
-        QuickList<ConstraintCache4, Buffer<ConstraintCache4>> constraintCache4;
+            public UntypedList(int initialSize, BufferPool pool)
+            {
+                pool.Take(initialSize, out Buffer);
+                Count = 0;
+                ByteCount = 0;
+            }
+
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public unsafe int Add<T>(ref T data, int minimumCount, BufferPool pool)
+            {
+                if (!Buffer.Allocated)
+                {
+                    //This didn't exist at all before; create a new entry for this type.
+                    pool.Take(minimumCount * Unsafe.SizeOf<T>(), out Buffer);
+                    Debug.Assert(Buffer.Length > 0);
+                }
+                else
+                {
+                    var newSize = Count * Unsafe.SizeOf<T>() + Unsafe.SizeOf<T>();
+                    if (newSize > Buffer.Length)
+                    {
+                        //This will bump up to the next allocated block size, so we don't have to worry about constant micro-resizes.
+                        pool.Take(newSize, out var newBuffer);
+                        Unsafe.CopyBlockUnaligned(newBuffer.Memory, Buffer.Memory, (uint)Buffer.Length);
+                    }
+                }
+                var index = Count++;
+                //If we store only byte count, we'd have to divide to get the element index.
+                //If we store only count, we would have to store per-type size somewhere since the PairCache constructor doesn't have an id->type mapping.
+                //So we just store both. It's pretty cheap and simple.
+                ByteCount += Unsafe.SizeOf<T>();
+                Unsafe.Add(ref Unsafe.As<byte, T>(ref *Buffer.Memory), index) = data;
+                return index;
+            }
+        }
+        BufferPool pool;
+        int minimumTypeCapacity;
         //Note that the per-type batches are untyped.
         //The caller will have the necessary type knowledge to interpret the buffer.
-        Buffer<CollisionDataList> collisionDataCache;
+        Buffer<UntypedList> constraintCaches;
+        Buffer<UntypedList> collisionCaches;
 
+        public struct PendingAdd
+        {
+            public CollidablePair Pair;
+            public CollidablePairPointers Pointers;
+        }
+
+        /// <summary>
+        /// The set of pair-pointer associations created by this worker that should be added to the pair mapping.
+        /// </summary>
+        public QuickList<PendingAdd, Buffer<PendingAdd>> PendingAdds;
+
+        public WorkerPairCache(BufferPool pool, ref QuickList<int, Buffer<int>> minimumSizesPerConstraintType, ref QuickList<int, Buffer<int>> minimumSizesPerCollisionType,
+            int pendingAddCapacity, int minimumTypeCapacity = 128)
+        {
+            this.pool = pool;
+            this.minimumTypeCapacity = minimumTypeCapacity;
+            const float previousTypeCountMultiplier = 1.25f;
+            pool.SpecializeFor<UntypedList>().Take((int)(minimumSizesPerConstraintType.Count * previousTypeCountMultiplier), out constraintCaches);
+            pool.SpecializeFor<UntypedList>().Take((int)(minimumSizesPerCollisionType.Count * previousTypeCountMultiplier), out collisionCaches);
+            for (int i = 0; i < minimumSizesPerConstraintType.Count; ++i)
+            {
+                if (minimumSizesPerConstraintType[i] > 0)
+                    constraintCaches[i] = new UntypedList(Math.Max(minimumTypeCapacity, minimumSizesPerConstraintType[i]), pool);
+                else
+                    constraintCaches[i] = new UntypedList();
+            }
+            for (int i = 0; i < minimumSizesPerCollisionType.Count; ++i)
+            {
+                if (minimumSizesPerCollisionType[i] > 0)
+                    collisionCaches[i] = new UntypedList(Math.Max(minimumTypeCapacity, minimumSizesPerCollisionType[i]), pool);
+                else
+                    collisionCaches[i] = new UntypedList();
+            }
+
+            QuickList<PendingAdd, Buffer<PendingAdd>>.Create(pool.SpecializeFor<PendingAdd>(), pendingAddCapacity, out PendingAdds);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private unsafe void WorkerCacheAdd<TCollision, TConstraint>(ref TCollision collisionCache, ref TConstraint constraintCache, out CollidablePairPointers pointers)
+            where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
+        {
+            pointers = new CollidablePairPointers
+            {
+                CollisionDetectionCache = new TypedIndex(collisionCache.TypeId, collisionCaches[collisionCache.TypeId].Add(ref collisionCache, minimumTypeCapacity, pool)),
+                ConstraintCache = new TypedIndex(constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumTypeCapacity, pool))
+            };
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private unsafe void WorkerCacheAdd<TConstraint>(ref TConstraint constraintCache, out CollidablePairPointers pointers)
+            where TConstraint : IPairCacheEntry
+        {
+            pointers = new CollidablePairPointers
+            {
+                CollisionDetectionCache = new TypedIndex(),
+                ConstraintCache = new TypedIndex(constraintCache.TypeId, constraintCaches[constraintCache.TypeId].Add(ref constraintCache, minimumTypeCapacity, pool))
+            };
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add<TCollision, TConstraint>(ref CollidablePair pair, ref TCollision collisionCache, ref TConstraint constraintCache)
+            where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
+        {
+            PendingAdd pendingAdd;
+            WorkerCacheAdd(ref collisionCache, ref constraintCache, out pendingAdd.Pointers);
+            pendingAdd.Pair = pair;
+            PendingAdds.Add(ref pendingAdd, pool.SpecializeFor<PendingAdd>());
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add<TConstraint>(ref CollidablePair pair, ref TConstraint constraintCache)
+            where TConstraint : IPairCacheEntry
+        {
+            PendingAdd pendingAdd;
+            WorkerCacheAdd(ref constraintCache, out pendingAdd.Pointers);
+            pendingAdd.Pair = pair;
+            PendingAdds.Add(ref pendingAdd, pool.SpecializeFor<PendingAdd>());
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Update<TCollision, TConstraint>(ref CollidablePairPointers pointers, ref TCollision collisionCache, ref TConstraint constraintCache)
+            where TCollision : struct, IPairCacheEntry where TConstraint : IPairCacheEntry
+        {
+            WorkerCacheAdd(ref collisionCache, ref constraintCache, out pointers);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Update<TConstraint>(ref CollidablePairPointers pointers, ref TConstraint constraintCache)
+            where TConstraint : IPairCacheEntry
+        {
+            WorkerCacheAdd(ref constraintCache, out pointers);
+        }
+        
+
+        public void Dispose()
+        {
+            for (int i = 0; i < constraintCaches.Length; ++i)
+            {
+                if (constraintCaches[i].Buffer.Allocated)
+                    pool.Return(ref collisionCaches[i].Buffer);
+            }
+            for (int i = 0; i < collisionCaches.Length; ++i)
+            {
+                if (collisionCaches[i].Buffer.Allocated)
+                    pool.Return(ref collisionCaches[i].Buffer);
+            }
+        }
+    }
+
+    public struct PairCache
+    {
+        OverlapMapping cache;
         BufferPool pool;
+
+
 
         int minimumCollisionDataBatchSize, minimumConstraintBatchSize;
 
@@ -133,30 +278,39 @@ namespace SolverPrototype.CollisionDetection
             this.minimumConstraintBatchSize = minimumConstraintBatchSize;
         }
 
+
         public void Dispose()
         {
-            if (constraintCache1.Span.Allocated)
-                constraintCache1.Dispose(pool.SpecializeFor<ConstraintCache1>());
-            if (constraintCache2.Span.Allocated)
-                constraintCache2.Dispose(pool.SpecializeFor<ConstraintCache2>());
-            if (constraintCache3.Span.Allocated)
-                constraintCache3.Dispose(pool.SpecializeFor<ConstraintCache3>());
-            if (constraintCache4.Span.Allocated)
-                constraintCache4.Dispose(pool.SpecializeFor<ConstraintCache4>());
-            for (int i = 0; i < collisionDataCache.Length; ++i)
-            {
-                if (collisionDataCache[i].Buffer.Allocated)
-                    pool.Return(ref collisionDataCache[i].Buffer);
-            }
             cache.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int IndexOf(ref CollidablePair pair)
+        {
+            return cache.IndexOf(ref pair);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetPointers(ref CollidablePair pair, out CollidablePairPointers pointers)
+        public ref CollidablePairPointers GetPointers(int index)
         {
-            return cache.TryGetValue(ref pair, out pointers);
+            return ref cache.Values[index];
         }
+        /// <summary>
+        /// Marks a pair in the narrow phase as fresh. It is not a candidate for removal from the narrow phase during this frame.
+        /// </summary>
+        /// <param name="index">Index to mark.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void MarkFresh(int index)
+        {
+            //TODO: Should have a pair-parallel array of bytes. Every updated pair will have its byte set to a value that avoids the removal postprocess.
+            //Note that this is not stored in the pointers array- the removal postprocess doesn't consider any information in its analysis pass except for the freshness bytes,
+            //so to keep memory bandwidth at a minimum, 
+            //(You could use a single bit, but then you have to manage the atomicity of changes manually.)
+        }
+
+        public void Update()
+
+        public void Add(int workerIndex, ref CollidablePair pair, )
 
 
         internal void ScatterNewImpulses(int constraintType, ref ConstraintReference constraintReference, ref ContactImpulses contactImpulses)
@@ -333,147 +487,6 @@ namespace SolverPrototype.CollisionDetection
             return ref Unsafe.As<ConstraintCache1, TConstraintCache>(ref constraintCache1[0]);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe int Add<TCollisionData>(ref TCollisionData data) where TCollisionData : struct, IPairCacheEntry
-        {
-            ref var cache = ref collisionDataCache[data.TypeId];
-            if (!cache.Buffer.Allocated)
-            {
-                //This didn't exist at all before; create a new entry for this type.
-                pool.Take(minimumCollisionDataBatchSize * Unsafe.SizeOf<TCollisionData>(), out cache.Buffer);
-                Debug.Assert(cache.Buffer.Length > 0);
-            }
-            else
-            {
-                var newSize = cache.Count * Unsafe.SizeOf<TCollisionData>() + Unsafe.SizeOf<TCollisionData>();
-                if (newSize > cache.Buffer.Length)
-                {
-                    //This will bump up to the next allocated block size, so we don't have to worry about constant micro-resizes.
-                    pool.Take(newSize, out var newBuffer);
-                    Unsafe.CopyBlockUnaligned(newBuffer.Memory, cache.Buffer.Memory, (uint)cache.Buffer.Length);
-                }
-            }
-            var index = cache.Count++;
-            //If we store only byte count, we'd have to divide to get the element index.
-            //If we store only count, we would have to store per-type size somewhere since the PairCache constructor doesn't have an id->type mapping.
-            //So we just store both. It's pretty cheap and simple.
-            cache.ByteCount += Unsafe.SizeOf<TCollisionData>();
-            Unsafe.Add(ref Unsafe.As<byte, TCollisionData>(ref *cache.Buffer.Memory), index) = data;
-            return index;
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe void Add(ref CollidablePair pair, TypedIndex collisionDataIndex, int featureId0, int featureId1, int featureId2, int featureId3)
-        {
-            ConstraintCache4 constraintCache;
-            constraintCache.ConstraintHandle = 0; //This is filled in later.
-            constraintCache.FeatureId0 = featureId0;
-            constraintCache.FeatureId1 = featureId1;
-            constraintCache.FeatureId2 = featureId2;
-            constraintCache.FeatureId3 = featureId3;
-            var constraintCacheIndex = constraintCache4.Count;
-            constraintCache4.Add(ref constraintCache, pool.SpecializeFor<ConstraintCache4>());
-            var pointers = new CollidablePairPointers
-            {
-                CollisionDetectionCache = collisionDataIndex,
-                ConstraintCache = new TypedIndex(3, constraintCacheIndex)
-            };
-            cache.Add(ref pair, ref pointers, pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe void Add(ref CollidablePair pair, TypedIndex collisionDataIndex, int featureId0, int featureId1, int featureId2)
-        {
-            ConstraintCache3 constraintCache;
-            constraintCache.ConstraintHandle = 0; //This is filled in later.
-            constraintCache.FeatureId0 = featureId0;
-            constraintCache.FeatureId1 = featureId1;
-            constraintCache.FeatureId2 = featureId2;
-            var constraintCacheIndex = constraintCache3.Count;
-            constraintCache3.Add(ref constraintCache, pool.SpecializeFor<ConstraintCache3>());
-            var pointers = new CollidablePairPointers
-            {
-                CollisionDetectionCache = collisionDataIndex,
-                ConstraintCache = new TypedIndex(2, constraintCacheIndex)
-            };
-            cache.Add(ref pair, ref pointers, pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe void Add(ref CollidablePair pair, TypedIndex collisionDataIndex, int featureId0, int featureId1)
-        {
-            ConstraintCache2 constraintCache;
-            constraintCache.ConstraintHandle = 0; //This is filled in later.
-            constraintCache.FeatureId0 = featureId0;
-            constraintCache.FeatureId1 = featureId1;
-            var constraintCacheIndex = constraintCache2.Count;
-            constraintCache2.Add(ref constraintCache, pool.SpecializeFor<ConstraintCache2>());
-            var pointers = new CollidablePairPointers
-            {
-                CollisionDetectionCache = collisionDataIndex,
-                ConstraintCache = new TypedIndex(1, constraintCacheIndex)
-            };
-            cache.Add(ref pair, ref pointers, pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe void Add(ref CollidablePair pair, TypedIndex collisionDataIndex)
-        {
-            ConstraintCache1 constraintCache;
-            constraintCache.ConstraintHandle = 0; //This is filled in later.
-            var constraintCacheIndex = constraintCache2.Count;
-            constraintCache1.Add(ref constraintCache, pool.SpecializeFor<ConstraintCache1>());
-            var pointers = new CollidablePairPointers
-            {
-                CollisionDetectionCache = collisionDataIndex,
-                ConstraintCache = new TypedIndex(0, constraintCacheIndex)
-            };
-            cache.Add(ref pair, ref pointers, pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, ref TCollisionData collisionData, int featureId0, int featureId1, int featureId2, int featureId3)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(collisionData.TypeId, Add(ref collisionData)), featureId0, featureId1, featureId2, featureId3);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, ref TCollisionData collisionData, int featureId0, int featureId1, int featureId2)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(collisionData.TypeId, Add(ref collisionData)), featureId0, featureId1, featureId2);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, ref TCollisionData collisionData, int featureId0, int featureId1)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(collisionData.TypeId, Add(ref collisionData)), featureId0, featureId1);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, ref TCollisionData collisionData)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(collisionData.TypeId, Add(ref collisionData)));
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, int featureId0, int featureId1, int featureId2, int featureId3)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(), featureId0, featureId1, featureId2, featureId3);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, int featureId0, int featureId1, int featureId2)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(), featureId0, featureId1, featureId2);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair, int featureId0, int featureId1)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex(), featureId0, featureId1);
-        }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TCollisionData>(ref CollidablePair pair)
-            where TCollisionData : struct, IPairCacheEntry
-        {
-            Add(ref pair, new TypedIndex());
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref TCollisionData GetCollisionData<TCollisionData>(int index) where TCollisionData : struct, IPairCacheEntry
