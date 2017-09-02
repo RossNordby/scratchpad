@@ -262,7 +262,7 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        public unsafe void UpdateConstraintsForPair(int workerIndex, CollidablePair pair, ContactManifold* manifold)
+        public unsafe void UpdateConstraintsForPair<TCollisionCache>(int workerIndex, ref CollidablePair pair, ContactManifold* manifold, ref TCollisionCache collisionCache) where TCollisionCache : IPairCacheEntry
         {
             //Note that we do not check for the pair being between two statics before reporting it. The assumption is that, if the initial broadphase pair filter allowed such a pair
             //to reach this point, the user probably wants to receive some information about the resulting contact manifold.
@@ -277,7 +277,7 @@ namespace SolverPrototype.CollisionDetection
                     {
                         //Two bodies.
                         var bodyHandles = new TwoBodyHandles { A = pair.A.Collidable, B = pair.B.Collidable };
-                        UpdateConstraintForManifold(workerIndex, manifold, ref pairMaterial, pointers.ConstraintCache, bodyHandles);
+                        UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, bodyHandles);
                     }
                     else
                     {
@@ -289,7 +289,7 @@ namespace SolverPrototype.CollisionDetection
                             pair.A = pair.B;
                             pair.B = tempA;
                         }
-                        UpdateConstraintForManifold(workerIndex, manifold, ref pairMaterial, pointers.ConstraintCache, pair.A.Collidable);
+                        UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, pair.A.Collidable);
                     }
                 }
                 //In the event that there are no contacts in the new manifold, the pair is left in a stale state. It will be removed by the stale removal post process. 

@@ -168,12 +168,7 @@ namespace SolverPrototype.CollisionDetection
             PackedConvexityAndContactCount = count | ((*(int*)&convex) << 4);
         }
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public ContactManifold(int contactCount, bool convex) : this()
-        {
-            SetConvexityAndCount(contactCount, convex);
-        }
+        
 
 
 

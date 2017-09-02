@@ -17,8 +17,8 @@ namespace SolverPrototype.CollisionDetection
      * Its job is to compute contact manifolds for overlapping collidables and to manage the constraints produced by those manifolds. 
      * 
      * The scheduling of collision detection jobs is conceptually asynchronous. There is no guarantee that a broad phase overlap provided to the narrow phase
-     * will result in an immediate calculation of the manifold. This is useful for batching together many collidable pairs of the same time for simultaneous SIMD-friendly execution.
-     * (Not all pairs are ideal fits for SIMD, but many common and simple ones are.)
+     * will result in an immediate calculation of the manifold. This is useful for batching together many collidable pairs of the same type for simultaneous SIMD-friendly execution.
+     * (Not all pairs are ideal fits for wide SIMD, but many common and simple ones are.)
      * 
      * The interface to the broad phase makes no guarantees about the nature of this batching. The narrow phase could immediately execute, or it could batch up Vector<float>.Count,
      * or maybe 32 in a row, or it could wait until all overlaps have been submitted before actually beginning work.
@@ -66,8 +66,8 @@ namespace SolverPrototype.CollisionDetection
      * 1) Any existing constraint, if it has the same number of contacts as the new manifold, should have its contact data updated.
      * 2) Any accumulated impulse from the previous frame's contact solve should be distributed over the new set of contacts for warm starting this frame's solve.
      * 3) Any change in contact count should result in the removal of the previous constraint (if present) and the addition of the new constraint (if above zero contacts).
-     * This mapping is stored in a single dictionary. The previous frame's mapping is treated as read-only by the new frame, so no synchronization is required to read it. The current frame builds
-     * a new dictionary incrementally. It starts from scratch, so only actually-needed overlaps will exist in the new dictionary.
+     * This mapping is stored in a single dictionary. The previous frame's mapping is treated as read-only during the new frame's narrow phase execution, 
+     * //so no synchronization is required to read it. The current frame updates pointerse in the dictionary and collects deferred adds on each worker thread for later flushing.
      * 
      * Constraints associated with 'stale' overlaps (those which were not updated during the current frame) are removed in a postpass.
      * 
@@ -540,13 +540,13 @@ namespace SolverPrototype.CollisionDetection
         //TODO: Need to check codegen on this. In some cases when everything involved is a reference type, the JIT won't devirtualize- or at least, that was how it used to be.
         public abstract void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b);
 
-        public static TNarrowPhase Create<TNarrowPhase>(Bodies bodies, BufferPool pool) where TNarrowPhase : NarrowPhase, new()
+        public static TNarrowPhase Create<TNarrowPhase>(Bodies bodies, BufferPool pool, int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
+            where TNarrowPhase : NarrowPhase, new()
         {
-            var emptyPairCache = new PairCache();
             var narrowPhase = new TNarrowPhase
             {
                 Pool = pool,
-                PairCache = new PairCache(pool, ref emptyPairCache)
+                PairCache = new PairCache(pool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity)
             };
             narrowPhase.OnInitialize(bodies);
             return narrowPhase;
@@ -647,13 +647,14 @@ namespace SolverPrototype.CollisionDetection
                 return false;
             }
 
-            public void Trigger(out ContactManifold outManifold)
+            public void Trigger(ContactManifold* outManifold)
             {
                 Debug.Assert(Substeps.CompletedSubsteps == Substeps.SubstepCount + 1);
                 //Attempt to create a single manifold which best represents all submanifolds.
-                Substeps.Trigger(out var substepManifold);
-                //We make use of the inner sphere contacts if 1) there is any room, or 2) an inner sphere contact has greater depth than any contact in the substepped manifold somehow.
-                Linear.CombineManifolds(ref substepManifold, ref Linear.Manifold, out outManifold);
+                ContactManifold substepManifold;
+                Substeps.Trigger(&substepManifold);
+                //Note that we assume that this struct is pinned. That is safe; the narrow phase structures are all stored in pinned or unmanaged memory buffers.
+                Linear.CombineManifolds(&substepManifold, (ContactManifold*)Unsafe.AsPointer(ref Linear.Manifold), outManifold);
             }
         }
 
@@ -681,25 +682,15 @@ namespace SolverPrototype.CollisionDetection
             //but these manifolds preallocate enough room for a full 4 nonconvex contacts.
             public ContactManifold Manifold;
 
-            static void ConvertConvexToNonconvex(ref ContactManifold convex, int convexIndex, ref ContactManifold nonconvex, int nonconvexIndex)
-            {
-                Debug.Assert(convex.Convex && !nonconvex.Convex && convexIndex < convex.ContactCount && nonconvexIndex < nonconvex.ContactCount);
-                ref var outContact = ref ContactManifold.GetNonconvexContact(ref nonconvex, nonconvexIndex);
-                ref var inContact = ref ContactManifold.GetConvexContact(ref convex, convexIndex);
-                outContact.Offset = inContact.Offset;
-                outContact.Depth = inContact.Depth;
-                outContact.SurfaceBasis = convex.ConvexSurfaceBasis;
-                outContact.FeatureId = inContact.FeatureId;
-            }
 
-            public static void CombineManifolds(ref ContactManifold mainManifold, ref ContactManifold linearManifold, out ContactManifold outManifold)
+            public static void CombineManifolds(ContactManifold* mainManifold, ContactManifold* linearManifold, ContactManifold* outManifold)
             {
-                var linearCount = linearManifold.ContactCount;
+                var linearCount = linearManifold->ContactCount;
                 if (linearCount > 0)
                 {
                     Debug.Assert(linearCount <= 2, "Inner sphere derived contacts should only ever contribute one contact per involved body.");
 
-                    var mainCount = mainManifold.ContactCount;
+                    var mainCount = mainManifold->ContactCount;
                     if (mainCount > 0)
                     {
                         var totalCount = mainCount + linearCount;
@@ -721,7 +712,7 @@ namespace SolverPrototype.CollisionDetection
                             var mainIndices = stackalloc int[mainCount];
                             if (linearCount == 2)
                             {
-                                if (linearManifold.NonconvexContact0.Depth < linearManifold.NonconvexContact1.Depth)
+                                if (linearManifold->Depth0 < linearManifold->Depth1)
                                 {
                                     linearIndices[0] = 0;
                                     linearIndices[1] = 1;
@@ -740,115 +731,146 @@ namespace SolverPrototype.CollisionDetection
                             for (int i = 0; i < mainCount; ++i)
                                 mainIndices[i] = i;
 
-                            outManifold = new ContactManifold(totalCount, false);
-                            if (mainManifold.Convex)
+                            outManifold->SetConvexityAndCount(totalCount, false);
+                            var mainDepths = &mainManifold->Depth0;
+                            for (int i = 1; i <= mainCount; ++i)
                             {
-                                for (int i = 1; i <= mainCount; ++i)
+                                var originalIndex = mainIndices[i];
+                                var depth = mainDepths[originalIndex];
+                                int compareIndex;
+                                for (compareIndex = i - 1; compareIndex >= 0; --compareIndex)
                                 {
-                                    var originalIndex = mainIndices[i];
-                                    var depth = ContactManifold.GetConvexContact(ref mainManifold, originalIndex).Depth;
-                                    int compareIndex;
-                                    for (compareIndex = i - 1; compareIndex >= 0; --compareIndex)
+                                    var compareDepth = mainDepths[compareIndex];
+                                    if (compareDepth < depth)
                                     {
-                                        var compareDepth = ContactManifold.GetConvexContact(ref mainManifold, compareIndex).Depth;
-                                        if (compareDepth < depth)
-                                        {
-                                            //Move the element up one slot.
-                                            var upperSlotIndex = compareIndex + 1;
-                                            mainIndices[upperSlotIndex] = mainIndices[compareIndex];
-                                        }
-                                        else
-                                            break;
+                                        //Move the element up one slot.
+                                        var upperSlotIndex = compareIndex + 1;
+                                        mainIndices[upperSlotIndex] = mainIndices[compareIndex];
                                     }
-                                    var targetIndex = compareIndex + 1;
-                                    if (targetIndex != i)
-                                    {
-                                        //Move the original index down.
-                                        mainIndices[targetIndex] = originalIndex;
-                                    }
+                                    else
+                                        break;
                                 }
+                                var targetIndex = compareIndex + 1;
+                                if (targetIndex != i)
+                                {
+                                    //Move the original index down.
+                                    mainIndices[targetIndex] = originalIndex;
+                                }
+                            }
 
-                                var outIndex = 0;
-                                var mainIndex = 0;
-                                var linearIndex = 0;
+                            var outIndex = 0;
+                            var mainIndex = 0;
+                            var linearIndex = 0;
+                            var outOffsets = &outManifold->Offset0;
+                            var outDepths = &outManifold->Depth0;
+                            var outBases = &outManifold->SurfaceBasis0;
+                            var outIds = &outManifold->FeatureId0;
+                            var linearOffsets = &linearManifold->Offset0;
+                            var linearDepths = &linearManifold->Depth0;
+                            var linearBases = &linearManifold->SurfaceBasis0;
+                            var linearIds = &linearManifold->FeatureId0;
+                            var mainOffsets = &mainManifold->Offset0;
+                            var mainIds = &mainManifold->FeatureId0;
+                            if (mainManifold->Convex)
+                            {
+                                //While the linear and output manifolds are nonconvex, the main one is convex.
                                 while (outIndex < 4)
                                 {
                                     if (linearIndex == linearCount ||
                                         (mainIndex < mainCount &&
-                                        ContactManifold.GetConvexContact(ref mainManifold, mainIndex).Depth > ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex).Depth))
+                                        mainDepths[mainIndex] > linearDepths[linearIndex]))
                                     {
-                                        ConvertConvexToNonconvex(ref mainManifold, mainIndex++, ref outManifold, outIndex++);
+                                        outOffsets[outIndex] = mainOffsets[mainIndex];
+                                        outDepths[outIndex] = mainDepths[mainIndex];
+                                        outBases[outIndex] = mainManifold->ConvexSurfaceBasis;
+                                        outIds[outIndex] = mainIds[mainIndex];
+                                        ++mainIndex;
                                     }
                                     else
                                     {
-                                        ContactManifold.GetNonconvexContact(ref outManifold, outIndex++) = ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex++);
+                                        outOffsets[outIndex] = linearOffsets[linearIndex];
+                                        outDepths[outIndex] = linearDepths[linearIndex];
+                                        outBases[outIndex] = linearBases[linearIndex];
+                                        outIds[outIndex] = linearIds[linearIndex];
+                                        ++linearIndex;
                                     }
                                 }
                             }
                             else
                             {
-                                for (int i = 1; i <= mainCount; ++i)
-                                {
-                                    var originalIndex = mainIndices[i];
-                                    var depth = ContactManifold.GetNonconvexContact(ref mainManifold, originalIndex).Depth;
-                                    int compareIndex;
-                                    for (compareIndex = i - 1; compareIndex >= 0; --compareIndex)
-                                    {
-                                        var compareDepth = ContactManifold.GetNonconvexContact(ref mainManifold, compareIndex).Depth;
-                                        if (compareDepth < depth)
-                                        {
-                                            //Move the element up one slot.
-                                            var upperSlotIndex = compareIndex + 1;
-                                            mainIndices[upperSlotIndex] = mainIndices[compareIndex];
-                                        }
-                                        else
-                                            break;
-                                    }
-                                    var targetIndex = compareIndex + 1;
-                                    if (targetIndex != i)
-                                    {
-                                        //Move the original index down.
-                                        mainIndices[targetIndex] = originalIndex;
-                                    }
-                                }
-                                var outIndex = 0;
-                                var mainIndex = 0;
-                                var linearIndex = 0;
+                                //Both manifolds are nonconvex.
+                                var mainBases = &mainManifold->SurfaceBasis0;
                                 while (outIndex < 4)
                                 {
                                     if (linearIndex == linearCount ||
                                         (mainIndex < mainCount &&
-                                        ContactManifold.GetNonconvexContact(ref mainManifold, mainIndex).Depth > ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex).Depth))
+                                        mainDepths[mainIndex] > linearDepths[linearIndex]))
                                     {
-                                        ContactManifold.GetNonconvexContact(ref outManifold, outIndex++) = ContactManifold.GetNonconvexContact(ref mainManifold, mainIndex++);
+                                        outOffsets[outIndex] = mainOffsets[mainIndex];
+                                        outDepths[outIndex] = mainDepths[mainIndex];
+                                        outBases[outIndex] = mainBases[mainIndex];
+                                        outIds[outIndex] = mainIds[mainIndex];
+                                        ++mainIndex;
                                     }
                                     else
                                     {
-                                        ContactManifold.GetNonconvexContact(ref outManifold, outIndex++) = ContactManifold.GetNonconvexContact(ref linearManifold, linearIndex++);
+                                        outOffsets[outIndex] = linearOffsets[linearIndex];
+                                        outDepths[outIndex] = linearDepths[linearIndex];
+                                        outBases[outIndex] = linearBases[linearIndex];
+                                        outIds[outIndex] = linearIds[linearIndex];
+                                        ++linearIndex;
                                     }
+                                    ++outIndex;
                                 }
                             }
                         }
                         else
                         {
                             //There is sufficient room in the manifold to include all the new contacts, so there is no need for prioritization.
-                            outManifold = new ContactManifold(totalCount, false);
+                            outManifold->SetConvexityAndCount(totalCount, false);
                             //Add all existing contacts. Note that the use of inner sphere contacts forces the manifold to be nonconvex unconditionally.
                             //While there are cases in which the normals could actually be planar, we don't spend the time figuring that out-
                             //this state will be extremely brief regardless, and there isn't much value in trying to tease out convexity for one or two frames.
-                            if (mainManifold.Convex)
+                            var outOffsets = &outManifold->Offset0;
+                            var outDepths = &outManifold->Depth0;
+                            var outBases = &outManifold->SurfaceBasis0;
+                            var outIds = &outManifold->FeatureId0;
+                            var mainOffsets = &mainManifold->Offset0;
+                            var mainDepths = &mainManifold->Depth0;
+                            var mainIds = &mainManifold->FeatureId0;
+                            if (mainManifold->Convex)
                             {
                                 for (int i = 0; i < mainCount; ++i)
                                 {
-                                    ConvertConvexToNonconvex(ref mainManifold, i, ref outManifold, i);
+                                    outOffsets[i] = mainOffsets[i];
+                                    outDepths[i] = mainDepths[i];
+                                    outBases[i] = mainManifold->ConvexSurfaceBasis;
+                                    outIds[i] = mainIds[i];
                                 }
                             }
                             else
                             {
+                                var mainBases = &mainManifold->SurfaceBasis0;
                                 for (int i = 0; i < mainCount; ++i)
                                 {
-                                    ContactManifold.GetNonconvexContact(ref outManifold, i) = ContactManifold.GetNonconvexContact(ref mainManifold, i);
+                                    outOffsets[i] = mainOffsets[i];
+                                    outDepths[i] = mainDepths[i];
+                                    outBases[i] = mainBases[i];
+                                    outIds[i] = mainIds[i];
                                 }
+                            }
+                            //Now add the linear contacts. Both manifolds are known to be nonconvex. 
+                            var linearOffsets = &linearManifold->Offset0;
+                            var linearDepths = &linearManifold->Depth0;
+                            var linearBases = &linearManifold->SurfaceBasis0;
+                            var linearIds = &linearManifold->FeatureId0;
+                            for (int linearIndex = 0; linearIndex < linearCount; ++linearIndex)
+                            {
+                                var outIndex = mainCount + linearIndex;
+                                outOffsets[outIndex] = linearOffsets[linearIndex];
+                                outDepths[outIndex] = linearDepths[linearIndex];
+                                outBases[outIndex] = linearBases[linearIndex];
+                                outIds[outIndex] = linearIds[linearIndex];
                             }
                         }
                     }
@@ -915,7 +937,7 @@ namespace SolverPrototype.CollisionDetection
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Trigger(out ContactManifold substepManifold)
+            public void Trigger(ContactManifold* substepManifold)
             {
                 //Scan the substeps looking for the first substep that contains any contacts.
                 //TODO: There are situations involving very high angular velocity where the first contacts are not the best choice. 
@@ -931,38 +953,42 @@ namespace SolverPrototype.CollisionDetection
                     var contactCount = manifold.ContactCount;
                     if (contactCount > 0)
                     {
-                        substepManifold = manifold;
+                        *substepManifold = manifold;
                         //Once the best substep is selected, transform the contact positions and depths to be relative to the poses at t=0.
                         //Since the contact position offsets are not rotated, all we have to do is add the offset from t=0 to the current time to each contact position
                         //and modify the penetration depths according to that offset along the normal.
                         var offset = RelativeOffsetChange * GetProgressionForSubstep(i, SubstepCount);
-                        if (substepManifold.Convex)
+                        var offsets = &substepManifold->Offset0;
+                        var depths = &substepManifold->Depth0;
+                        //TODO: these two TransformY's could be optimized with knowledge that it's unit length. 
+                        //That would be pretty useful generally- I'm not sure we've ever used those functions without it being unit length.
+                        //Pretty micro-optimizey, though.
+                        if (substepManifold->Convex)
                         {
-                            BEPUutilities2.Quaternion.TransformY(1, ref substepManifold.ConvexSurfaceBasis, out var manifoldNormal);
+                            BEPUutilities2.Quaternion.TransformY(1, ref substepManifold->ConvexSurfaceBasis, out var manifoldNormal);
                             var penetrationOffset = Vector3.Dot(offset, manifoldNormal);
                             for (int j = 0; j < contactCount; ++j)
                             {
-                                ref var contact = ref ContactManifold.GetConvexContact(ref substepManifold, j);
-                                contact.Offset += offset;
-                                contact.Depth += penetrationOffset;
+                                offsets[j] += offset;
+                                depths[j] += penetrationOffset;
                             }
                         }
                         else
                         {
+                            var bases = &substepManifold->SurfaceBasis0;
                             for (int j = 0; j < contactCount; ++j)
                             {
-                                ref var contact = ref ContactManifold.GetNonconvexContact(ref substepManifold, j);
-                                BEPUutilities2.Quaternion.TransformY(1, ref contact.SurfaceBasis, out var manifoldNormal);
+                                BEPUutilities2.Quaternion.TransformY(1, ref bases[j], out var manifoldNormal);
                                 var penetrationOffset = Vector3.Dot(offset, manifoldNormal);
-                                contact.Offset += offset;
-                                contact.Depth += penetrationOffset;
+                                offsets[j] += offset;
+                                depths[j] += penetrationOffset;
                             }
                         }
                         return;
                     }
                 }
                 //If there are no contacts, then just return an empty manifold.
-                substepManifold = Manifolds[0];
+                *substepManifold = Manifolds[0];
             }
         }
 
