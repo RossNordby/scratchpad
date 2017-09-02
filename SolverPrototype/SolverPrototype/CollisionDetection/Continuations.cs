@@ -128,7 +128,7 @@ namespace SolverPrototype.CollisionDetection
                 ContactImpulses newImpulses;
                 if (typeof(TConstraintCache) == typeof(ConstraintCache1))
                 {
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache1>(constraintCacheIndex.Index);
+                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache1>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     //If there's only one contact, assume we can directly reuse the old impulse even when the feature id wouldn't match.
@@ -137,7 +137,7 @@ namespace SolverPrototype.CollisionDetection
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache2))
                 {
                     const int oldContactCount = 2;
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache2>(constraintCacheIndex.Index);
+                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache2>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
@@ -147,7 +147,7 @@ namespace SolverPrototype.CollisionDetection
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache3))
                 {
                     const int oldContactCount = 3;
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache3>(constraintCacheIndex.Index);
+                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache3>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
@@ -157,7 +157,7 @@ namespace SolverPrototype.CollisionDetection
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache4))
                 {
                     const int oldContactCount = 4;
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache4>(constraintCacheIndex.Index);
+                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache4>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
