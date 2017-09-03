@@ -3,6 +3,7 @@ using SolverPrototype;
 using SolverPrototype.Collidables;
 using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
+using SolverPrototypeTests.SpecializedTests;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -10,75 +11,74 @@ using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
-    public static class SimulationSetup<TNarrowPhase, TCollidableData> where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
+    public interface IBodyBuilder
     {
-        //Most users can get away with just creating a Simulation-derived type that hides the generic implementation details. Here, we're just gonna bite the bullet.
-        public interface IBodyBuilder
+        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription<int> bodyDescription);
+    }
+    public interface IConstraintBuilder
+    {
+        void RegisterConstraintTypes();
+        void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
+            ref BodyDescription<int> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
+    }
+    public struct LatticeBodyGetter
+    {
+        int width, height, length;
+        int[] bodyHandles;
+        Bodies<int> bodies;
+        public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Bodies<int> bodies)
         {
-            void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription<TCollidableData> bodyDescription);
+            this.width = width;
+            this.height = height;
+            this.length = length;
+            this.bodyHandles = bodyHandles;
+            this.bodies = bodies;
         }
-        public interface IConstraintBuilder
+        public bool TryGetId(int columnIndex, int rowIndex, int sliceIndex, out int id)
         {
-            void RegisterConstraintTypes();
-            void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
-                ref BodyDescription<TCollidableData> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
+            if (columnIndex < 0 || columnIndex >= width || rowIndex < 0 || rowIndex >= height || sliceIndex < 0 || sliceIndex >= length)
+            {
+                id = -1;
+                return false;
+            }
+            id = sliceIndex * (height * width) + rowIndex * width + columnIndex;
+            return true;
         }
-        public struct LatticeBodyGetter
+        public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription<int> bodyDescription)
         {
-            int width, height, length;
-            int[] bodyHandles;
-            Bodies<TCollidableData> bodies;
-            public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Bodies<TCollidableData> bodies)
+            if (!TryGetId(columnIndex, rowIndex, sliceIndex, out var id))
             {
-                this.width = width;
-                this.height = height;
-                this.length = length;
-                this.bodyHandles = bodyHandles;
-                this.bodies = bodies;
+                handle = -1;
+                bodyDescription = new BodyDescription<int>();
+                return false;
             }
-            public bool TryGetId(int columnIndex, int rowIndex, int sliceIndex, out int id)
-            {
-                if (columnIndex < 0 || columnIndex >= width || rowIndex < 0 || rowIndex >= height || sliceIndex < 0 || sliceIndex >= length)
-                {
-                    id = -1;
-                    return false;
-                }
-                id = sliceIndex * (height * width) + rowIndex * width + columnIndex;
-                return true;
-            }
-            public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription<TCollidableData> bodyDescription)
-            {
-                if (!TryGetId(columnIndex, rowIndex, sliceIndex, out var id))
-                {
-                    handle = -1;
-                    bodyDescription = new BodyDescription<TCollidableData>();
-                    return false;
-                }
-                handle = bodyHandles[id];
-                bodies.GetDescription(handle, out bodyDescription);
-                return true;
-            }
+            handle = bodyHandles[id];
+            bodies.GetDescription(handle, out bodyDescription);
+            return true;
+        }
+    }
+
+    public struct ConstraintAdder
+    {
+        public int LocalBodyHandle;
+        DemoSimulation simulation;
+        public List<int> ConstraintHandles;
+        public ConstraintAdder(DemoSimulation simulation, List<int> constraintHandles)
+        {
+            this.simulation = simulation;
+            this.ConstraintHandles = constraintHandles;
+            LocalBodyHandle = 0;
         }
 
-        public struct ConstraintAdder
+        public void Add<T>(ref T description, int otherBodyHandle) where T : IConstraintDescription<T>
         {
-            public int LocalBodyHandle;
-            Simulation<TNarrowPhase, TCollidableData> simulation;
-            public List<int> ConstraintHandles;
-            public ConstraintAdder(Simulation<TNarrowPhase, TCollidableData> simulation, List<int> constraintHandles)
-            {
-                this.simulation = simulation;
-                this.ConstraintHandles = constraintHandles;
-                LocalBodyHandle = 0;
-            }
-
-            public void Add<T>(ref T description, int otherBodyHandle) where T : IConstraintDescription<T>
-            {
-                var constraintHandle = simulation.Add(LocalBodyHandle, otherBodyHandle, ref description);
-                ConstraintHandles.Add(constraintHandle);
-            }
+            var constraintHandle = simulation.Add(LocalBodyHandle, otherBodyHandle, ref description);
+            ConstraintHandles.Add(constraintHandle);
         }
+    }
 
+    public static class SimulationSetup
+    {
         public static void BuildBasis(ref BodyPose a, ref BodyPose b, out Vector3 x, out Vector3 y, out Vector3 z)
         {
             y = Vector3.Normalize(a.Position - b.Position);
@@ -97,7 +97,7 @@ namespace SolverPrototypeTests
             z = Vector3.Cross(x, y);
         }
 
-        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, Simulation<TNarrowPhase, TCollidableData> simulation,
+        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, DemoSimulation simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
             var bodyCount = width * height * length;
@@ -139,11 +139,11 @@ namespace SolverPrototypeTests
 
 
         public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length,
-            out Simulation<TNarrowPhase, TCollidableData> simulation,
+            out DemoSimulation simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
             var bodyCount = width * height * length;
-            simulation = new Simulation<TNarrowPhase, TCollidableData>(
+            simulation = new DemoSimulation(
                 new BufferPool(),
                 new SimulationAllocationSizes
                 {

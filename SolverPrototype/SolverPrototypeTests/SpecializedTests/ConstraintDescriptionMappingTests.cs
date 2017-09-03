@@ -1,6 +1,7 @@
 ﻿using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
@@ -10,9 +11,11 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using BEPUutilities2;
 
 namespace SolverPrototypeTests.SpecializedTests
 {
+
     public unsafe class ConstraintDescriptionMappingTests
     {
 
@@ -24,7 +27,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 Unsafe.Add(ref bytes, i) = (byte)random.Next(256);
             }
         }
-        public static void Test<T>(Simulation simulation, Random random, int constraintTypeBodyCount) where T : struct, IConstraintDescription<T>
+        public static void Test<T>(DemoSimulation simulation, Random random, int constraintTypeBodyCount) where T : struct, IConstraintDescription<T>
         {
             int constraintTestCount = Vector<float>.Count * 128;
 
@@ -90,13 +93,13 @@ namespace SolverPrototypeTests.SpecializedTests
         public static void Test()
         {
             var pool = new BufferPool();
-            var simulation = new Simulation(pool);
+            var simulation = new DemoSimulation(pool);
 
 
             const int bodyCount = 2048;
             for (int i = 0; i < bodyCount; ++i)
             {
-                var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = 1 }, Pose = new BodyPose { Orientation = BEPUutilities2.Quaternion.Identity } };
+                var bodyDescription = new BodyDescription<int> { LocalInertia = new BodyInertia { InverseMass = 1 }, Pose = new BodyPose { Orientation = BEPUutilities2.Quaternion.Identity } };
                 simulation.Add(ref bodyDescription);
             }
             var random = new Random(5);

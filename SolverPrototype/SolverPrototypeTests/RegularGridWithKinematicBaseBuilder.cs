@@ -18,9 +18,9 @@ namespace SolverPrototypeTests
             ShapeIndex = shapeIndex;
         }
 
-        public void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription)
+        public void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription<int> bodyDescription)
         {
-            bodyDescription = new BodyDescription
+            bodyDescription = new BodyDescription<int>
             {
                 Pose = new BodyPose
                 {

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.4</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <Version>2.0.0</Version>
     <Company>Bepu Entertainment LLC</Company>
     <Authors>Ross Nordby</Authors>
@@ -11,6 +11,11 @@
     <PackageLicenseUrl>https://github.com/RossNordby/scratchpad/blob/master/LICENSE.md</PackageLicenseUrl>
     <RepositoryUrl>https://github.com/RossNordby/scratchpad</RepositoryUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/RossNordby/bepuphysics1/master/Documentation/images/readme/bepuphysicslogo256.png</PackageIconUrl>
+  </PropertyGroup>
+  
+  <!-- TODO: Why is this necessary? It refers to 1.6.1 rather than 2.0 without this, despite the target framework being set to 2.0 above. -->
+  <PropertyGroup>
+    <NetStandardImplicitPackageVersion>2.0</NetStandardImplicitPackageVersion>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -45,11 +50,6 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <DefineConstants>TRACE;DEBUG;NETSTANDARD1_4;CHECKMATH;PROFILE</DefineConstants>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0-preview2-25405-01" />
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.4.0-preview2-25405-01" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj" />

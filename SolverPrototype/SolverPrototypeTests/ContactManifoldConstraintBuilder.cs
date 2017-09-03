@@ -1,11 +1,11 @@
 ﻿using BEPUutilities2;
 using SolverPrototype;
+using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-
 using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
@@ -53,8 +53,8 @@ namespace SolverPrototypeTests
             }
         }
 
-        public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder)
+        public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex, ref BodyDescription<int> bodyDescription,
+            ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder)
         {
             //For each lower neighbor, create a connection.
             if (ids.GetBody(columnIndex - 1, rowIndex, sliceIndex, out var previousColumnHandle, out var previousColumnDescription) &&
@@ -79,6 +79,7 @@ namespace SolverPrototypeTests
                 constraintAdder.Add(ref description, previousSliceHandle);
             }
         }
+
     }
 
 

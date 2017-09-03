@@ -23,7 +23,7 @@ namespace DemoContentBuilder
             var directoryUri = new Uri(baseDirectory);
             return Uri.UnescapeDataString(directoryUri.MakeRelativeUri(pathUri).ToString().Replace('/', Path.DirectorySeparatorChar));
         }
-                      
+
 
         unsafe static void CollectContentPaths(string projectPath, out string workingPath,
             out List<string> shaderPaths,
@@ -111,8 +111,8 @@ namespace DemoContentBuilder
             var targetPaths = new List<string>();
             for (int i = 0; i < args.Length; ++i)
             {
-                //The argument should be either a compilation flag or a project path.
-                if (args[i][0] == '-')
+                //The argument should be either a compilation flag or a project path
+                if (args[i].Length > 0 && args[i][0] == '-')
                 {
                     switch (args[i])
                     {
@@ -135,7 +135,14 @@ namespace DemoContentBuilder
                 }
                 else
                 {
-                    targetPaths.Add(args[i]);
+                    if (File.Exists(args[i]))
+                    {
+                        targetPaths.Add(args[i]);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"No file exists for argument \"{args[i]}\".");
+                    }
                 }
             }
             foreach (var targetPath in targetPaths)

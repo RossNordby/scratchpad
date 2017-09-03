@@ -1,15 +1,12 @@
-﻿<Project>
-  <!--Note workaround for macro evaluation issue.-->
-  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
-    <RuntimeFrameworkVersion>2.0.0-preview3-25518-01</RuntimeFrameworkVersion>
+    <!--<RuntimeFrameworkVersion>2.1.0-preview2-25616-02</RuntimeFrameworkVersion>-->
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-  </PropertyGroup>
-  
-  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+  </PropertyGroup>  
 
   <PropertyGroup>
     <PreBuildEvent Condition="'$(Configuration)'=='Debug'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)" -debug</PreBuildEvent>
@@ -36,6 +33,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\BEPUutilities v2\BEPUutilities\BEPUutilities2.csproj" />
     <ProjectReference Include="..\DemoRenderer\DemoRenderer.csproj" />
     <ProjectReference Include="..\DemoUtilities\DemoUtilities.csproj" />
@@ -55,10 +56,6 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-  </ItemGroup>
-
-  <ItemGroup>
-    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
   </ItemGroup>
 
 </Project>

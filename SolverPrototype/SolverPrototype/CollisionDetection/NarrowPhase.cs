@@ -218,14 +218,14 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
-    /// <summary>
-    /// Performs a collision test on a set of collidable pairs as a batch. Responsible for gathering necessary state, executing batches, and reporting results to pair owners.
-    /// </summary>
-    public abstract class CollidablePairTester
-    {
-        public int BatchSize { get; protected set; }
-        public abstract void Test(ref QuickList<PairJob, Buffer<PairJob>> jobs, ref Continuations owners, ref CollidableDataSource collidableSource);
-    }
+    ///// <summary>
+    ///// Performs a collision test on a set of collidable pairs as a batch. Responsible for gathering necessary state, executing batches, and reporting results to pair owners.
+    ///// </summary>
+    //public abstract class CollidablePairTester
+    //{
+    //    public int BatchSize { get; protected set; }
+    //    public abstract void Test(ref QuickList<PairJob, Buffer<PairJob>> jobs, ref Continuations owners, ref CollidableDataSource collidableSource);
+    //}
 
 
     public enum ContinuationType
@@ -445,91 +445,91 @@ namespace SolverPrototype.CollisionDetection
     }
 
 
-    public class SpherePairGatherExecuteReport : CollidablePairTester
-    {
-        public SpherePairGatherExecuteReport()
-        {
-            BatchSize = 32;
-        }
-        //TODO: Compound children don't have a collidable reference, so they cannot be gathered in the same way.
-        //Mesh children don't have a collidable reference, nor do they have a shape reference, so they can't be gathered in the same way.
-        //We'll need to refactor this interface. 
-        //Compound-Convex would decompose into a series of ChildConvex-Convex that know to gather the pose from the compound pose + child relative pose.
-        //Mesh-Convex would decompose into a series of MeshTriangle-Convex pairs that gather vertex data from the mesh transform + local vertex positions.
-        //Ideally we could find a good layout that shares as much as possible- it's not required that we have a separate batch for ChildSphere-Box, for example.
-        //(However, in the mesh case, it's unlikely that we will support a standalone triangle shape, so there will likely be a MeshTriangle-Box and so on.)
+    //public class SpherePairGatherExecuteReport : CollidablePairTester
+    //{
+    //    public SpherePairGatherExecuteReport()
+    //    {
+    //        BatchSize = 32;
+    //    }
+    //    //TODO: Compound children don't have a collidable reference, so they cannot be gathered in the same way.
+    //    //Mesh children don't have a collidable reference, nor do they have a shape reference, so they can't be gathered in the same way.
+    //    //We'll need to refactor this interface. 
+    //    //Compound-Convex would decompose into a series of ChildConvex-Convex that know to gather the pose from the compound pose + child relative pose.
+    //    //Mesh-Convex would decompose into a series of MeshTriangle-Convex pairs that gather vertex data from the mesh transform + local vertex positions.
+    //    //Ideally we could find a good layout that shares as much as possible- it's not required that we have a separate batch for ChildSphere-Box, for example.
+    //    //(However, in the mesh case, it's unlikely that we will support a standalone triangle shape, so there will likely be a MeshTriangle-Box and so on.)
 
-        //Note that the collidable pair tester itself has no dynamic state.
-        //This will be called from many threads. The caller is responsible for maintaining the necessary state in a thread safe way.
-        public override void Test(ref QuickList<PairJob, Buffer<PairJob>> jobs, ref Continuations owners, ref CollidableDataSource collidableSource)
-        {
-            collidableSource.GetShapeBuffer(out Buffer<Sphere> shapes);
-            Vector<float> radiiA, radiiB;
-            Vector3Wide localPositionB;
-            Vector<float> minimumDepth;
-            ref var radiiStartA = ref Unsafe.As<Vector<float>, float>(ref radiiA);
-            ref var radiiStartB = ref Unsafe.As<Vector<float>, float>(ref radiiB);
-            for (int pairIndex = 0; pairIndex < jobs.Count; pairIndex += Vector<float>.Count)
-            {
-                var count = jobs.Count - pairIndex;
-                if (count > Vector<float>.Count)
-                    count = Vector<float>.Count;
-                //Gather everything necessary for the pair.
-                for (int innerIndex = 0; innerIndex < count; ++innerIndex)
-                {
-                    ref var pair = ref jobs[pairIndex + innerIndex];
-                    //For pairs between different shapes, this gather phase will need to work out which entry needs to go first. 
-                    //For example, if the sphere-box pair always uses the sphere first, then we might need to swap the order of A and B.
-                    //This is a sphere-sphere pair, so there's no need.
-                    collidableSource.GatherRigidPair(ref pair.Pair, out var shapeIndexA, out var shapeIndexB, innerIndex, ref minimumDepth, ref localPositionB);
-                    Unsafe.Add(ref radiiStartA, innerIndex) = shapes[shapeIndexA].Radius;
-                    Unsafe.Add(ref radiiStartB, innerIndex) = shapes[shapeIndexB].Radius;
-                }
-                //TODO: Check type punning impact on codegen. Had bugs and perf issues with that in the past.
-                SpherePairTester.Test(ref radiiA, ref radiiB, ref minimumDepth, ref localPositionB, out var localContactPosition, out var contactNormal, out var depth, out var contactCount);
-                //Scatter results to owners.
-                for (int innerIndex = 0; innerIndex < count; ++innerIndex)
-                {
-                    owners.Execute(jobs[pairIndex + innerIndex].Continuation);
-                }
-            }
-        }
-    }
+    //    //Note that the collidable pair tester itself has no dynamic state.
+    //    //This will be called from many threads. The caller is responsible for maintaining the necessary state in a thread safe way.
+    //    public override void Test(ref QuickList<PairJob, Buffer<PairJob>> jobs, ref Continuations owners, ref CollidableDataSource collidableSource)
+    //    {
+    //        collidableSource.GetShapeBuffer(out Buffer<Sphere> shapes);
+    //        Vector<float> radiiA, radiiB;
+    //        Vector3Wide localPositionB;
+    //        Vector<float> minimumDepth;
+    //        ref var radiiStartA = ref Unsafe.As<Vector<float>, float>(ref radiiA);
+    //        ref var radiiStartB = ref Unsafe.As<Vector<float>, float>(ref radiiB);
+    //        for (int pairIndex = 0; pairIndex < jobs.Count; pairIndex += Vector<float>.Count)
+    //        {
+    //            var count = jobs.Count - pairIndex;
+    //            if (count > Vector<float>.Count)
+    //                count = Vector<float>.Count;
+    //            //Gather everything necessary for the pair.
+    //            for (int innerIndex = 0; innerIndex < count; ++innerIndex)
+    //            {
+    //                ref var pair = ref jobs[pairIndex + innerIndex];
+    //                //For pairs between different shapes, this gather phase will need to work out which entry needs to go first. 
+    //                //For example, if the sphere-box pair always uses the sphere first, then we might need to swap the order of A and B.
+    //                //This is a sphere-sphere pair, so there's no need.
+    //                collidableSource.GatherRigidPair(ref pair.Pair, out var shapeIndexA, out var shapeIndexB, innerIndex, ref minimumDepth, ref localPositionB);
+    //                Unsafe.Add(ref radiiStartA, innerIndex) = shapes[shapeIndexA].Radius;
+    //                Unsafe.Add(ref radiiStartB, innerIndex) = shapes[shapeIndexB].Radius;
+    //            }
+    //            //TODO: Check type punning impact on codegen. Had bugs and perf issues with that in the past.
+    //            SpherePairTester.Test(ref radiiA, ref radiiB, ref minimumDepth, ref localPositionB, out var localContactPosition, out var contactNormal, out var depth, out var contactCount);
+    //            //Scatter results to owners.
+    //            for (int innerIndex = 0; innerIndex < count; ++innerIndex)
+    //            {
+    //                owners.Execute(jobs[pairIndex + innerIndex].Continuation);
+    //            }
+    //        }
+    //    }
+    //}
 
 
-    /// <summary>
-    /// Handles collision detection for a batch of collidable pairs together once filled or forced.
-    /// </summary>
-    /// <remarks>This is used by a single thread to accumulate collidable pairs over time until enough have been found to justify a wide execution.</remarks>
-    public struct PairBatch<TTester> where TTester : CollidablePairTester
-    {
-        public QuickList<CollidablePair, Buffer<CollidablePair>> PendingPairs;
-        public TTester Tester;
+    ///// <summary>
+    ///// Handles collision detection for a batch of collidable pairs together once filled or forced.
+    ///// </summary>
+    ///// <remarks>This is used by a single thread to accumulate collidable pairs over time until enough have been found to justify a wide execution.</remarks>
+    //public struct PairBatch<TTester> where TTester : CollidablePairTester
+    //{
+    //    public QuickList<CollidablePair, Buffer<CollidablePair>> PendingPairs;
+    //    public TTester Tester;
 
-        public PairBatch(TTester tester, BufferPool pool) : this()
-        {
-            Tester = tester;
-            QuickList<CollidablePair, Buffer<CollidablePair>>.Create(pool.SpecializeFor<CollidablePair>(), tester.BatchSize, out PendingPairs);
-        }
+    //    public PairBatch(TTester tester, BufferPool pool) : this()
+    //    {
+    //        Tester = tester;
+    //        QuickList<CollidablePair, Buffer<CollidablePair>>.Create(pool.SpecializeFor<CollidablePair>(), tester.BatchSize, out PendingPairs);
+    //    }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(ref CollidablePair pair)
-        {
-            PendingPairs.AddUnsafely(pair);
-            if (PendingPairs.Count == Tester.BatchSize)
-            {
-                //Tester.Test(ref PendingPairs);
-            }
-        }
+    //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    //    public void Add(ref CollidablePair pair)
+    //    {
+    //        PendingPairs.AddUnsafely(pair);
+    //        if (PendingPairs.Count == Tester.BatchSize)
+    //        {
+    //            //Tester.Test(ref PendingPairs);
+    //        }
+    //    }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Flush()
-        {
-            //if (PendingPairs.Count > 0)
-            //    Tester.Test(ref PendingPairs);
+    //    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    //    public void Flush()
+    //    {
+    //        //if (PendingPairs.Count > 0)
+    //        //    Tester.Test(ref PendingPairs);
 
-        }
-    }
+    //    }
+    //}
 
     public abstract class NarrowPhase
     {
@@ -1017,7 +1017,6 @@ namespace SolverPrototype.CollisionDetection
                         //Create a continuation for the pair given the CCD state.
                         if (useSubstepping && useInnerSphere)
                         {
-                            AddLinearAndSubstepContinuation();
                         }
                         else if (useSubstepping)
                         {

@@ -33,6 +33,10 @@ namespace SolverPrototype.CollisionDetection
     public class PairCache
     {
         OverlapMapping mapping;
+        /// <summary>
+        /// Per-pair 'freshness' flags set when a pair is added or updated by the narrow phase execution.
+        /// </summary>
+        RawBuffer pairFreshness;
         BufferPool pool;
         int minimumPendingSize;
         int minimumPerTypeCapacity;
@@ -103,6 +107,10 @@ namespace SolverPrototype.CollisionDetection
             {
                 nextWorkerCaches[0] = new WorkerPairCache(0, pool, ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType, pendingSize, minimumPerTypeCapacity);
             }
+            pool.Take(mapping.Count, out pairFreshness);
+            //This clears 1 byte per pair. 32768 pairs with 10GBps assumed single core bandwidth means about 3 microseconds.
+            //There is a small chance that multithreading this would be useful in larger simulations- but it would be very, very close.
+            pairFreshness.Clear(0, mapping.Count);
 
             minimumSizesPerConstraintType.Dispose(pool.SpecializeFor<int>());
             minimumSizesPerCollisionType.Dispose(pool.SpecializeFor<int>());
@@ -139,6 +147,7 @@ namespace SolverPrototype.CollisionDetection
                 }
                 cache.PendingAdds.Dispose(pendingPool);
             }
+            previousPendingSize = largestPendingSize;
             //Swap references.
             var temp = nextWorkerCaches;
             workerCaches = nextWorkerCaches;

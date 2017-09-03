@@ -36,7 +36,7 @@ namespace SolverPrototypeTests
             Solver = new TimingsRingBuffer(frameCapacity);
         }
 
-        public void RecordFrame(Simulation simulation)
+        public void RecordFrame(DemoSimulation simulation)
         {
             //This requires the simulation to be compiled with profiling enabled.
             Simulation.Add(simulation.Timings[simulation]);

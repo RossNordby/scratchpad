@@ -1,5 +1,6 @@
 ﻿using SolverPrototype;
 using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
 using SolverPrototype.Constraints;
 using System;
 using System.Collections.Generic;
@@ -11,7 +12,8 @@ namespace SolverPrototypeTests.SpecializedTests
 {
     public static class SimulationScrambling
     {
-        public static void ScrambleBodies(Simulation simulation)
+        public static void ScrambleBodies<TNarrowPhase, TCollidableData>(Simulation<TNarrowPhase, TCollidableData> simulation) 
+            where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
         {
             //Having every single body in order is pretty unrealistic. In a real application, churn and general lack of care will result in 
             //scrambled body versus constraint memory access patterns. That's a big increase in cache misses.
@@ -23,7 +25,7 @@ namespace SolverPrototypeTests.SpecializedTests
             for (int i = simulation.Bodies.BodyCount - 1; i >= 1; --i)
             {
                 //This helper function handles the updates that have to be performed across all body-sensitive systems.
-                BodyLayoutOptimizer.SwapBodyLocation(simulation.Bodies, simulation.BroadPhase, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
+                BodyLayoutOptimizer<TCollidableData>.SwapBodyLocation(simulation.Bodies, simulation.BroadPhase, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
             }
 
         }
@@ -39,7 +41,8 @@ namespace SolverPrototypeTests.SpecializedTests
                 }
             }
         }
-        public static void ScrambleBodyConstraintLists(Simulation simulation)
+        public static void ScrambleBodyConstraintLists<TNarrowPhase, TCollidableData>(Simulation<TNarrowPhase, TCollidableData> simulation)
+            where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
         {
             Random random = new Random(5);
             //Body lists are isolated enough that we don't have to worry about a bunch of internal bookkeeping. Just pull the list and mess with it.
@@ -94,7 +97,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
 
-        static void RemoveConstraint(Simulation simulation, int constraintHandle, int[] constraintHandlesToIdentity, int[] constraintHandles, List<int> removedConstraints)
+        static void RemoveConstraint(DemoSimulation simulation, int constraintHandle, int[] constraintHandlesToIdentity, int[] constraintHandles, List<int> removedConstraints)
         {
             var constraintIdentity = constraintHandlesToIdentity[constraintHandle];
             constraintHandlesToIdentity[constraintHandle] = -1;
@@ -105,7 +108,7 @@ namespace SolverPrototypeTests.SpecializedTests
 
         struct ConstraintBodyValidationEnumerator : IForEach<int>
         {
-            public Simulation Simulation;
+            public DemoSimulation Simulation;
             public int ConstraintHandle;
             public void LoopBody(int bodyIndex)
             {
@@ -125,7 +128,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
         [Conditional("DEBUG")]
-        static void Validate(Simulation simulation, List<int> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
+        static void Validate(DemoSimulation simulation, List<int> removedConstraints, List<int> removedBodies, int originalBodyCount, int originalConstraintCount)
         {
             for (int batchIndex = 0; batchIndex < simulation.Solver.Batches.Count; ++batchIndex)
             {
@@ -178,7 +181,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnAddBody(Simulation simulation, BodyDescription[] bodyDescriptions, int[] bodyHandles, int[] bodyHandlesToIdentity,
+        private static void ChurnAddBody(DemoSimulation simulation, BodyDescription<int>[] bodyDescriptions, int[] bodyHandles, int[] bodyHandlesToIdentity,
             int originalConstraintCount, List<int> removedConstraints, List<int> removedBodies, Random random)
         {
             //Add a body.
@@ -193,7 +196,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnRemoveBody<T>(Simulation simulation, int[] bodyHandles, int[] bodyHandlesToIdentity, int[] constraintHandles,
+        private static void ChurnRemoveBody<T>(DemoSimulation simulation, int[] bodyHandles, int[] bodyHandlesToIdentity, int[] constraintHandles,
             int[] constraintHandlesToIdentity, CachedConstraint<T>[] constraintDescriptions,
             List<int> removedConstraints, List<int> removedBodies, Random random) where T : IConstraintDescription<T>
         {
@@ -219,7 +222,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnAddConstraint<T>(Simulation simulation, int[] bodyHandles, int[] constraintHandles, int[] constraintHandlesToIdentity,
+        private static void ChurnAddConstraint<T>(DemoSimulation simulation, int[] bodyHandles, int[] constraintHandles, int[] constraintHandlesToIdentity,
             CachedConstraint<T>[] constraintDescriptions, List<int> removedConstraints, List<int> removedBodies, Random random) where T : IConstraintDescription<T>
         {
             //Add a constraint.
@@ -247,7 +250,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnRemoveConstraint<T>(Simulation simulation, int originalBodyCount,
+        private static void ChurnRemoveConstraint<T>(DemoSimulation simulation, int originalBodyCount,
             int[] constraintHandlesToIdentity, int[] constraintHandles, CachedConstraint<T>[] constraintDescriptions, List<int> removedConstraints, List<int> removedBodies, Random random)
             where T : IConstraintDescription<T>
         {
@@ -270,7 +273,7 @@ namespace SolverPrototypeTests.SpecializedTests
             }
         }
 
-        public static double AddRemoveChurn<T>(Simulation simulation, int iterations, int[] bodyHandles, int[] constraintHandles) where T : IConstraintDescription<T>
+        public static double AddRemoveChurn<T>(DemoSimulation simulation, int iterations, int[] bodyHandles, int[] constraintHandles) where T : IConstraintDescription<T>
         {
             //There are three levels of 'index' for each object in this test:
             //1) The top level 'identity'. Even when a body or constraint gets readded, the slot in the top level array maintains a pointer to the new handle.
@@ -279,7 +282,7 @@ namespace SolverPrototypeTests.SpecializedTests
             //As we add and remove stuff, we want to still be able to find a particular constraint by its original identity, so we have to do some work to track that.
 
             //Take a snapshot of the body descriptions.
-            var bodyDescriptions = new BodyDescription[bodyHandles.Length];
+            var bodyDescriptions = new BodyDescription<int>[bodyHandles.Length];
             var constraintDescriptions = new CachedConstraint<T>[constraintHandles.Length];
             Debug.Assert(simulation.Bodies.BodyCount == bodyHandles.Length);
             int originalConstraintCount = 0;

@@ -2,6 +2,7 @@
 using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype;
+using SolverPrototype.CollisionDetection;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -26,7 +27,8 @@ namespace DemoRenderer.Shapes
             spheres.Count = 0;
         }
 
-        public void AddInstances(Simulation simulation, IThreadDispatcher threadDispatcher = null)
+        public void AddInstances<TNarrowPhase, TCollidableData>(Simulation<TNarrowPhase, TCollidableData> simulation, IThreadDispatcher threadDispatcher = null)
+            where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
         {
             spheres.EnsureCapacity(simulation.Bodies.BodyCount, new PassthroughArrayPool<SphereInstance>());
             for (int i = 0; i < simulation.Bodies.BodyCount; ++i)

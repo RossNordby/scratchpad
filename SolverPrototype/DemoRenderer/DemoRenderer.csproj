@@ -1,14 +1,11 @@
-﻿<Project>
-  <!--Note workaround for macro evaluation issue.-->
-  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  
   <PropertyGroup>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
-    <RuntimeFrameworkVersion>2.0.0-preview3-25518-01</RuntimeFrameworkVersion>
+    <!--<RuntimeFrameworkVersion>2.1.0-preview2-25616-02</RuntimeFrameworkVersion>-->
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
-
-  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
 
   <PropertyGroup>
     <PreBuildEvent Condition="'$(Configuration)'=='Debug'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)" -debug</PreBuildEvent>
@@ -31,7 +28,7 @@
   <ItemGroup>
     <PackageReference Include="SharpDX" Version="4.0.1" />
     <PackageReference Include="SharpDX.Direct3D11" Version="4.0.1" />
-    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0-preview2-25405-01" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
   </ItemGroup>
 
   <ItemGroup>

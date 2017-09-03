@@ -10,13 +10,13 @@ using SolverPrototype.CollisionDetection;
 
 namespace SolverPrototype
 {
-    partial class BodyLayoutOptimizer
+    public partial class BodyLayoutOptimizer<TCollidableData> where TCollidableData : struct
     {
         //TODO: This approach is likely going to go away. It actually does slightly worse than the super naive version, and it's more complex.
 
         struct PartialIslandDFSEnumerator : IForEach<int>
         {
-            public Bodies bodies;
+            public Bodies<TCollidableData> bodies;
             public BroadPhase broadPhase;
             public ConstraintConnectivityGraph graph;
             public Solver solver;

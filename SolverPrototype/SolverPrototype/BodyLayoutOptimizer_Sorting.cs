@@ -9,7 +9,7 @@ using System.Threading;
 
 namespace SolverPrototype
 {
-    partial class BodyLayoutOptimizer
+    public partial class BodyLayoutOptimizer<TCollidableData> where TCollidableData : struct
     {
         //TODO: This approach is likely going to go away. It's a testing mechanism for now to confirm that we haven't introduced any dependencies on the body list order.
 
