@@ -1,16 +1,18 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-  
+﻿<Project>
+  <!--Note workaround for macro evaluation issue.-->
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
     <!--<RuntimeFrameworkVersion>2.1.0-preview2-25616-02</RuntimeFrameworkVersion>-->
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-  </PropertyGroup>  
-
+  </PropertyGroup>
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
+  
   <PropertyGroup>
-    <PreBuildEvent Condition="'$(Configuration)'=='Debug'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)" -debug</PreBuildEvent>
-    <PreBuildEvent Condition="'$(Configuration)'=='Release'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectPath)"</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='Debug'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectDir)$(ProjectName).content" -debug</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='Release'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
@@ -21,16 +23,6 @@
     <Optimize>true</Optimize>
     <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Remove="Content\Carlito-Regular.ttf" />
-    <None Remove="Content\Courier Prime Sans.ttf" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Content Include="Content\Carlito-Regular.ttf" />
-    <Content Include="Content\Courier Prime Sans.ttf" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />

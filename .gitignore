@@ -57,10 +57,10 @@ dlldata.c
 *.svclog
 *.ide
 # Demo content pipeline cache files
-*.scc
-*.sc
-*.cbc
-*.ca
+*.shaderbuildcache
+*.shaderarchive
+*.contentbuildcache
+*.contentarchive
 
 # Chutzpah Test files
 _Chutzpah*
