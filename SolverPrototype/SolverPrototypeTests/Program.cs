@@ -16,6 +16,8 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            DenseFlagTests.Test();
+            return;
             //VirtualOverheadTest.Test();
             //TreeTest.Test();
             //ReinterpretVectorRepro.Test();
