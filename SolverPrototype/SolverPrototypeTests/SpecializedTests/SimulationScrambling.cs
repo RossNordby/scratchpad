@@ -12,8 +12,8 @@ namespace SolverPrototypeTests.SpecializedTests
 {
     public static class SimulationScrambling
     {
-        public static void ScrambleBodies<TNarrowPhase, TCollidableData>(Simulation<TNarrowPhase, TCollidableData> simulation) 
-            where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
+        public static void ScrambleBodies<TNarrowPhase>(Simulation<TNarrowPhase> simulation) 
+            where TNarrowPhase : NarrowPhase, new()
         {
             //Having every single body in order is pretty unrealistic. In a real application, churn and general lack of care will result in 
             //scrambled body versus constraint memory access patterns. That's a big increase in cache misses.
@@ -25,7 +25,7 @@ namespace SolverPrototypeTests.SpecializedTests
             for (int i = simulation.Bodies.BodyCount - 1; i >= 1; --i)
             {
                 //This helper function handles the updates that have to be performed across all body-sensitive systems.
-                BodyLayoutOptimizer<TCollidableData>.SwapBodyLocation(simulation.Bodies, simulation.BroadPhase, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
+                BodyLayoutOptimizer.SwapBodyLocation(simulation.Bodies, simulation.BroadPhase, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
             }
 
         }
@@ -41,8 +41,8 @@ namespace SolverPrototypeTests.SpecializedTests
                 }
             }
         }
-        public static void ScrambleBodyConstraintLists<TNarrowPhase, TCollidableData>(Simulation<TNarrowPhase, TCollidableData> simulation)
-            where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
+        public static void ScrambleBodyConstraintLists<TNarrowPhase>(Simulation<TNarrowPhase> simulation)
+            where TNarrowPhase : NarrowPhase, new()
         {
             Random random = new Random(5);
             //Body lists are isolated enough that we don't have to worry about a bunch of internal bookkeeping. Just pull the list and mess with it.
@@ -181,7 +181,7 @@ namespace SolverPrototypeTests.SpecializedTests
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ChurnAddBody(DemoSimulation simulation, BodyDescription<int>[] bodyDescriptions, int[] bodyHandles, int[] bodyHandlesToIdentity,
+        private static void ChurnAddBody(DemoSimulation simulation, BodyDescription[] bodyDescriptions, int[] bodyHandles, int[] bodyHandlesToIdentity,
             int originalConstraintCount, List<int> removedConstraints, List<int> removedBodies, Random random)
         {
             //Add a body.
@@ -282,7 +282,7 @@ namespace SolverPrototypeTests.SpecializedTests
             //As we add and remove stuff, we want to still be able to find a particular constraint by its original identity, so we have to do some work to track that.
 
             //Take a snapshot of the body descriptions.
-            var bodyDescriptions = new BodyDescription<int>[bodyHandles.Length];
+            var bodyDescriptions = new BodyDescription[bodyHandles.Length];
             var constraintDescriptions = new CachedConstraint<T>[constraintHandles.Length];
             Debug.Assert(simulation.Bodies.BodyCount == bodyHandles.Length);
             int originalConstraintCount = 0;

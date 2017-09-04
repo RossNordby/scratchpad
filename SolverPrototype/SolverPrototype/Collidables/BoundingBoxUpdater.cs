@@ -37,6 +37,8 @@ namespace SolverPrototype.Collidables
             this.dt = dt;
             //The number of registered types cannot change mid-frame, because adding collidables mid-update is illegal. Can just allocate based on current count.
             pool.SpecializeFor<QuickList<int, Buffer<int>>>().Take(shapes.RegisteredTypeSpan, out batchesPerType);
+            //Batches are lazily created. The underlying span is checked before lazy initialization, so we need to clear out any trash in the backing array.
+            batchesPerType.Clear(0, shapes.RegisteredTypeSpan);
         }
 
 
@@ -129,7 +131,7 @@ namespace SolverPrototype.Collidables
             Vector3Wide.Subtract(ref minDisplacement, ref angularExpansion, out minDisplacement);
             Vector3Wide.Add(ref maxDisplacement, ref angularExpansion, out maxDisplacement);
 
-            //The maximum expansion passed into this function is the speculative margin for discrete mode collidables, and ~infinity for continuous ones.
+            //The maximum expansion passed into this function is the speculative margin for discrete mode collidables, and ~infinity for passive or continuous ones.
             var negativeMaximum = -maximumExpansion;
             Vector3Wide.Max(ref negativeMaximum, ref minDisplacement, out minDisplacement);
             Vector3Wide.Min(ref maximumExpansion, ref maxDisplacement, out maxDisplacement);

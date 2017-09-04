@@ -29,7 +29,7 @@ namespace SolverPrototypeTests
             };
         }
         static void TryConnectTo(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription<int> bodyDescription,
+            ref BodyDescription bodyDescription,
             ref LatticeBodyGetter ids, 
             ref ConstraintAdder constraintAdder)
         {
@@ -41,7 +41,7 @@ namespace SolverPrototypeTests
             }
         }
         public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription<int> bodyDescription,
+            ref BodyDescription bodyDescription,
             ref LatticeBodyGetter ids,
             ref ConstraintAdder constraintAdder)
         {

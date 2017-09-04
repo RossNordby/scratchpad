@@ -21,7 +21,7 @@ namespace SolverPrototypeTests
         Font font;
 
         bool showControls;
-        bool showConstraints = true; 
+        bool showConstraints = true;
         bool showContacts;
         bool showBoundingBoxes;
 
@@ -83,12 +83,16 @@ namespace SolverPrototypeTests
 
                 ForceVerticalAxisMinimumToZero = true
             });
-            timingGraph.AddSeries("Total", new Vector3(0, 0, 0), 0.75f, timeSamples.Simulation);
-            timingGraph.AddSeries("Body Opt", new Vector3(1, 0, 0), 0.125f, timeSamples.BodyOptimizer);
-            timingGraph.AddSeries("Constraint Opt", new Vector3(0, 0, 1), 0.125f, timeSamples.ConstraintOptimizer);
-            timingGraph.AddSeries("Batch Compress", new Vector3(0, 1, 0), 0.125f, timeSamples.BatchCompressor);
-            timingGraph.AddSeries("Pose Integrator", new Vector3(1, 1, 0), 0.25f, timeSamples.PoseIntegrator);
-            timingGraph.AddSeries("Solver", new Vector3(1, 0, 1), 0.5f, timeSamples.Solver);
+            timingGraph.AddSeries("Total", new Vector3(1, 1, 1), 0.75f, timeSamples.Simulation);
+            timingGraph.AddSeries("Pose Integrator", new Vector3(0, 0, 1), 0.25f, timeSamples.PoseIntegrator);
+            timingGraph.AddSeries("Broad Update", new Vector3(1, 1, 0), 0.25f, timeSamples.BroadPhaseUpdate);
+            timingGraph.AddSeries("Collision Test", new Vector3(0, 1, 0), 0.25f, timeSamples.CollisionTesting);
+            timingGraph.AddSeries("Narrow Flush", new Vector3(1, 0, 1), 0.25f, timeSamples.NarrowPhaseFlush);
+            timingGraph.AddSeries("Solver", new Vector3(1, 0, 0), 0.5f, timeSamples.Solver);
+
+            timingGraph.AddSeries("Body Opt", new Vector3(1, 0.5f, 0), 0.125f, timeSamples.BodyOptimizer);
+            timingGraph.AddSeries("Constraint Opt", new Vector3(0, 0.5f, 1), 0.125f, timeSamples.ConstraintOptimizer);
+            timingGraph.AddSeries("Batch Compress", new Vector3(0, 0.5f, 0), 0.125f, timeSamples.BatchCompressor);
 
             demoSet = new DemoSet();
             demo = demoSet.Build(0, camera);
@@ -336,7 +340,7 @@ namespace SolverPrototypeTests
             renderer.Shapes.ClearInstances();
             renderer.Shapes.AddInstances(demo.Simulation, demo.ThreadDispatcher);
             renderer.Lines.ClearInstances();
-            renderer.Lines.Extract(demo.Simulation.Bodies,demo.Simulation.Solver, demo.Simulation.BroadPhase, showConstraints, showContacts, showBoundingBoxes, demo.ThreadDispatcher);
+            renderer.Lines.Extract(demo.Simulation.Bodies, demo.Simulation.Solver, demo.Simulation.BroadPhase, showConstraints, showContacts, showBoundingBoxes, demo.ThreadDispatcher);
         }
 
         bool disposed;

@@ -13,20 +13,20 @@ namespace SolverPrototypeTests
 {
     public interface IBodyBuilder
     {
-        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription<int> bodyDescription);
+        void Build(int columnIndex, int rowIndex, int sliceIndex, out BodyDescription bodyDescription);
     }
     public interface IConstraintBuilder
     {
         void RegisterConstraintTypes();
         void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
-            ref BodyDescription<int> bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
+            ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
     }
     public struct LatticeBodyGetter
     {
         int width, height, length;
         int[] bodyHandles;
-        Bodies<int> bodies;
-        public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Bodies<int> bodies)
+        Bodies bodies;
+        public LatticeBodyGetter(int width, int height, int length, int[] bodyHandles, Bodies bodies)
         {
             this.width = width;
             this.height = height;
@@ -44,12 +44,12 @@ namespace SolverPrototypeTests
             id = sliceIndex * (height * width) + rowIndex * width + columnIndex;
             return true;
         }
-        public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription<int> bodyDescription)
+        public bool GetBody(int columnIndex, int rowIndex, int sliceIndex, out int handle, out BodyDescription bodyDescription)
         {
             if (!TryGetId(columnIndex, rowIndex, sliceIndex, out var id))
             {
                 handle = -1;
-                bodyDescription = new BodyDescription<int>();
+                bodyDescription = new BodyDescription();
                 return false;
             }
             handle = bodyHandles[id];

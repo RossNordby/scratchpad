@@ -27,8 +27,8 @@ namespace DemoRenderer.Shapes
             spheres.Count = 0;
         }
 
-        public void AddInstances<TNarrowPhase, TCollidableData>(Simulation<TNarrowPhase, TCollidableData> simulation, IThreadDispatcher threadDispatcher = null)
-            where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
+        public void AddInstances<TNarrowPhase>(Simulation<TNarrowPhase> simulation, IThreadDispatcher threadDispatcher = null)
+            where TNarrowPhase : NarrowPhase, new()
         {
             spheres.EnsureCapacity(simulation.Bodies.BodyCount, new PassthroughArrayPool<SphereInstance>());
             for (int i = 0; i < simulation.Bodies.BodyCount; ++i)

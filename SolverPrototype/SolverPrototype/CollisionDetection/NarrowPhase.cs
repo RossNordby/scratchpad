@@ -572,15 +572,14 @@ namespace SolverPrototype.CollisionDetection
     public partial class NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> : NarrowPhase
         where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover where TCollidableData : struct
     {
-        public Bodies<TCollidableData> Bodies;
+        public Bodies Bodies;
         public TFilters Filters;
         public TConstraintAdder ConstraintAdder;
         public TConstraintRemover ConstraintRemover;
 
         protected override void OnInitialize(Bodies bodies)
         {
-            Debug.Assert(bodies.GetType() == typeof(Bodies<TCollidableData>), "We jumped through some type unsafe hoops here. Simulation should guarantee that whatever it's using has valid types.");
-            Bodies = (Bodies<TCollidableData>)bodies;
+            Bodies = bodies;
         }
         public override void Flush(IThreadDispatcher threadDispatcher = null)
         {

@@ -1,15 +1,11 @@
 ﻿using System.Runtime.CompilerServices;
-using static SolverPrototype.ConstraintConnectivityGraph;
-using System;
 using System.Diagnostics;
 using BEPUutilities2.Memory;
 using BEPUutilities2.Collections;
-using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace SolverPrototype
 {
-    public partial class BodyLayoutOptimizer<TCollidableData> where TCollidableData : struct
+    public partial class BodyLayoutOptimizer
     {
         //TODO: This approach is likely going to go away. It's a testing mechanism for now to confirm that we haven't introduced any dependencies on the body list order.
 

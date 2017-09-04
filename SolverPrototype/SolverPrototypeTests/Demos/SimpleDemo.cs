@@ -31,7 +31,7 @@ namespace SolverPrototypeTests
                 new BallSocketConstraintBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-            SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100000, bodyHandles, constraintHandles);
+            SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
             //var removeCount = constraintHandles.Length / 4;
             //var removedConstraints = new RemovedConstraint<BallSocket>[removeCount];
             //var removeStart = Stopwatch.GetTimestamp();

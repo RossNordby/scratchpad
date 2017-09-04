@@ -53,7 +53,7 @@ namespace SolverPrototypeTests
             }
         }
 
-        public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex, ref BodyDescription<int> bodyDescription,
+        public void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex, ref BodyDescription bodyDescription,
             ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder)
         {
             //For each lower neighbor, create a connection.

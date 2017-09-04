@@ -15,9 +15,9 @@ namespace SolverPrototype
     /// <summary>
     /// Incrementally changes the layout of a set of bodies to minimize the cache misses associated with the solver and other systems that rely on connection following.
     /// </summary>
-    public partial class BodyLayoutOptimizer<TCollidableData> where TCollidableData : struct
+    public partial class BodyLayoutOptimizer
     {
-        Bodies<TCollidableData> bodies;
+        Bodies bodies;
         BroadPhase broadPhase;
         ConstraintConnectivityGraph graph;
         Solver solver;
@@ -41,7 +41,7 @@ namespace SolverPrototype
         }
 
         Action<int> incrementalOptimizeWorkDelegate;
-        public BodyLayoutOptimizer(Bodies<TCollidableData> bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
+        public BodyLayoutOptimizer(Bodies bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver, BufferPool pool, float optimizationFraction = 0.005f)
         {
             this.bodies = bodies;
             this.broadPhase = broadPhase;
@@ -64,7 +64,7 @@ namespace SolverPrototype
             broadPhase.UpdateForCollidableMemoryMove(bodies.Collidables[newBodyIndex].BroadPhaseIndex, newBodyIndex);
         }
 
-        public static void SwapBodyLocation(Bodies<TCollidableData> bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
+        public static void SwapBodyLocation(Bodies bodies, BroadPhase broadPhase, ConstraintConnectivityGraph graph, Solver solver, int a, int b)
         {
             Debug.Assert(a != b, "Swapping a body with itself isn't meaningful. Whaddeyer doin?");
             //Enumerate the bodies' current set of constraints, changing the reference in each to the new location.
@@ -82,7 +82,7 @@ namespace SolverPrototype
 
         struct IncrementalEnumerator : IForEach<int>
         {
-            public Bodies<TCollidableData> bodies;
+            public Bodies bodies;
             public BroadPhase broadPhase;
             public ConstraintConnectivityGraph graph;
             public Solver solver;
@@ -184,7 +184,7 @@ namespace SolverPrototype
 
         struct ClaimConnectedBodiesEnumerator : IForEach<int>
         {
-            public Bodies<TCollidableData> Bodies;
+            public Bodies Bodies;
             public BroadPhase BroadPhase;
             public ConstraintConnectivityGraph Graph;
             public Solver Solver;

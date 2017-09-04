@@ -33,9 +33,8 @@ namespace SolverPrototypeTests
         {
         }
 
-        public void Initialize<TNarrowPhase, TSupplementData>(Simulation<TNarrowPhase, TSupplementData> simulation)
+        public void Initialize<TNarrowPhase>(Simulation<TNarrowPhase> simulation)
             where TNarrowPhase : NarrowPhase, new()
-            where TSupplementData : struct
         {
         }
     }
@@ -61,7 +60,7 @@ namespace SolverPrototypeTests
     /// <summary>
     /// Default simulation type used by most demos. You can pick and choose the features in your own simulation type.
     /// </summary>
-    public class DemoSimulation : Simulation<TestNarrowPhase, int>
+    public class DemoSimulation : Simulation<TestNarrowPhase>
     {
         public DemoSimulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes) : base(bufferPool, initialAllocationSizes)
         {

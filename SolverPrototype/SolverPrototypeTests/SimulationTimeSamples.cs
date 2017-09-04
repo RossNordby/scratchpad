@@ -20,31 +20,40 @@ namespace SolverPrototypeTests
     public class SimulationTimeSamples
     {
         public TimingsRingBuffer Simulation;
+        public TimingsRingBuffer PoseIntegrator;
+        public TimingsRingBuffer BroadPhaseUpdate;
+        public TimingsRingBuffer CollisionTesting;
+        public TimingsRingBuffer NarrowPhaseFlush;
+        public TimingsRingBuffer Solver;
         public TimingsRingBuffer BodyOptimizer;
         public TimingsRingBuffer ConstraintOptimizer;
         public TimingsRingBuffer BatchCompressor;
-        public TimingsRingBuffer PoseIntegrator;
-        public TimingsRingBuffer Solver;
-        
+
         public SimulationTimeSamples(int frameCapacity)
         {
             Simulation = new TimingsRingBuffer(frameCapacity);
+            PoseIntegrator = new TimingsRingBuffer(frameCapacity);
+            BroadPhaseUpdate = new TimingsRingBuffer(frameCapacity);
+            CollisionTesting = new TimingsRingBuffer(frameCapacity);
+            NarrowPhaseFlush = new TimingsRingBuffer(frameCapacity);
+            Solver = new TimingsRingBuffer(frameCapacity);
             BodyOptimizer = new TimingsRingBuffer(frameCapacity);
             ConstraintOptimizer = new TimingsRingBuffer(frameCapacity);
             BatchCompressor = new TimingsRingBuffer(frameCapacity);
-            PoseIntegrator = new TimingsRingBuffer(frameCapacity);
-            Solver = new TimingsRingBuffer(frameCapacity);
         }
 
         public void RecordFrame(DemoSimulation simulation)
         {
             //This requires the simulation to be compiled with profiling enabled.
             Simulation.Add(simulation.Timings[simulation]);
+            PoseIntegrator.Add(simulation.Timings[simulation.PoseIntegrator]);
+            BroadPhaseUpdate.Add(simulation.Timings[simulation.BroadPhase]);
+            CollisionTesting.Add(simulation.Timings[simulation.BroadPhaseOverlapFinder]);
+            NarrowPhaseFlush.Add(simulation.Timings[simulation.NarrowPhase]);
+            Solver.Add(simulation.Timings[simulation.Solver]);
             BodyOptimizer.Add(simulation.Timings[simulation.BodyLayoutOptimizer]);
             ConstraintOptimizer.Add(simulation.Timings[simulation.ConstraintLayoutOptimizer]);
             BatchCompressor.Add(simulation.Timings[simulation.SolverBatchCompressor]);
-            PoseIntegrator.Add(simulation.Timings[simulation.PoseIntegrator]);
-            Solver.Add(simulation.Timings[simulation.Solver]);
         }
     }
 }

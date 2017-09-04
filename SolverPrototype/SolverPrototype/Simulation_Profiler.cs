@@ -89,7 +89,7 @@ namespace SolverPrototype
         }
     }
 #endif
-    partial class Simulation<TNarrowPhase, TCollidableData>
+    partial class Simulation<TNarrowPhase>
     {
         //We're basically requiring users to also have conditionally compiled code when using the profiler (if they ever don't compile with profiling), which isn't too crazy.
         //There is a chance that convenience demands making this property unconditional, but it's a pretty small detail and the object would just be dead weight.

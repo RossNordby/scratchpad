@@ -12,12 +12,12 @@ namespace SolverPrototype
     /// <summary>
     /// Orchestrates the bookkeeping and execution of a full dynamic simulation.
     /// </summary>
-    public partial class Simulation<TNarrowPhase, TCollidableData> : IDisposable where TNarrowPhase : NarrowPhase, new() where TCollidableData : struct
+    public partial class Simulation<TNarrowPhase> : IDisposable where TNarrowPhase : NarrowPhase, new()
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
-        public Bodies<TCollidableData> Bodies { get; private set; }
+        public Bodies Bodies { get; private set; }
         public Shapes Shapes { get; private set; }
-        public BodyLayoutOptimizer<TCollidableData> BodyLayoutOptimizer { get; private set; }
+        public BodyLayoutOptimizer BodyLayoutOptimizer { get; private set; }
         public ConstraintLayoutOptimizer ConstraintLayoutOptimizer { get; private set; }
         public BatchCompressor SolverBatchCompressor { get; private set; }
         public Solver Solver { get; private set; }
@@ -44,19 +44,20 @@ namespace SolverPrototype
         public Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
             BufferPool = bufferPool;
-            Bodies = new Bodies<TCollidableData>(bufferPool, initialAllocationSizes.Bodies);
+            Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
             Shapes = new Shapes(bufferPool, initialAllocationSizes.ShapesPerType);
-            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
-            BodyLayoutOptimizer = new BodyLayoutOptimizer<TCollidableData>(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
-            ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
-            SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
             Solver = new Solver(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
-            PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
             BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
+            PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
             NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, BufferPool);
             BroadPhaseOverlapFinder = new BroadPhaseOverlapFinder<TNarrowPhase>(NarrowPhase, BroadPhase);
+
+            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
+            SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
+            BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
+            ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
         }
 
         /// <summary>
@@ -77,7 +78,7 @@ namespace SolverPrototype
         }
 
 
-        public int Add(ref BodyDescription<TCollidableData> bodyDescription)
+        public int Add(ref BodyDescription bodyDescription)
         {
             var handle = Bodies.Add(ref bodyDescription);
             var bodyIndex = Bodies.HandleToIndex[handle];
@@ -131,7 +132,7 @@ namespace SolverPrototype
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer<TCollidableData>.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BroadPhase, ConstraintGraph, Solver);
+                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BroadPhase, ConstraintGraph, Solver);
             }
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);
@@ -211,32 +212,27 @@ namespace SolverPrototype
             //All other stages internally handle the availability of threading in an case-by-case way. It would be nice if every stage did so so we didn't need a dual implementation out here.
             if (threadDispatcher != null)
             {
-                //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
 
-                ProfilerStart(BodyLayoutOptimizer);
-                BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
-                ProfilerEnd(BodyLayoutOptimizer);
-
-                ProfilerStart(ConstraintLayoutOptimizer);
-                ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
-                ProfilerEnd(ConstraintLayoutOptimizer);
-
-                ProfilerStart(SolverBatchCompressor);
-                SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
-                ProfilerEnd(SolverBatchCompressor);
-
-                //Note that the first behavior-affecting stage is actually the solver. This is a shift from v1, where collision detection went first.
-                //This is a tradeoff: by running the solver first, any existing constraints are able to handle new velocities. However, any contact constraints will still be from the
-                //previous frame. Since the pose integrator runs immediately after the solver, arbitrary external velocity changes could result in undetected penetration.
-                //That's not great and puts some burden on the user, but by doing this, generated contact positions are in sync with the integrated poses. 
+                //Note that the first behavior-affecting stage is actually the pose integrator. This is a shift from v1, where collision detection went first.
+                //This is a tradeoff:
+                //1) Any externally set velocities will be integrated without input from the solver. The v1-style external velocity control won't work as well-
+                //the user would instead have to change velocities after the pose integrator runs. This isn't perfect either, since the pose integrator is also responsible
+                //for updating the bounding boxes used for collision detection.
+                //2) By bundling bounding box calculation with pose integration, you avoid redundant pose and velocity memory accesses.
+                //3) Generated contact positions are in sync with the integrated poses. 
                 //That's often helpful for gameplay purposes- you don't have to reinterpret contact data when creating graphical effects or positioning sound sources.
+
                 //TODO: This is something that is possibly worth exposing as one of the generic type parameters. Users could just choose the order arbitrarily.
                 //Or, since you're talking about something that happens once per frame instead of once per collision pair, just provide a simple callback.
                 //(Or maybe an enum even?)
+                //#1 is a difficult problem, though. There is no fully 'correct' place to change velocities. We might just have to bite the bullet and create a
+                //inertia tensor/bounding box update separate from pose integration. If the cache gets evicted in between (virtually guaranteed unless no stages run),
+                //this basically means an extra 100-200 microseconds per frame on a processor with ~20GBps bandwidth simulating 32768 bodies.
 
-                ProfilerStart(Solver);
-                Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt);
-                ProfilerEnd(Solver);
+                //Note that the reason why the pose integrator comes first instead of, say, the solver, is that the solver relies on world space inertias calculated by the pose integration.
+                //If the pose integrator doesn't run first, we either need 
+                //1) complicated on demand updates of world inertia when objects are added or local inertias are changed or 
+                //2) local->world inertia calculation before the solver.                
 
                 ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt, BufferPool, threadDispatcher);
@@ -254,25 +250,28 @@ namespace SolverPrototype
                 NarrowPhase.Flush(threadDispatcher);
                 ProfilerEnd(NarrowPhase);
 
-            }
-            else
-            {
+                ProfilerStart(Solver);
+                Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt);
+                ProfilerEnd(Solver);
+
+                //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
+                //TODO: The order of these optimizer stages is performance relevant, even though they don't have any effect on correctness.
+                //You may want to try them in different locations to see how they impact cache residency.
                 ProfilerStart(BodyLayoutOptimizer);
-                BodyLayoutOptimizer.IncrementalOptimize();
+                BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
                 ProfilerEnd(BodyLayoutOptimizer);
 
                 ProfilerStart(ConstraintLayoutOptimizer);
-                ConstraintLayoutOptimizer.Update(BufferPool);
+                ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
                 ProfilerEnd(ConstraintLayoutOptimizer);
 
                 ProfilerStart(SolverBatchCompressor);
-                SolverBatchCompressor.Compress(BufferPool);
+                SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
                 ProfilerEnd(SolverBatchCompressor);
 
-                ProfilerStart(Solver);
-                Solver.Update(dt);
-                ProfilerEnd(Solver);
-
+            }
+            else
+            {
                 ProfilerStart(PoseIntegrator);
                 PoseIntegrator.Update(dt, BufferPool);
                 ProfilerEnd(PoseIntegrator);
@@ -288,6 +287,22 @@ namespace SolverPrototype
                 ProfilerStart(NarrowPhase);
                 NarrowPhase.Flush();
                 ProfilerEnd(NarrowPhase);
+
+                ProfilerStart(Solver);
+                Solver.Update(dt);
+                ProfilerEnd(Solver);
+
+                ProfilerStart(BodyLayoutOptimizer);
+                BodyLayoutOptimizer.IncrementalOptimize();
+                ProfilerEnd(BodyLayoutOptimizer);
+
+                ProfilerStart(ConstraintLayoutOptimizer);
+                ConstraintLayoutOptimizer.Update(BufferPool);
+                ProfilerEnd(ConstraintLayoutOptimizer);
+
+                ProfilerStart(SolverBatchCompressor);
+                SolverBatchCompressor.Compress(BufferPool);
+                ProfilerEnd(SolverBatchCompressor);
             }
             ProfilerEnd(this);
         }
