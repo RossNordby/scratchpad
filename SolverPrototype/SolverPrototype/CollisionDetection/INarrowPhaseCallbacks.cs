@@ -7,7 +7,7 @@ using SolverPrototype.Constraints;
 
 namespace SolverPrototype.CollisionDetection
 {
-    public interface INarrowPhaseFilters
+    public interface INarrowPhaseCallbacks
     {
         void Initialize<TNarrowPhase>(Simulation<TNarrowPhase> simulation) where TNarrowPhase : NarrowPhase, new();
         /// <summary>
@@ -50,21 +50,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <returns>True if this manifold should be considered for constraint generation, false otherwise.</returns>
         bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ContactManifold manifold);
-
-        /// <summary>
-        /// Performs any post-narrowphase execution tasks.
-        /// </summary>
-        /// <param name="threadDispatcher">Thread dispatcher for use in the flush.</param>
-        void Flush(IThreadDispatcher threadDispatcher);
-    }
-
-    public interface INarrowPhaseConstraintAdder
-    {
-        /// <summary>
-        /// Initializes the constraint adder with the target solver.
-        /// </summary>
-        /// <param name="solver">Solver to add constraints to.</param>
-        void Initialize(NarrowPhase narrowPhase, Solver solver);
+                
         /// <summary>
         /// Requests that a constraint be added to the solver between two bodies.
         /// Implementers must notify the NarrowPhase.PairCache of the constraint handle using NarrowPhase.PairCache.FillConstraintHandle.
@@ -90,21 +76,6 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="bodyHandle">Handle of the body in the pair.</param>
         /// <param name="constraintDescription">Description of the constraint being added to the solver.</param>
         void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>;
-
-        /// <summary>
-        /// Performs any post-narrowphase execution tasks.
-        /// </summary>
-        /// <param name="threadDispatcher">Thread dispatcher for use in the flush.</param>
-        void Flush(IThreadDispatcher threadDispatcher);
-    }
-
-    public interface INarrowPhaseConstraintRemover
-    {
-        /// <summary>
-        /// Initializes the constraint adder with the target solver.
-        /// </summary>
-        /// <param name="solver">Solver to remove constraints from.</param>
-        void Initialize(Solver solver);
 
         /// <summary>
         /// Enqueues a constraint for removal from the solver. The implementer must wait until after the narrow phase's contact generation phase completes;

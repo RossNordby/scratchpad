@@ -34,9 +34,15 @@ namespace SolverPrototype.CollisionDetection
     {
         OverlapMapping mapping;
         /// <summary>
-        /// Per-pair 'freshness' flags set when a pair is added or updated by the narrow phase execution.
+        /// Per-pair 'freshness' flags set when a pair is added or updated by the narrow phase execution. Only initialized for the duration of the narrowphase's execution.
         /// </summary>
-        RawBuffer pairFreshness;
+        /// <remarks>
+        /// This stores one byte per pair. While it could be compressed to 1 bit, that requires manually ensuring thread safety. By using bytes, we rely on the 
+        /// atomic setting behavior for data types no larger than the native pointer size. Further, smaller sizes actually pay a higher price in terms of increased false sharing.
+        /// Choice of data type is a balancing act between the memory bandwidth of the post analysis and the frequency of false sharing.
+        /// </remarks>
+        //TODO: It's probably worth it to try out the other variants in a realistic test. False sharing is going to be less of an issue in the full narrowphase execution context.
+        internal RawBuffer PairFreshness;
         BufferPool pool;
         int minimumPendingSize;
         int minimumPerTypeCapacity;
@@ -58,7 +64,6 @@ namespace SolverPrototype.CollisionDetection
             OverlapMapping.Create(
                 pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>(),
                 SpanHelper.GetContainingPowerOf2(minimumMappingSize), 3, out mapping);
-
         }
 
         public void Prepare(IThreadDispatcher threadDispatcher = null)
@@ -107,13 +112,15 @@ namespace SolverPrototype.CollisionDetection
             {
                 nextWorkerCaches[0] = new WorkerPairCache(0, pool, ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType, pendingSize, minimumPerTypeCapacity);
             }
-            pool.Take(mapping.Count, out pairFreshness);
-            //This clears 1 byte per pair. 32768 pairs with 10GBps assumed single core bandwidth means about 3 microseconds.
-            //There is a small chance that multithreading this would be useful in larger simulations- but it would be very, very close.
-            pairFreshness.Clear(0, mapping.Count);
-
             minimumSizesPerConstraintType.Dispose(pool.SpecializeFor<int>());
             minimumSizesPerCollisionType.Dispose(pool.SpecializeFor<int>());
+
+            //Create the pair freshness array for the existing overlaps.
+            pool.Take(mapping.Count, out PairFreshness);
+            //This clears 1 byte per pair. 32768 pairs with 10GBps assumed single core bandwidth means about 3 microseconds.
+            //There is a small chance that multithreading this would be useful in larger simulations- but it would be very, very close.
+            PairFreshness.Clear(0, mapping.Count);
+
         }
 
         /// <summary>
@@ -140,18 +147,30 @@ namespace SolverPrototype.CollisionDetection
                 {
                     largestPendingSize = cache.PendingAdds.Count;
                 }
+                if (cache.PendingRemoves.Count > largestPendingSize)
+                {
+                    largestPendingSize = cache.PendingRemoves.Count;
+                }
+                for (int j = 0; j < cache.PendingRemoves.Count; ++j)
+                {
+                    mapping.FastRemove(ref cache.PendingRemoves[j]);
+                }
                 for (int j = 0; j < cache.PendingAdds.Count; ++j)
                 {
                     ref var pending = ref cache.PendingAdds[j];
                     mapping.Add(ref pending.Pair, ref pending.Pointers, pairPool, pointerPool, intPool);
                 }
                 cache.PendingAdds.Dispose(pendingPool);
+                cache.PendingRemoves.Dispose(pairPool);
             }
             previousPendingSize = largestPendingSize;
             //Swap references.
             var temp = nextWorkerCaches;
             workerCaches = nextWorkerCaches;
             nextWorkerCaches = temp;
+
+            //The freshness cache is no longer required; get rid of it.
+            pool.Return(ref PairFreshness);
         }
 
 
@@ -181,18 +200,6 @@ namespace SolverPrototype.CollisionDetection
         public ref CollidablePairPointers GetPointers(int index)
         {
             return ref mapping.Values[index];
-        }
-        /// <summary>
-        /// Marks a pair in the narrow phase as fresh. It is not a candidate for removal from the narrow phase during this frame.
-        /// </summary>
-        /// <param name="index">Index to mark.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void MarkFresh(int index)
-        {
-            //TODO: Should have a pair-parallel array of bytes. Every updated pair will have its byte set to a value that avoids the removal postprocess.
-            //Note that this is not stored in the pointers array- the removal postprocess doesn't consider any information in its analysis pass except for the freshness bytes,
-            //so to keep memory bandwidth at a minimum, 
-            //(You could use a single bit, but then you have to manage the atomicity of changes manually.)
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -228,14 +235,17 @@ namespace SolverPrototype.CollisionDetection
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
         {
+            //Note that we do not have to set any freshness bytes here; using this path means there exists no previous overlap to remove anyway.
             BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
             return nextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache);
         }
 
-        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, int* featureIds)
+        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, int* featureIds)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
-        {
+        { 
+            //We're updating an existing pair, so we should prevent this pair from being removed.
+            PairFreshness[pairIndex] = 0xFF;
             BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
             nextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache);
         }

@@ -51,7 +51,7 @@ namespace SolverPrototype
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
             BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
-            NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, BufferPool);
+            NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, Solver, BufferPool);
             BroadPhaseOverlapFinder = new BroadPhaseOverlapFinder<TNarrowPhase>(NarrowPhase, BroadPhase);
 
             ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);

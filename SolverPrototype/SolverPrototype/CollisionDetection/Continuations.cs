@@ -7,27 +7,28 @@ using System.Numerics;
 using SolverPrototype.Collidables;
 using System;
 
-public interface IPendingContactConstraint
-{
-    int PendingBatchId { get; }
-}
-
-public struct PendingTwoBodyConvex4Constraint : IPendingContactConstraint
-{
-    public CollidableReference A;
-    public CollidableReference B;
-    public ContactManifold4Constraint Description;
-    public float AccumulatedImpulse0;
-    public float AccumulatedImpulse1;
-    public float AccumulatedImpulse2;
-    public float AccumulatedImpulse3;
-
-    public int PendingBatchId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 3; } }
-}
-
 
 namespace SolverPrototype.CollisionDetection
 {
+    public interface IPendingContactConstraint
+    {
+        int PendingBatchId { get; }
+    }
+
+    public struct PendingTwoBodyConvex4Constraint : IPendingContactConstraint
+    {
+        public CollidableReference A;
+        public CollidableReference B;
+        public ContactManifold4Constraint Description;
+        public float AccumulatedImpulse0;
+        public float AccumulatedImpulse1;
+        public float AccumulatedImpulse2;
+        public float AccumulatedImpulse3;
+
+        public int PendingBatchId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 3; } }
+    }
+
+
     /// <summary>
     /// Associated with a pair of two collidables that each are controlled by bodies.
     /// </summary>
@@ -53,18 +54,8 @@ namespace SolverPrototype.CollisionDetection
         public float Impulse3;
     }
 
-    public struct Continuations<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData>
-        where TFilters : INarrowPhaseFilters where TConstraintAdder : INarrowPhaseConstraintAdder where TConstraintRemover : INarrowPhaseConstraintRemover where TCollidableData : struct
+    public partial class NarrowPhase<TCallbacks> where TCallbacks : struct, INarrowPhaseCallbacks
     {
-        public Solver Solver;
-        public NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> NarrowPhase;
-        public Continuations(Solver solver, NarrowPhase<TFilters, TConstraintAdder, TConstraintRemover, TCollidableData> narrowPhase)
-        {
-            Solver = solver;
-            NarrowPhase = narrowPhase;
-        }
-
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private unsafe void RedistributeImpulses(int oldContactCount, float* oldImpulses, int* oldFeatureIds, ContactManifold* manifold, float* newImpulses)
         {
@@ -92,13 +83,13 @@ namespace SolverPrototype.CollisionDetection
             if (typeof(TBodyHandles) == typeof(int))
             {
                 //This is a single body constraint.
-                NarrowPhase.ConstraintAdder.AddConstraint(workerIndex, constraintCacheIndex, ref *newImpulses, Unsafe.As<TBodyHandles, int>(ref bodyHandles), ref description);
+                Callbacks.AddConstraint(workerIndex, constraintCacheIndex, ref *newImpulses, Unsafe.As<TBodyHandles, int>(ref bodyHandles), ref description);
             }
             else if (typeof(TBodyHandles) == typeof(TwoBodyHandles))
             {
                 //Two body constraint.
                 var typedBodyHandles = Unsafe.As<TBodyHandles, TwoBodyHandles>(ref bodyHandles);
-                NarrowPhase.ConstraintAdder.AddConstraint(workerIndex, constraintCacheIndex, ref *newImpulses, typedBodyHandles.A, typedBodyHandles.B, ref description);
+                Callbacks.AddConstraint(workerIndex, constraintCacheIndex, ref *newImpulses, typedBodyHandles.A, typedBodyHandles.B, ref description);
             }
             else
             {
@@ -113,11 +104,11 @@ namespace SolverPrototype.CollisionDetection
             where TCollisionCache : IPairCacheEntry
             where TDescription : IConstraintDescription<TDescription>
         {
-            var index = NarrowPhase.PairCache.IndexOf(ref pair);
+            var index = PairCache.IndexOf(ref pair);
             if (index >= 0)
             {
                 //The previous frame had a constraint for this pair.
-                ref var pointers = ref NarrowPhase.PairCache.GetPointers(index);
+                ref var pointers = ref PairCache.GetPointers(index);
                 Debug.Assert(pointers.ConstraintCache.Exists, "If a pair was persisted in the narrow phase, there should be a constraint associated with it.");
                 //TODO: Mark the entry as non-stale. 
 
@@ -128,40 +119,40 @@ namespace SolverPrototype.CollisionDetection
                 ContactImpulses newImpulses;
                 if (typeof(TConstraintCache) == typeof(ConstraintCache1))
                 {
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache1>(constraintCacheIndex);
+                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache1>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     //If there's only one contact, assume we can directly reuse the old impulse even when the feature id wouldn't match.
-                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, &newImpulses.Impulse0);
+                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, &newImpulses.Impulse0);
                 }
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache2))
                 {
                     const int oldContactCount = 2;
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache2>(constraintCacheIndex);
+                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache2>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
-                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
+                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
                     RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
                 }
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache3))
                 {
                     const int oldContactCount = 3;
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache3>(constraintCacheIndex);
+                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache3>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
-                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
+                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
                     RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
                 }
                 else if (typeof(TConstraintCache) == typeof(ConstraintCache4))
                 {
                     const int oldContactCount = 4;
-                    ref var constraintCache = ref NarrowPhase.PairCache.GetConstraintCache<ConstraintCache4>(constraintCacheIndex);
+                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache4>(constraintCacheIndex);
                     constraintHandle = constraintCache.ConstraintHandle;
                     Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
                     var oldImpulses = stackalloc float[oldContactCount];
-                    NarrowPhase.PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
+                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
                     RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
                 }
                 else
@@ -169,13 +160,13 @@ namespace SolverPrototype.CollisionDetection
                     throw new InvalidOperationException("Invalid constraint cache type.");
                 }
 
-                NarrowPhase.PairCache.Update<TConstraintCache, TCollisionCache>(workerIndex, ref pointers, ref collisionCache, &manifold->FeatureId0);
+                PairCache.Update<TConstraintCache, TCollisionCache>(workerIndex, index, ref pointers, ref collisionCache, &manifold->FeatureId0);
                 if (manifoldTypeAsConstraintType == constraintCacheIndex.Type)
                 {
                     //There exists a constraint and it has the same type as the manifold. Directly apply the new description and impulses.
                     Solver.ApplyDescription(ref constraintReference, ref description);
                     //TODO: Check init hack.
-                    NarrowPhase.PairCache.ScatterNewImpulses(manifoldTypeAsConstraintType, ref constraintReference, ref *&newImpulses);
+                    PairCache.ScatterNewImpulses(manifoldTypeAsConstraintType, ref constraintReference, ref *&newImpulses);
                 }
                 else
                 {
@@ -186,7 +177,7 @@ namespace SolverPrototype.CollisionDetection
                     //means a 4-16x reduction in lock-related overhead, assuming no contests.)
                     //2) The old constraint must be removed.
                     RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
-                    NarrowPhase.ConstraintRemover.EnqueueConstraintRemoval(workerIndex, constraintHandle);
+                    Callbacks.EnqueueConstraintRemoval(workerIndex, constraintHandle);
                 }
 
             }
@@ -194,7 +185,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 //No preexisting constraint; add a fresh constraint and pair cache entry.
                 //The pair cache entry has to be created first so that the adder has a place to put the result of the constraint add.
-                var constraintCacheIndex = NarrowPhase.PairCache.Add<TConstraintCache, TCollisionCache>(workerIndex, ref pair, ref collisionCache, &manifold->FeatureId0);
+                var constraintCacheIndex = PairCache.Add<TConstraintCache, TCollisionCache>(workerIndex, ref pair, ref collisionCache, &manifold->FeatureId0);
                 var newImpulses = new ContactImpulses();
                 //TODO: It would be nice to avoid the impulse scatter for fully new constraints; it's going to be all zeroes regardless. Worth investigating later.
                 RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
@@ -269,7 +260,7 @@ namespace SolverPrototype.CollisionDetection
             //That said, such a pair cannot generate constraints no matter what- constraints must involve at least one body, always.
             var aIsBody = !pair.A.IsStatic;
             var bIsBody = !pair.B.IsStatic;
-            if (NarrowPhase.Filters.ConfigureContactManifold(workerIndex, pair, ref *manifold, out var pairMaterial) && (aIsBody || bIsBody))
+            if (Callbacks.ConfigureContactManifold(workerIndex, pair, ref *manifold, out var pairMaterial) && (aIsBody || bIsBody))
             {
                 if (manifold->ContactCount > 0)
                 {
