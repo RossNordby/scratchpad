@@ -305,6 +305,7 @@ namespace SolverPrototypeTests.SpecializedTests
             {
                 Console.WriteLine($"Bits time (us): {1e6 * Time<Bits>(iterationCount, flagCount, threadDispatcher)}");
                 Console.WriteLine($"Bytes time (us): {1e6 * Time<Bytes>(iterationCount, flagCount, threadDispatcher)}");
+                Console.WriteLine($"Shorts time (us): {1e6 * Time<Shorts>(iterationCount, flagCount, threadDispatcher)}");
                 Console.WriteLine($"Ints time (us): {1e6 * Time<Ints>(iterationCount, flagCount, threadDispatcher)}");
                 Console.WriteLine($"Longs time (us): {1e6 * Time<Longs>(iterationCount, flagCount, threadDispatcher)}");
             }

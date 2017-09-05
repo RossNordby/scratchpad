@@ -8,10 +8,10 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
-  
+
   <PropertyGroup>
-    <PreBuildEvent Condition="'$(Configuration)'=='Debug'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectDir)$(ProjectName).content" -debug</PreBuildEvent>
-    <PreBuildEvent Condition="'$(Configuration)'=='Release'">"$(SolutionDir)DemoContentBuilder\bin\x86\$(Configuration)\DemoContentBuilder.exe" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='Debug'">dotnet "$(SolutionDir)DemoContentBuilder\bin\$(Configuration)\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content" -debug</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='Release'">dotnet "$(SolutionDir)DemoContentBuilder\bin\$(Configuration)\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
