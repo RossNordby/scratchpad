@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text;
+using static SolverPrototype.CollisionDetection.WorkerPairCache;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -135,23 +136,30 @@ namespace SolverPrototype.CollisionDetection
                 workerCaches[i].Dispose();
             }
 
-            //Flush all pending adds from the new set.
-            var pairPool = pool.SpecializeFor<CollidablePair>();
-            var pendingPool = pool.SpecializeFor<WorkerPairCache.PendingAdd>();
-            var pointerPool = pool.SpecializeFor<CollidablePairPointers>();
-            var intPool = pool.SpecializeFor<int>();
-            int largestPendingSize = 0;
+            //The freshness cache should have already been used in order to generate the constraint removal requests and the PendingRemoves that we handle in a moment; dispose it now.
+            pool.Return(ref PairFreshness);
+
+            //Ensure the overlap mapping size is sufficient up front. This requires scanning all the pending sizes.
+            int largestIntermediateSize = Mapping.Count;
+            var newMappingSize = Mapping.Count;
             for (int i = 0; i < NextWorkerCaches.Count; ++i)
             {
                 ref var cache = ref NextWorkerCaches[i];
-                if (cache.PendingAdds.Count > largestPendingSize)
-                {
-                    largestPendingSize = cache.PendingAdds.Count;
-                }
-                if (cache.PendingRemoves.Count > largestPendingSize)
-                {
-                    largestPendingSize = cache.PendingRemoves.Count;
-                }
+                //Removes occur first, so this cache can only result in a larger mapping if there are more adds than removes.
+                newMappingSize += cache.PendingAdds.Count - cache.PendingRemoves.Count;
+                if (newMappingSize > largestIntermediateSize)
+                    largestIntermediateSize = newMappingSize;
+            }
+            Mapping.EnsureCapacity(largestIntermediateSize, pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
+
+            //Flush all pending adds from the new set.
+            //TODO: Note that this phase accesses no shared memory- it's all pair cache local, and no pool accesses are made.
+            //That means we could run it as a job alongside solver constraint removal. That's good, because adding and removing to the hash tables isn't terribly fast.  
+            //(On the order of 10-100 nanoseconds per operation, so in pathological cases, it can start showing up in profiles.)
+            for (int i = 0; i < NextWorkerCaches.Count; ++i)
+            {
+                ref var cache = ref NextWorkerCaches[i];
+
                 for (int j = 0; j < cache.PendingRemoves.Count; ++j)
                 {
                     Mapping.FastRemove(ref cache.PendingRemoves[j]);
@@ -159,19 +167,33 @@ namespace SolverPrototype.CollisionDetection
                 for (int j = 0; j < cache.PendingAdds.Count; ++j)
                 {
                     ref var pending = ref cache.PendingAdds[j];
-                    Mapping.Add(ref pending.Pair, ref pending.Pointers, pairPool, pointerPool, intPool);
+                    Mapping.AddUnsafely(ref pending.Pair, ref pending.Pointers);
                 }
-                cache.PendingAdds.Dispose(pendingPool);
-                cache.PendingRemoves.Dispose(pairPool);
+            }
+
+            //This bookkeeping and disposal phase is trivially cheap compared to the cost of updating the mapping table, so we do it sequentially.
+            //The fact that we access the per-worker pools here would prevent easy multithreading anyway; the other threads may use them. 
+            int largestPendingSize = 0;
+            for (int i = 0; i < NextWorkerCaches.Count; ++i)
+            {
+                ref var cache = ref NextWorkerCaches[i]; if (cache.PendingAdds.Count > largestPendingSize)
+                {
+                    largestPendingSize = cache.PendingAdds.Count;
+                }
+                if (cache.PendingRemoves.Count > largestPendingSize)
+                {
+                    largestPendingSize = cache.PendingRemoves.Count;
+                }
+                cache.PendingAdds.Dispose(cache.pool.SpecializeFor<PendingAdd>());
+                cache.PendingRemoves.Dispose(cache.pool.SpecializeFor<CollidablePair>());
             }
             previousPendingSize = largestPendingSize;
+
             //Swap references.
             var temp = NextWorkerCaches;
             workerCaches = NextWorkerCaches;
             NextWorkerCaches = temp;
 
-            //The freshness cache is no longer required; get rid of it.
-            pool.Return(ref PairFreshness);
         }
 
 
@@ -244,7 +266,7 @@ namespace SolverPrototype.CollisionDetection
         internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, int* featureIds)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
-        { 
+        {
             //We're updating an existing pair, so we should prevent this pair from being removed.
             PairFreshness[pairIndex] = 0xFF;
             BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
@@ -481,7 +503,7 @@ namespace SolverPrototype.CollisionDetection
             solver.GetConstraintReference(constraintHandle, out var reference);
             ScatterNewImpulses(constraintCacheIndex.Type, ref reference, ref impulses);
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe int GetConstraintHandle(int pairIndex)
         {
@@ -495,7 +517,7 @@ namespace SolverPrototype.CollisionDetection
             //Note that these refer to the previous workerCaches, not the nextWorkerCaches. We read from these caches during the narrowphase to redistribute impulses.
             return ref Unsafe.AsRef<TConstraintCache>(workerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex));
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref TCollisionData GetCollisionData<TCollisionData>(PairCacheIndex index) where TCollisionData : struct, IPairCacheEntry
         {
