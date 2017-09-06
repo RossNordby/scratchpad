@@ -58,7 +58,7 @@ namespace SolverPrototype.CollisionDetection
                 return byteIndex;
             }
         }
-        BufferPool pool; //note that this reference makes the entire worker pair cache nonblittable. That's why the pair cache uses managed arrays to store the worker caches.
+        internal BufferPool pool; //note that this reference makes the entire worker pair cache nonblittable. That's why the pair cache uses managed arrays to store the worker caches.
         int minimumPerTypeCapacity;
         int workerIndex;
         //Note that the per-type batches are untyped.

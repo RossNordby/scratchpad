@@ -120,6 +120,8 @@ namespace SolverPrototype.CollisionDetection
         
         public override void Flush(IThreadDispatcher threadDispatcher = null)
         {
+            CreateFreshnessJobs(threadDispatcher);
+            //TODO: execute the jobs, and see if we can find any decent work bundling opportunities across all the remaining flushes.
             Callbacks.Flush(threadDispatcher);
         }
 

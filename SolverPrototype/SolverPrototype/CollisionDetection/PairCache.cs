@@ -32,7 +32,8 @@ namespace SolverPrototype.CollisionDetection
 
     public class PairCache
     {
-        OverlapMapping mapping;
+        internal OverlapMapping Mapping;
+
         /// <summary>
         /// Per-pair 'freshness' flags set when a pair is added or updated by the narrow phase execution. Only initialized for the duration of the narrowphase's execution.
         /// </summary>
@@ -53,7 +54,7 @@ namespace SolverPrototype.CollisionDetection
         //super duper gross, we don't use the untyped buffer pools to store it. 
         //Given that the size of the arrays here will be small and almost never change, this isn't a significant issue.
         QuickList<WorkerPairCache, Array<WorkerPairCache>> workerCaches;
-        QuickList<WorkerPairCache, Array<WorkerPairCache>> nextWorkerCaches;
+        internal QuickList<WorkerPairCache, Array<WorkerPairCache>> NextWorkerCaches;
 
 
         public PairCache(BufferPool pool, int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
@@ -63,7 +64,7 @@ namespace SolverPrototype.CollisionDetection
             this.pool = pool;
             OverlapMapping.Create(
                 pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>(),
-                SpanHelper.GetContainingPowerOf2(minimumMappingSize), 3, out mapping);
+                SpanHelper.GetContainingPowerOf2(minimumMappingSize), 3, out Mapping);
         }
 
         public void Prepare(IThreadDispatcher threadDispatcher = null)
@@ -86,40 +87,40 @@ namespace SolverPrototype.CollisionDetection
 
             var threadCount = threadDispatcher != null ? threadDispatcher.ThreadCount : 1;
             //Ensure that the new worker pair caches can hold all workers.
-            if (nextWorkerCaches.Span.Length < threadCount)
+            if (NextWorkerCaches.Span.Length < threadCount)
             {
                 //The next worker caches should never need to be disposed here. The flush should have taken care of it.
 #if DEBUG
                 for (int i = 0; i < nextWorkerCaches.Count; ++i)
                     Debug.Assert(nextWorkerCaches[i].Equals(default(WorkerPairCache)));
 #endif
-                QuickList<WorkerPairCache, Array<WorkerPairCache>>.Create(new PassthroughArrayPool<WorkerPairCache>(), threadCount, out nextWorkerCaches);
+                QuickList<WorkerPairCache, Array<WorkerPairCache>>.Create(new PassthroughArrayPool<WorkerPairCache>(), threadCount, out NextWorkerCaches);
             }
             //Note that we have not initialized the workerCaches from the previous frame. In the event that this is the first frame and there are no previous worker caches,
             //there will be no pointers into the caches, and removal analysis loops over the count which defaults to zero- so it's safe.
-            nextWorkerCaches.Count = threadCount;
+            NextWorkerCaches.Count = threadCount;
 
             var pendingSize = Math.Max(minimumPendingSize, previousPendingSize);
             if (threadDispatcher != null)
             {
                 for (int i = 0; i < threadCount; ++i)
                 {
-                    nextWorkerCaches[i] = new WorkerPairCache(i, threadDispatcher.GetThreadMemoryPool(i), ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType,
+                    NextWorkerCaches[i] = new WorkerPairCache(i, threadDispatcher.GetThreadMemoryPool(i), ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType,
                         pendingSize, minimumPerTypeCapacity);
                 }
             }
             else
             {
-                nextWorkerCaches[0] = new WorkerPairCache(0, pool, ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType, pendingSize, minimumPerTypeCapacity);
+                NextWorkerCaches[0] = new WorkerPairCache(0, pool, ref minimumSizesPerConstraintType, ref minimumSizesPerCollisionType, pendingSize, minimumPerTypeCapacity);
             }
             minimumSizesPerConstraintType.Dispose(pool.SpecializeFor<int>());
             minimumSizesPerCollisionType.Dispose(pool.SpecializeFor<int>());
 
             //Create the pair freshness array for the existing overlaps.
-            pool.Take(mapping.Count, out PairFreshness);
+            pool.Take(Mapping.Count, out PairFreshness);
             //This clears 1 byte per pair. 32768 pairs with 10GBps assumed single core bandwidth means about 3 microseconds.
             //There is a small chance that multithreading this would be useful in larger simulations- but it would be very, very close.
-            PairFreshness.Clear(0, mapping.Count);
+            PairFreshness.Clear(0, Mapping.Count);
 
         }
 
@@ -140,9 +141,9 @@ namespace SolverPrototype.CollisionDetection
             var pointerPool = pool.SpecializeFor<CollidablePairPointers>();
             var intPool = pool.SpecializeFor<int>();
             int largestPendingSize = 0;
-            for (int i = 0; i < nextWorkerCaches.Count; ++i)
+            for (int i = 0; i < NextWorkerCaches.Count; ++i)
             {
-                ref var cache = ref nextWorkerCaches[i];
+                ref var cache = ref NextWorkerCaches[i];
                 if (cache.PendingAdds.Count > largestPendingSize)
                 {
                     largestPendingSize = cache.PendingAdds.Count;
@@ -153,21 +154,21 @@ namespace SolverPrototype.CollisionDetection
                 }
                 for (int j = 0; j < cache.PendingRemoves.Count; ++j)
                 {
-                    mapping.FastRemove(ref cache.PendingRemoves[j]);
+                    Mapping.FastRemove(ref cache.PendingRemoves[j]);
                 }
                 for (int j = 0; j < cache.PendingAdds.Count; ++j)
                 {
                     ref var pending = ref cache.PendingAdds[j];
-                    mapping.Add(ref pending.Pair, ref pending.Pointers, pairPool, pointerPool, intPool);
+                    Mapping.Add(ref pending.Pair, ref pending.Pointers, pairPool, pointerPool, intPool);
                 }
                 cache.PendingAdds.Dispose(pendingPool);
                 cache.PendingRemoves.Dispose(pairPool);
             }
             previousPendingSize = largestPendingSize;
             //Swap references.
-            var temp = nextWorkerCaches;
-            workerCaches = nextWorkerCaches;
-            nextWorkerCaches = temp;
+            var temp = NextWorkerCaches;
+            workerCaches = NextWorkerCaches;
+            NextWorkerCaches = temp;
 
             //The freshness cache is no longer required; get rid of it.
             pool.Return(ref PairFreshness);
@@ -187,19 +188,19 @@ namespace SolverPrototype.CollisionDetection
                 Debug.Assert(nextWorkerCaches[i].Equals(default(WorkerPairCache)), "Outside of the execution of the narrow phase, the 'next' caches should not be allocated.");
             }
 #endif
-            mapping.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
+            Mapping.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(ref CollidablePair pair)
         {
-            return mapping.IndexOf(ref pair);
+            return Mapping.IndexOf(ref pair);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref CollidablePairPointers GetPointers(int index)
         {
-            return ref mapping.Values[index];
+            return ref Mapping.Values[index];
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -237,7 +238,7 @@ namespace SolverPrototype.CollisionDetection
         {
             //Note that we do not have to set any freshness bytes here; using this path means there exists no previous overlap to remove anyway.
             BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
-            return nextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache);
+            return NextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache);
         }
 
         internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, int* featureIds)
@@ -247,7 +248,7 @@ namespace SolverPrototype.CollisionDetection
             //We're updating an existing pair, so we should prevent this pair from being removed.
             PairFreshness[pairIndex] = 0xFF;
             BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
-            nextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache);
+            NextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache);
         }
 
 
@@ -476,12 +477,17 @@ namespace SolverPrototype.CollisionDetection
         {
             //Note that the update is being directed to the *next* worker caches. We have not yet performed the flush that swaps references.
             //Note that this assumes that the constraint handle is stored in the first 4 bytes of the constraint cache.
-            *(int*)nextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex) = constraintHandle;
+            *(int*)NextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex) = constraintHandle;
             solver.GetConstraintReference(constraintHandle, out var reference);
             ScatterNewImpulses(constraintCacheIndex.Type, ref reference, ref impulses);
         }
-
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe int GetConstraintHandle(int pairIndex)
+        {
+            ref var constraintCacheIndex = ref Mapping.Values[pairIndex].ConstraintCache;
+            return *(int*)NextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref TConstraintCache GetConstraintCache<TConstraintCache>(PairCacheIndex constraintCacheIndex)
@@ -489,8 +495,7 @@ namespace SolverPrototype.CollisionDetection
             //Note that these refer to the previous workerCaches, not the nextWorkerCaches. We read from these caches during the narrowphase to redistribute impulses.
             return ref Unsafe.AsRef<TConstraintCache>(workerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex));
         }
-
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref TCollisionData GetCollisionData<TCollisionData>(PairCacheIndex index) where TCollisionData : struct, IPairCacheEntry
         {
