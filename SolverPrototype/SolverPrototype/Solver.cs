@@ -239,16 +239,9 @@ namespace SolverPrototype
 
         }
 
-        /// <summary>
-        /// Removes a constraint from a batch, performing any necessary batch cleanup, but does not return the constraint's handle to the pool.
-        /// </summary>
-        /// <param name="batchIndex">Index of the batch to remove from.</param>
-        /// <param name="typeId">Type id of the constraint to remove.</param>
-        /// <param name="indexInTypeBatch">Index of the constraint to remove within its type batch.</param>
-        internal void RemoveFromBatch(int batchIndex, int typeId, int indexInTypeBatch)
+        //This is split out for use by the multithreaded constraint remover.
+        internal void RemoveBatchIfEmpty(ConstraintBatch batch, int batchIndex)
         {
-            var batch = Batches[batchIndex];
-            batch.Remove(typeId, indexInTypeBatch, bodies, ref HandleToConstraint, TypeBatchAllocation);
             if (batch.TypeBatches.Count == 0)
             {
                 //No more constraints exist within the batch; we may be able to get rid of this batch.
@@ -278,6 +271,19 @@ namespace SolverPrototype
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Removes a constraint from a batch, performing any necessary batch cleanup, but does not return the constraint's handle to the pool.
+        /// </summary>
+        /// <param name="batchIndex">Index of the batch to remove from.</param>
+        /// <param name="typeId">Type id of the constraint to remove.</param>
+        /// <param name="indexInTypeBatch">Index of the constraint to remove within its type batch.</param>
+        internal void RemoveFromBatch(int batchIndex, int typeId, int indexInTypeBatch)
+        {
+            var batch = Batches[batchIndex];
+            batch.Remove(typeId, indexInTypeBatch, bodies, ref HandleToConstraint, TypeBatchAllocation);
+            RemoveBatchIfEmpty(batch, batchIndex);
         }
         /// <summary>
         /// Removes the constraint associated with the given handle. Note that this may invalidate any outstanding direct constraint references (TypeBatch-index pairs)
