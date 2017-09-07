@@ -52,7 +52,7 @@ namespace SolverPrototype
 
         Bodies bodies;
 
-        IdPool<Buffer<int>, BufferPool<int>> handlePool;
+        internal IdPool<Buffer<int>, BufferPool<int>> handlePool;
         BufferPool bufferPool;
         public Buffer<ConstraintLocation> HandleToConstraint;
 

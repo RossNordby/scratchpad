@@ -76,15 +76,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="bodyHandle">Handle of the body in the pair.</param>
         /// <param name="constraintDescription">Description of the constraint being added to the solver.</param>
         void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>;
-
-        /// <summary>
-        /// Enqueues a constraint for removal from the solver. The implementer must wait until after the narrow phase's contact generation phase completes;
-        /// the prestep data and accumulated impulses of existing constraints are modified in parallel, and constraint removes can move memory around.
-        /// </summary> 
-        /// <param name="workerIndex">Index of the worker thread enqueuing this request.</param>
-        /// <param name="constraintHandle">Constraint handle to remove from the solver.</param>
-        void EnqueueConstraintRemoval(int workerIndex, int constraintHandle);
-
+        
         /// <summary>
         /// Performs any post-narrowphase execution tasks.
         /// </summary>

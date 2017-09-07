@@ -177,16 +177,7 @@ namespace SolverPrototype
             return Add(ref bodyReferences[0], 2, ref description);
         }
 
-        struct ConstraintGraphRemovalEnumerator : IForEach<int>
-        {
-            internal ConstraintConnectivityGraph graph;
-            internal int constraintHandle;
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void LoopBody(int bodyIndex)
-            {
-                graph.RemoveConstraint(bodyIndex, constraintHandle);
-            }
-        }
+
         public void RemoveConstraint(int constraintHandle)
         {
             ConstraintGraphRemovalEnumerator enumerator;

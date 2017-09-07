@@ -42,11 +42,7 @@ namespace SolverPrototypeTests
         public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
         {
         }
-
-        public void EnqueueConstraintRemoval(int workerIndex, int constraintHandle)
-        {
-        }
-
+        
         public void Flush(IThreadDispatcher threadDispatcher)
         {
         }

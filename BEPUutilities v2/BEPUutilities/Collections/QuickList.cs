@@ -200,6 +200,30 @@ namespace BEPUutilities2.Collections
         }
 
         /// <summary>
+        /// Appends space on the end of the list without checking capacity and returns a reference to it.
+        /// </summary>
+        /// <returns>Reference to the allocated space.</returns>
+        /// <remarks>This lacks a non-unsafe overload for now because it's likely only ever used in situations where passing in a pool would be better handled externally.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public ref T AllocateUnsafely()
+        {
+            ValidateUnsafeAdd();
+            return ref Span[Count++];
+        }
+
+        /// <summary>
+        /// Adds the element to the list without checking the count against the capacity.
+        /// </summary>
+        /// <param name="element">Item to add.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void AddUnsafely(T element)
+        {
+            Validate();
+            ValidateUnsafeAdd();
+            AllocateUnsafely() = element;
+        }
+
+        /// <summary>
         /// Adds the element to the list.
         /// </summary>
         /// <typeparam name="TPool">Type of the pool to pull from.</typeparam>
@@ -217,14 +241,13 @@ namespace BEPUutilities2.Collections
         /// <summary>
         /// Adds the element to the list without checking the count against the capacity.
         /// </summary>
-        /// <param name="element">Item to add.</param>
+        /// <param name="element">Element to add.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddUnsafely(T element)
+        public void AddUnsafely(ref T element)
         {
             Validate();
             ValidateUnsafeAdd();
-            Span[Count] = element;
-            ++Count;
+            AllocateUnsafely() = element;
         }
 
         /// <summary>
@@ -241,18 +264,7 @@ namespace BEPUutilities2.Collections
             AddUnsafely(ref element);
         }
 
-        /// <summary>
-        /// Adds the element to the list without checking the count against the capacity.
-        /// </summary>
-        /// <param name="element">Element to add.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddUnsafely(ref T element)
-        {
-            Validate();
-            ValidateUnsafeAdd();
-            Span[Count] = element;
-            ++Count;
-        }
+
 
         /// <summary>
         /// Gets the index of the element in the list using the default comparer, if present.
