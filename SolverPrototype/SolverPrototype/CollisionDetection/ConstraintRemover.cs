@@ -63,6 +63,8 @@ namespace SolverPrototype.CollisionDetection
     public class ConstraintRemover
     {
         Solver solver;
+        Bodies bodies;
+        ConstraintConnectivityGraph constraintGraph;
         BufferPool pool;
 
         struct BodyHandleToRemove
@@ -189,10 +191,12 @@ namespace SolverPrototype.CollisionDetection
         Array<WorkerCache> workerCaches; //there is a reference within the worker cache for the pool, so this can't be a buffer.
         IThreadDispatcher dispatcher;
 
-        public ConstraintRemover(BufferPool pool, Solver solver, int minimumTypeCapacity = 4, int minimumRemovalCapacity = 128, float previousCapacityMultiplier = 1.25f)
+        public ConstraintRemover(BufferPool pool, Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, int minimumTypeCapacity = 4, int minimumRemovalCapacity = 128, float previousCapacityMultiplier = 1.25f)
         {
             this.pool = pool;
+            this.bodies = bodies;
             this.solver = solver;
+            this.constraintGraph = constraintGraph;
             this.minimumConstraintCapacity = minimumRemovalCapacity;
             this.minimumTypeCapacity = minimumTypeCapacity;
             this.previousCapacityMultiplier = previousCapacityMultiplier;
@@ -280,10 +284,10 @@ namespace SolverPrototype.CollisionDetection
 
         //TODO: It would be wise to double check the overhead associated with having these locally sequential jobs as separate jobs. It's likely that a couple of them 
         //(the constraint handle return and body handle removal) are fast enough that trying to share the cache lines would exceed the cost of just doing all the work on a single thread.
-        public void RemoveConstraintsFromBodyLists(Solver solver, ConstraintConnectivityGraph graph)
+        public void RemoveConstraintsFromBodyLists()
         {
             ConstraintGraphRemovalEnumerator enumerator;
-            enumerator.graph = graph;
+            enumerator.graph = constraintGraph;
             //While this could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
             //to guarantee that no two threads hit the same body constraint list at the same time. 
             //That is more complicated and would almost certainly be slower than this locally sequential version.
@@ -319,7 +323,7 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        public void RemoveBodyHandlesFromBatches(Bodies bodies)
+        public void RemoveBodyHandlesFromBatches()
         {
             for (int workerIndex = 0; workerIndex < dispatcher.ThreadCount; ++workerIndex)
             {
@@ -334,7 +338,7 @@ namespace SolverPrototype.CollisionDetection
 
         QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> removedTypeBatches;
         SpinLock removedTypeBatchLocker = new SpinLock();
-        public void RemoveConstraintsFromBatch(int index, Solver solver)
+        public void RemoveConstraintsFromTypeBatch(int index)
         {
             ref var batchReferences = ref batches.Values[index];
             bool lockTaken = false;

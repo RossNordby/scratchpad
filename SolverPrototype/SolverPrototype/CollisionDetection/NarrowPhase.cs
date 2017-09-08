@@ -74,20 +74,23 @@ namespace SolverPrototype.CollisionDetection
      */
 
 
-  
+
 
     public abstract class NarrowPhase
     {
         public BufferPool Pool;
         public Bodies Bodies;
         public Solver Solver;
+        public ConstraintRemover ConstraintRemover;
+        public FreshnessChecker FreshnessChecker;
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
         //TODO: Need to check codegen on this. In some cases when everything involved is a reference type, the JIT won't devirtualize- or at least, that was how it used to be.
         public abstract void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b);
 
-        public static TNarrowPhase Create<TNarrowPhase>(Bodies bodies, Solver solver, BufferPool pool, int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
+        public static TNarrowPhase Create<TNarrowPhase>(Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, BufferPool pool,
+            int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
             where TNarrowPhase : NarrowPhase, new()
         {
             var narrowPhase = new TNarrowPhase
@@ -95,14 +98,24 @@ namespace SolverPrototype.CollisionDetection
                 Pool = pool,
                 Bodies = bodies,
                 Solver = solver,
-                PairCache = new PairCache(pool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity)
+                PairCache = new PairCache(pool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity),
+                ConstraintRemover = new ConstraintRemover(pool, bodies, solver, constraintGraph, minimumRemovalCapacity: minimumPendingSize),
             };
+            narrowPhase.FreshnessChecker = new FreshnessChecker(narrowPhase);
+
             return narrowPhase;
         }
-        
+
 
         public abstract void Flush(IThreadDispatcher threadDispatcher = null);
 
+        public void Dispose()
+        {
+            PairCache.Dispose();
+            OnDispose();
+        }
+
+        protected abstract void OnDispose();
 
 
         //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
@@ -117,14 +130,83 @@ namespace SolverPrototype.CollisionDetection
     public partial class NarrowPhase<TCallbacks> : NarrowPhase where TCallbacks : struct, INarrowPhaseCallbacks
     {
         public TCallbacks Callbacks;
-        
+
+        public NarrowPhase()
+        {
+            flushWorkerLoop = FlushWorkerLoop;
+        }
+
         public override void Flush(IThreadDispatcher threadDispatcher = null)
         {
-            CreateFreshnessJobs(threadDispatcher);
-            //TODO: execute the jobs, and see if we can find any decent work bundling opportunities across all the remaining flushes.
+            FreshnessChecker.CheckFreshness(threadDispatcher);
+
+            //Given the sizes involved, a fixed guess of 128 should be just fine for essentially any simulation. Overkill, but not in a concerning way.
+            //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
+            //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
+            QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>>.Create(Pool.SpecializeFor<NarrowPhaseFlushJob>(), 128, out flushJobList);
+            PairCache.PrepareFlushJobs(ref flushJobList);
+            ConstraintRemover.CreateFlushJobs(ref flushJobList);
+
+            if (threadDispatcher == null)
+            {
+                for (int i = 0; i < flushJobList.Count; ++i)
+                {
+                    ExecuteFlushJob(ref flushJobList[i]);
+                }
+            }
+            else
+            {
+                flushJobIndex = -1;
+                threadDispatcher.DispatchWorkers(flushWorkerLoop);
+            }
+            flushJobList.Dispose(Pool.SpecializeFor<NarrowPhaseFlushJob>());
+
+            PairCache.Postflush();
+            ConstraintRemover.Postflush();
+
             Callbacks.Flush(threadDispatcher);
         }
 
+        int flushJobIndex;
+        QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobList;
+        Action<int> flushWorkerLoop;
+        void FlushWorkerLoop(int workerIndex)
+        {
+            int jobIndex;
+            while ((jobIndex = Interlocked.Increment(ref flushJobIndex)) < flushJobList.Count)
+            {
+                ExecuteFlushJob(ref flushJobList[jobIndex]);
+            }
+        }
+
+        void ExecuteFlushJob(ref NarrowPhaseFlushJob job)
+        {
+            switch (job.Type)
+            {
+                case NarrowPhaseFlushJobType.RemoveConstraintsFromBodyLists:
+                    ConstraintRemover.RemoveConstraintsFromBodyLists();
+                    break;
+                case NarrowPhaseFlushJobType.RemoveConstraintFromTypeBatch:
+                    ConstraintRemover.RemoveConstraintsFromTypeBatch(job.Index);
+                    break;
+                case NarrowPhaseFlushJobType.RemoveBodyHandlesFromBatches:
+                    ConstraintRemover.RemoveBodyHandlesFromBatches();
+                    break;
+                case NarrowPhaseFlushJobType.ReturnConstraintHandlesToPool:
+                    ConstraintRemover.ReturnConstraintHandlesToPool();
+                    break;
+                case NarrowPhaseFlushJobType.FlushPairCacheChanges:
+                    PairCache.FlushMappingChanges();
+                    break;
+            }
+
+        }
+
+        protected override void OnDispose()
+        {
+            Callbacks.Dispose();
+        }
+        
 
         /// <summary>
         /// Continuations accumulated for a worker.

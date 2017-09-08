@@ -82,5 +82,10 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         /// <param name="threadDispatcher">Thread dispatcher for use in the flush.</param>
         void Flush(IThreadDispatcher threadDispatcher);
+
+        /// <summary>
+        /// Releases any resources held by the callbacks. Called by the owning narrow phase when it is being disposed.
+        /// </summary>
+        void Dispose();
     }
 }

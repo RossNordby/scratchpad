@@ -177,7 +177,7 @@ namespace SolverPrototype.CollisionDetection
                     //means a 4-16x reduction in lock-related overhead, assuming no contests.)
                     //2) The old constraint must be removed.
                     RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
-                    Callbacks.EnqueueConstraintRemoval(workerIndex, constraintHandle);
+                    ConstraintRemover.EnqueueRemoval(workerIndex, constraintHandle);
                 }
 
             }

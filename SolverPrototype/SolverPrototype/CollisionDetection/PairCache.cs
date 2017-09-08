@@ -125,10 +125,11 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
+
         /// <summary>
         /// Flush all deferred changes from the last narrow phase execution.
         /// </summary>
-        public void Flush()
+        public void PrepareFlushJobs(ref QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> jobs)
         {
             //Get rid of the now-unused worker caches.
             for (int i = 0; i < workerCaches.Count; ++i)
@@ -152,6 +153,10 @@ namespace SolverPrototype.CollisionDetection
             }
             Mapping.EnsureCapacity(largestIntermediateSize, pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());
 
+            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.FlushPairCacheChanges }, pool.SpecializeFor<NarrowPhaseFlushJob>());
+        }
+        public void FlushMappingChanges()
+        {
             //Flush all pending adds from the new set.
             //TODO: Note that this phase accesses no shared memory- it's all pair cache local, and no pool accesses are made.
             //That means we could run it as a job alongside solver constraint removal. That's good, because adding and removing to the hash tables isn't terribly fast.  
@@ -170,6 +175,9 @@ namespace SolverPrototype.CollisionDetection
                     Mapping.AddUnsafely(ref pending.Pair, ref pending.Pointers);
                 }
             }
+        }
+        public void Postflush()
+        {
 
             //This bookkeeping and disposal phase is trivially cheap compared to the cost of updating the mapping table, so we do it sequentially.
             //The fact that we access the per-worker pools here would prevent easy multithreading anyway; the other threads may use them. 

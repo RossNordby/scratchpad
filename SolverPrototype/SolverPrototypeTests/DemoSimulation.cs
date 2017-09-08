@@ -47,6 +47,9 @@ namespace SolverPrototypeTests
         {
         }
 
+        public void Dispose()
+        {
+        }
     }
 
     public class TestNarrowPhase : NarrowPhase<TestCallbacks>

@@ -49,12 +49,13 @@ namespace SolverPrototype
             Solver = new Solver(Bodies, BufferPool,
                 initialCapacity: initialAllocationSizes.Constraints,
                 minimumCapacityPerTypeBatch: initialAllocationSizes.ConstraintsPerTypeBatch);
+            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
+
             BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
-            NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, Solver, BufferPool);
+            NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, Solver, ConstraintGraph, BufferPool);
             BroadPhaseOverlapFinder = new BroadPhaseOverlapFinder<TNarrowPhase>(NarrowPhase, BroadPhase);
 
-            ConstraintGraph = new ConstraintConnectivityGraph(Solver, bufferPool, initialAllocationSizes.Bodies, initialAllocationSizes.ConstraintCountPerBodyEstimate);
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
             ConstraintLayoutOptimizer = new ConstraintLayoutOptimizer(Bodies, Solver);
@@ -367,6 +368,7 @@ namespace SolverPrototype
             Clear();
             Solver.Dispose();
             BroadPhase.Dispose();
+            NarrowPhase.Dispose();
             Bodies.Dispose();
             BodyLayoutOptimizer.Dispose(BufferPool);
             ConstraintGraph.Dispose();
