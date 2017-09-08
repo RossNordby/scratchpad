@@ -14,9 +14,9 @@ namespace SolverPrototype.CollisionDetection
     public struct ImmediateConstraintAdder<TNarrowPhase> where TNarrowPhase : NarrowPhase, new()
     {
 
-        Simulation<TNarrowPhase> simulation;
+        Simulation simulation;
 
-        public void Initialize(Simulation<TNarrowPhase> simulation)
+        public void Initialize(Simulation simulation)
         {
             this.simulation = simulation;
         }

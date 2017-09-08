@@ -42,7 +42,7 @@ namespace SolverPrototypeTests
             BatchCompressor = new TimingsRingBuffer(frameCapacity);
         }
 
-        public void RecordFrame(DemoSimulation simulation)
+        public void RecordFrame(Simulation simulation)
         {
             //This requires the simulation to be compiled with profiling enabled.
             Simulation.Add(simulation.Timings[simulation]);

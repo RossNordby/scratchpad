@@ -20,7 +20,7 @@ namespace SolverPrototypeTests
 
         public unsafe override void Initialize(Camera camera)
         {
-            Simulation = new DemoSimulation(BufferPool);
+            Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
             const int width = 12;

@@ -27,7 +27,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 Unsafe.Add(ref bytes, i) = (byte)random.Next(256);
             }
         }
-        public static void Test<T>(DemoSimulation simulation, Random random, int constraintTypeBodyCount) where T : struct, IConstraintDescription<T>
+        public static void Test<T>(Simulation simulation, Random random, int constraintTypeBodyCount) where T : struct, IConstraintDescription<T>
         {
             int constraintTestCount = Vector<float>.Count * 128;
 
@@ -93,7 +93,7 @@ namespace SolverPrototypeTests.SpecializedTests
         public static void Test()
         {
             var pool = new BufferPool();
-            var simulation = new DemoSimulation(pool);
+            var simulation = Simulation.Create(pool, new TestCallbacks());
 
 
             const int bodyCount = 2048;

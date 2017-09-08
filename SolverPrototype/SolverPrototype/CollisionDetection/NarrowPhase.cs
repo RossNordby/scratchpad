@@ -86,27 +86,8 @@ namespace SolverPrototype.CollisionDetection
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
-        //TODO: Need to check codegen on this. In some cases when everything involved is a reference type, the JIT won't devirtualize- or at least, that was how it used to be.
-        public abstract void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b);
 
-        public static TNarrowPhase Create<TNarrowPhase>(Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, BufferPool pool,
-            int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
-            where TNarrowPhase : NarrowPhase, new()
-        {
-            var narrowPhase = new TNarrowPhase
-            {
-                Pool = pool,
-                Bodies = bodies,
-                Solver = solver,
-                PairCache = new PairCache(pool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity),
-                ConstraintRemover = new ConstraintRemover(pool, bodies, solver, constraintGraph, minimumRemovalCapacity: minimumPendingSize),
-            };
-            narrowPhase.FreshnessChecker = new FreshnessChecker(narrowPhase);
-
-            return narrowPhase;
-        }
-
-        public NarrowPhase()
+        protected NarrowPhase()
         {
             flushWorkerLoop = FlushWorkerLoop;
         }
@@ -191,7 +172,7 @@ namespace SolverPrototype.CollisionDetection
             OnDispose();
         }
 
-        protected abstract void OnDispose(); 
+        protected abstract void OnDispose();
 
         //TODO: Configurable memory usage. It automatically adapts based on last frame state, but it's nice to be able to specify minimums when more information is known.
 
@@ -206,19 +187,30 @@ namespace SolverPrototype.CollisionDetection
     {
         public TCallbacks Callbacks;
 
+        public NarrowPhase(Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, BufferPool pool,
+             int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
+            : base()
+        {
+            Pool = pool;
+            Bodies = bodies;
+            Solver = solver;
+            PairCache = new PairCache(pool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity);
+            ConstraintRemover = new ConstraintRemover(pool, bodies, solver, constraintGraph, minimumRemovalCapacity: minimumPendingSize);
+            FreshnessChecker = new FreshnessChecker(this);
+        }
 
         protected override void OnFlush(IThreadDispatcher threadDispatcher = null)
         {
             Callbacks.Flush(threadDispatcher);
         }
 
-      
+
 
         protected override void OnDispose()
         {
             Callbacks.Dispose();
         }
-        
+
 
         /// <summary>
         /// Continuations accumulated for a worker.
@@ -624,9 +616,14 @@ namespace SolverPrototype.CollisionDetection
 
 
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
+        {
+            Console.WriteLine("ASDF");
+            HandleOverlapTest(workerIndex, a, b);
+        }
 
-
-        public override void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
+        public void HandleOverlapTest(int workerIndex, CollidableReference a, CollidableReference b)
         {
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;

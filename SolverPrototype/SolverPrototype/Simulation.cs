@@ -12,7 +12,7 @@ namespace SolverPrototype
     /// <summary>
     /// Orchestrates the bookkeeping and execution of a full dynamic simulation.
     /// </summary>
-    public partial class Simulation<TNarrowPhase> : IDisposable where TNarrowPhase : NarrowPhase, new()
+    public partial class Simulation : IDisposable
     {
         public ConstraintConnectivityGraph ConstraintGraph { get; private set; }
         public Bodies Bodies { get; private set; }
@@ -23,8 +23,8 @@ namespace SolverPrototype
         public Solver Solver { get; private set; }
         public PoseIntegrator PoseIntegrator { get; private set; }
         public BroadPhase BroadPhase { get; private set; }
-        public BroadPhaseOverlapFinder<TNarrowPhase> BroadPhaseOverlapFinder { get; private set; }
-        public TNarrowPhase NarrowPhase { get; private set; }
+        public CollidableOverlapFinder BroadPhaseOverlapFinder { get; private set; }
+        public NarrowPhase NarrowPhase { get; private set; }
 
 
 
@@ -33,15 +33,7 @@ namespace SolverPrototype
         /// </summary>
         public BufferPool BufferPool { get; private set; }
 
-        //You might wonder why this calls out 'full featured', since there are no other non-full featured simulations.
-        //Later on, we might include such a partial simulation- for example, kinematic only, or even collision detection only.
-        //The only real difference is what stages are included (and a few changes in memory layout).
-        /// <summary>
-        /// Constructs a full featured simulation supporting dynamic movement and constraints.
-        /// </summary>
-        /// <param name="initialAllocationSizes">Allocation sizes to initialize the simulation with.</param>
-        /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
-        public Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
+        protected Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
             BufferPool = bufferPool;
             Bodies = new Bodies(bufferPool, initialAllocationSizes.Bodies);
@@ -53,8 +45,6 @@ namespace SolverPrototype
 
             BroadPhase = new BroadPhase(bufferPool, initialAllocationSizes.Bodies);
             PoseIntegrator = new PoseIntegrator(Bodies, Shapes, BroadPhase);
-            NarrowPhase = CollisionDetection.NarrowPhase.Create<TNarrowPhase>(Bodies, Solver, ConstraintGraph, BufferPool);
-            BroadPhaseOverlapFinder = new BroadPhaseOverlapFinder<TNarrowPhase>(NarrowPhase, BroadPhase);
 
             SolverBatchCompressor = new BatchCompressor(Solver, Bodies);
             BodyLayoutOptimizer = new BodyLayoutOptimizer(Bodies, BroadPhase, ConstraintGraph, Solver, bufferPool);
@@ -62,11 +52,33 @@ namespace SolverPrototype
         }
 
         /// <summary>
-        /// Constructs a full featured simulation supporting dynamic movement and constraints. Uses a default preallocation size.
+        /// Constructs a simulation supporting dynamic movement and constraints with the specified narrow phase callbacks.
         /// </summary>
         /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
-        public Simulation(BufferPool bufferPool)
-            : this(bufferPool, new SimulationAllocationSizes
+        /// <param name="narrowPhaseCallbacks">Callbacks to use in the narrow phase.</param>
+        /// <param name="initialAllocationSizes">Allocation sizes to initialize the simulation with.</param>
+        /// <returns>New simulation.</returns>
+        public static Simulation Create<TNarrowPhaseCallbacks>(BufferPool bufferPool, TNarrowPhaseCallbacks narrowPhaseCallbacks, SimulationAllocationSizes initialAllocationSizes)
+            where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks
+        {
+            var simulation = new Simulation(bufferPool, initialAllocationSizes);
+            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation.Bodies, simulation.Solver, simulation.ConstraintGraph, simulation.BufferPool);
+            simulation.NarrowPhase = narrowPhase;
+            simulation.BroadPhaseOverlapFinder = new CollidableOverlapFinder<TNarrowPhaseCallbacks>(narrowPhase, simulation.BroadPhase);
+
+            return simulation;
+        }
+
+        /// <summary>
+        /// Constructs a simulation supporting dynamic movement and constraints with the specified narrow phase callbacks and a default set of initial allocation sizes.
+        /// </summary>
+        /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
+        /// <param name="narrowPhaseCallbacks">Callbacks to use in the narrow phase.</param>
+        /// <returns>New simulation.</returns>
+        public static Simulation Create<TNarrowPhaseCallbacks>(BufferPool bufferPool, TNarrowPhaseCallbacks narrowPhaseCallbacks)
+            where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks           
+        {
+            return Create(bufferPool, narrowPhaseCallbacks, new SimulationAllocationSizes
             {
                 Bodies = 4096,
                 ShapesPerType = 128,
@@ -74,9 +86,9 @@ namespace SolverPrototype
                 ConstraintCountPerBodyEstimate = 8,
                 Constraints = 16384,
                 ConstraintsPerTypeBatch = 256
-            })
-        {
+            });
         }
+
 
 
         public int Add(ref BodyDescription bodyDescription)
@@ -235,7 +247,7 @@ namespace SolverPrototype
                 ProfilerEnd(BroadPhase);
 
                 ProfilerStart(BroadPhaseOverlapFinder);
-                BroadPhaseOverlapFinder.FindOverlaps(threadDispatcher);
+                BroadPhaseOverlapFinder.DispatchOverlaps(threadDispatcher);
                 ProfilerEnd(BroadPhaseOverlapFinder);
 
                 ProfilerStart(NarrowPhase);
@@ -273,7 +285,7 @@ namespace SolverPrototype
                 ProfilerEnd(BroadPhase);
 
                 ProfilerStart(BroadPhaseOverlapFinder);
-                BroadPhaseOverlapFinder.FindOverlaps();
+                BroadPhaseOverlapFinder.DispatchOverlaps();
                 ProfilerEnd(BroadPhaseOverlapFinder);
 
                 ProfilerStart(NarrowPhase);

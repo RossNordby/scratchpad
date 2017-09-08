@@ -9,8 +9,7 @@ namespace SolverPrototypeTests
 {
     public struct TestCallbacks : INarrowPhaseCallbacks
     {
-        public void Initialize<TNarrowPhase>(Simulation<TNarrowPhase> simulation)
-            where TNarrowPhase : NarrowPhase, new()
+        public void Initialize(Simulation simulation)
         {
         }
 
@@ -51,21 +50,5 @@ namespace SolverPrototypeTests
         {
         }
     }
-
-    public class TestNarrowPhase : NarrowPhase<TestCallbacks>
-    {
-    }
-
-    /// <summary>
-    /// Default simulation type used by most demos. You can pick and choose the features in your own simulation type.
-    /// </summary>
-    public class DemoSimulation : Simulation<TestNarrowPhase>
-    {
-        public DemoSimulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes) : base(bufferPool, initialAllocationSizes)
-        {
-        }
-        public DemoSimulation(BufferPool bufferPool) : base(bufferPool)
-        {
-        }
-    }
+    
 }

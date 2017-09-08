@@ -12,8 +12,7 @@ namespace SolverPrototypeTests
         /// <summary>
         /// Gets the simulation created by the demo's Initialize call.
         /// </summary>
-        public DemoSimulation Simulation { get; protected set; }
-        //TODO: may want to split this up to allow other sim types later.
+        public Simulation Simulation { get; protected set; }
 
         //Note that the buffer pool used by the simulation is not considered to be *owned* by the simulation. The simulation merely uses the pool.
         //Disposing the simulation will not dispose or clear the buffer pool.

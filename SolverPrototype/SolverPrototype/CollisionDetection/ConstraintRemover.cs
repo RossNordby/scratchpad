@@ -188,7 +188,7 @@ namespace SolverPrototype.CollisionDetection
         float previousCapacityMultiplier;
         int minimumConstraintCapacity;
         int minimumTypeCapacity;
-        Array<WorkerCache> workerCaches; //there is a reference within the worker cache for the pool, so this can't be a buffer.
+        WorkerCache[] workerCaches; //there is a reference within the worker cache for the pool, so this can't be a buffer.
         int threadCount;
 
         public ConstraintRemover(BufferPool pool, Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, int minimumTypeCapacity = 4, int minimumRemovalCapacity = 128, float previousCapacityMultiplier = 1.25f)
@@ -207,9 +207,9 @@ namespace SolverPrototype.CollisionDetection
         {
             threadCount = dispatcher == null ? 1 : dispatcher.ThreadCount;
             //There aren't going to be that many workers or resizes of this array, so a managed reference is fine. Makes the storage of the buffer pool easier.
-            if (!workerCaches.Allocated || workerCaches.Length < threadCount)
+            if (workerCaches == null || workerCaches.Length < threadCount)
             {
-                new PassthroughArrayPool<WorkerCache>().Take(threadCount, out workerCaches);
+                workerCaches = new WorkerCache[threadCount];
             }
             var batchCapacity = (int)Math.Max(minimumTypeCapacity, previousBatchCapacity * previousCapacityMultiplier);
             var capacityPerBatch = (int)Math.Max(minimumConstraintCapacity, previousCapacityPerBatch * previousCapacityMultiplier);

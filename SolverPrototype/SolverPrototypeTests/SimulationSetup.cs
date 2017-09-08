@@ -61,9 +61,9 @@ namespace SolverPrototypeTests
     public struct ConstraintAdder
     {
         public int LocalBodyHandle;
-        DemoSimulation simulation;
+        Simulation simulation;
         public List<int> ConstraintHandles;
-        public ConstraintAdder(DemoSimulation simulation, List<int> constraintHandles)
+        public ConstraintAdder(Simulation simulation, List<int> constraintHandles)
         {
             this.simulation = simulation;
             this.ConstraintHandles = constraintHandles;
@@ -97,7 +97,7 @@ namespace SolverPrototypeTests
             z = Vector3.Cross(x, y);
         }
 
-        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, DemoSimulation simulation,
+        public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length, Simulation simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
             var bodyCount = width * height * length;
@@ -139,12 +139,13 @@ namespace SolverPrototypeTests
 
 
         public static void BuildLattice<TBodyBuilder, TConstraintBuilder>(TBodyBuilder bodyBuilder, TConstraintBuilder constraintBuilder, int width, int height, int length,
-            out DemoSimulation simulation,
+            out Simulation simulation,
             out int[] bodyHandles, out int[] constraintHandles) where TBodyBuilder : IBodyBuilder where TConstraintBuilder : IConstraintBuilder
         {
             var bodyCount = width * height * length;
-            simulation = new DemoSimulation(
+            simulation = Simulation.Create(
                 new BufferPool(),
+                new TestCallbacks(),
                 new SimulationAllocationSizes
                 {
                     Bodies = bodyCount,

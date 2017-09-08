@@ -9,7 +9,7 @@ namespace SolverPrototype.CollisionDetection
 {
     public interface INarrowPhaseCallbacks
     {
-        void Initialize<TNarrowPhase>(Simulation<TNarrowPhase> simulation) where TNarrowPhase : NarrowPhase, new();
+        void Initialize(Simulation simulation);
         /// <summary>
         /// Chooses whether to allow contact generation to proceed for two overlapping collidables.
         /// </summary>
