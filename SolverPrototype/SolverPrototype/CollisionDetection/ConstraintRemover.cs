@@ -189,7 +189,7 @@ namespace SolverPrototype.CollisionDetection
         int minimumConstraintCapacity;
         int minimumTypeCapacity;
         Array<WorkerCache> workerCaches; //there is a reference within the worker cache for the pool, so this can't be a buffer.
-        IThreadDispatcher dispatcher;
+        int threadCount;
 
         public ConstraintRemover(BufferPool pool, Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, int minimumTypeCapacity = 4, int minimumRemovalCapacity = 128, float previousCapacityMultiplier = 1.25f)
         {
@@ -205,24 +205,27 @@ namespace SolverPrototype.CollisionDetection
 
         public void Prepare(IThreadDispatcher dispatcher)
         {
-            this.dispatcher = dispatcher;
+            threadCount = dispatcher == null ? 1 : dispatcher.ThreadCount;
+            //There aren't going to be that many workers or resizes of this array, so a managed reference is fine. Makes the storage of the buffer pool easier.
+            if (!workerCaches.Allocated || workerCaches.Length < threadCount)
+            {
+                new PassthroughArrayPool<WorkerCache>().Take(threadCount, out workerCaches);
+            }
+            var batchCapacity = (int)Math.Max(minimumTypeCapacity, previousBatchCapacity * previousCapacityMultiplier);
+            var capacityPerBatch = (int)Math.Max(minimumConstraintCapacity, previousCapacityPerBatch * previousCapacityMultiplier);
             if (dispatcher != null)
             {
-                //There aren't going to be that many workers or resizes of this array, so a managed reference is fine. Makes the storage of the buffer pool easier.
-                if (workerCaches.Length < dispatcher.ThreadCount)
-                {
-                    new PassthroughArrayPool<WorkerCache>().Take(dispatcher.ThreadCount, out workerCaches);
-                }
-                var batchCapacity = (int)Math.Max(minimumTypeCapacity, previousBatchCapacity * previousCapacityMultiplier);
-                var capacityPerBatch = (int)Math.Max(minimumConstraintCapacity, previousCapacityPerBatch * previousCapacityMultiplier);
-                for (int i = 0; i < dispatcher.ThreadCount; ++i)
+                for (int i = 0; i < threadCount; ++i)
                 {
                     //Note the use of per-thread pools. It is possible for the workers to resize the collections.
                     workerCaches[i] = new WorkerCache(dispatcher.GetThreadMemoryPool(i), batchCapacity, capacityPerBatch);
                 }
-
-
             }
+            else
+            {
+                workerCaches[0] = new WorkerCache(pool, batchCapacity, capacityPerBatch);
+            }
+
         }
 
         //The general idea for multithreaded constraint removal is that there are varying levels of parallelism across the process.
@@ -250,12 +253,12 @@ namespace SolverPrototype.CollisionDetection
             //Accumulate the set of unique type batches in a contiguous list so we can easily execute multithreaded jobs over them.
             //Note that we're not actually copying over the contents of the per-worker lists here- just storing a reference to the per-worker lists.
             Batches.Create(pool.SpecializeFor<TypeBatchIndex>(), pool.SpecializeFor<QuickList<WorkerBatchReference, Buffer<WorkerBatchReference>>>(), pool.SpecializeFor<int>(),
-                128, 3, out batches);
+                7, 3, out batches);
             var typeBatchIndexPool = pool.SpecializeFor<TypeBatchIndex>();
             var quickListPool = pool.SpecializeFor<QuickList<WorkerBatchReference, Buffer<WorkerBatchReference>>>();
             var intPool = pool.SpecializeFor<int>();
 
-            for (int i = 0; i < dispatcher.ThreadCount; ++i)
+            for (int i = 0; i < threadCount; ++i)
             {
                 ref var cache = ref workerCaches[i];
                 for (int j = 0; j < cache.Batches.Count; ++j)
@@ -270,7 +273,7 @@ namespace SolverPrototype.CollisionDetection
                     else
                     {
                         //This worker batch doesn't exist in the combined set. Add it now.
-                        QuickList<WorkerBatchReference, Buffer<WorkerBatchReference>>.Create(pool.SpecializeFor<WorkerBatchReference>(), dispatcher.ThreadCount - i, out var references);
+                        QuickList<WorkerBatchReference, Buffer<WorkerBatchReference>>.Create(pool.SpecializeFor<WorkerBatchReference>(), threadCount - i, out var references);
                         WorkerBatchReference reference;
                         reference.WorkerIndex = (short)i;
                         reference.WorkerBatchIndex = (short)j;
@@ -280,6 +283,8 @@ namespace SolverPrototype.CollisionDetection
                     }
                 }
             }
+
+            QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>>.Create(pool.SpecializeFor<TypeBatchIndex>(), 16, out removedTypeBatches);
         }
 
         //TODO: It would be wise to double check the overhead associated with having these locally sequential jobs as separate jobs. It's likely that a couple of them 
@@ -291,7 +296,7 @@ namespace SolverPrototype.CollisionDetection
             //While this could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
             //to guarantee that no two threads hit the same body constraint list at the same time. 
             //That is more complicated and would almost certainly be slower than this locally sequential version.
-            for (int workerIndex = 0; workerIndex < dispatcher.ThreadCount; ++workerIndex)
+            for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];
                 for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
@@ -309,7 +314,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void ReturnConstraintHandlesToPool()
         {
-            for (int workerIndex = 0; workerIndex < dispatcher.ThreadCount; ++workerIndex)
+            for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];
                 for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
@@ -325,7 +330,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void RemoveBodyHandlesFromBatches()
         {
-            for (int workerIndex = 0; workerIndex < dispatcher.ThreadCount; ++workerIndex)
+            for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];
                 for (int handleToRemoveIndex = 0; handleToRemoveIndex < workerCache.BodyHandlesToRemove.Count; ++handleToRemoveIndex)
@@ -391,7 +396,11 @@ namespace SolverPrototype.CollisionDetection
                 QuickSort.Sort(ref removedTypeBatches[0], 0, removedTypeBatches.Count - 1, ref comparer);
                 for (int i = 0; i < removedTypeBatches.Count; ++i)
                 {
-
+                    var batchIndices = removedTypeBatches[i];
+                    var batch = solver.Batches[batchIndices.Batch];
+                    var typeBatch = batch.TypeBatches[batchIndices.TypeBatch];
+                    batch.RemoveTypeBatchIfEmpty(typeBatch, batchIndices.TypeBatch, solver.TypeBatchAllocation);
+                    solver.RemoveBatchIfEmpty(batch, batchIndices.Batch);
                 }
             }
             removedTypeBatches.Dispose(pool.SpecializeFor<TypeBatchIndex>());
@@ -405,7 +414,7 @@ namespace SolverPrototype.CollisionDetection
 
             //Get rid of the worker cache allocations and store the capacities for next frame initialization.
             previousCapacityPerBatch = 0;
-            for (int i = 0; i < dispatcher.ThreadCount; ++i)
+            for (int i = 0; i < threadCount; ++i)
             {
                 ref var workerCache = ref workerCaches[i];
                 for (int j = 0; j < workerCache.BatchHandles.Count; ++j)
@@ -417,7 +426,6 @@ namespace SolverPrototype.CollisionDetection
                     previousBatchCapacity = workerCache.BatchHandles.Count;
                 workerCache.Dispose();
             }
-            dispatcher = null;
         }
 
         public void EnqueueRemoval(int workerIndex, int constraintHandle)

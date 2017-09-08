@@ -138,6 +138,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void FindOverlaps(IThreadDispatcher threadDispatcher = null)
         {
+            narrowPhase.Prepare(threadDispatcher);
             if (threadDispatcher != null)
             {
                 if (threadHandlers == null || threadHandlers.Length < threadDispatcher.ThreadCount)

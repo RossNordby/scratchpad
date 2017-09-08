@@ -97,6 +97,8 @@ namespace SolverPrototype.CollisionDetection
                 else
                     constraintCaches[i] = new UntypedList();
             }
+            //Clear out the remainder of slots to avoid invalid data.
+            constraintCaches.Clear(minimumSizesPerConstraintType.Count, constraintCaches.Length - minimumSizesPerConstraintType.Count);
             for (int i = 0; i < minimumSizesPerCollisionType.Count; ++i)
             {
                 if (minimumSizesPerCollisionType[i] > 0)
@@ -104,6 +106,8 @@ namespace SolverPrototype.CollisionDetection
                 else
                     collisionCaches[i] = new UntypedList();
             }
+            //Clear out the remainder of slots to avoid invalid data.
+            collisionCaches.Clear(minimumSizesPerCollisionType.Count, collisionCaches.Length - minimumSizesPerCollisionType.Count);
 
             QuickList<PendingAdd, Buffer<PendingAdd>>.Create(pool.SpecializeFor<PendingAdd>(), pendingCapacity, out PendingAdds);
             QuickList<CollidablePair, Buffer<CollidablePair>>.Create(pool.SpecializeFor<CollidablePair>(), pendingCapacity, out PendingRemoves);
@@ -134,13 +138,28 @@ namespace SolverPrototype.CollisionDetection
 
         public void AccumulateMinimumSizes(ref QuickList<int, Buffer<int>> minimumSizesPerConstraintType, ref QuickList<int, Buffer<int>> minimumSizesPerCollisionType)
         {
+            //Note that the count is expanded only as a constraint or cache of a given type is encountered.
             for (int i = 0; i < constraintCaches.Length; ++i)
             {
-                minimumSizesPerConstraintType[i] = Math.Max(minimumSizesPerConstraintType[i], constraintCaches[i].Count);
+                if (constraintCaches[i].Count > 0)
+                {
+                    if (i >= minimumSizesPerConstraintType.Count)
+                    {
+                        minimumSizesPerConstraintType.Count = i + 1;
+                    }
+                    minimumSizesPerConstraintType[i] = Math.Max(minimumSizesPerConstraintType[i], constraintCaches[i].Count);
+                }
             }
             for (int i = collisionCaches.Length - 1; i >= 0; --i)
             {
-                minimumSizesPerCollisionType[i] = Math.Max(minimumSizesPerCollisionType[i], collisionCaches[i].Count);
+                if (collisionCaches[i].Count > 0)
+                {
+                    if (i >= minimumSizesPerCollisionType.Count)
+                    {
+                        minimumSizesPerCollisionType.Count = i + 1;
+                    }
+                    minimumSizesPerCollisionType[i] = Math.Max(minimumSizesPerCollisionType[i], collisionCaches[i].Count);
+                }
             }
         }
 

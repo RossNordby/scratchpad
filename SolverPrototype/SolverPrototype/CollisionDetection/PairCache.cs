@@ -88,12 +88,12 @@ namespace SolverPrototype.CollisionDetection
 
             var threadCount = threadDispatcher != null ? threadDispatcher.ThreadCount : 1;
             //Ensure that the new worker pair caches can hold all workers.
-            if (NextWorkerCaches.Span.Length < threadCount)
+            if (!NextWorkerCaches.Span.Allocated || NextWorkerCaches.Span.Length < threadCount)
             {
                 //The next worker caches should never need to be disposed here. The flush should have taken care of it.
 #if DEBUG
-                for (int i = 0; i < nextWorkerCaches.Count; ++i)
-                    Debug.Assert(nextWorkerCaches[i].Equals(default(WorkerPairCache)));
+                for (int i = 0; i < NextWorkerCaches.Count; ++i)
+                    Debug.Assert(NextWorkerCaches[i].Equals(default(WorkerPairCache)));
 #endif
                 QuickList<WorkerPairCache, Array<WorkerPairCache>>.Create(new PassthroughArrayPool<WorkerPairCache>(), threadCount, out NextWorkerCaches);
             }
@@ -178,13 +178,13 @@ namespace SolverPrototype.CollisionDetection
         }
         public void Postflush()
         {
-
             //This bookkeeping and disposal phase is trivially cheap compared to the cost of updating the mapping table, so we do it sequentially.
             //The fact that we access the per-worker pools here would prevent easy multithreading anyway; the other threads may use them. 
             int largestPendingSize = 0;
             for (int i = 0; i < NextWorkerCaches.Count; ++i)
             {
-                ref var cache = ref NextWorkerCaches[i]; if (cache.PendingAdds.Count > largestPendingSize)
+                ref var cache = ref NextWorkerCaches[i];
+                if (cache.PendingAdds.Count > largestPendingSize)
                 {
                     largestPendingSize = cache.PendingAdds.Count;
                 }
@@ -198,7 +198,7 @@ namespace SolverPrototype.CollisionDetection
             previousPendingSize = largestPendingSize;
 
             //Swap references.
-            var temp = NextWorkerCaches;
+            var temp = workerCaches;
             workerCaches = NextWorkerCaches;
             NextWorkerCaches = temp;
 
@@ -213,9 +213,9 @@ namespace SolverPrototype.CollisionDetection
             }
             //Note that we do not need to dispose the worker cache arrays themselves- they were just arrays pulled out of a passthrough pool.
 #if DEBUG
-            for (int i =0; i < nextWorkerCaches.Count; ++i)
+            for (int i =0; i < NextWorkerCaches.Count; ++i)
             {
-                Debug.Assert(nextWorkerCaches[i].Equals(default(WorkerPairCache)), "Outside of the execution of the narrow phase, the 'next' caches should not be allocated.");
+                Debug.Assert(NextWorkerCaches[i].Equals(default(WorkerPairCache)), "Outside of the execution of the narrow phase, the 'next' caches should not be allocated.");
             }
 #endif
             Mapping.Dispose(pool.SpecializeFor<CollidablePair>(), pool.SpecializeFor<CollidablePairPointers>(), pool.SpecializeFor<int>());

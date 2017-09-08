@@ -286,6 +286,21 @@ namespace BEPUutilities2.Memory
             Debug.Assert(power >= 0 && power <= SpanHelper.MaximumSpanSizePower);
             pools[power].Take(out buffer);
         }
+
+        /// <summary>
+        /// Returns a buffer to the pool without clearing the reference.
+        /// </summary>
+        /// <param name="buffer">Buffer to return to the pool.</param>
+        /// <remarks>Typed buffer pools zero out the passed-in buffer by convention.
+        /// This costs very little and avoids a wide variety of bugs (either directly or by forcing fast failure). For consistency, BufferPool.Return does the same thing.
+        /// This "Unsafe" overload should be used only in cases where there's a reason to bypass the clear; the naming is intended to dissuade casual use.</remarks>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void ReturnUnsafe(ref RawBuffer buffer)
+        {
+            ValidatePinnedState(true);
+            pools[SpanHelper.GetContainingPowerOf2(buffer.Length)].Return(ref buffer);
+        }
+
         /// <summary>
         /// Returns a buffer to the pool.
         /// </summary>
@@ -293,8 +308,8 @@ namespace BEPUutilities2.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Return(ref RawBuffer buffer)
         {
-            ValidatePinnedState(true);
-            pools[SpanHelper.GetContainingPowerOf2(buffer.Length)].Return(ref buffer);
+            ReturnUnsafe(ref buffer);
+            buffer = new RawBuffer();
         }
 
         /// <summary>
@@ -442,7 +457,7 @@ namespace BEPUutilities2.Memory
             //Note that we have to rederive the original allocation size, since the size of T might not have allowed size * count to equal the original byte count.
             Debug.Assert(span.Length > 0, "If this span has zero length, then it can't be an original request, and so isn't a valid buffer to return.");
             var rawBuffer = new RawBuffer(span.Memory, 1 << SpanHelper.GetContainingPowerOf2(Unsafe.SizeOf<T>() * span.Length), span.Id);
-            Raw.Return(ref rawBuffer);
+            Raw.ReturnUnsafe(ref rawBuffer);
             span = new Buffer<T>();
         }
 
