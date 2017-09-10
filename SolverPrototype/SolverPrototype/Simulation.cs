@@ -62,7 +62,7 @@ namespace SolverPrototype
             where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks
         {
             var simulation = new Simulation(bufferPool, initialAllocationSizes);
-            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation.Bodies, simulation.Solver, simulation.ConstraintGraph, simulation.BufferPool);
+            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation, narrowPhaseCallbacks);
             simulation.NarrowPhase = narrowPhase;
             simulation.BroadPhaseOverlapFinder = new CollidableOverlapFinder<TNarrowPhaseCallbacks>(narrowPhase, simulation.BroadPhase);
 

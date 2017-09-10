@@ -18,6 +18,8 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="b">Reference to the second collidable in the pair.</param>
         /// <returns>True if collision detection should proceed, false otherwise.</returns>
         bool AllowContactGeneration(int workerIndex, CollidableReference a, CollidableReference b);
+
+
         /// <summary>
         /// Provides a notification that a manifold has been created. Offers an opportunity to change the manifold's details. 
         /// </summary>
@@ -27,6 +29,10 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="pairMaterial">Material properties of the manifold.</param>
         /// <returns>True if a constraint should be created for the manifold, false otherwise.</returns>
         bool ConfigureContactManifold(int workerIndex, CollidablePair pair, ref ContactManifold manifold, out PairMaterialProperties pairMaterial);
+
+        //TODO: There is an argument for finer grained material tuning, both per child and per contact. Need an efficient way to do this before we commit-
+        //one possibility is a material per convex manifold. For nonconvex manifolds, there would be a material property per contact.
+        //That's not an ideal setup- it's an extra 16-20 bytes per contact in the solver, which is pretty painful.
 
         /// <summary>
         /// Chooses whether to allow contact generation to proceed for the children of two overlapping collidables in a compound-including pair.

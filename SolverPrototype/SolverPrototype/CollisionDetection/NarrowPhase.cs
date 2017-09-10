@@ -187,15 +187,17 @@ namespace SolverPrototype.CollisionDetection
     {
         public TCallbacks Callbacks;
 
-        public NarrowPhase(Bodies bodies, Solver solver, ConstraintConnectivityGraph constraintGraph, BufferPool pool,
+        public NarrowPhase(Simulation simulation, TCallbacks callbacks,
              int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
             : base()
         {
-            Pool = pool;
-            Bodies = bodies;
-            Solver = solver;
-            PairCache = new PairCache(pool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity);
-            ConstraintRemover = new ConstraintRemover(pool, bodies, solver, constraintGraph, minimumRemovalCapacity: minimumPendingSize);
+            Pool = simulation.BufferPool;
+            Bodies = simulation.Bodies;
+            Solver = simulation.Solver;
+            Callbacks = callbacks;
+            Callbacks.Initialize(simulation);
+            PairCache = new PairCache(simulation.BufferPool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity);
+            ConstraintRemover = new ConstraintRemover(simulation.BufferPool, simulation.Bodies, simulation.Solver, simulation.ConstraintGraph, minimumRemovalCapacity: minimumPendingSize);
             FreshnessChecker = new FreshnessChecker(this);
         }
 
@@ -615,15 +617,8 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        
         public void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
-        {
-            Console.WriteLine("ASDF");
-            HandleOverlapTest(workerIndex, a, b);
-        }
-
-        public void HandleOverlapTest(int workerIndex, CollidableReference a, CollidableReference b)
         {
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
@@ -644,6 +639,7 @@ namespace SolverPrototype.CollisionDetection
                         //Create a continuation for the pair given the CCD state.
                         if (useSubstepping && useInnerSphere)
                         {
+                            collisionBatchers[workerIndex].Add(a, b);
                         }
                         else if (useSubstepping)
                         {
