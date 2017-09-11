@@ -36,6 +36,19 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe ref T AllocateUnsafely<T>()
+        {
+            var newSize = ByteCount + Unsafe.SizeOf<T>();          
+            //If we store only byte count, we'd have to divide to get the element index.
+            //If we store only count, we would have to store per-type size somewhere since the PairCache constructor doesn't have an id->type mapping.
+            //So we just store both. It's pretty cheap and simple.
+            Count++;
+            var byteIndex = ByteCount;
+            ByteCount = newSize;
+            return ref Unsafe.As<byte, T>(ref Buffer[byteIndex]);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe int Allocate<T>(int minimumCount, BufferPool pool)
         {
             var newSize = ByteCount + Unsafe.SizeOf<T>();

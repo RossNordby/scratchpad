@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.Memory;
+﻿using BEPUutilities2.Collections;
+using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
 using System;
 using System.Collections.Generic;
@@ -43,16 +44,21 @@ namespace SolverPrototype.CollisionDetection
         /// Gets the type ids of the specialized subtasks registered by this task.
         /// </summary>
         public int[] Subtasks { get; protected set; }
+        public int ExpectedFirstId { get; protected set; }
 
         //Note that we leave the details of input and output of a task's execution to be undefined.
         //A task can reach into the batcher and create new entries or trigger continuations as required.
         /// <summary>
         /// Executes the task on the given input.
         /// </summary>
-        /// <typeparam name="TFilters">Type of the input to interpret for execution.</typeparam>
-        /// <param name="input">Input to interpret for execution.</param>
+        /// <typeparam name="TFilters">Type of the filters used to influence execution of collision tasks.</typeparam>
+        /// <typeparam name="TContinuations">Type of the continuations that can be triggered by the this execution.</typeparam>
         /// <param name="batcher">Batcher responsible for the invocation.</param>
-        public abstract void ExecuteBatch<TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TFilters filters)
+        /// <param name="batch">Batch of pairs to test.</param>
+        /// <param name="continuations">Continuations to invoke upon completion of a top level pair.</param>
+        /// <param name="filters">Filters to use to influence execution of the collision tasks.</param>
+        public abstract void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
+            where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters;
 
         /// <summary>
@@ -139,8 +145,8 @@ namespace SolverPrototype.CollisionDetection
     {
         public TShapeA A;
         public TShapeB B;
-        public BodyPose PoseA;
-        public BodyPose PoseB;
+        public BodyPose RelativePose;
+        public TypedIndex Continuation;
     }
 
 
@@ -155,37 +161,61 @@ namespace SolverPrototype.CollisionDetection
         CollisionTypeMatrix typeMatrix;
         BufferPool pool;
 
-        Buffer<UntypedList> batches;
+        struct Batch
+        {
+            public UntypedList List;
+            public int TaskTypeIndex;
 
-        public StreamingBatcher(BufferPool pool, CollisionTypeMatrix collisionTypeMatrix)
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public Batch(BufferPool pool, int byteCount, int taskTypeIndex)
+            {
+                List = new UntypedList(byteCount, pool);
+                TaskTypeIndex = taskTypeIndex;
+            }
+        }
+
+        QuickList<Batch, Buffer<Batch>> batches;
+        //A subset of collision tasks require a place to return information.
+        QuickList<Batch, Buffer<Batch>> localContinuations;
+        struct TaskIndices
+        {
+            public int TaskIndex;
+            public short ContinuationType;
+            public short ContinuationIndex;
+        }
+
+        Buffer<TaskIndices> taskTypeToTaskIndices;
+
+        public unsafe StreamingBatcher(BufferPool pool, CollisionTypeMatrix collisionTypeMatrix)
         {
             this.pool = pool;
             typeMatrix = collisionTypeMatrix;
-            pool.SpecializeFor<UntypedList>().Take(collisionTypeMatrix.tasks.Length, out batches);
+            QuickList<Batch, Buffer<Batch>>.Create(pool.SpecializeFor<Batch>(), collisionTypeMatrix.tasks.Length, out batches);
+            QuickList<Batch, Buffer<Batch>>.Create(pool.SpecializeFor<Batch>(), collisionTypeMatrix.tasks.Length, out localContinuations);
+            pool.SpecializeFor<TaskIndices>().Take(collisionTypeMatrix.tasks.Length, out taskTypeToTaskIndices);
+            Unsafe.InitBlockUnaligned(ref *taskTypeToTaskIndices.Memory, 0xFF, (uint)(Unsafe.SizeOf<TaskIndices>() * collisionTypeMatrix.tasks.Length));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(CollisionTask task, int taskIndex, 
-            ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
+        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(CollisionTask task, int taskIndex,
+            ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose relativePose,
             TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
         {
             ref var batch = ref batches[taskIndex];
-            var byteIndex = batch.Allocate<RigidPair<TShapeA, TShapeB>>(task.BatchSize, pool);
-            ref var pairData = ref batch.GetFromBytes<RigidPair<TShapeA, TShapeB>>(byteIndex);
+            ref var pairData = ref batch.List.AllocateUnsafely<RigidPair<TShapeA, TShapeB>>();
             pairData.A = shapeA;
             pairData.B = shapeB;
-            pairData.PoseA = poseA;
-            pairData.PoseB = poseB;
-            if (batch.Count == task.BatchSize)
+            pairData.RelativePose = relativePose;
+            if (batch.List.Count == task.BatchSize)
             {
-                task.ExecuteBatch(ref batch, ref this, ref filters);
+                task.ExecuteBatch(ref batch.List, ref this, ref continuations, ref filters);
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
+        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose relativePose,
              TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
              where TShapeA : struct, IShape where TShapeB : struct, IShape
              where TContinuations : struct, IContinuations
@@ -194,30 +224,46 @@ namespace SolverPrototype.CollisionDetection
             //TODO: It's possible that only retrieving the actual task in the event that it's time to dispatch could save some cycles.
             //That would imply caching the batch sizes and expected first ids, likely alongside the task indices.
             //Value of that is questionable, since all the task-associated indirections are pretty much guaranteed to be cached.
-            typeMatrix.GetTask<TShapeA, TShapeB>(out var task, out var taskIndex);
-            if (typeof(TShapeA) != typeof(TShapeB))
+            typeMatrix.GetTask<TShapeA, TShapeB>(out var task, out var taskTypeIndex);
+            ref var taskIndices = ref taskTypeToTaskIndices[taskTypeIndex];
+            if (taskIndices.TaskIndex == unchecked((int)0xFFFF_FFFF))
             {
-                //The inputs may need to be reordered to guarantee that the collision tasks are handed data in the proper order.
-                if (TypeIds<IShape>.GetId<TShapeA>() == task.ExpectedFirstId)
-                {
-
-                }
-                else
-                {
-
-                }
+                taskIndices.TaskIndex = batches.Count;
+                batches.AllocateUnsafely() = new Batch(pool, task.BatchSize * Unsafe.SizeOf<RigidPair<TShapeA, TShapeB>>(), taskTypeIndex);
+            }
+            //The type comparison should be a compilation constant.
+            if (typeof(TShapeA) != typeof(TShapeB) && TypeIds<IShape>.GetId<TShapeA>() != task.ExpectedFirstId)
+            {
+                //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
+                Add(task, taskIndices.TaskIndex, ref shapeA, ref shapeB, ref relativePose, continuationId, ref continuations, ref filters);
             }
             else
             {
-
+                Add(task, taskIndices.TaskIndex, ref shapeA, ref shapeB, ref relativePose, continuationId, ref continuations, ref filters);
             }
-           
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Flush<TContinuations>(ref TContinuations continuations)
+        public void Flush<TContinuations, TFilters>(ref TContinuations continuations, ref TFilters filters)
+            where TContinuations : struct, IContinuations
+            where TFilters : struct, ICollisionSubtaskFilters
         {
-
+            while (batches.Count > 0)
+            {
+                //TODO: Each batch execution may create additional work that must then be flushed, so we must restart the loop if batches persist.
+                //May be able to do something like position all work generators up front if you can prove a DAG relationship between collision tasks.
+                //The type matrix's registration process could help here- we can spend an arbitrarily long time building some form of structure during registration to help us during runtime.
+                for (int i = 0; i < batches.Count; ++i)
+                {
+                    ref var batch = ref batches[i];
+                    if (batch.List.Count > 0)
+                    {
+                        typeMatrix.tasks[batch.TaskTypeIndex].ExecuteBatch(ref batch.List, ref this, ref filters);
+                    }
+                }
+            }
+            //TODO: dispose everything here too. 
         }
     }
 }
