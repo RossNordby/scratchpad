@@ -16,9 +16,9 @@ namespace SolverPrototype.CollisionDetection
 
         
 
-        public UntypedList(int initialSize, BufferPool pool)
+        public UntypedList(int initialSizeInBytes, BufferPool pool)
         {
-            pool.Take(initialSize, out Buffer);
+            pool.Take(initialSizeInBytes, out Buffer);
             Count = 0;
             ByteCount = 0;
         }
