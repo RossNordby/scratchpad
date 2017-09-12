@@ -11,7 +11,7 @@ namespace SolverPrototype.CollisionDetection
 {
     public interface IContinuations
     {
-        void Notify(TypedIndex continuationId);
+        void Notify(TypedIndex continuationId, ref ContactManifold manifold);
     }
 
     /// <summary>
@@ -76,16 +76,27 @@ namespace SolverPrototype.CollisionDetection
 
     }
 
-    struct TopLevelIndices
+    public struct CollisionTaskReference
     {
         public int TaskIndex;
+        public int BatchSize;
+        public int ExpectedFirstTypeId;
     }
 
     public class CollisionTaskRegistry
     {
-        int[][] topLevelMatrix;
+        CollisionTaskReference[][] topLevelMatrix;
         internal CollisionTask[] tasks;
         int count;
+
+        public CollisionTask this[int taskIndex]
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get
+            {
+                return tasks[taskIndex];
+            }
+        }
 
         public CollisionTaskRegistry(int initialShapeCount = 9)
         {
@@ -94,10 +105,15 @@ namespace SolverPrototype.CollisionDetection
 
         void ResizeMatrix(int newSize)
         {
+            var oldSize = topLevelMatrix != null ? topLevelMatrix.Length : 0;
             Array.Resize(ref topLevelMatrix, newSize);
             for (int i = 0; i < newSize; ++i)
             {
                 Array.Resize(ref topLevelMatrix[i], newSize);
+                for (int j = oldSize; j < newSize; ++j)
+                {
+                    topLevelMatrix[i][j] = new CollisionTaskReference { TaskIndex = -1 };
+                }
             }
         }
 
@@ -116,9 +132,9 @@ namespace SolverPrototype.CollisionDetection
                 {
                     for (int j = 0; j < topLevelMatrix.Length; ++j)
                     {
-                        if (topLevelMatrix[i][j] >= index)
+                        if (topLevelMatrix[i][j].TaskIndex >= index)
                         {
-                            ++topLevelMatrix[i][j];
+                            ++topLevelMatrix[i][j].TaskIndex;
                         }
                     }
                 }
@@ -165,8 +181,9 @@ namespace SolverPrototype.CollisionDetection
                 //there is no need for them to appear in the top level matrix.
                 if (highestShapeIndex >= topLevelMatrix.Length)
                     ResizeMatrix(highestShapeIndex + 1);
-                topLevelMatrix[a][b] = index;
-                topLevelMatrix[b][a] = index;
+                var taskInfo = new CollisionTaskReference { TaskIndex = index, BatchSize = task.BatchSize, ExpectedFirstTypeId = task.ShapeTypeIndexA };
+                topLevelMatrix[a][b] = taskInfo;
+                topLevelMatrix[b][a] = taskInfo;
             }
 
 #if DEBUG
@@ -196,17 +213,16 @@ namespace SolverPrototype.CollisionDetection
 
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GetTask(int topLevelTypeA, int topLevelTypeB, out CollisionTask task, out int taskIndex)
+        public ref CollisionTaskReference GetTaskReference(int topLevelTypeA, int topLevelTypeB)
         {
-            taskIndex = topLevelMatrix[topLevelTypeA][topLevelTypeB];
-            task = tasks[taskIndex];
+            return ref topLevelMatrix[topLevelTypeA][topLevelTypeB];
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GetTask<TShapeA, TShapeB>(out CollisionTask task, out int taskIndex)
+        public ref CollisionTaskReference GetTaskReference<TShapeA, TShapeB>()
             where TShapeA : struct, IShape
             where TShapeB : struct, IShape
         {
-            GetTask(TypeIds<IShape>.GetId<TShapeA>(), TypeIds<IShape>.GetId<TShapeB>(), out task, out taskIndex);
+            return ref GetTaskReference(TypeIds<IShape>.GetId<TShapeA>(), TypeIds<IShape>.GetId<TShapeB>());
         }
     }
 
@@ -245,29 +261,29 @@ namespace SolverPrototype.CollisionDetection
             pool.SpecializeFor<UntypedList>().Take(collisionTypeMatrix.tasks.Length, out localContinuations);
             //Clearing is required ensure that we know when a batch needs to be created and when a batch needs to be disposed.
             batches.Clear(0, collisionTypeMatrix.tasks.Length);
-            localContinuations.Clear(0, collisionTypeMatrix.tasks.Length);
             minimumBatchIndex = collisionTypeMatrix.tasks.Length;
             maximumBatchIndex = -1;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(CollisionTask task, int taskIndex,
+        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
             ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose relativePose,
             TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
         {
-            ref var batch = ref batches[taskIndex];
+            ref var batch = ref batches[reference.TaskIndex];
             ref var pairData = ref batch.AllocateUnsafely<RigidPair<TShapeA, TShapeB>>();
             pairData.A = shapeA;
             pairData.B = shapeB;
             pairData.RelativePose = relativePose;
-            if (batch.Count == task.BatchSize)
+            if (batch.Count == reference.BatchSize)
             {
-                task.ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
+                typeMatrix[reference.TaskIndex].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
             }
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose relativePose,
              TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
@@ -278,25 +294,32 @@ namespace SolverPrototype.CollisionDetection
             //TODO: It's possible that only retrieving the actual task in the event that it's time to dispatch could save some cycles.
             //That would imply caching the batch sizes and expected first ids, likely alongside the task indices.
             //Value of that is questionable, since all the task-associated indirections are pretty much guaranteed to be cached.
-            typeMatrix.GetTask<TShapeA, TShapeB>(out var task, out var taskIndex);
-            ref var batch = ref batches[taskIndex];
+            ref var reference = ref typeMatrix.GetTaskReference<TShapeA, TShapeB>();
+            if (reference.TaskIndex < 0)
+            {
+                //There is no task for this shape type pair. Immediately respond with an empty manifold.
+                var manifold = new ContactManifold();
+                continuations.Notify(continuationId, ref manifold);
+                return;
+            }
+            ref var batch = ref batches[reference.TaskIndex];
             if (!batch.Buffer.Allocated)
             {
-                batch = new UntypedList(task.BatchSize * Unsafe.SizeOf<RigidPair<TShapeA, TShapeB>>(), pool);
-                if (minimumBatchIndex > taskIndex)
-                    minimumBatchIndex = taskIndex;
-                if (maximumBatchIndex < taskIndex)
-                    maximumBatchIndex = taskIndex;
+                batch = new UntypedList(reference.BatchSize * Unsafe.SizeOf<RigidPair<TShapeA, TShapeB>>(), pool);
+                if (minimumBatchIndex > reference.TaskIndex)
+                    minimumBatchIndex = reference.TaskIndex;
+                if (maximumBatchIndex < reference.TaskIndex)
+                    maximumBatchIndex = reference.TaskIndex;
             }
             //The type comparison should be a compilation constant.
-            if (typeof(TShapeA) != typeof(TShapeB) && TypeIds<IShape>.GetId<TShapeA>() != task.ShapeTypeIndexA)
+            if (typeof(TShapeA) != typeof(TShapeB) && TypeIds<IShape>.GetId<TShapeA>() != reference.ExpectedFirstTypeId)
             {
                 //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
-                Add(task, taskIndex, ref shapeA, ref shapeB, ref relativePose, continuationId, ref continuations, ref filters);
+                Add(ref reference, ref shapeB, ref shapeA, ref relativePose, continuationId, ref continuations, ref filters);
             }
             else
             {
-                Add(task, taskIndex, ref shapeA, ref shapeB, ref relativePose, continuationId, ref continuations, ref filters);
+                Add(ref reference, ref shapeA, ref shapeB, ref relativePose, continuationId, ref continuations, ref filters);
             }
         }
 
@@ -314,8 +337,16 @@ namespace SolverPrototype.CollisionDetection
                 {
                     typeMatrix.tasks[i].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
                 }
+                if(batch.Buffer.Allocated)
+                {
+                    //Dispose of the batch and any associated buffers; since the flush is one pass, we won't be needing this again.
+                    pool.Return(ref batch.Buffer);
+                    pool.Return(ref localContinuations[i].Buffer);
+                }
             }
-            //TODO: dispose everything here too. 
+            var listPool = pool.SpecializeFor<UntypedList>();
+            listPool.Return(ref batches);
+            listPool.Return(ref localContinuations);
         }
     }
 }
