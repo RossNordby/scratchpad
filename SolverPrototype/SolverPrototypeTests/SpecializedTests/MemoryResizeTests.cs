@@ -150,13 +150,9 @@ namespace SolverPrototypeTests.SpecializedTests
                         GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.Y, innerIndexB),
                         GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.Z, innerIndexB));
                     var relativeVelocity = (velocityA - velocityB);
-                    var surfaceBasis = new Quaternion(
-                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.X, innerIndex),
-                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.Y, innerIndex),
-                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.Z, innerIndex),
-                        GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].SurfaceBasis.W, innerIndex));
-                    Matrix3x3.CreateFromQuaternion(ref surfaceBasis, out var surfaceBasisMatrix);
-                    var normal = surfaceBasisMatrix.Y;
+                     Vector3 normal;
+                    unsafe { var mmhmm = &normal; }
+                    GatherScatter.GetLane(ref typeBatch.PrestepData[bundleIndex].Normal.X, innerIndex, ref normal.X, 3);
                     var penetrationChange = -dt * Vector3.Dot(relativeVelocity, normal);
                     ref var penetrationDepth = ref GatherScatter.Get(ref typeBatch.PrestepData[bundleIndex].PenetrationDepth0, innerIndex);
                     penetrationDepth += penetrationChange;

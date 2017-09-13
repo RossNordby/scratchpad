@@ -44,5 +44,10 @@ namespace SolverPrototype.Collidables
             packed = (uint)((type << 24) | index | (1u << 31));
         }
 
+        public override string ToString()
+        {
+            return $"<{Type}, {Index}>";
+        }
+
     }
 }

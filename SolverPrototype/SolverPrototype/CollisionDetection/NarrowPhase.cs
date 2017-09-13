@@ -387,11 +387,11 @@ namespace SolverPrototype.CollisionDetection
                             var linearIndex = 0;
                             var outOffsets = &outManifold->Offset0;
                             var outDepths = &outManifold->Depth0;
-                            var outBases = &outManifold->SurfaceBasis0;
+                            var outBases = &outManifold->Normal0;
                             var outIds = &outManifold->FeatureId0;
                             var linearOffsets = &linearManifold->Offset0;
                             var linearDepths = &linearManifold->Depth0;
-                            var linearBases = &linearManifold->SurfaceBasis0;
+                            var linearBases = &linearManifold->Normal0;
                             var linearIds = &linearManifold->FeatureId0;
                             var mainOffsets = &mainManifold->Offset0;
                             var mainIds = &mainManifold->FeatureId0;
@@ -406,7 +406,7 @@ namespace SolverPrototype.CollisionDetection
                                     {
                                         outOffsets[outIndex] = mainOffsets[mainIndex];
                                         outDepths[outIndex] = mainDepths[mainIndex];
-                                        outBases[outIndex] = mainManifold->ConvexSurfaceBasis;
+                                        outBases[outIndex] = mainManifold->ConvexNormal;
                                         outIds[outIndex] = mainIds[mainIndex];
                                         ++mainIndex;
                                     }
@@ -423,7 +423,7 @@ namespace SolverPrototype.CollisionDetection
                             else
                             {
                                 //Both manifolds are nonconvex.
-                                var mainBases = &mainManifold->SurfaceBasis0;
+                                var mainBases = &mainManifold->Normal0;
                                 while (outIndex < 4)
                                 {
                                     if (linearIndex == linearCount ||
@@ -457,7 +457,7 @@ namespace SolverPrototype.CollisionDetection
                             //this state will be extremely brief regardless, and there isn't much value in trying to tease out convexity for one or two frames.
                             var outOffsets = &outManifold->Offset0;
                             var outDepths = &outManifold->Depth0;
-                            var outBases = &outManifold->SurfaceBasis0;
+                            var outBases = &outManifold->Normal0;
                             var outIds = &outManifold->FeatureId0;
                             var mainOffsets = &mainManifold->Offset0;
                             var mainDepths = &mainManifold->Depth0;
@@ -468,13 +468,13 @@ namespace SolverPrototype.CollisionDetection
                                 {
                                     outOffsets[i] = mainOffsets[i];
                                     outDepths[i] = mainDepths[i];
-                                    outBases[i] = mainManifold->ConvexSurfaceBasis;
+                                    outBases[i] = mainManifold->ConvexNormal;
                                     outIds[i] = mainIds[i];
                                 }
                             }
                             else
                             {
-                                var mainBases = &mainManifold->SurfaceBasis0;
+                                var mainBases = &mainManifold->Normal0;
                                 for (int i = 0; i < mainCount; ++i)
                                 {
                                     outOffsets[i] = mainOffsets[i];
@@ -486,7 +486,7 @@ namespace SolverPrototype.CollisionDetection
                             //Now add the linear contacts. Both manifolds are known to be nonconvex. 
                             var linearOffsets = &linearManifold->Offset0;
                             var linearDepths = &linearManifold->Depth0;
-                            var linearBases = &linearManifold->SurfaceBasis0;
+                            var linearBases = &linearManifold->Normal0;
                             var linearIds = &linearManifold->FeatureId0;
                             for (int linearIndex = 0; linearIndex < linearCount; ++linearIndex)
                             {
@@ -589,8 +589,7 @@ namespace SolverPrototype.CollisionDetection
                         //Pretty micro-optimizey, though.
                         if (substepManifold->Convex)
                         {
-                            BEPUutilities2.Quaternion.TransformY(1, ref substepManifold->ConvexSurfaceBasis, out var manifoldNormal);
-                            var penetrationOffset = Vector3.Dot(offset, manifoldNormal);
+                            var penetrationOffset = Vector3.Dot(offset, substepManifold->ConvexNormal);
                             for (int j = 0; j < contactCount; ++j)
                             {
                                 offsets[j] += offset;
@@ -599,11 +598,10 @@ namespace SolverPrototype.CollisionDetection
                         }
                         else
                         {
-                            var bases = &substepManifold->SurfaceBasis0;
+                            var normals = &substepManifold->Normal0;
                             for (int j = 0; j < contactCount; ++j)
                             {
-                                BEPUutilities2.Quaternion.TransformY(1, ref bases[j], out var manifoldNormal);
-                                var penetrationOffset = Vector3.Dot(offset, manifoldNormal);
+                                var penetrationOffset = Vector3.Dot(offset, normals[j]);
                                 offsets[j] += offset;
                                 depths[j] += penetrationOffset;
                             }
@@ -639,7 +637,7 @@ namespace SolverPrototype.CollisionDetection
                         //Create a continuation for the pair given the CCD state.
                         if (useSubstepping && useInnerSphere)
                         {
-                            collisionBatchers[workerIndex].Add(a, b);
+                            //collisionBatchers[workerIndex].Add(a, b);
                         }
                         else if (useSubstepping)
                         {

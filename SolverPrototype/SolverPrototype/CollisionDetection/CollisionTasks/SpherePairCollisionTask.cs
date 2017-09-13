@@ -65,24 +65,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             }
         }
 
-        public static void BuildOrthnormalBasis(ref Vector3Wide normal, out QuaternionWide basis)
-        {
-            //This could probably be improved.
-            var sign = Vector.ConditionalSelect(Vector.LessThan(normal.Z, Vector<float>.Zero), -Vector<float>.One, Vector<float>.One);
-
-            //This has a discontinuity at z==0. Raw frisvad has only one discontinuity, though that region is more unpredictable than the revised version.
-            var scale = -Vector<float>.One / (sign + normal.Z);
-            Vector3Wide t1, t2;
-            t1.X = normal.X * normal.Y * scale;
-            t1.Y = sign + normal.Y * normal.Y * scale;
-            t1.Z = -normal.Y;
-
-            t2.X = Vector<float>.One + sign * normal.X * normal.X * scale;
-            t2.Y = sign * t1.X;
-            t2.Z = -sign * normal.X;
-
-            QuaternionWide.CreateFromRotationMatrix()
-        }
 
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
@@ -96,17 +78,28 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 int countInBundle = batch.Count - i;
                 if (countInBundle > Vector<float>.Count)
                     countInBundle = Vector<float>.Count;
+                //TODO: It's likely that the compiler won't be able to fold all these independent transposition loops. Would be better to do all data at once in a single loop.
+                //Could do some generics abuse.
                 LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.A.Radius, countInBundle, out var radiiA);
                 LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.B.Radius, countInBundle, out var radiiB);
-                Vector3Wide relativePosition;
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.RelativePose.Position.X, countInBundle, out relativePosition.X);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.RelativePose.Position.Y, countInBundle, out relativePosition.Y);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.RelativePose.Position.Z, countInBundle, out relativePosition.Z);
+                Vector3Wide positionA, positionB;
+                //TODO: It's very possible that on most hardware using a scalar Vector3 subtract is faster than doing the AOS->SOA transpose followed by wide subtract.
+                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.X, countInBundle, out positionA.X);
+                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Y, countInBundle, out positionA.Y);
+                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Z, countInBundle, out positionA.Z);
+                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.X, countInBundle, out positionB.X);
+                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Y, countInBundle, out positionB.Y);
+                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Z, countInBundle, out positionB.Z);
+                Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
                 SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
                 for (int j = 0; j < countInBundle; ++j)
                 {
-                    manifold.ConvexSurfaceBasis = GatherScatter.GetLane()
-                    continuations.Notify()
+                    GatherScatter.GetLane(ref contactNormal.X, j, ref manifold.ConvexNormal.X, 3);
+                    GatherScatter.GetLane(ref contactPosition.X, j, ref manifold.Offset0.X, 3);
+                    manifold.Depth0 = GatherScatter.Get(ref depth, j);
+                    GatherScatter.GetLane(ref relativePosition.X, j, ref manifold.OffsetB.X, 3);
+
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
                 }
             }
         }

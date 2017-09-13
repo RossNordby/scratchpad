@@ -283,7 +283,7 @@ namespace SolverPrototype
             ref var lane = ref Get(ref startVector, innerIndex);
             values = lane;
             //Even if the jit recognizes the count as constant, it doesn't unroll anything. Could do it manually, like we did in CopyLane.
-            for (int vectorIndex = Vector<T>.Count; vectorIndex < valueCount; ++vectorIndex)
+            for (int vectorIndex = 1; vectorIndex < valueCount; ++vectorIndex)
             {
                 //The multiplication should become a shift; the jit recognizes the count as constant.
                 Unsafe.Add(ref values, vectorIndex) = Unsafe.Add(ref lane, vectorIndex * Vector<T>.Count);
@@ -305,7 +305,7 @@ namespace SolverPrototype
             ref var lane = ref Get(ref startVector, innerIndex);
             lane = values;
             //Even if the jit recognizes the count as constant, it doesn't unroll anything. Could do it manually, like we did in CopyLane.
-            for (int vectorIndex = Vector<T>.Count; vectorIndex < valueCount; ++vectorIndex)
+            for (int vectorIndex = 1; vectorIndex < valueCount; ++vectorIndex)
             {
                 //The multiplication should become a shift; the jit recognizes the count as constant.
                 Unsafe.Add(ref lane, vectorIndex * Vector<T>.Count) = Unsafe.Add(ref values, vectorIndex);

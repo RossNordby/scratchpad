@@ -232,7 +232,7 @@ namespace SolverPrototype.CollisionDetection
                         description.FrictionCoefficient = material.FrictionCoefficient;
                         description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
                         description.SpringSettings = material.SpringSettings;
-                        description.SurfaceBasis = manifold->ConvexSurfaceBasis;
+                        description.Normal = manifold->ConvexNormal;
 
                         //TODO: Check init hack.
                         UpdateConstraint<ContactManifold4Constraint, TCollisionCache, ConstraintCache4, TBodyHandles>(

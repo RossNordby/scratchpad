@@ -30,7 +30,7 @@ namespace SolverPrototype.Constraints
         public ManifoldContactDataAOS Contact2;
         public ManifoldContactDataAOS Contact3;
         public float FrictionCoefficient;
-        public Quaternion SurfaceBasis;
+        public Vector3 Normal;
         public SpringSettingsAOS SpringSettings;
         public float MaximumRecoveryVelocity;
 
@@ -78,19 +78,18 @@ namespace SolverPrototype.Constraints
 
             Unsafe.Add(ref lane, 24 * Vector<float>.Count) = FrictionCoefficient;
 
-            Unsafe.Add(ref lane, 25 * Vector<float>.Count) = SurfaceBasis.X;
-            Unsafe.Add(ref lane, 26 * Vector<float>.Count) = SurfaceBasis.Y;
-            Unsafe.Add(ref lane, 27 * Vector<float>.Count) = SurfaceBasis.Z;
-            Unsafe.Add(ref lane, 28 * Vector<float>.Count) = SurfaceBasis.W;
+            Unsafe.Add(ref lane, 25 * Vector<float>.Count) = Normal.X;
+            Unsafe.Add(ref lane, 26 * Vector<float>.Count) = Normal.Y;
+            Unsafe.Add(ref lane, 27 * Vector<float>.Count) = Normal.Z;
 
-            Unsafe.Add(ref lane, 29 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
-            Unsafe.Add(ref lane, 30 * Vector<float>.Count) = SpringSettings.DampingRatio;
-            Unsafe.Add(ref lane, 31 * Vector<float>.Count) = MaximumRecoveryVelocity;
+            Unsafe.Add(ref lane, 28 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
+            Unsafe.Add(ref lane, 29 * Vector<float>.Count) = SpringSettings.DampingRatio;
+            Unsafe.Add(ref lane, 30 * Vector<float>.Count) = MaximumRecoveryVelocity;
 
-            Unsafe.Add(ref lane, 32 * Vector<float>.Count) = Contact0.PenetrationDepth;
-            Unsafe.Add(ref lane, 33 * Vector<float>.Count) = Contact1.PenetrationDepth;
-            Unsafe.Add(ref lane, 34 * Vector<float>.Count) = Contact2.PenetrationDepth;
-            Unsafe.Add(ref lane, 35 * Vector<float>.Count) = Contact3.PenetrationDepth;
+            Unsafe.Add(ref lane, 31 * Vector<float>.Count) = Contact0.PenetrationDepth;
+            Unsafe.Add(ref lane, 32 * Vector<float>.Count) = Contact1.PenetrationDepth;
+            Unsafe.Add(ref lane, 33 * Vector<float>.Count) = Contact2.PenetrationDepth;
+            Unsafe.Add(ref lane, 34 * Vector<float>.Count) = Contact3.PenetrationDepth;
 
 
 
@@ -130,19 +129,18 @@ namespace SolverPrototype.Constraints
 
             description.FrictionCoefficient = Unsafe.Add(ref lane, 24 * Vector<float>.Count);
 
-            description.SurfaceBasis.X = Unsafe.Add(ref lane, 25 * Vector<float>.Count);
-            description.SurfaceBasis.Y = Unsafe.Add(ref lane, 26 * Vector<float>.Count);
-            description.SurfaceBasis.Z = Unsafe.Add(ref lane, 27 * Vector<float>.Count);
-            description.SurfaceBasis.W = Unsafe.Add(ref lane, 28 * Vector<float>.Count);
+            description.Normal.X = Unsafe.Add(ref lane, 25 * Vector<float>.Count);
+            description.Normal.Y = Unsafe.Add(ref lane, 26 * Vector<float>.Count);
+            description.Normal.Z = Unsafe.Add(ref lane, 27 * Vector<float>.Count);
 
-            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 29 * Vector<float>.Count);
-            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 30 * Vector<float>.Count);
-            description.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 31 * Vector<float>.Count);
+            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 28 * Vector<float>.Count);
+            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 29 * Vector<float>.Count);
+            description.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 30 * Vector<float>.Count);
 
-            description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 32 * Vector<float>.Count);
-            description.Contact1.PenetrationDepth = Unsafe.Add(ref lane, 33 * Vector<float>.Count);
-            description.Contact2.PenetrationDepth = Unsafe.Add(ref lane, 34 * Vector<float>.Count);
-            description.Contact3.PenetrationDepth = Unsafe.Add(ref lane, 35 * Vector<float>.Count);
+            description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 31 * Vector<float>.Count);
+            description.Contact1.PenetrationDepth = Unsafe.Add(ref lane, 32 * Vector<float>.Count);
+            description.Contact2.PenetrationDepth = Unsafe.Add(ref lane, 33 * Vector<float>.Count);
+            description.Contact3.PenetrationDepth = Unsafe.Add(ref lane, 34 * Vector<float>.Count);
 
         }
 

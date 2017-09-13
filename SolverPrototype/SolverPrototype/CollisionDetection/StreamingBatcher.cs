@@ -122,7 +122,7 @@ namespace SolverPrototype.CollisionDetection
             //This allocates a lot of garbage due to frequently resizing, but it does not matter- task registration a one time thing at program initialization.
             //Having tight bounds is more useful for performance in the end (by virtue of having a marginally simpler heap).
             int newCount = count + 1;
-            if (newCount > tasks.Length)
+            if (tasks == null || newCount > tasks.Length)
                 Array.Resize(ref tasks, newCount);
             if (index < count)
             {
@@ -243,7 +243,8 @@ namespace SolverPrototype.CollisionDetection
     {
         public TShapeA A;
         public TShapeB B;
-        public BodyPose RelativePose;
+        public BodyPose PoseA;
+        public BodyPose PoseB;
         public TypedIndex Continuation;
     }
 
@@ -279,7 +280,7 @@ namespace SolverPrototype.CollisionDetection
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
-            ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose relativePose,
+            ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
             TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations
@@ -289,15 +290,19 @@ namespace SolverPrototype.CollisionDetection
             ref var pairData = ref batch.AllocateUnsafely<RigidPair<TShapeA, TShapeB>>();
             pairData.A = shapeA;
             pairData.B = shapeB;
-            pairData.RelativePose = relativePose;
+            pairData.PoseA = poseA;
+            pairData.PoseB = poseB;
+            pairData.Continuation = continuationId;
             if (batch.Count == reference.BatchSize)
             {
                 typeMatrix[reference.TaskIndex].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
+                batch.Count = 0;
+                batch.ByteCount = 0;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose relativePose,
+        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
              TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
              where TShapeA : struct, IShape where TShapeB : struct, IShape
              where TContinuations : struct, IContinuations
@@ -327,11 +332,11 @@ namespace SolverPrototype.CollisionDetection
             if (typeof(TShapeA) != typeof(TShapeB) && TypeIds<IShape>.GetId<TShapeA>() != reference.ExpectedFirstTypeId)
             {
                 //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
-                Add(ref reference, ref shapeB, ref shapeA, ref relativePose, continuationId, ref continuations, ref filters);
+                Add(ref reference, ref shapeB, ref shapeA, ref poseB, ref poseA, continuationId, ref continuations, ref filters);
             }
             else
             {
-                Add(ref reference, ref shapeA, ref shapeB, ref relativePose, continuationId, ref continuations, ref filters);
+                Add(ref reference, ref shapeA, ref shapeB, ref poseA, ref poseB, continuationId, ref continuations, ref filters);
             }
         }
 
@@ -349,10 +354,14 @@ namespace SolverPrototype.CollisionDetection
                 {
                     typeMatrix.tasks[i].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
                 }
+                //Dispose of the batch and any associated buffers; since the flush is one pass, we won't be needing this again.
                 if (batch.Buffer.Allocated)
                 {
-                    //Dispose of the batch and any associated buffers; since the flush is one pass, we won't be needing this again.
                     pool.Return(ref batch.Buffer);
+                }
+                //Note that the local continuations are not guaranteed to be allocated when the batch is; many tasks don't have any associated continuations.
+                if (localContinuations[i].Buffer.Allocated)
+                {
                     pool.Return(ref localContinuations[i].Buffer);
                 }
             }

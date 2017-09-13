@@ -28,14 +28,8 @@ namespace SolverPrototypeTests
                 },
                 MaximumRecoveryVelocity = 1f,
                 FrictionCoefficient = 1,
+                Normal = unitY
             };
-            Matrix3x3 basisMatrix;
-            basisMatrix.X = unitX;
-            basisMatrix.Y = unitY;
-            basisMatrix.Z = unitZ;
-            Debug.Assert(basisMatrix.Determinant() == 1);
-            Quaternion.CreateFromRotationMatrix(ref basisMatrix, out description.SurfaceBasis);
-            Matrix3x3.CreateFromQuaternion(ref description.SurfaceBasis, out var test);
 
             for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
             {

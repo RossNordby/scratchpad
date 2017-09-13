@@ -67,7 +67,7 @@ namespace SolverPrototype.CollisionDetection
     /// </summary>
     /// <remarks>The idea here is to unify producers and consumers of convex and nonconvex manifolds. In many cases, this type is far larger than is required- we could store far less
     /// when we know there's only going to be one contact. However, having a single representation keeps things a little simpler.</remarks>
-    [StructLayout(LayoutKind.Explicit, Size = 160)]
+    [StructLayout(LayoutKind.Explicit, Size = 144)]
     public unsafe struct ContactManifold
     {
         /// <summary>
@@ -103,31 +103,31 @@ namespace SolverPrototype.CollisionDetection
         [FieldOffset(92)]
         public int FeatureId3;
         /// <summary>
-        /// Surface basis of nonconvex contact 0. Value undefined if manifold is convex.
+        /// Normal of nonconvex contact 0. Value undefined if manifold is convex.
         /// </summary>
         [FieldOffset(96)]
-        public BEPUutilities2.Quaternion SurfaceBasis0;
+        public Vector3 Normal0;
         /// <summary>
-        /// Surface basis of nonconvex contact 1. Value undefined if manifold is convex.
+        /// Normal of nonconvex contact 1. Value undefined if manifold is convex.
         /// </summary>
-        [FieldOffset(112)]
-        public BEPUutilities2.Quaternion SurfaceBasis1;
+        [FieldOffset(108)]
+        public Vector3 Normal1;
         /// <summary>
-        /// Surface basis of nonconvex contact 2. Value undefined if manifold is convex.
+        /// Normal of nonconvex contact 2. Value undefined if manifold is convex.
         /// </summary>
-        [FieldOffset(128)]
-        public BEPUutilities2.Quaternion SurfaceBasis2;
+        [FieldOffset(120)]
+        public Vector3 Normal2;
         /// <summary>
-        /// Surface basis of nonconvex contact 3. Value undefined if manifold is convex.
+        /// Normal of nonconvex contact 3. Value undefined if manifold is convex.
         /// </summary>
-        [FieldOffset(144)]
-        public BEPUutilities2.Quaternion SurfaceBasis3;
+        [FieldOffset(132)]
+        public Vector3 Normal3;
 
         /// <summary>
-        /// Surface basis of the convex manifold. Value undefined if manifold is nonconvex.
+        /// Normal of the convex manifold. Value undefined if manifold is nonconvex.
         /// </summary>
         [FieldOffset(96)]
-        public BEPUutilities2.Quaternion ConvexSurfaceBasis;
+        public Vector3 ConvexNormal;
 
         /// <summary>
         /// Gets or sets whether the manifold should be considered convex.

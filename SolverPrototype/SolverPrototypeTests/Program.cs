@@ -16,6 +16,8 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            ConstraintDescriptionMappingTests.Test();
+            BatchedCollisionTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();
             //TreeTest.Test();
@@ -23,7 +25,6 @@ namespace SolverPrototypeTests
             //TriangularTests.Test();
             //LocalsinitCodegen.Test();
             //InterlockedOverheadTests.Test();
-            //ConstraintDescriptionMappingTests.Test();
             //LocalsinitCodegen.Test();
             //AutoTester.Test();
             //ContactManifoldConvergenceTests.Test();
@@ -32,6 +33,7 @@ namespace SolverPrototypeTests
             //ConstraintCacheOptimizationTests.Test();
             //SortTest.Test();
             //SpanCodegenTests.Test();
+            return;
 
             Console.ReadKey();
             DefaultTypes.Register();
