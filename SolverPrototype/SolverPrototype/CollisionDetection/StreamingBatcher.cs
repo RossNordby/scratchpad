@@ -141,12 +141,15 @@ namespace SolverPrototype.CollisionDetection
                 for (int i = index + 1; i < newCount; ++i)
                 {
                     var t = tasks[i];
-                    for (int j = 0; j < t.SubtaskIndices.Length; ++j)
+                    if (t.SubtaskIndices != null)
                     {
-                        ref var subtaskIndex = ref t.SubtaskIndices[j];
-                        if (subtaskIndex >= index)
+                        for (int j = 0; j < t.SubtaskIndices.Length; ++j)
                         {
-                            ++subtaskIndex;
+                            ref var subtaskIndex = ref t.SubtaskIndices[j];
+                            if (subtaskIndex >= index)
+                            {
+                                ++subtaskIndex;
+                            }
                         }
                     }
                 }
@@ -163,11 +166,14 @@ namespace SolverPrototype.CollisionDetection
             //This task may have some dependencies that are already present. In order for the batcher's flush to work with a single pass,
             //the tasks must be stored in dependency order- any task that can create more subwork has to appear earlier in the list than the subwork's task.
             //Where is the earliest one?
-            for (int i = 0; i < task.Subtasks.Length; ++i)
+            if (task.Subtasks != null)
             {
-                var subtaskIndex = Array.IndexOf(tasks, task.Subtasks[i], 0, count);
-                if (subtaskIndex >= 0 && subtaskIndex < index)
-                    index = subtaskIndex;
+                for (int i = 0; i < task.Subtasks.Length; ++i)
+                {
+                    var subtaskIndex = Array.IndexOf(tasks, task.Subtasks[i], 0, count);
+                    if (subtaskIndex >= 0 && subtaskIndex < index)
+                        index = subtaskIndex;
+                }
             }
 
             InsertTask(task, index);
@@ -188,25 +194,31 @@ namespace SolverPrototype.CollisionDetection
 
 #if DEBUG
             //Ensure that no task dependency cycles exist.
-            for (int i = 0; i < task.Subtasks.Length; ++i)
+            if (task.Subtasks != null)
             {
-                for (int j = i + 1; j < task.Subtasks.Length; ++j)
+                for (int i = 0; i < task.Subtasks.Length; ++i)
                 {
-                    Debug.Assert(Array.IndexOf(tasks[j].Subtasks, tasks[i]) == -1,
-                        "Tasks must be stored in a strict order of work generation- if a task generates work for another task, the receiving task must appear later in the list. " +
-                        "No cycles can exist.");
+                    for (int j = i + 1; j < task.Subtasks.Length; ++j)
+                    {
+                        Debug.Assert(Array.IndexOf(tasks[j].Subtasks, tasks[i]) == -1,
+                            "Tasks must be stored in a strict order of work generation- if a task generates work for another task, the receiving task must appear later in the list. " +
+                            "No cycles can exist.");
+                    }
                 }
             }
 #endif
             //Register any unregistered subtasks.
-            for (int i = 0; i < task.Subtasks.Length; ++i)
+            if (task.Subtasks != null)
             {
-                var subtaskIndex = Array.IndexOf(tasks, task.Subtasks[i], 0, count);
-                if (subtaskIndex < 0)
+                for (int i = 0; i < task.Subtasks.Length; ++i)
                 {
-                    subtaskIndex = Register(task);
+                    var subtaskIndex = Array.IndexOf(tasks, task.Subtasks[i], 0, count);
+                    if (subtaskIndex < 0)
+                    {
+                        subtaskIndex = Register(task);
+                    }
+                    task.SubtaskIndices[i] = subtaskIndex;
                 }
-                task.SubtaskIndices[i] = subtaskIndex;
             }
             Debug.Assert(tasks[index] == task, "No subtask registrations should move the original task; that would imply a cycle in the dependency graph.");
             return index;
@@ -337,7 +349,7 @@ namespace SolverPrototype.CollisionDetection
                 {
                     typeMatrix.tasks[i].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
                 }
-                if(batch.Buffer.Allocated)
+                if (batch.Buffer.Allocated)
                 {
                     //Dispose of the batch and any associated buffers; since the flush is one pass, we won't be needing this again.
                     pool.Return(ref batch.Buffer);

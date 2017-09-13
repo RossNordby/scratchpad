@@ -38,37 +38,6 @@ namespace SolverPrototype.CollisionDetection
     }
 
 
-    //Individual pair testers are designed to be used outside of the narrow phase. They need to be usable for queries and such, so all necessary data must be gathered externally.
-    public struct SpherePairTester
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Test(
-            ref Vector<float> radiiA, ref Vector<float> radiiB,
-            ref Vector<float> minimumDepth,
-            ref Vector3Wide relativePositionB,
-            out Vector3Wide relativeContactPosition, out Vector3Wide contactNormal, out Vector<float> depth, out Vector<int> contactCount)
-        {
-            Vector3Wide.Length(ref relativePositionB, out var centerDistance);
-            var inverseDistance = Vector<float>.One / centerDistance;
-            Vector3Wide.Scale(ref relativePositionB, ref inverseDistance, out contactNormal);
-            var normalIsValid = Vector.GreaterThan(centerDistance, Vector<float>.Zero);
-            //Arbitrarily choose the (0,1,0) if the two spheres are in the same position. Any unit length vector is equally valid.
-            contactNormal.X = Vector.ConditionalSelect(normalIsValid, contactNormal.X, Vector<float>.Zero);
-            contactNormal.Y = Vector.ConditionalSelect(normalIsValid, contactNormal.Y, Vector<float>.One);
-            contactNormal.Z = Vector.ConditionalSelect(normalIsValid, contactNormal.Z, Vector<float>.Zero);
-            depth = radiiA + radiiB - centerDistance;
-            //The position should be placed at the average of the extremePoint(a, a->b) and extremePoint(b, b->a). That puts it in the middle of the overlapping or nonoverlapping interval.
-            //The contact normal acts as the direction from a to b.
-            Vector3Wide.Scale(ref contactNormal, ref radiiA, out var extremeA);
-            Vector3Wide.Scale(ref contactNormal, ref radiiB, out var extremeB);
-            //note the following subtraction: contactNormal goes from a to b, so the negation pushes the extreme point in the proper direction from b to a.
-            Vector3Wide.Subtract(ref relativePositionB, ref extremeB, out extremeB);
-            Vector3Wide.Add(ref extremeA, ref extremeB, out relativeContactPosition);
-            var scale = new Vector<float>(0.5f);
-            Vector3Wide.Scale(ref relativeContactPosition, ref scale, out relativeContactPosition);
-            contactCount = Vector.ConditionalSelect(Vector.GreaterThanOrEqual(depth, minimumDepth), Vector<int>.One, Vector<int>.Zero);
-        }
-    }
 
     public struct CollidableDataSource
     {
