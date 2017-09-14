@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace SolverPrototype.CollisionDetection.CollisionTasks
@@ -65,6 +66,34 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             }
         }
 
+        struct TestWide
+        {
+            public Vector<float> RadiiA;
+            public Vector<float> RadiiB;
+            public Vector3Wide PositionA;
+            public Vector3Wide PositionB;
+        }
+        [StructLayout(LayoutKind.Explicit)]
+        struct TestLane
+        {
+            [FieldOffset(0)]
+            public float A;
+            [FieldOffset(16)]
+            public float B;
+            [FieldOffset(32)]
+            public float AX;
+            [FieldOffset(48)]
+            public float AY;
+            [FieldOffset(64)]
+            public float AZ;
+            [FieldOffset(80)]
+            public float BX;
+            [FieldOffset(96)]
+            public float BY;
+            [FieldOffset(112)]
+            public float BZ;
+        }
+
 
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
@@ -72,26 +101,74 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             ContactManifold manifold;
             var trustMeThisManifoldIsTotallyInitialized = &manifold;
             manifold.SetConvexityAndCount(1, true);
+
+            TestWide wide;
+            ref var baseLane = ref Unsafe.As<TestWide, float>(ref wide);
+
             for (int i = 0; i < batch.Count; i += Vector<float>.Count)
             {
                 ref var bundleStart = ref Unsafe.Add(ref start, i);
                 int countInBundle = batch.Count - i;
                 if (countInBundle > Vector<float>.Count)
                     countInBundle = Vector<float>.Count;
-                //TODO: It's likely that the compiler won't be able to fold all these independent transposition loops. Would be better to do all data at once in a single loop.
-                //Could do some generics abuse.
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.A.Radius, countInBundle, out var radiiA);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.B.Radius, countInBundle, out var radiiB);
-                Vector3Wide positionA, positionB;
-                //TODO: It's very possible that on most hardware using a scalar Vector3 subtract is faster than doing the AOS->SOA transpose followed by wide subtract.
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.X, countInBundle, out positionA.X);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Y, countInBundle, out positionA.Y);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Z, countInBundle, out positionA.Z);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.X, countInBundle, out positionB.X);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Y, countInBundle, out positionB.Y);
-                LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Z, countInBundle, out positionB.Z);
-                Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
-                SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
+                ////TODO: It's likely that the compiler won't be able to fold all these independent transposition loops. Would be better to do all data at once in a single loop.
+                ////Could do some generics abuse.
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.A.Radius, countInBundle, out var radiiA);
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.B.Radius, countInBundle, out var radiiB);
+                //Vector3Wide positionA, positionB;
+                ////TODO: It's very possible that on most hardware using a scalar Vector3 subtract is faster than doing the AOS->SOA transpose followed by wide subtract.
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.X, countInBundle, out positionA.X);
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Y, countInBundle, out positionA.Y);
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Z, countInBundle, out positionA.Z);
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.X, countInBundle, out positionB.X);
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Y, countInBundle, out positionB.Y);
+                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Z, countInBundle, out positionB.Z);
+                //Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
+                //SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
+
+
+                //Vector<float> radiiA, radiiB;
+                //ref var slotsRadiiA = ref Unsafe.As<Vector<float>, float>(ref radiiA);
+                //ref var slotsRadiiB = ref Unsafe.As<Vector<float>, float>(ref radiiB);
+                //Vector3Wide positionA, positionB;
+                //ref var slotsPositionAX = ref Unsafe.As<Vector<float>, float>(ref positionA.X);
+                //ref var slotsPositionAY = ref Unsafe.As<Vector<float>, float>(ref positionA.Y);
+                //ref var slotsPositionAZ = ref Unsafe.As<Vector<float>, float>(ref positionA.Z);
+                //ref var slotsPositionBX = ref Unsafe.As<Vector<float>, float>(ref positionB.X);
+                //ref var slotsPositionBY = ref Unsafe.As<Vector<float>, float>(ref positionB.Y);
+                //ref var slotsPositionBZ = ref Unsafe.As<Vector<float>, float>(ref positionB.Z);
+                //for (int j = 0; j < countInBundle; ++j)
+                //{
+                //    ref var pair = ref Unsafe.Add(ref bundleStart, j);
+                //    Unsafe.Add(ref slotsRadiiA, j) = pair.A.Radius;
+                //    Unsafe.Add(ref slotsRadiiB, j) = pair.B.Radius;
+                //    Unsafe.Add(ref slotsPositionAX, j) = pair.PoseA.Position.X;
+                //    Unsafe.Add(ref slotsPositionAY, j) = pair.PoseA.Position.Y;
+                //    Unsafe.Add(ref slotsPositionAZ, j) = pair.PoseA.Position.Z;
+                //    Unsafe.Add(ref slotsPositionBX, j) = pair.PoseB.Position.X;
+                //    Unsafe.Add(ref slotsPositionBY, j) = pair.PoseB.Position.Y;
+                //    Unsafe.Add(ref slotsPositionBZ, j) = pair.PoseB.Position.Z;
+                //}
+                //Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
+                //SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
+
+                for (int j = 0; j < countInBundle; ++j)
+                {
+                    ref var pair = ref Unsafe.Add(ref bundleStart, j);
+                    ref var lane = ref Unsafe.As<float, TestLane>(ref Unsafe.Add(ref baseLane, j));
+                    lane.A = pair.A.Radius;
+                    lane.B = pair.B.Radius;
+                    lane.AX = pair.PoseA.Position.X;
+                    lane.AY = pair.PoseA.Position.Y;
+                    lane.AZ = pair.PoseA.Position.Z;
+                    lane.BX = pair.PoseB.Position.X;
+                    lane.BY = pair.PoseB.Position.Y;
+                    lane.BZ = pair.PoseB.Position.Z;
+                }
+                Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out var relativePosition);
+                SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
+
+                Console.WriteLine(contactNormal);
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     GatherScatter.GetLane(ref contactNormal.X, j, ref manifold.ConvexNormal.X, 3);

@@ -8,7 +8,7 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
-
+  
   <PropertyGroup>
     <PreBuildEvent Condition="'$(Configuration)'=='Debug'">dotnet "$(SolutionDir)DemoContentBuilder\bin\$(Configuration)\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content" -debug</PreBuildEvent>
     <PreBuildEvent Condition="'$(Configuration)'=='Release'">dotnet "$(SolutionDir)DemoContentBuilder\bin\$(Configuration)\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
@@ -21,7 +21,7 @@
   <ItemGroup>
     <PackageReference Include="SharpDX" Version="4.0.1" />
     <PackageReference Include="SharpDX.Direct3D11" Version="4.0.1" />
-    <PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
+    <PackageReference Include="System.Numerics.Vectors" Version="4.5.0-preview2-25707-02" />
   </ItemGroup>
 
   <ItemGroup>

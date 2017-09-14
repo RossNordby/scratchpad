@@ -212,5 +212,11 @@ namespace SolverPrototype
             narrow.Y = Unsafe.Add(ref start, Vector<float>.Count);
             narrow.Z = Unsafe.Add(ref start, 2 * Vector<float>.Count);
         }
+
+
+        public override string ToString()
+        {
+            return $"<{X}, {Y}, {Z}>";
+        }
     }
 }
