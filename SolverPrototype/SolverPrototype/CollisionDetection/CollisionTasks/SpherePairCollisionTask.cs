@@ -48,24 +48,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             ShapeTypeIndexB = ShapeTypeIndexA;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void LocalAOSToSOA<TSourceContainer, TLane>(ref TLane source, int count, out Vector<TLane> lane) where TLane : struct
-        {
-            //TODO: Check for codegen issues. Type punning concerns.
-            Debug.Assert(count <= Vector<TLane>.Count);
-            int containerSizeInLanes = Unsafe.SizeOf<TSourceContainer>() / Unsafe.SizeOf<TLane>();
-            Debug.Assert(containerSizeInLanes * Unsafe.SizeOf<TLane>() == Unsafe.SizeOf<TSourceContainer>(),
-                "We assume a container evenly divisible by the size of the type of its lanes so that the container step can be expressed as lane steps.");
-            ref var laneSlot = ref Unsafe.As<Vector<TLane>, TLane>(ref lane);
-            laneSlot = source;
-            int sourceIndex = 0;
-            for (int i = 1; i < count; ++i)
-            {
-                sourceIndex += containerSizeInLanes;
-                Unsafe.Add(ref laneSlot, i) = Unsafe.Add(ref source, sourceIndex);
-            }
-        }
-
         struct PairWide
         {
             public Vector<float> RadiiA;
@@ -73,8 +55,13 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             public Vector3Wide PositionA;
             public Vector3Wide PositionB;
         }
+        //If we choose to go down this road, either you specify a unique lane stride for every intrinsic width or just pick a fixed length (64 byte+ for AVX512).
+        //If you pick a fixed width, the user will have to be aware that the structure spans multiple registers on most hardware.
+        //This has implications across the entire engine- the solver would be heavily hit. The question is... would the extra pipelining of beyond-intrinsic width win out over the
+        //extra register pressure?
+        //oooooooooooooooooooooooooooough. May be no other choice to take advantage of the next corefx intrinsics api.
         [StructLayout(LayoutKind.Explicit)]
-        struct PairLane
+        struct PairLane4
         {
             [FieldOffset(0)]
             public float A;
@@ -95,7 +82,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         }
 
         [StructLayout(LayoutKind.Explicit)]
-        struct Vector3Lane
+        struct Vector3Lane4
         {
             [FieldOffset(0)]
             public float X;
@@ -106,7 +93,8 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         }
 
 
-
+        //Every single collision task type will mirror this general layout.
+        //
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
             ref var start = ref Unsafe.As<byte, RigidPair<Sphere, Sphere>>(ref batch.Buffer[0]);
@@ -117,27 +105,19 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             PairWide wide;
             ref var baseLane = ref Unsafe.As<PairWide, float>(ref wide);
 
+            Vector3Wide contactNormal, contactPosition, relativePosition;
+            Vector<float> depth;
+            ref var normalLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactNormal);
+            ref var positionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactPosition);
+            ref var relativePositionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref relativePosition);
+            ref var depthLaneStart = ref Unsafe.As<Vector<float>, float>(ref depth);
+
             for (int i = 0; i < batch.Count; i += Vector<float>.Count)
             {
                 ref var bundleStart = ref Unsafe.Add(ref start, i);
                 int countInBundle = batch.Count - i;
                 if (countInBundle > Vector<float>.Count)
                     countInBundle = Vector<float>.Count;
-                ////TODO: It's likely that the compiler won't be able to fold all these independent transposition loops. Would be better to do all data at once in a single loop.
-                ////Could do some generics abuse.
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.A.Radius, countInBundle, out var radiiA);
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.B.Radius, countInBundle, out var radiiB);
-                //Vector3Wide positionA, positionB;
-                ////TODO: It's very possible that on most hardware using a scalar Vector3 subtract is faster than doing the AOS->SOA transpose followed by wide subtract.
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.X, countInBundle, out positionA.X);
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Y, countInBundle, out positionA.Y);
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseA.Position.Z, countInBundle, out positionA.Z);
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.X, countInBundle, out positionB.X);
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Y, countInBundle, out positionB.Y);
-                //LocalAOSToSOA<RigidPair<Sphere, Sphere>, float>(ref bundleStart.PoseB.Position.Z, countInBundle, out positionB.Z);
-                //Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
-                //SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
-
 
                 //Vector<float> radiiA, radiiB;
                 //ref var slotsRadiiA = ref Unsafe.As<Vector<float>, float>(ref radiiA);
@@ -163,11 +143,13 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 //}
                 //Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
                 //SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
-
+                
+                //TODO: Boy howdy it sure would be nice to have gathers and scatters. They aren't fundamentally faster on most hardware than just 
+                //direct scalar loads and insertions, but we don't exactly have access to high efficiency codegen for direct scalar loads and insertions either.
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     ref var pair = ref Unsafe.Add(ref bundleStart, j);
-                    ref var lane = ref Unsafe.As<float, PairLane>(ref Unsafe.Add(ref baseLane, j));
+                    ref var lane = ref Unsafe.As<float, PairLane4>(ref Unsafe.Add(ref baseLane, j));
                     lane.A = pair.A.Radius;
                     lane.B = pair.B.Radius;
                     lane.AX = pair.PoseA.Position.X;
@@ -177,45 +159,28 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                     lane.BY = pair.PoseB.Position.Y;
                     lane.BZ = pair.PoseB.Position.Z;
                 }
-                Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out var relativePosition);
-                SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
-
-                //can hoist..
-                ref var normalLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactNormal);
-                ref var positionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactPosition);
-                ref var relativePositionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref relativePosition);
-                ref var depthLaneStart = ref Unsafe.As<Vector<float>, float>(ref depth);
+                Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
+                SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out  depth);
+                
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     //If this doesn't suffer from the same type punning compiler bug, I'll be surprised.
-                    ref var normalLane = ref Unsafe.As<float, Vector3Lane>(ref Unsafe.Add(ref normalLaneStart, j));
-                    ref var positionLane = ref Unsafe.As<float, Vector3Lane>(ref Unsafe.Add(ref positionLaneStart, j));
-                    ref var relativePositionLane = ref Unsafe.As<float, Vector3Lane>(ref Unsafe.Add(ref relativePositionLaneStart, j));
+                    ref var normalLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref normalLaneStart, j));
+                    ref var positionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref positionLaneStart, j));
+                    ref var relativePositionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref relativePositionLaneStart, j));
                     manifold.ConvexNormal = new Vector3(normalLane.X, normalLane.Y, normalLane.Z);
                     manifold.Offset0 = new Vector3(positionLane.X, positionLane.Y, positionLane.Z);
                     manifold.OffsetB = new Vector3(relativePositionLane.X, relativePositionLane.Y, relativePositionLane.Z);
                     manifold.Depth0 = Unsafe.Add(ref depthLaneStart, j);
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
                 }
-                //Console.WriteLine(contactPosition);
-                //Console.WriteLine(contactNormal);
-                //compiler bugs are great :) :) :)
-                //this one is actually fixed in later versions of ryujit, but it's a bit much work to upgrade to that version at the moment
+                
                 //for (int j = 0; j < countInBundle; ++j)
                 //{
                 //    manifold.ConvexNormal = new Vector3(contactNormal.X[j], contactNormal.Y[j], contactNormal.Z[j]);
                 //    manifold.Offset0 = new Vector3(contactPosition.X[j], contactPosition.Y[j], contactPosition.Z[j]);
                 //    manifold.OffsetB = new Vector3(relativePosition.X[j], relativePosition.Y[j], relativePosition.Z[j]);
                 //    manifold.Depth0 = depth[j];
-                //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
-                //}
-                //for (int j = 0; j < countInBundle; ++j)
-                //{
-                //    GatherScatter.GetLane(ref contactNormal.X, j, ref manifold.ConvexNormal.X, 3);
-                //    GatherScatter.GetLane(ref contactPosition.X, j, ref manifold.Offset0.X, 3);
-                //    manifold.Depth0 = GatherScatter.Get(ref depth, j);
-                //    GatherScatter.GetLane(ref relativePosition.X, j, ref manifold.OffsetB.X, 3);
-
                 //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
                 //}
             }

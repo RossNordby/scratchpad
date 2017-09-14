@@ -1,4 +1,4 @@
-﻿using BEPUutilities2;
+﻿ using BEPUutilities2;
 using DemoContentLoader;
 using DemoRenderer.UI;
 using DemoUtilities;
@@ -17,7 +17,8 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             ConstraintDescriptionMappingTests.Test();
-            BatchedCollisionTests.Test();
+            //BatchedCollisionTests.Test();
+            ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();
             //TreeTest.Test();

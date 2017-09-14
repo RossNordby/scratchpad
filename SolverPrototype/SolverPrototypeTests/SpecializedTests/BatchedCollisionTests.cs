@@ -1,4 +1,5 @@
-﻿using BEPUutilities2.Memory;
+﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
 using SolverPrototype;
 using SolverPrototype.Collidables;
 using SolverPrototype.CollisionDetection;
@@ -63,6 +64,8 @@ namespace SolverPrototypeTests.SpecializedTests
             var end = Stopwatch.GetTimestamp();
             return (end - start) / (double)Stopwatch.Frequency;
         }
+
+
 
         public static void Test()
         {
