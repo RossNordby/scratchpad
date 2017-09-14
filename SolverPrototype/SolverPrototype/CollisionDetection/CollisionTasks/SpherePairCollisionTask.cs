@@ -66,7 +66,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             }
         }
 
-        struct TestWide
+        struct PairWide
         {
             public Vector<float> RadiiA;
             public Vector<float> RadiiB;
@@ -74,7 +74,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             public Vector3Wide PositionB;
         }
         [StructLayout(LayoutKind.Explicit)]
-        struct TestLane
+        struct PairLane
         {
             [FieldOffset(0)]
             public float A;
@@ -94,6 +94,18 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             public float BZ;
         }
 
+        [StructLayout(LayoutKind.Explicit)]
+        struct Vector3Lane
+        {
+            [FieldOffset(0)]
+            public float X;
+            [FieldOffset(16)]
+            public float Y;
+            [FieldOffset(32)]
+            public float Z;
+        }
+
+
 
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
@@ -102,8 +114,8 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             var trustMeThisManifoldIsTotallyInitialized = &manifold;
             manifold.SetConvexityAndCount(1, true);
 
-            TestWide wide;
-            ref var baseLane = ref Unsafe.As<TestWide, float>(ref wide);
+            PairWide wide;
+            ref var baseLane = ref Unsafe.As<PairWide, float>(ref wide);
 
             for (int i = 0; i < batch.Count; i += Vector<float>.Count)
             {
@@ -155,7 +167,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     ref var pair = ref Unsafe.Add(ref bundleStart, j);
-                    ref var lane = ref Unsafe.As<float, TestLane>(ref Unsafe.Add(ref baseLane, j));
+                    ref var lane = ref Unsafe.As<float, PairLane>(ref Unsafe.Add(ref baseLane, j));
                     lane.A = pair.A.Radius;
                     lane.B = pair.B.Radius;
                     lane.AX = pair.PoseA.Position.X;
@@ -168,16 +180,44 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out var relativePosition);
                 SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
 
-                Console.WriteLine(contactNormal);
+                //can hoist..
+                ref var normalLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactNormal);
+                ref var positionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactPosition);
+                ref var relativePositionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref relativePosition);
+                ref var depthLaneStart = ref Unsafe.As<Vector<float>, float>(ref depth);
                 for (int j = 0; j < countInBundle; ++j)
                 {
-                    GatherScatter.GetLane(ref contactNormal.X, j, ref manifold.ConvexNormal.X, 3);
-                    GatherScatter.GetLane(ref contactPosition.X, j, ref manifold.Offset0.X, 3);
-                    manifold.Depth0 = GatherScatter.Get(ref depth, j);
-                    GatherScatter.GetLane(ref relativePosition.X, j, ref manifold.OffsetB.X, 3);
-
+                    //If this doesn't suffer from the same type punning compiler bug, I'll be surprised.
+                    ref var normalLane = ref Unsafe.As<float, Vector3Lane>(ref Unsafe.Add(ref normalLaneStart, j));
+                    ref var positionLane = ref Unsafe.As<float, Vector3Lane>(ref Unsafe.Add(ref positionLaneStart, j));
+                    ref var relativePositionLane = ref Unsafe.As<float, Vector3Lane>(ref Unsafe.Add(ref relativePositionLaneStart, j));
+                    manifold.ConvexNormal = new Vector3(normalLane.X, normalLane.Y, normalLane.Z);
+                    manifold.Offset0 = new Vector3(positionLane.X, positionLane.Y, positionLane.Z);
+                    manifold.OffsetB = new Vector3(relativePositionLane.X, relativePositionLane.Y, relativePositionLane.Z);
+                    manifold.Depth0 = Unsafe.Add(ref depthLaneStart, j);
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
                 }
+                //Console.WriteLine(contactPosition);
+                //Console.WriteLine(contactNormal);
+                //compiler bugs are great :) :) :)
+                //this one is actually fixed in later versions of ryujit, but it's a bit much work to upgrade to that version at the moment
+                //for (int j = 0; j < countInBundle; ++j)
+                //{
+                //    manifold.ConvexNormal = new Vector3(contactNormal.X[j], contactNormal.Y[j], contactNormal.Z[j]);
+                //    manifold.Offset0 = new Vector3(contactPosition.X[j], contactPosition.Y[j], contactPosition.Z[j]);
+                //    manifold.OffsetB = new Vector3(relativePosition.X[j], relativePosition.Y[j], relativePosition.Z[j]);
+                //    manifold.Depth0 = depth[j];
+                //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
+                //}
+                //for (int j = 0; j < countInBundle; ++j)
+                //{
+                //    GatherScatter.GetLane(ref contactNormal.X, j, ref manifold.ConvexNormal.X, 3);
+                //    GatherScatter.GetLane(ref contactPosition.X, j, ref manifold.Offset0.X, 3);
+                //    manifold.Depth0 = GatherScatter.Get(ref depth, j);
+                //    GatherScatter.GetLane(ref relativePosition.X, j, ref manifold.OffsetB.X, 3);
+
+                //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
+                //}
             }
         }
     }
