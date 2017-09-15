@@ -28,7 +28,7 @@ namespace SolverPrototypeTests.SpecializedTests
         public static void Add(ref ScalarWideUnsafeAdds a, ref ScalarWideUnsafeAdds b, out ScalarWideUnsafeAdds result)
         {
             int bundleCount = size / (4 * Vector<float>.Count);
-            if (bundleCount <= 4 && System.Numerics.Vector.IsHardwareAccelerated)
+            if (bundleCount <= 4 && Vector.IsHardwareAccelerated)
             {
                 ref var startA = ref Unsafe.As<ScalarWideUnsafeAdds, Vector<float>>(ref a);
                 ref var startB = ref Unsafe.As<ScalarWideUnsafeAdds, Vector<float>>(ref b);
