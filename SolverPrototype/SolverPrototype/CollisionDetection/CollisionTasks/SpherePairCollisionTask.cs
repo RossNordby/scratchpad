@@ -135,57 +135,11 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             public T T15;
         }
 
-        struct WhiningNoises4<TContainer> where TContainer : struct
-        {
-            //This is very gross.
-            public TContainer TContainer0;
-            public TContainer TContainer1;
-            public TContainer TContainer2;
-            public TContainer TContainer3;
-        }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Gather2<T, TContainer>(ref Vector<T> vector, ref TContainer containers, int offsetInElements) where T : struct where TContainer : struct
+        static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer sourceContainers, int offsetInElements) where T : struct where TContainer : struct
         {
-            //Unfortunately, there is a fundamental mismatch between the ideal form of gathering with hardware acceleration and without hardware acceleration.
-            //The 'count' serves as a mask in a scalar version, but introduces full branches.
-            //TODO: May be worth an unconditional gather... would require a remainder loop.
-            if (Vector<T>.Count == 2)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
-            }
-            else if (Vector<T>.Count == 4)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref vector);
-                ref var source = ref Unsafe.As<T, WhiningNoises4<TContainer>>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref containers), offsetInElements));
-                remapped.T0 = Unsafe.As<TContainer, T>(ref source.TContainer0);
-                remapped.T1 = Unsafe.As<TContainer, T>(ref source.TContainer1);
-                remapped.T2 = Unsafe.As<TContainer, T>(ref source.TContainer2);
-                remapped.T3 = Unsafe.As<TContainer, T>(ref source.TContainer3);
-            }
-            else if (Vector<T>.Count == 8)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref vector);
-            }
-            else if (Vector<T>.Count == 16)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref vector);
-            }
-            else
-            {
-                throw new InvalidOperationException("Unsupported type or vector size.");
-            }
-        }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer containers, int offsetInElements) where T : struct where TContainer : struct
-        {
-            //Unfortunately, there is a fundamental mismatch between the ideal form of gathering with hardware acceleration and without hardware acceleration.
-            //The 'count' serves as a mask in a scalar version, but introduces full branches.
-            //TODO: May be worth an unconditional gather... would require a remainder loop.
-            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref containers), offsetInElements));
+            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref sourceContainers), offsetInElements));
             if (Vector<T>.Count == 2)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
@@ -238,6 +192,65 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Scatter<T, TContainer>(ref Vector<T> vector, ref TContainer targetContainers, int offsetInElements) where T : struct where TContainer : struct
+        {
+            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref targetContainers), offsetInElements));
+            if (Vector<T>.Count == 2)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+            }
+            else if (Vector<T>.Count == 4)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
+            }
+            else if (Vector<T>.Count == 8)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4)) = remapped.T4;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5)) = remapped.T5;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6)) = remapped.T6;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7)) = remapped.T7;
+            }
+            else if (Vector<T>.Count == 16)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4)) = remapped.T4;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5)) = remapped.T5;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6)) = remapped.T6;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7)) = remapped.T7;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 8)) = remapped.T8;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 9)) = remapped.T9;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 10)) = remapped.T10;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 11)) = remapped.T11;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 12)) = remapped.T12;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 13)) = remapped.T13;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 14)) = remapped.T14;
+                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 15)) = remapped.T15;
+            }
+            else
+            {
+                throw new InvalidOperationException("Unsupported type or vector size.");
+            }
+        }
+
+
+        //TODO: In the future, maybe once codegen improves a little bit, it might be a good idea to revisit this remainder gather to get rid of the redundant per-property branches.
+        //Worst case scenario, you could create a bunch of overloads for different property counts. ooooooooooooooof.
         static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer containers, int offsetInElements, int count) where T : struct where TContainer : struct
         {
             //Unfortunately, there is a fundamental mismatch between the ideal form of gathering with hardware acceleration and without hardware acceleration.
@@ -328,10 +341,12 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
             ref var start = ref Unsafe.As<byte, RigidPair<Sphere, Sphere>>(ref batch.Buffer[0]);
-            ContactManifold manifold;
-            var trustMeThisManifoldIsTotallyInitialized = &manifold;
-            manifold.SetConvexityAndCount(1, true);
-
+            var manifolds = stackalloc ContactManifold[Vector<float>.Count];
+            var trustMeThisManifoldIsTotallyInitialized = &manifolds;
+            for (int i = 0; i < Vector<float>.Count; ++i)
+            {
+                manifolds[i].SetConvexityAndCount(1, true);
+            }
             PairWide wide;
             ref var baseLane = ref Unsafe.As<PairWide, float>(ref wide);
 
@@ -349,31 +364,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 if (countInBundle > Vector<float>.Count)
                     countInBundle = Vector<float>.Count;
 
-                //Vector<float> radiiA, radiiB;
-                //ref var slotsRadiiA = ref Unsafe.As<Vector<float>, float>(ref radiiA);
-                //ref var slotsRadiiB = ref Unsafe.As<Vector<float>, float>(ref radiiB);
-                //Vector3Wide positionA, positionB;
-                //ref var slotsPositionAX = ref Unsafe.As<Vector<float>, float>(ref positionA.X);
-                //ref var slotsPositionAY = ref Unsafe.As<Vector<float>, float>(ref positionA.Y);
-                //ref var slotsPositionAZ = ref Unsafe.As<Vector<float>, float>(ref positionA.Z);
-                //ref var slotsPositionBX = ref Unsafe.As<Vector<float>, float>(ref positionB.X);
-                //ref var slotsPositionBY = ref Unsafe.As<Vector<float>, float>(ref positionB.Y);
-                //ref var slotsPositionBZ = ref Unsafe.As<Vector<float>, float>(ref positionB.Z);
-                //for (int j = 0; j < countInBundle; ++j)
-                //{
-                //    ref var pair = ref Unsafe.Add(ref bundleStart, j);
-                //    Unsafe.Add(ref slotsRadiiA, j) = pair.A.Radius;
-                //    Unsafe.Add(ref slotsRadiiB, j) = pair.B.Radius;
-                //    Unsafe.Add(ref slotsPositionAX, j) = pair.PoseA.Position.X;
-                //    Unsafe.Add(ref slotsPositionAY, j) = pair.PoseA.Position.Y;
-                //    Unsafe.Add(ref slotsPositionAZ, j) = pair.PoseA.Position.Z;
-                //    Unsafe.Add(ref slotsPositionBX, j) = pair.PoseB.Position.X;
-                //    Unsafe.Add(ref slotsPositionBY, j) = pair.PoseB.Position.Y;
-                //    Unsafe.Add(ref slotsPositionBZ, j) = pair.PoseB.Position.Z;
-                //}
-                //Vector3Wide.Subtract(ref positionB, ref positionA, out var relativePosition);
-                //SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out var contactPosition, out var contactNormal, out var depth);
-
                 Gather(ref wide.RadiiA, ref bundleStart, 0);
                 Gather(ref wide.RadiiB, ref bundleStart, 1);
                 Gather(ref wide.PositionA.X, ref bundleStart, 2);
@@ -383,38 +373,36 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Gather(ref wide.PositionB.Y, ref bundleStart, 10);
                 Gather(ref wide.PositionB.Z, ref bundleStart, 11);
 
-
-                //TODO: Boy howdy it sure would be nice to have gathers and scatters. They aren't fundamentally faster on most hardware than just 
-                //direct scalar loads and insertions, but we don't exactly have access to high efficiency codegen for direct scalar loads and insertions either.
-                //for (int j = 0; j < countInBundle; ++j)
-                //{
-                //    ref var pair = ref Unsafe.Add(ref bundleStart, j);
-                //    ref var lane = ref Unsafe.As<float, PairLane4>(ref Unsafe.Add(ref baseLane, j));
-                //    lane.A = pair.A.Radius;
-                //    lane.B = pair.B.Radius;
-                //    lane.AX = pair.PoseA.Position.X;
-                //    lane.AY = pair.PoseA.Position.Y;
-                //    lane.AZ = pair.PoseA.Position.Z;
-                //    lane.BX = pair.PoseB.Position.X;
-                //    lane.BY = pair.PoseB.Position.Y;
-                //    lane.BZ = pair.PoseB.Position.Z;
-                //}
                 Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
                 SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
 
+                //for (int j = 0; j < countInBundle; ++j)
+                //{
+                //    //If this doesn't suffer from the same type punning compiler bug, I'll be surprised.
+                //    ref var normalLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref normalLaneStart, j));
+                //    ref var positionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref positionLaneStart, j));
+                //    ref var relativePositionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref relativePositionLaneStart, j));
+                //    manifold.ConvexNormal = new Vector3(normalLane.X, normalLane.Y, normalLane.Z);
+                //    manifold.Offset0 = new Vector3(positionLane.X, positionLane.Y, positionLane.Z);
+                //    manifold.OffsetB = new Vector3(relativePositionLane.X, relativePositionLane.Y, relativePositionLane.Z);
+                //    manifold.Depth0 = Unsafe.Add(ref depthLaneStart, j);
+                //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
+                //}
+
+                Scatter(ref relativePosition.X, ref *manifolds, 0);
+                Scatter(ref relativePosition.Y, ref *manifolds, 1);
+                Scatter(ref relativePosition.Z, ref *manifolds, 2);
+                Scatter(ref contactPosition.X, ref *manifolds, 4);
+                Scatter(ref contactPosition.Y, ref *manifolds, 5);
+                Scatter(ref contactPosition.Z, ref *manifolds, 6);
+                Scatter(ref depth, ref *manifolds, 16);
+                Scatter(ref contactNormal.X, ref *manifolds, 24);
+                Scatter(ref contactNormal.Y, ref *manifolds, 25);
+                Scatter(ref contactNormal.Z, ref *manifolds, 26);
                 for (int j = 0; j < countInBundle; ++j)
                 {
-                    //If this doesn't suffer from the same type punning compiler bug, I'll be surprised.
-                    ref var normalLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref normalLaneStart, j));
-                    ref var positionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref positionLaneStart, j));
-                    ref var relativePositionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref relativePositionLaneStart, j));
-                    manifold.ConvexNormal = new Vector3(normalLane.X, normalLane.Y, normalLane.Z);
-                    manifold.Offset0 = new Vector3(positionLane.X, positionLane.Y, positionLane.Z);
-                    manifold.OffsetB = new Vector3(relativePositionLane.X, relativePositionLane.Y, relativePositionLane.Z);
-                    manifold.Depth0 = Unsafe.Add(ref depthLaneStart, j);
-                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]);
                 }
-
                 //for (int j = 0; j < countInBundle; ++j)
                 //{
                 //    manifold.ConvexNormal = new Vector3(contactNormal.X[j], contactNormal.Y[j], contactNormal.Z[j]);

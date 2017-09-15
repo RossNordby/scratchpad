@@ -1,5 +1,6 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+﻿<Project>
+  <!--Note workaround for macro evaluation issue.-->
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.props" />
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Version>2.0.0</Version>
@@ -12,12 +13,13 @@
     <PackageIconUrl>https://raw.githubusercontent.com/RossNordby/bepuphysics1/master/Documentation/images/readme/bepuphysicslogo256.png</PackageIconUrl>
     <PackageLicenseUrl>https://github.com/RossNordby/scratchpad/blob/master/LICENSE.md</PackageLicenseUrl>
   </PropertyGroup>
+  <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
   
   <!-- TODO: Why is this necessary? It refers to 1.6.1 rather than 2.0 without this, despite the target framework being set to 2.0 above. -->
   <PropertyGroup>
     <NetStandardImplicitPackageVersion>2.0</NetStandardImplicitPackageVersion>
   </PropertyGroup>
-  
+    
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <DebugType>full</DebugType>
