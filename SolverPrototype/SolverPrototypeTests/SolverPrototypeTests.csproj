@@ -7,12 +7,17 @@
     <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>
     <!--<RuntimeFrameworkVersion>2.1.0-preview2-25616-02</RuntimeFrameworkVersion>-->
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Configurations>Debug;Release;ReleaseStrip</Configurations>
   </PropertyGroup>
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
   
   <PropertyGroup>
     <PreBuildEvent Condition="'$(Configuration)'=='Debug'">dotnet "$(SolutionDir)DemoContentBuilder\bin\$(Configuration)\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content" -debug</PreBuildEvent>
-    <PreBuildEvent Condition="'$(Configuration)'=='Release'">dotnet "$(SolutionDir)DemoContentBuilder\bin\$(Configuration)\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='Release'">dotnet "$(SolutionDir)DemoContentBuilder\bin\Release\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
+    <PreBuildEvent Condition="'$(Configuration)'=='ReleaseStrip'">dotnet "$(SolutionDir)DemoContentBuilder\bin\Release\netcoreapp2.0\DemoContentBuilder.dll" "$(ProjectDir)$(ProjectName).content"</PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent Condition="'$(Configuration)'=='ReleaseStrip'">dotnet "$(SolutionDir)Dependencies\ilopt\ilopt.dll" "$(TargetPath)"</PostBuildEvent>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
@@ -24,6 +29,14 @@
     <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStrip|AnyCPU'">
+    <Optimize>true</Optimize>
+    <DefineConstants>TRACE;RELEASE;NETCOREAPP2_0</DefineConstants>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

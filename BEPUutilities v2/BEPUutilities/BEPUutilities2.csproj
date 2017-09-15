@@ -12,9 +12,14 @@
     <RepositoryUrl>https://github.com/RossNordby/scratchpad</RepositoryUrl>
     <PackageIconUrl>https://raw.githubusercontent.com/RossNordby/bepuphysics1/master/Documentation/images/readme/bepuphysicslogo256.png</PackageIconUrl>
     <PackageLicenseUrl>https://github.com/RossNordby/scratchpad/blob/master/LICENSE.md</PackageLicenseUrl>
+    <Configurations>Debug;Release;ReleaseStrip</Configurations>
   </PropertyGroup>
   <Import Sdk="Microsoft.NET.Sdk" Project="Sdk.targets" />
-  
+
+  <PropertyGroup>
+    <PostBuildEvent Condition="'$(Configuration)'=='ReleaseStrip'">dotnet "$(SolutionDir)Dependencies\ilopt\ilopt.dll" "$(TargetPath)"</PostBuildEvent>
+  </PropertyGroup>
+
   <!-- TODO: Why is this necessary? It refers to 1.6.1 rather than 2.0 without this, despite the target framework being set to 2.0 above. -->
   <PropertyGroup>
     <NetStandardImplicitPackageVersion>2.0</NetStandardImplicitPackageVersion>
@@ -25,13 +30,30 @@
     <DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
+    
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStrip|AnyCPU'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStrip|x86'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseStrip|x64'">
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
