@@ -136,6 +136,181 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         }
 
 
+
+        /// <summary>
+        /// Gathers values at a given set of element-width offsets from a base address and puts them into a vector.
+        /// </summary>
+        /// <typeparam name="T">Type to be gathered.</typeparam>
+        /// <param name="sourceAddress">Base address to which the offsets are added.</param>
+        /// <param name="offsets">Offsets to gather values from. Length must match or exceed vector width for type T.</param>
+        /// <param name="target">Vector to store gathered values into.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static unsafe void Gather<T>(ref T sourceAddress, int* offsets, ref Vector<T> target) where T : struct
+        {
+            if (Vector<T>.Count == 2)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets[0]);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, offsets[1]);
+            }
+            else if (Vector<T>.Count == 4)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets[0]);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, offsets[1]);
+                remapped.T2 = Unsafe.Add(ref sourceAddress, offsets[2]);
+                remapped.T3 = Unsafe.Add(ref sourceAddress, offsets[3]);
+            }
+            else if (Vector<T>.Count == 8)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets[0]);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, offsets[1]);
+                remapped.T2 = Unsafe.Add(ref sourceAddress, offsets[2]);
+                remapped.T3 = Unsafe.Add(ref sourceAddress, offsets[3]);
+                remapped.T4 = Unsafe.Add(ref sourceAddress, offsets[4]);
+                remapped.T5 = Unsafe.Add(ref sourceAddress, offsets[5]);
+                remapped.T6 = Unsafe.Add(ref sourceAddress, offsets[6]);
+                remapped.T7 = Unsafe.Add(ref sourceAddress, offsets[7]);
+            }
+            else if (Vector<T>.Count == 16)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress,  offsets[0]);
+                remapped.T1 = Unsafe.Add(ref sourceAddress,  offsets[1]);
+                remapped.T2 = Unsafe.Add(ref sourceAddress,  offsets[2]);
+                remapped.T3 = Unsafe.Add(ref sourceAddress,  offsets[3]);
+                remapped.T4 = Unsafe.Add(ref sourceAddress,  offsets[4]);
+                remapped.T5 = Unsafe.Add(ref sourceAddress,  offsets[5]);
+                remapped.T6 = Unsafe.Add(ref sourceAddress,  offsets[6]);
+                remapped.T7 = Unsafe.Add(ref sourceAddress,  offsets[7]);
+                remapped.T8 = Unsafe.Add(ref sourceAddress,  offsets[8]);
+                remapped.T9 = Unsafe.Add(ref sourceAddress,  offsets[9]);
+                remapped.T10 = Unsafe.Add(ref sourceAddress, offsets[10]);
+                remapped.T11 = Unsafe.Add(ref sourceAddress, offsets[11]);
+                remapped.T12 = Unsafe.Add(ref sourceAddress, offsets[12]);
+                remapped.T13 = Unsafe.Add(ref sourceAddress, offsets[13]);
+                remapped.T14 = Unsafe.Add(ref sourceAddress, offsets[14]);
+                remapped.T15 = Unsafe.Add(ref sourceAddress, offsets[15]);
+            }
+        }
+
+        /// <summary>
+        /// Gathers values at a given set of element-width offsets from a base address and puts them into a vector.
+        /// </summary>
+        /// <typeparam name="T">Type to be gathered.</typeparam>
+        /// <param name="sourceAddress">Base address to which the offsets are added.</param>
+        /// <param name="offsets">Offsets to gather values from. Length must match or exceed vector width for type T.</param>
+        /// <param name="target">Vector to store gathered values into.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Gather<T>(ref T sourceAddress, ref int offsets, ref Vector<T> target) where T : struct
+        {
+            if (Vector<T>.Count == 2)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 1));
+            }
+            else if (Vector<T>.Count == 4)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 1));
+                remapped.T2 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 2));
+                remapped.T3 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 3));
+            }
+            else if (Vector<T>.Count == 8)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 1));
+                remapped.T2 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 2));
+                remapped.T3 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 3));
+                remapped.T4 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 4));
+                remapped.T5 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 5));
+                remapped.T6 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 6));
+                remapped.T7 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 7));
+            }
+            else if (Vector<T>.Count == 16)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref target);
+                remapped.T0 = Unsafe.Add(ref sourceAddress, offsets);
+                remapped.T1 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 1));
+                remapped.T2 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 2));
+                remapped.T3 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 3));
+                remapped.T4 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 4));
+                remapped.T5 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 5));
+                remapped.T6 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 6));
+                remapped.T7 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 7));
+                remapped.T8 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 8));
+                remapped.T9 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 9));
+                remapped.T10 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 10));
+                remapped.T11 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 11));
+                remapped.T12 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 12));
+                remapped.T13 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 13));
+                remapped.T14 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 14));
+                remapped.T15 = Unsafe.Add(ref sourceAddress, Unsafe.Add(ref offsets, 15));
+            }
+        }
+
+        /// <summary>
+        /// Gathers values at a given set of element-width offsets from a base address and puts them into a vector.
+        /// </summary>
+        /// <typeparam name="T">Type to be gathered.</typeparam>
+        /// <param name="targetAddress">Base address to which the offsets are added.</param>
+        /// <param name="offsets">Offsets to scatter values to. Length must match or exceed vector width for type T.</param>
+        /// <param name="source">Vector to pull values out of.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Scatter<T>(ref Vector<T> source, ref T targetAddress, ref int offsets) where T : struct
+        {
+            if (Vector<T>.Count == 2)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref source);
+                Unsafe.Add(ref targetAddress, offsets) = remapped.T0;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 1)) = remapped.T1;
+            }
+            else if (Vector<T>.Count == 4)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref source);
+                Unsafe.Add(ref targetAddress, offsets) = remapped.T0;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 1)) = remapped.T1;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 2)) = remapped.T2;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 3)) = remapped.T3;
+            }
+            else if (Vector<T>.Count == 8)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref source);
+                Unsafe.Add(ref targetAddress, offsets) = remapped.T0;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 1)) = remapped.T1;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 2)) = remapped.T2;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 3)) = remapped.T3;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 4)) = remapped.T4;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 5)) = remapped.T5;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 6)) = remapped.T6;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 7)) = remapped.T7;
+            }
+            else if (Vector<T>.Count == 16)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref source);
+                Unsafe.Add(ref targetAddress, offsets) = remapped.T0;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 1)) = remapped.T1;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 2)) = remapped.T2;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 3)) = remapped.T3;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 4)) = remapped.T4;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 5)) = remapped.T5;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 6)) = remapped.T6;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 7)) = remapped.T7;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 8)) = remapped.T8;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 9)) = remapped.T9;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 10)) = remapped.T10;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 11)) = remapped.T11;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 12)) = remapped.T12;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 13)) = remapped.T13;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 14)) = remapped.T14;
+                Unsafe.Add(ref targetAddress, Unsafe.Add(ref offsets, 15)) = remapped.T15;
+            }
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer sourceContainers, int offsetInElements) where T : struct where TContainer : struct
         {
@@ -432,6 +607,18 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             Vector3Wide contactNormal, contactPosition, relativePosition;
             Vector<float> depth;
 
+            var gatherOffsets = stackalloc int[Vector<float>.Count];
+            var scatterOffsets = stackalloc int[Vector<float>.Count];
+
+            //The jit can unroll this. Turns into a xor and four movs on 4-wide.
+            //int gatherOffset = 0;
+            for (int i = 0; i < Vector<float>.Count; ++i)
+            {
+                gatherOffsets[i] = i * Unsafe.SizeOf<RigidPair<Sphere, Sphere>>() / sizeof(float);
+                //gatherOffset += Unsafe.SizeOf<RigidPair<Sphere, Sphere>>();
+                scatterOffsets[i] = i * Unsafe.SizeOf<ContactManifold>() / sizeof(float);
+            }
+
             var fullBundleCount = batch.Count / Vector<float>.Count;
             var pairsInFullBundlesCount = fullBundleCount * Vector<float>.Count;
             for (int i = 0; i < pairsInFullBundlesCount; i += Vector<float>.Count)
@@ -440,13 +627,15 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
 
                 Gather(ref wide.RadiiA, ref bundleStart, 0);
                 Gather(ref wide.RadiiB, ref bundleStart, 1);
+                ////TODO: Poses are not necessarily simple single precision floating point numbers. They might be doubles, they might be fixed point...
+                ////This is a problem that any gather-before-relative faces.
                 Gather(ref wide.PositionA.X, ref bundleStart, 2);
                 Gather(ref wide.PositionA.Y, ref bundleStart, 3);
                 Gather(ref wide.PositionA.Z, ref bundleStart, 4);
                 Gather(ref wide.PositionB.X, ref bundleStart, 9);
                 Gather(ref wide.PositionB.Y, ref bundleStart, 10);
                 Gather(ref wide.PositionB.Z, ref bundleStart, 11);
-
+                
                 Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
                 SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
 
@@ -460,6 +649,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Scatter(ref contactNormal.X, ref *manifolds, 24);
                 Scatter(ref contactNormal.Y, ref *manifolds, 25);
                 Scatter(ref contactNormal.Z, ref *manifolds, 26);
+                
                 for (int j = 0; j < Vector<float>.Count;)
                 {
                     Debug.Assert(Vector<float>.Count >= 4);
@@ -502,41 +692,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]);
                 }
             }
-
-            //for (int i = 0; i < batch.Count; i += Vector<float>.Count)
-            //{
-            //    ref var bundleStart = ref Unsafe.Add(ref start, i);
-            //    int countInBundle = batch.Count - i;
-            //    if (countInBundle > Vector<float>.Count)
-            //        countInBundle = Vector<float>.Count;
-
-            //    Gather(ref wide.RadiiA, ref bundleStart, 0, countInBundle);
-            //    Gather(ref wide.RadiiB, ref bundleStart, 1, countInBundle);
-            //    Gather(ref wide.PositionA.X, ref bundleStart, 2, countInBundle);
-            //    Gather(ref wide.PositionA.Y, ref bundleStart, 3, countInBundle);
-            //    Gather(ref wide.PositionA.Z, ref bundleStart, 4, countInBundle);
-            //    Gather(ref wide.PositionB.X, ref bundleStart, 9, countInBundle);
-            //    Gather(ref wide.PositionB.Y, ref bundleStart, 10, countInBundle);
-            //    Gather(ref wide.PositionB.Z, ref bundleStart, 11, countInBundle);
-
-            //    Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
-            //    SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
-
-            //    Scatter(ref relativePosition.X, ref *manifolds, 0, countInBundle);
-            //    Scatter(ref relativePosition.Y, ref *manifolds, 1, countInBundle);
-            //    Scatter(ref relativePosition.Z, ref *manifolds, 2, countInBundle);
-            //    Scatter(ref contactPosition.X, ref *manifolds, 4, countInBundle);
-            //    Scatter(ref contactPosition.Y, ref *manifolds, 5, countInBundle);
-            //    Scatter(ref contactPosition.Z, ref *manifolds, 6, countInBundle);
-            //    Scatter(ref depth, ref *manifolds, 16, countInBundle);
-            //    Scatter(ref contactNormal.X, ref *manifolds, 24, countInBundle);
-            //    Scatter(ref contactNormal.Y, ref *manifolds, 25, countInBundle);
-            //    Scatter(ref contactNormal.Z, ref *manifolds, 26, countInBundle);
-            //    for (int j = 0; j < countInBundle; ++j)
-            //    {
-            //        continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]);
-            //    }
-            //}
+            
         }
     }
 }
