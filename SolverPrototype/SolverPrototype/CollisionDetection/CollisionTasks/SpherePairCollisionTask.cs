@@ -253,82 +253,161 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         //Worst case scenario, you could create a bunch of overloads for different property counts. ooooooooooooooof.
         static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer containers, int offsetInElements, int count) where T : struct where TContainer : struct
         {
-            //Unfortunately, there is a fundamental mismatch between the ideal form of gathering with hardware acceleration and without hardware acceleration.
-            //The 'count' serves as a mask in a scalar version, but introduces full branches.
-            //TODO: May be worth an unconditional gather... would require a remainder loop.
-            Debug.Assert(count > 0);
+            Debug.Assert(count > 0 && count <= Vector<float>.Count);
             ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref containers), offsetInElements));
             if (Vector<T>.Count == 2)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
                 remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                if (count >= 1)
+                if (count >= 2)
                     remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
             }
             else if (Vector<T>.Count == 4)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref vector);
                 remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                if (count >= 1)
-                    remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
                 if (count >= 2)
-                    remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
+                    remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
                 if (count >= 3)
+                    remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
+                if (count >= 4)
                     remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
             }
             else if (Vector<T>.Count == 8)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref vector);
                 remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                if (count >= 1)
-                    remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
                 if (count >= 2)
-                    remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
+                    remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
                 if (count >= 3)
-                    remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
+                    remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
                 if (count >= 4)
-                    remapped.T4 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4));
+                    remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
                 if (count >= 5)
-                    remapped.T5 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5));
+                    remapped.T4 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4));
                 if (count >= 6)
-                    remapped.T6 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6));
+                    remapped.T5 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5));
                 if (count >= 7)
+                    remapped.T6 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6));
+                if (count >= 8)
                     remapped.T7 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7));
             }
             else if (Vector<T>.Count == 16)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref vector);
                 remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                if (count >= 1)
-                    remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
                 if (count >= 2)
-                    remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
+                    remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
                 if (count >= 3)
-                    remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
+                    remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
                 if (count >= 4)
-                    remapped.T4 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4));
+                    remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
                 if (count >= 5)
-                    remapped.T5 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5));
+                    remapped.T4 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4));
                 if (count >= 6)
-                    remapped.T6 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6));
+                    remapped.T5 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5));
                 if (count >= 7)
-                    remapped.T7 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7));
+                    remapped.T6 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6));
                 if (count >= 8)
-                    remapped.T8 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 8));
+                    remapped.T7 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7));
                 if (count >= 9)
-                    remapped.T9 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 9));
+                    remapped.T8 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 8));
                 if (count >= 10)
-                    remapped.T10 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 10));
+                    remapped.T9 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 9));
                 if (count >= 11)
-                    remapped.T11 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 11));
+                    remapped.T10 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 10));
                 if (count >= 12)
-                    remapped.T12 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 12));
+                    remapped.T11 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 11));
                 if (count >= 13)
-                    remapped.T13 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 13));
+                    remapped.T12 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 12));
                 if (count >= 14)
-                    remapped.T14 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 14));
+                    remapped.T13 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 13));
                 if (count >= 15)
+                    remapped.T14 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 14));
+                if (count == 16)
                     remapped.T15 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 15));
+            }
+            else
+            {
+                throw new InvalidOperationException("Unsupported type or vector size.");
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void Scatter<T, TContainer>(ref Vector<T> vector, ref TContainer targetContainers, int offsetInElements, int count) where T : struct where TContainer : struct
+        {
+            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref targetContainers), offsetInElements));
+            if (Vector<T>.Count == 2)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                if (count >= 2)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+            }
+            else if (Vector<T>.Count == 4)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                if (count >= 2)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+                if (count >= 3)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
+                if (count >= 4)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
+            }
+            else if (Vector<T>.Count == 8)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                if (count >= 2)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+                if (count >= 3)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
+                if (count >= 4)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
+                if (count >= 5)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4)) = remapped.T4;
+                if (count >= 6)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5)) = remapped.T5;
+                if (count >= 7)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6)) = remapped.T6;
+                if (count >= 8)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7)) = remapped.T7;
+            }
+            else if (Vector<T>.Count == 16)
+            {
+                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref vector);
+                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
+                if (count >= 2)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
+                if (count >= 3)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
+                if (count >= 4)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
+                if (count >= 5)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4)) = remapped.T4;
+                if (count >= 6)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5)) = remapped.T5;
+                if (count >= 7)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6)) = remapped.T6;
+                if (count >= 8)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7)) = remapped.T7;
+                if (count >= 9)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 8)) = remapped.T8;
+                if (count >= 10)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 9)) = remapped.T9;
+                if (count >= 11)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 10)) = remapped.T10;
+                if (count >= 12)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 11)) = remapped.T11;
+                if (count >= 13)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 12)) = remapped.T12;
+                if (count >= 14)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 13)) = remapped.T13;
+                if (count >= 15)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 14)) = remapped.T14;
+                if (count >= 16)
+                    Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 15)) = remapped.T15;
             }
             else
             {
@@ -352,17 +431,12 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
 
             Vector3Wide contactNormal, contactPosition, relativePosition;
             Vector<float> depth;
-            ref var normalLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactNormal);
-            ref var positionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref contactPosition);
-            ref var relativePositionLaneStart = ref Unsafe.As<Vector3Wide, float>(ref relativePosition);
-            ref var depthLaneStart = ref Unsafe.As<Vector<float>, float>(ref depth);
 
-            for (int i = 0; i < batch.Count; i += Vector<float>.Count)
+            var fullBundleCount = batch.Count / Vector<float>.Count;
+            var pairsInFullBundlesCount = fullBundleCount * Vector<float>.Count;
+            for (int i = 0; i < pairsInFullBundlesCount; i += Vector<float>.Count)
             {
                 ref var bundleStart = ref Unsafe.Add(ref start, i);
-                int countInBundle = batch.Count - i;
-                if (countInBundle > Vector<float>.Count)
-                    countInBundle = Vector<float>.Count;
 
                 Gather(ref wide.RadiiA, ref bundleStart, 0);
                 Gather(ref wide.RadiiB, ref bundleStart, 1);
@@ -376,19 +450,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
                 SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
 
-                //for (int j = 0; j < countInBundle; ++j)
-                //{
-                //    //If this doesn't suffer from the same type punning compiler bug, I'll be surprised.
-                //    ref var normalLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref normalLaneStart, j));
-                //    ref var positionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref positionLaneStart, j));
-                //    ref var relativePositionLane = ref Unsafe.As<float, Vector3Lane4>(ref Unsafe.Add(ref relativePositionLaneStart, j));
-                //    manifold.ConvexNormal = new Vector3(normalLane.X, normalLane.Y, normalLane.Z);
-                //    manifold.Offset0 = new Vector3(positionLane.X, positionLane.Y, positionLane.Z);
-                //    manifold.OffsetB = new Vector3(relativePositionLane.X, relativePositionLane.Y, relativePositionLane.Z);
-                //    manifold.Depth0 = Unsafe.Add(ref depthLaneStart, j);
-                //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
-                //}
-
                 Scatter(ref relativePosition.X, ref *manifolds, 0);
                 Scatter(ref relativePosition.Y, ref *manifolds, 1);
                 Scatter(ref relativePosition.Z, ref *manifolds, 2);
@@ -399,19 +460,83 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Scatter(ref contactNormal.X, ref *manifolds, 24);
                 Scatter(ref contactNormal.Y, ref *manifolds, 25);
                 Scatter(ref contactNormal.Z, ref *manifolds, 26);
+                for (int j = 0; j < Vector<float>.Count;)
+                {
+                    Debug.Assert(Vector<float>.Count >= 4);
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]); ++j;
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]); ++j;
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]); ++j;
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]); ++j;
+                }
+            }
+
+            if (batch.Count > pairsInFullBundlesCount)
+            {
+                ref var bundleStart = ref Unsafe.Add(ref start, pairsInFullBundlesCount);
+                int countInBundle = batch.Count - pairsInFullBundlesCount;
+
+                Gather(ref wide.RadiiA, ref bundleStart, 0, countInBundle);
+                Gather(ref wide.RadiiB, ref bundleStart, 1, countInBundle);
+                Gather(ref wide.PositionA.X, ref bundleStart, 2, countInBundle);
+                Gather(ref wide.PositionA.Y, ref bundleStart, 3, countInBundle);
+                Gather(ref wide.PositionA.Z, ref bundleStart, 4, countInBundle);
+                Gather(ref wide.PositionB.X, ref bundleStart, 9, countInBundle);
+                Gather(ref wide.PositionB.Y, ref bundleStart, 10, countInBundle);
+                Gather(ref wide.PositionB.Z, ref bundleStart, 11, countInBundle);
+
+                Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
+                SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
+
+                Scatter(ref relativePosition.X, ref *manifolds, 0, countInBundle);
+                Scatter(ref relativePosition.Y, ref *manifolds, 1, countInBundle);
+                Scatter(ref relativePosition.Z, ref *manifolds, 2, countInBundle);
+                Scatter(ref contactPosition.X, ref *manifolds, 4, countInBundle);
+                Scatter(ref contactPosition.Y, ref *manifolds, 5, countInBundle);
+                Scatter(ref contactPosition.Z, ref *manifolds, 6, countInBundle);
+                Scatter(ref depth, ref *manifolds, 16, countInBundle);
+                Scatter(ref contactNormal.X, ref *manifolds, 24, countInBundle);
+                Scatter(ref contactNormal.Y, ref *manifolds, 25, countInBundle);
+                Scatter(ref contactNormal.Z, ref *manifolds, 26, countInBundle);
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]);
                 }
-                //for (int j = 0; j < countInBundle; ++j)
-                //{
-                //    manifold.ConvexNormal = new Vector3(contactNormal.X[j], contactNormal.Y[j], contactNormal.Z[j]);
-                //    manifold.Offset0 = new Vector3(contactPosition.X[j], contactPosition.Y[j], contactPosition.Z[j]);
-                //    manifold.OffsetB = new Vector3(relativePosition.X[j], relativePosition.Y[j], relativePosition.Z[j]);
-                //    manifold.Depth0 = depth[j];
-                //    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifold);
-                //}
             }
+
+            //for (int i = 0; i < batch.Count; i += Vector<float>.Count)
+            //{
+            //    ref var bundleStart = ref Unsafe.Add(ref start, i);
+            //    int countInBundle = batch.Count - i;
+            //    if (countInBundle > Vector<float>.Count)
+            //        countInBundle = Vector<float>.Count;
+
+            //    Gather(ref wide.RadiiA, ref bundleStart, 0, countInBundle);
+            //    Gather(ref wide.RadiiB, ref bundleStart, 1, countInBundle);
+            //    Gather(ref wide.PositionA.X, ref bundleStart, 2, countInBundle);
+            //    Gather(ref wide.PositionA.Y, ref bundleStart, 3, countInBundle);
+            //    Gather(ref wide.PositionA.Z, ref bundleStart, 4, countInBundle);
+            //    Gather(ref wide.PositionB.X, ref bundleStart, 9, countInBundle);
+            //    Gather(ref wide.PositionB.Y, ref bundleStart, 10, countInBundle);
+            //    Gather(ref wide.PositionB.Z, ref bundleStart, 11, countInBundle);
+
+            //    Vector3Wide.Subtract(ref wide.PositionB, ref wide.PositionA, out relativePosition);
+            //    SpherePairTester.Test(ref wide.RadiiA, ref wide.RadiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
+
+            //    Scatter(ref relativePosition.X, ref *manifolds, 0, countInBundle);
+            //    Scatter(ref relativePosition.Y, ref *manifolds, 1, countInBundle);
+            //    Scatter(ref relativePosition.Z, ref *manifolds, 2, countInBundle);
+            //    Scatter(ref contactPosition.X, ref *manifolds, 4, countInBundle);
+            //    Scatter(ref contactPosition.Y, ref *manifolds, 5, countInBundle);
+            //    Scatter(ref contactPosition.Z, ref *manifolds, 6, countInBundle);
+            //    Scatter(ref depth, ref *manifolds, 16, countInBundle);
+            //    Scatter(ref contactNormal.X, ref *manifolds, 24, countInBundle);
+            //    Scatter(ref contactNormal.Y, ref *manifolds, 25, countInBundle);
+            //    Scatter(ref contactNormal.Z, ref *manifolds, 26, countInBundle);
+            //    for (int j = 0; j < countInBundle; ++j)
+            //    {
+            //        continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]);
+            //    }
+            //}
         }
     }
 }
