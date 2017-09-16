@@ -7,6 +7,13 @@ using SolverPrototype.Constraints;
 
 namespace SolverPrototype.CollisionDetection
 {
+    public struct PairMaterialProperties
+    {
+        public float FrictionCoefficient;
+        public float MaximumRecoveryVelocity;
+        public SpringSettingsAOS SpringSettings;
+    }
+
     public interface INarrowPhaseCallbacks
     {
         void Initialize(Simulation simulation);

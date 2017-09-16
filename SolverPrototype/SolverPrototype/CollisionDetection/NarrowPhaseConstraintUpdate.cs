@@ -7,28 +7,8 @@ using System.Numerics;
 using SolverPrototype.Collidables;
 using System;
 
-
 namespace SolverPrototype.CollisionDetection
 {
-    public interface IPendingContactConstraint
-    {
-        int PendingBatchId { get; }
-    }
-
-    public struct PendingTwoBodyConvex4Constraint : IPendingContactConstraint
-    {
-        public CollidableReference A;
-        public CollidableReference B;
-        public ContactManifold4Constraint Description;
-        public float AccumulatedImpulse0;
-        public float AccumulatedImpulse1;
-        public float AccumulatedImpulse2;
-        public float AccumulatedImpulse3;
-
-        public int PendingBatchId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 3; } }
-    }
-
-
     /// <summary>
     /// Associated with a pair of two collidables that each are controlled by bodies.
     /// </summary>
@@ -286,45 +266,6 @@ namespace SolverPrototype.CollisionDetection
                 //In the event that there are no contacts in the new manifold, the pair is left in a stale state. It will be removed by the stale removal post process. 
             }
         }
-
-        public unsafe void Execute(Buffer<PairJob> jobs, int jobStart, int jobCount, ref ConvexContactManifoldWide manifold)
-        {
-            //Given the use of virtuals elsewhere, it may seem a bit odd to use a hardcoded switch here.
-            //Especially because these are not guaranteed to be the only types ever supported. Some extensions may demand new entries here.
-            //As usual, this comes down to performance:
-            //1) Continuation types vary on a per-pair basis, rather than on a per-batch basis. This was a tradeoff:
-            //the greater the degree of batch segmentation, the less work could be batched together, and the more pending pairs sit around in L1 cache.
-            //Since the contact manifold calculation is the dominant cost on nontrivial pairs, the more full-occupancy SIMD dispatches we can do, the better.
-
-            //2) Having established per-pair invocation, virtual invocations tend to be slower than contiguous switch statements by about 8-15 cycles.
-            //For 100000 pairs on a 3770K-like CPU, we'd expect a virtual implementation to run 50-100us slower than a switch implementation.
-            //That's pretty small, but this kind of thing adds up. 
-
-            //(This choice is something to monitor over time in terms of virtual/switch codegen, batching, and extensibility. We already do a virtual dispatch at the 
-            //batch level, so if it turns out pairType x continuationType batching is okay in practice and the hardcodedness is getting in the way, we can switch.)
-            var pairBase = (PairJob*)jobs.Memory + jobStart;
-            for (int i = 0; i < jobCount; ++i)
-            {
-                ref var job = ref *(pairBase + i);
-                switch (job.Continuation.Type)
-                {
-                    case ContinuationType.ConvexConstraintGenerator:
-
-                        //if (PairCache.TryGetValue(ref job.Pair, out var constraintHandle))
-                        //{
-                        //    //This pair is associated with a constraint. 
-                        //    GatherAccumulatedImpulses(constraintHandle, out var previousImpulses)
-
-
-
-
-                        //}
-                        //TODO: When we support non-constraint manifold storage targets for coldet-only use cases, we'll need to avoid attempting to make changes to the solver.
-                        break;
-
-                }
-            }
-
-        }
+        
     }
 }

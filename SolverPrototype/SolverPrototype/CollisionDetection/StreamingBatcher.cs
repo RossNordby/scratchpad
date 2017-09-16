@@ -11,7 +11,8 @@ namespace SolverPrototype.CollisionDetection
 {
     public interface IContinuations
     {
-        void Notify(TypedIndex continuationId, ref ContactManifold manifold);
+        //TODO: In the future, continuations will need to be able to take typed collision caches. The PairCache will store cached separating axes for hull-hull acceleration and similar things.
+        unsafe void Notify(TypedIndex continuationId, ContactManifold* manifold);
     }
 
     /// <summary>

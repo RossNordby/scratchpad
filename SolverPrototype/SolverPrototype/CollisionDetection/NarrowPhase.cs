@@ -94,10 +94,12 @@ namespace SolverPrototype.CollisionDetection
 
         public void Prepare(IThreadDispatcher threadDispatcher = null)
         {
+            OnPrepare(threadDispatcher);
             PairCache.Prepare(threadDispatcher);
             ConstraintRemover.Prepare(threadDispatcher);
         }
 
+        protected abstract void OnPrepare(IThreadDispatcher threadDispatcher = null);
         protected abstract void OnFlush(IThreadDispatcher threadDispatcher = null);
 
         int flushJobIndex;
@@ -199,6 +201,11 @@ namespace SolverPrototype.CollisionDetection
             PairCache = new PairCache(simulation.BufferPool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity);
             ConstraintRemover = new ConstraintRemover(simulation.BufferPool, simulation.Bodies, simulation.Solver, simulation.ConstraintGraph, minimumRemovalCapacity: minimumPendingSize);
             FreshnessChecker = new FreshnessChecker(this);
+        }
+
+        protected override void OnPrepare(IThreadDispatcher threadDispatcher = null)
+        {
+            PrepareConstraintGenerators(threadDispatcher);
         }
 
         protected override void OnFlush(IThreadDispatcher threadDispatcher = null)

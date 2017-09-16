@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using static SolverPrototype.CollisionDetection.WorkerPairCache;
 
@@ -14,6 +15,31 @@ namespace SolverPrototype.CollisionDetection
 {
     //would you care for some generics
     using OverlapMapping = QuickDictionary<CollidablePair, CollidablePairPointers, Buffer<CollidablePair>, Buffer<CollidablePairPointers>, Buffer<int>, CollidablePairComparer>;
+
+    [StructLayout(LayoutKind.Explicit, Size = 8)]
+    public struct CollidablePair
+    {
+        [FieldOffset(0)]
+        public CollidableReference A;
+        [FieldOffset(4)]
+        public CollidableReference B;
+    }
+
+    public struct CollidablePairComparer : IEqualityComparerRef<CollidablePair>
+    {
+        //The order of collidables in the pair should not affect equality or hashing. The broad phase is not guaranteed to provide a reliable order.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(ref CollidablePair a, ref CollidablePair b)
+        {
+            return Unsafe.As<CollidablePair, ulong>(ref a) == Unsafe.As<CollidablePair, ulong>(ref b);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int Hash(ref CollidablePair item)
+        {
+            return (int)(item.A.packed ^ item.B.packed);
+        }
+    }
 
     public struct CollidablePairPointers
     {
@@ -28,8 +54,7 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         public PairCacheIndex CollisionDetectionCache;
     }
-
-
+    
 
     public class PairCache
     {
