@@ -70,13 +70,17 @@ namespace SolverPrototype.Constraints
             //angularB: N x offsetB
             //Note that we leave the penetration depth as is, even when it's negative. Speculative contacts!
             Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA0, ref normal, out projection.Penetration0.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB0, out projection.Penetration0.AngularB);
+            Vector3Wide.Subtract(ref prestep.OffsetA0, ref prestep.OffsetB, out var offsetB0);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref offsetB0, out projection.Penetration0.AngularB);
             Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA1, ref normal, out projection.Penetration1.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB1, out projection.Penetration1.AngularB);
+            Vector3Wide.Subtract(ref prestep.OffsetA1, ref prestep.OffsetB, out var offsetB1);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref offsetB1, out projection.Penetration1.AngularB);
             Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA2, ref normal, out projection.Penetration2.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB2, out projection.Penetration2.AngularB);
+            Vector3Wide.Subtract(ref prestep.OffsetA2, ref prestep.OffsetB, out var offsetB2);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref offsetB2, out projection.Penetration2.AngularB);
             Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA3, ref normal, out projection.Penetration3.AngularA);
-            Vector3Wide.CrossWithoutOverlap(ref normal, ref prestep.OffsetB3, out projection.Penetration3.AngularB);
+            Vector3Wide.Subtract(ref prestep.OffsetA3, ref prestep.OffsetB, out var offsetB3);
+            Vector3Wide.CrossWithoutOverlap(ref normal, ref offsetB3, out projection.Penetration3.AngularB);
 
             //effective mass
             Triangular3x3Wide.VectorSandwich(ref projection.Penetration0.AngularA, ref inertiaA.InverseInertiaTensor, out var angularA0);

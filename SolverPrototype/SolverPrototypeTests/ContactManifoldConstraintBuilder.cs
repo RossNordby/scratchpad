@@ -16,7 +16,7 @@ namespace SolverPrototypeTests
         {
             TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
         }
-        static void CreateManifoldConstraint(ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ, out ContactManifold4Constraint description)
+        static void CreateManifoldConstraint(ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ, ref Vector3 offsetB, out ContactManifold4Constraint description)
         {
             description = new ContactManifold4Constraint
             {
@@ -28,7 +28,8 @@ namespace SolverPrototypeTests
                 },
                 MaximumRecoveryVelocity = 1f,
                 FrictionCoefficient = 1,
-                Normal = unitY
+                Normal = unitY,
+                OffsetB = offsetB
             };
 
             for (int contactIndex = 0; contactIndex < 4; ++contactIndex)
@@ -42,7 +43,6 @@ namespace SolverPrototypeTests
                 var worldOffsetA = localOffsetA.X * unitX + localOffsetA.Y * unitY + localOffsetA.Z * unitZ;
                 var worldOffsetB = localOffsetB.X * unitX + localOffsetB.Y * unitY + localOffsetB.Z * unitZ;
                 contact.OffsetA = worldOffsetA;
-                contact.OffsetB = worldOffsetB;
                 contact.PenetrationDepth = 0.00f;
             }
         }
@@ -54,22 +54,22 @@ namespace SolverPrototypeTests
             if (ids.GetBody(columnIndex - 1, rowIndex, sliceIndex, out var previousColumnHandle, out var previousColumnDescription) &&
                 (bodyDescription.LocalInertia.InverseMass != 0 || previousColumnDescription.LocalInertia.InverseMass != 0))
             {
-                SimulationSetup.BuildBasis(ref bodyDescription.Pose, ref previousColumnDescription.Pose, out var x, out var y, out var z);
-                CreateManifoldConstraint(ref x, ref y, ref z, out var description);
+                SimulationSetup.BuildBasis(ref bodyDescription.Pose, ref previousColumnDescription.Pose, out var offsetB, out var x, out var y, out var z);
+                CreateManifoldConstraint(ref x, ref y, ref z, ref offsetB, out var description);
                 constraintAdder.Add(ref description, previousColumnHandle);
             }
             if (ids.GetBody(columnIndex, rowIndex - 1, sliceIndex, out var previousRowHandle, out var previousRowDescription) &&
                 (bodyDescription.LocalInertia.InverseMass != 0 || previousRowDescription.LocalInertia.InverseMass != 0))
             {
-                SimulationSetup.BuildBasis(ref bodyDescription.Pose, ref previousRowDescription.Pose, out var x, out var y, out var z);
-                CreateManifoldConstraint(ref x, ref y, ref z, out var description);
+                SimulationSetup.BuildBasis(ref bodyDescription.Pose, ref previousRowDescription.Pose, out var offsetB, out var x, out var y, out var z);
+                CreateManifoldConstraint(ref x, ref y, ref z, ref offsetB, out var description);
                 constraintAdder.Add(ref description, previousRowHandle);
             }
             if (ids.GetBody(columnIndex, rowIndex, sliceIndex - 1, out var previousSliceHandle, out var previousSliceDescription) &&
                 (bodyDescription.LocalInertia.InverseMass != 0 || previousSliceDescription.LocalInertia.InverseMass != 0))
             {
-                SimulationSetup.BuildBasis(ref bodyDescription.Pose, ref previousSliceDescription.Pose, out var x, out var y, out var z);
-                CreateManifoldConstraint(ref x, ref y, ref z, out var description);
+                SimulationSetup.BuildBasis(ref bodyDescription.Pose, ref previousSliceDescription.Pose, out var offsetB, out var x, out var y, out var z);
+                CreateManifoldConstraint(ref x, ref y, ref z, ref offsetB, out var description);
                 constraintAdder.Add(ref description, previousSliceHandle);
             }
         }

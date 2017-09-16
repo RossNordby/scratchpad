@@ -79,9 +79,10 @@ namespace SolverPrototypeTests
 
     public static class SimulationSetup
     {
-        public static void BuildBasis(ref BodyPose a, ref BodyPose b, out Vector3 x, out Vector3 y, out Vector3 z)
+        public static void BuildBasis(ref BodyPose a, ref BodyPose b, out Vector3 offsetB, out Vector3 x, out Vector3 y, out Vector3 z)
         {
-            y = Vector3.Normalize(a.Position - b.Position);
+            offsetB = b.Position - a.Position;
+            y = Vector3.Normalize(-offsetB);
             Quaternion.TransformZ(1, ref a.Orientation, out var ax);
             x = Vector3.Cross(ax, y);
             var xLength = x.Length();

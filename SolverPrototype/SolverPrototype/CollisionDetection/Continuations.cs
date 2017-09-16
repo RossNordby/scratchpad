@@ -226,9 +226,9 @@ namespace SolverPrototype.CollisionDetection
                         {
                             ref var descriptionContact = ref descriptionContacts[i];
                             descriptionContact.OffsetA = offsets[i];
-                            descriptionContact.OffsetB = offsets[i] - manifold->OffsetB;
                             descriptionContact.PenetrationDepth = depths[i];
                         }
+                        description.OffsetB = manifold->OffsetB;
                         description.FrictionCoefficient = material.FrictionCoefficient;
                         description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
                         description.SpringSettings = material.SpringSettings;

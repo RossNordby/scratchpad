@@ -91,120 +91,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             public T T15;
         }
 
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer sourceContainers, int offsetInElements) where T : struct where TContainer : struct
-        {
-            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref sourceContainers), offsetInElements));
-            if (Vector<T>.Count == 2)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
-                remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
-            }
-            else if (Vector<T>.Count == 4)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref vector);
-                remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
-                remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
-                remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
-            }
-            else if (Vector<T>.Count == 8)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref vector);
-                remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
-                remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
-                remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
-                remapped.T4 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4));
-                remapped.T5 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5));
-                remapped.T6 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6));
-                remapped.T7 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7));
-            }
-            else if (Vector<T>.Count == 16)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref vector);
-                remapped.T0 = Unsafe.As<TContainer, T>(ref start);
-                remapped.T1 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1));
-                remapped.T2 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2));
-                remapped.T3 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3));
-                remapped.T4 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4));
-                remapped.T5 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5));
-                remapped.T6 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6));
-                remapped.T7 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7));
-                remapped.T8 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 8));
-                remapped.T9 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 9));
-                remapped.T10 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 10));
-                remapped.T11 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 11));
-                remapped.T12 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 12));
-                remapped.T13 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 13));
-                remapped.T14 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 14));
-                remapped.T15 = Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 15));
-            }
-            else
-            {
-                throw new InvalidOperationException("Unsupported type or vector size.");
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Scatter<T, TContainer>(ref Vector<T> vector, ref TContainer targetContainers, int offsetInElements) where T : struct where TContainer : struct
-        {
-            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref targetContainers), offsetInElements));
-            if (Vector<T>.Count == 2)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
-                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
-            }
-            else if (Vector<T>.Count == 4)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap4<T>>(ref vector);
-                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
-            }
-            else if (Vector<T>.Count == 8)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap8<T>>(ref vector);
-                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4)) = remapped.T4;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5)) = remapped.T5;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6)) = remapped.T6;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7)) = remapped.T7;
-            }
-            else if (Vector<T>.Count == 16)
-            {
-                ref var remapped = ref Unsafe.As<Vector<T>, Remap16<T>>(ref vector);
-                Unsafe.As<TContainer, T>(ref start) = remapped.T0;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 1)) = remapped.T1;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 2)) = remapped.T2;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 3)) = remapped.T3;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 4)) = remapped.T4;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 5)) = remapped.T5;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 6)) = remapped.T6;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 7)) = remapped.T7;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 8)) = remapped.T8;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 9)) = remapped.T9;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 10)) = remapped.T10;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 11)) = remapped.T11;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 12)) = remapped.T12;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 13)) = remapped.T13;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 14)) = remapped.T14;
-                Unsafe.As<TContainer, T>(ref Unsafe.Add(ref start, 15)) = remapped.T15;
-            }
-            else
-            {
-                throw new InvalidOperationException("Unsupported type or vector size.");
-            }
-        }
-
-
         //TODO: In the future, maybe once codegen improves a little bit, it might be a good idea to revisit this remainder gather to get rid of the redundant per-property branches.
         //Worst case scenario, you could create a bunch of overloads for different property counts. ooooooooooooooof.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -373,7 +259,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         }
 
         //Every single collision task type will mirror this general layout.
-        //
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
             ref var start = ref Unsafe.As<byte, RigidPair<Sphere, Sphere>>(ref batch.Buffer[0]);
@@ -389,7 +274,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             Vector3Wide positionB;
             Vector3Wide contactNormal, contactPosition, relativePosition;
             Vector<float> depth;
-            
+
             for (int i = 0; i < batch.Count; i += Vector<float>.Count)
             {
                 ref var bundleStart = ref Unsafe.Add(ref start, i);

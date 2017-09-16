@@ -91,7 +91,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 }
                 batcher.Flush(ref continuations, ref filters);
             };
-            var time0 = Test(action, 1 << 25);
+            var time0 = Test(action, 1024);
             Console.WriteLine($"Completed count: {continuations.Count}, time (ms): {1e3 * time0}");
             Console.ReadKey();
         }
