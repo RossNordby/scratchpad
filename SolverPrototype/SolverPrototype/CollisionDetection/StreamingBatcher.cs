@@ -303,7 +303,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
+        public unsafe void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
              TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
              where TShapeA : struct, IShape where TShapeB : struct, IShape
              where TContinuations : struct, IContinuations
@@ -317,7 +317,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 //There is no task for this shape type pair. Immediately respond with an empty manifold.
                 var manifold = new ContactManifold();
-                continuations.Notify(continuationId, ref manifold);
+                continuations.Notify(continuationId, &manifold);
                 return;
             }
             ref var batch = ref batches[reference.TaskIndex];

@@ -20,24 +20,69 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         Direct = 0,
         /// <summary>
-        /// One of potentially multiple substeps produced by a collidable pair using substepped continuous collision detection.
+        /// Pair expecting both a discrete and inner sphere manifolds.
         /// </summary>
-        Substep = 1,
+        Linear = 1,
         /// <summary>
-        /// Inner sphere test associated with a collidable pair using inner sphere continuous collision detection.
+        /// Pair expecting multiple discrete manifolds.
         /// </summary>
-        InnerSphere = 2
+        Substep = 2,
+        /// <summary>
+        /// Pair expecting both inner sphere manifolds and multiple discrete manifolds.
+        /// </summary>
+        SubstepWithLinear = 3
     }
-
-
 
     public partial class NarrowPhase<TCallbacks> where TCallbacks : struct, INarrowPhaseCallbacks
     {
         public struct ConstraintGenerators : IContinuations
         {
             int workerIndex;
+            BufferPool pool;
             NarrowPhase<TCallbacks> narrowPhase;
-            public ConstraintGenerators(int workerIndex, NarrowPhase<TCallbacks> narrowPhase)
+
+            struct Linear
+            {
+                public ContactManifold Discrete;
+                public ContactManifold LinearA;
+                public ContactManifold LinearB;
+                public int ManifoldsReported;
+            }
+
+            struct Substep
+            {
+                public QuickList<ContactManifold, Buffer<ContactManifold>> Manifolds;
+                public int ManifoldsReported;
+                public Substep(BufferPool pool, int capacity)
+                {
+                    QuickList<ContactManifold, Buffer<ContactManifold>>.Create(pool.SpecializeFor<ContactManifold>(), capacity, out Manifolds);
+                    ManifoldsReported = 0;
+                }
+            }
+
+            struct SubstepWithLinear
+            {
+                public ContactManifold LinearA;
+                public ContactManifold LinearB;
+                public Substep Substep;
+
+                public SubstepWithLinear(BufferPool pool, int capacity)
+                {
+                    Substep = new Substep(pool, capacity);
+                    LinearA = new ContactManifold();
+                    LinearB = new ContactManifold();
+                }
+            }
+
+
+
+            Buffer<CollidablePair> direct;
+            Buffer<Linear> linear;
+            Buffer<Substep> substep;
+            Buffer<SubstepWithLinear> substepWithLinear;
+
+
+            public ConstraintGenerators(int workerIndex, BufferPool pool, NarrowPhase<TCallbacks> narrowPhase)
             {
                 this.workerIndex = workerIndex;
                 this.narrowPhase = narrowPhase;
@@ -60,7 +105,7 @@ namespace SolverPrototype.CollisionDetection
                 Array.Resize(ref constraintGenerators, threadCount);
             for (int i = 0; i < threadCount; ++i)
             {
-                constraintGenerators[i] = new ConstraintGenerators(i, this);
+                constraintGenerators[i] = new ConstraintGenerators(i, threadDispatcher != null ? threadDispatcher.GetThreadMemoryPool(i) : Pool, this);
             }
         }
 
