@@ -306,7 +306,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Scatter(ref contactNormal.Z, ref *manifolds, 26, countInBundle);
                 for (int j = 0; j < countInBundle; ++j)
                 {
-                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, ref manifolds[j]);
+                    continuations.Notify(Unsafe.Add(ref bundleStart, j).Continuation, manifolds + j);
                 }
             }
 

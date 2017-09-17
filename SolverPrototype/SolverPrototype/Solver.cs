@@ -52,7 +52,7 @@ namespace SolverPrototype
 
         Bodies bodies;
 
-        internal IdPool<Buffer<int>, BufferPool<int>> handlePool;
+        internal IdPool<Buffer<int>> handlePool;
         BufferPool bufferPool;
         public Buffer<ConstraintLocation> HandleToConstraint;
 
@@ -107,7 +107,7 @@ namespace SolverPrototype
             this.iterationCount = iterationCount;
             this.bodies = bodies;
             this.bufferPool = bufferPool;
-            handlePool = new IdPool<Buffer<int>, BufferPool<int>>(bufferPool.SpecializeFor<int>());
+            IdPool<Buffer<int>>.Create(bufferPool.SpecializeFor<int>(), 128, out handlePool);
             //Note that managed arrays must be used to hold the reference types. It's technically possible to bypass this by completely abandoning inheritance in the typebatches, but
             //that would make a variety of things more annoying to handle. We can make use of just a tiny amount of idiomatic C#-ness. This won't be many references anyway.
             //We also don't bother pooling this stuff, and we don't have an API for preallocating it- because we're talking about a very, very small amount of data.
@@ -296,7 +296,7 @@ namespace SolverPrototype
             //(Could cache the batch index, but that's splitting some very fine hairs.)
             var constraintLocation = HandleToConstraint[handle];
             RemoveFromBatch(constraintLocation.BatchIndex, constraintLocation.TypeId, constraintLocation.IndexInTypeBatch);
-            handlePool.Return(handle);
+            handlePool.Return(handle, bufferPool.SpecializeFor<int>());
         }
 
         public void GetDescription<TConstraintDescription, TTypeBatch>(ref ConstraintReference constraintReference, out TConstraintDescription description)
@@ -437,7 +437,7 @@ namespace SolverPrototype
             //Like the bodies set, we lazily handle handlePool internal capacity unless explicitly told to expand by ensure capacity.
             //This will likely be overkill, but it's a pretty small cost (oh no four hundred kilobytes for a simulation with 100,000 constraints).
             //If the user really wants to stop resizes, well, this will do that.
-            handlePool.EnsureCapacity(constraintCount);
+            handlePool.EnsureCapacity(constraintCount, bufferPool.SpecializeFor<int>());
         }
 
         public void Compact(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
@@ -456,7 +456,7 @@ namespace SolverPrototype
             {
                 Batches[i].Compact(TypeBatchAllocation, bodies, bodiesCount);
             }
-            handlePool.Compact(constraintCount);
+            handlePool.Compact(constraintCount, bufferPool.SpecializeFor<int>());
         }
 
         public void Resize(int bodiesCount, int constraintCount, int constraintsPerTypeBatch)
@@ -476,7 +476,7 @@ namespace SolverPrototype
             {
                 Batches[i].Resize(TypeBatchAllocation, bodies, bodiesCount, TypeCountEstimate);
             }
-            handlePool.Resize(constraintCount);
+            handlePool.Resize(constraintCount, bufferPool.SpecializeFor<int>());
         }
 
         /// <summary>
@@ -491,7 +491,7 @@ namespace SolverPrototype
             }
             bufferPool.SpecializeFor<ConstraintLocation>().Return(ref HandleToConstraint);
             HandleToConstraint = new Buffer<ConstraintLocation>();
-            handlePool.Dispose();
+            handlePool.Dispose(bufferPool.SpecializeFor<int>());
             Batches.Dispose(new PassthroughArrayPool<ConstraintBatch>());
             Batches = new QuickList<ConstraintBatch, Array<ConstraintBatch>>();
             TypeBatchAllocation.ResetPools();

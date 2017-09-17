@@ -9,7 +9,7 @@ namespace BEPUutilities2.Memory
     /// Manages a pool of identifier values. Grabbing an id from the pool picks a number that has been picked and returned before, 
     /// or if none of those are available, the minimum value greater than any existing id.
     /// </summary>
-    public class IdPool<TSpan, TPool> where TSpan : ISpan<int> where TPool : IMemoryPool<int, TSpan>
+    public struct IdPool<TSpan> where TSpan : ISpan<int>
     {
         //TODO: You could make this quite a bit more memory efficient in the case where a bunch of ids are requested, then returned.
         //It would require a little more bookkeeping effort, though; it's likely that either taking or returning ids would slow down a little.
@@ -24,25 +24,28 @@ namespace BEPUutilities2.Memory
         {
             get { return nextIndex - 1; }
         }
-        TPool pool;
-        public IdPool(TPool pool, int initialCapacity = 128)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void Create<TPool>(TPool pool, int initialCapacity, out IdPool<TSpan> idPool) where TPool : IMemoryPool<int, TSpan>
         {
-            this.pool = pool;
-            QuickList<int, TSpan>.Create(this.pool, initialCapacity, out AvailableIds);
+            idPool.nextIndex = -1;
+            QuickList<int, TSpan>.Create(pool, initialCapacity, out idPool.AvailableIds);
         }
 
         //Note that all availableIds are guaranteed to be less than nextIndex.
         //[0, nextIndex) contains all currently used ids and ids contained within availableIds.
         public QuickList<int, TSpan> AvailableIds;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Take()
         {
             if (AvailableIds.TryPop(out var id))
                 return id;
             return nextIndex++;
         }
-        
-        public void Return(int id)
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Return<TPool>(int id, TPool pool) where TPool : IMemoryPool<int, TSpan>
         {
             AvailableIds.Add(id, pool);
         }
@@ -60,7 +63,8 @@ namespace BEPUutilities2.Memory
         /// Ensures that the underlying id queue can hold at least a certain number of ids.
         /// </summary>
         /// <param name="count">Number of elements to preallocate space for in the available ids queue.</param>
-        public void EnsureCapacity(int count)
+        /// <param name="pool">Pool to pull resized spans from.</param>
+        public void EnsureCapacity<TPool>(int count, TPool pool) where TPool : IMemoryPool<int, TSpan>
         {
             if (!AvailableIds.Span.Allocated)
             {
@@ -77,7 +81,7 @@ namespace BEPUutilities2.Memory
         /// Shrinks the available ids queue to the smallest size that can fit the given count and the current available id count.
         /// </summary>
         /// <param name="queuedCount">Number of elements to guarantee space for in the available ids queue.</param>
-        public void Compact(int queuedCount)
+        public void Compact<TPool>(int queuedCount, TPool pool) where TPool : IMemoryPool<int, TSpan>
         {
             var targetLength = BufferPool<int>.GetLowestContainingElementCount(Math.Max(queuedCount, AvailableIds.Count));
             if (AvailableIds.Span.Length > targetLength)
@@ -89,7 +93,7 @@ namespace BEPUutilities2.Memory
         /// Resizes the underlying buffer to the smallest size required to hold the given count and the current available id count.
         /// </summary>
         /// <param name="count">Number of elements to guarantee space for in the available ids queue.</param>
-        public void Resize(int count)
+        public void Resize<TPool>(int count, TPool pool) where TPool : IMemoryPool<int, TSpan>
         {
             if (!AvailableIds.Span.Allocated)
             {
@@ -108,7 +112,8 @@ namespace BEPUutilities2.Memory
         /// Returns underlying memory to the pool.
         /// </summary>
         /// <remarks>The IdPool can be reused only if EnsureCapacity or Resize is called.</remarks>
-        public void Dispose()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Dispose<TPool>(TPool pool) where TPool : IMemoryPool<int, TSpan>
         {
             AvailableIds.Dispose(pool);
             //This simplifies reuse and makes it harder to use invalid data.
@@ -116,5 +121,5 @@ namespace BEPUutilities2.Memory
             AvailableIds = new QuickList<int, TSpan>();
         }
 
-    }
+    }  
 }

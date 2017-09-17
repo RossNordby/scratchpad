@@ -115,7 +115,7 @@ namespace SolverPrototype.Collidables
     {
 
         internal Buffer<TShape> shapes;
-        protected IdPool<Buffer<int>, BufferPool<int>> idPool;
+        protected IdPool<Buffer<int>> idPool;
 
         public ShapeBatch(BufferPool pool, int initialShapeCount)
         {
@@ -125,7 +125,7 @@ namespace SolverPrototype.Collidables
             //In debug mode, unused slots are kept at the default value. This helps catch misuse.
             shapes.Clear(0, shapes.Length);
 #endif
-            idPool = new IdPool<Buffer<int>, BufferPool<int>>(pool.SpecializeFor<int>(), initialShapeCount);
+            IdPool<Buffer<int>>.Create(pool.SpecializeFor<int>(), initialShapeCount, out idPool);
         }
 
         /// <summary>
@@ -169,7 +169,7 @@ namespace SolverPrototype.Collidables
             //Don't have to actually clear out the shape set since everything is blittable. For debug purposes, we do, just to catch invalid usages.
             shapes[index] = default(TShape);
 #endif
-            idPool.Return(index);
+            idPool.Return(index, pool.SpecializeFor<int>());
         }
 
         public override void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt)
