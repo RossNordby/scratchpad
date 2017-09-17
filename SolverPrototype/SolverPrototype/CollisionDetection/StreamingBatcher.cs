@@ -12,7 +12,7 @@ namespace SolverPrototype.CollisionDetection
     public interface IContinuations
     {
         //TODO: In the future, continuations will need to be able to take typed collision caches. The PairCache will store cached separating axes for hull-hull acceleration and similar things.
-        unsafe void Notify(TypedIndex continuationId, ContactManifold* manifold);
+        unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold);
     }
 
     /// <summary>
@@ -246,7 +246,7 @@ namespace SolverPrototype.CollisionDetection
         public TShapeB B;
         public BodyPose PoseA;
         public BodyPose PoseB;
-        public TypedIndex Continuation;
+        public ContinuationIndex Continuation;
     }
 
 
@@ -282,7 +282,7 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
             ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
-            TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+            ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
@@ -304,7 +304,7 @@ namespace SolverPrototype.CollisionDetection
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
-             TypedIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+             ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
              where TShapeA : struct, IShape where TShapeB : struct, IShape
              where TContinuations : struct, IContinuations
              where TFilters : struct, ICollisionSubtaskFilters
