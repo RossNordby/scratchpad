@@ -18,28 +18,27 @@ namespace SolverPrototypeTests.SpecializedTests
         struct ContinuationsTest : IContinuations
         {
             public int Count;
-            public unsafe void Notify(TypedIndex continuationId, ref ContactManifold manifold)
+            public unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold)
             {
-                //Console.WriteLine($"Completed {continuationId}:");
-                //var local = manifold;
-                //var normals = &local.Normal0;
-                //var offsets = &local.Offset0;
-                //var depths = &local.Depth0;
-                //if (manifold.Convex)
-                //{
-                //    for (int i = 0; i < manifold.ContactCount; ++i)
-                //    {
-                //        Console.WriteLine($"{i}: P: {offsets[i]}, N: {manifold.ConvexNormal}, D: {depths[i]}");
-                //    }
-                //}
-                //else
-                //{
-                //    for (int i = 0; i < manifold.ContactCount; ++i)
-                //    {
-                //        Console.WriteLine($"{i}: P: {offsets[i]}, N: {normals[i]}, D: {depths[i]}");
-                //    }
-                //}
-                var extra = 1e-16 * (manifold.Depth0 + manifold.Offset0.X + manifold.Normal0.X);
+                Console.WriteLine($"Completed {continuationId}:");
+                var normals = &manifold->Normal0;
+                var offsets = &manifold->Offset0;
+                var depths = &manifold->Depth0;
+                if (manifold->Convex)
+                {
+                    for (int i = 0; i < manifold->ContactCount; ++i)
+                    {
+                        Console.WriteLine($"{i}: P: {offsets[i]}, N: {manifold->ConvexNormal}, D: {depths[i]}");
+                    }
+                }
+                else
+                {
+                    for (int i = 0; i < manifold->ContactCount; ++i)
+                    {
+                        Console.WriteLine($"{i}: P: {offsets[i]}, N: {normals[i]}, D: {depths[i]}");
+                    }
+                }
+                var extra = 1e-16 * (manifold->Depth0 + manifold->Offset0.X + manifold->Normal0.X);
                 Count += 1 + (int)extra;
             }
         }
@@ -84,10 +83,10 @@ namespace SolverPrototypeTests.SpecializedTests
                 var batcher = new StreamingBatcher(pool, registry);
                 for (int i = 0; i < iterationCount; ++i)
                 {
-                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new TypedIndex(), ref continuations, ref filters);
-                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new TypedIndex(), ref continuations, ref filters);
-                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new TypedIndex(), ref continuations, ref filters);
-                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new TypedIndex(), ref continuations, ref filters);
+                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new ContinuationIndex(), ref continuations, ref filters);
+                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new ContinuationIndex(), ref continuations, ref filters);
+                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new ContinuationIndex(), ref continuations, ref filters);
+                    batcher.Add(ref sphere, ref sphere, ref poseA, ref poseB, new ContinuationIndex(), ref continuations, ref filters);
                 }
                 batcher.Flush(ref continuations, ref filters);
             };

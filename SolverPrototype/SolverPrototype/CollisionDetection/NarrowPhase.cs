@@ -210,16 +210,17 @@ namespace SolverPrototype.CollisionDetection
 
         protected override void OnFlush(IThreadDispatcher threadDispatcher = null)
         {
+            //TODO: Constraint generators can actually be disposed immediately once the overlap finding process completes.
+            //Here, we are disposing them late- that means we suffer a little more wasted memory use. 
+            //If you actually wanted to address this, you could add in an OnPreflush or similar.
+            DisposeConstraintGenerators(threadDispatcher == null ? 1 : threadDispatcher.ThreadCount);
             Callbacks.Flush(threadDispatcher);
         }
-
-
 
         protected override void OnDispose()
         {
             Callbacks.Dispose();
-        }
-        
+        }        
                
         public void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
@@ -255,7 +256,7 @@ namespace SolverPrototype.CollisionDetection
                         else
                         {
                             //This pair uses no CCD beyond its speculative margin.
-
+                            
                         }
 
                         //Pull the velocity information for all involved bodies. We will request a number of steps that will cover the motion path.

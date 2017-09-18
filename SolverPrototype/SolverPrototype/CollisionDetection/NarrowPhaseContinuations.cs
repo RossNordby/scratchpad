@@ -14,28 +14,29 @@ using System.Text;
 namespace SolverPrototype.CollisionDetection
 {
 
-    public enum ConstraintGeneratorType
-    {
-        /// <summary>
-        /// Pair which will directly produce constraints.
-        /// </summary>
-        Direct = 0,
-        /// <summary>
-        /// Pair expecting both a discrete and inner sphere manifolds.
-        /// </summary>
-        Linear = 1,
-        /// <summary>
-        /// Pair expecting multiple discrete manifolds.
-        /// </summary>
-        Substep = 2,
-        /// <summary>
-        /// Pair expecting both inner sphere manifolds and multiple discrete manifolds.
-        /// </summary>
-        SubstepWithLinear = 3
-    }
 
     public partial class NarrowPhase<TCallbacks> where TCallbacks : struct, INarrowPhaseCallbacks
     {
+        public enum ConstraintGeneratorType
+        {
+            /// <summary>
+            /// Pair which will directly produce constraints.
+            /// </summary>
+            Direct = 0,
+            /// <summary>
+            /// Pair expecting both a discrete and inner sphere manifolds.
+            /// </summary>
+            Linear = 1,
+            /// <summary>
+            /// Pair expecting multiple discrete manifolds.
+            /// </summary>
+            Substep = 2,
+            /// <summary>
+            /// Pair expecting both inner sphere manifolds and multiple discrete manifolds.
+            /// </summary>
+            SubstepWithLinear = 3
+        }
+
         public struct ConstraintGenerators : IContinuations
         {
             int workerIndex;
@@ -514,7 +515,7 @@ namespace SolverPrototype.CollisionDetection
                             ref var continuation = ref this.substepWithLinear.Caches[continuationId.Index];
                             var innerIndex = continuationId.InnerIndex;
                             switch (innerIndex)
-                                                            {
+                            {
                                 case 0:
                                     FillLinearManifoldSlotA(ref continuation.LinearManifold, manifold);
                                     break;
@@ -542,23 +543,39 @@ namespace SolverPrototype.CollisionDetection
                 }
 
             }
+
+            internal void Dispose()
+            {
+                discrete.Dispose(pool);
+                linear.Dispose(pool);
+                substep.Dispose(pool);
+                substepWithLinear.Dispose(pool);
+            }
         }
 
-        ConstraintGenerators[] constraintGenerators;
+        ConstraintGenerators[] workerConstraintGenerators;
 
         private void PrepareConstraintGenerators(IThreadDispatcher threadDispatcher)
         {
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
             //Resizes should be very rare, and having a single extra very small array isn't concerning.
             //(It's not an unmanaged type because it contains nonblittable references.)
-            if (constraintGenerators == null || constraintGenerators.Length < threadCount)
-                Array.Resize(ref constraintGenerators, threadCount);
+            if (workerConstraintGenerators == null || workerConstraintGenerators.Length < threadCount)
+                Array.Resize(ref workerConstraintGenerators, threadCount);
             for (int i = 0; i < threadCount; ++i)
             {
-                constraintGenerators[i] = new ConstraintGenerators(i, threadDispatcher != null ? threadDispatcher.GetThreadMemoryPool(i) : Pool, this);
+                workerConstraintGenerators[i] = new ConstraintGenerators(i, threadDispatcher != null ? threadDispatcher.GetThreadMemoryPool(i) : Pool, this);
             }
         }
 
+        private void DisposeConstraintGenerators(int threadCount)
+        {
+            for (int i = 0; i < threadCount; ++i)
+            {
+                workerConstraintGenerators[threadCount].Dispose();
+            }
+
+        }
 
     }
 
