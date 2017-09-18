@@ -322,7 +322,7 @@ namespace SolverPrototype.CollisionDetection
                     ref var handles = ref workerCache.BatchHandles[batchIndex];
                     for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
                     {
-                        solver.handlePool.Return(handles[handleIndex]);
+                        solver.handlePool.Return(handles[handleIndex], pool.SpecializeFor<int>());
                     }
                 }
             }

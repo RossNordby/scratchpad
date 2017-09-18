@@ -324,6 +324,7 @@ namespace SolverPrototype.CollisionDetection
                 {
                     Pair = pair;
                     ManifoldsReported = 0;
+                    LinearManifold.SetConvexityAndCount(2, false);
                 }
             }
 
@@ -355,6 +356,7 @@ namespace SolverPrototype.CollisionDetection
                     SubstepManifolds.Initialize(pool, substepCapacity);
                     Pair = pair;
                     ManifoldsReported = 0;
+                    LinearManifold.SetConvexityAndCount(2, false);
                 }
             }
 
@@ -382,6 +384,12 @@ namespace SolverPrototype.CollisionDetection
                 }
 
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                public void Return(int index, BufferPool pool)
+                {
+                    Ids.Return(index, pool.SpecializeFor<int>());
+                }
+
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
                 public void Dispose(BufferPool pool)
                 {
                     Ids.Dispose(pool.SpecializeFor<int>());
@@ -405,34 +413,131 @@ namespace SolverPrototype.CollisionDetection
                 substepWithLinear = new ContinuationCache<SubstepWithLinearPair>(pool);
             }
 
+            static class CCDFeatureIdOffsets
+            {
+                public const int LinearA = 1 << 16;
+                public const int LinearB = 1 << 17;
+                //Substeps are simply a series of discrete steps, so you don't want to offset them and make actual discrete contacts unshared.
+            }
+
+
+
+            private unsafe void FillLinearManifoldSlotA(ref ContactManifold linearManifold, ContactManifold* manifold)
+            {
+                //Note that linear A is always in slot 0, and linear B is always in slot 1.
+                //This is allowed because a linear pair is guaranteed to have two contacts generated from CCD.
+                //There is no separation limit on inner sphere pairs, and you never just create one sphere-collidable pair- it's always bilateral.
+                //Also note that offsetB is only used from linear A, not linear B. They should be identical.                       
+                Debug.Assert(manifold->ContactCount == 1);
+                linearManifold.OffsetB = manifold->OffsetB;
+                linearManifold.Offset0 = manifold->Offset0;
+                linearManifold.Depth0 = manifold->Depth0;
+                linearManifold.FeatureId0 = CCDFeatureIdOffsets.LinearA;
+                linearManifold.Normal0 = manifold->Normal0;
+
+            }
+            private unsafe void FillLinearManifoldSlotB(ref ContactManifold linearManifold, ContactManifold* manifold)
+            {
+                Debug.Assert(manifold->ContactCount == 1);
+                linearManifold.Offset1 = manifold->Offset0;
+                linearManifold.Depth1 = manifold->Depth0;
+                linearManifold.FeatureId1 = CCDFeatureIdOffsets.LinearB;
+                linearManifold.Normal1 = manifold->Normal0;
+            }
+
+
             public unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold)
             {
                 var todoTestCollisionCache = default(EmptyCollisionCache);
+                var continuationIndex = continuationId.Index;
                 switch ((ConstraintGeneratorType)continuationId.Type)
                 {
                     case ConstraintGeneratorType.Direct:
-                        //Direct has no need for accumulating multiple reports; we can immediately dispatch.
-                        narrowPhase.UpdateConstraintsForPair(workerIndex, ref discrete.Caches[continuationId.Index], manifold, ref todoTestCollisionCache);
+                        {
+                            //Direct has no need for accumulating multiple reports; we can immediately dispatch.
+                            ref var continuation = ref discrete.Caches[continuationIndex];
+                            narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation, manifold, ref todoTestCollisionCache);
+                            discrete.Return(continuationIndex, pool);
+                        }
                         break;
                     //TODO: Note that we could avoid a copy on all the multi-manifold continuations-
                     //rather than creating a manifold and passing it in, we could let the user 'allocate' from the continuation
                     //and then fill the appropriate slot. However, this complicates the api- the user would then have to say 'okay im done' to trigger the flush.
                     case ConstraintGeneratorType.Linear:
                         {
-                            //Rely on the memory layout. Discrete = 0, linearA = 1, linearB = 2.
-                            ref var continuation = ref linear.Caches[continuationId.Index];
-                            Unsafe.Add(ref continuation.DiscreteManifold, continuationId.InnerIndex) = *manifold;
+                            ref var continuation = ref linear.Caches[continuationIndex];
+                            Debug.Assert(continuation.ManifoldsReported < 2 || manifold->OffsetB == continuation.LinearManifold.OffsetB,
+                                "The offset from A to B should be the same in both LinearA and linearB. This requires a guarantee on the part of work submission; did you break that?");
+                            switch (continuationId.InnerIndex)
+                            {
+                                case 0:
+                                    //Discrete
+                                    continuation.DiscreteManifold = *manifold;
+                                    break;
+                                case 1:
+                                    FillLinearManifoldSlotA(ref continuation.LinearManifold, manifold);
+                                    break;
+                                case 2:
+                                    FillLinearManifoldSlotB(ref continuation.LinearManifold, manifold);
+                                    break;
+                            }
                             ++continuation.ManifoldsReported;
 
                             if (continuation.ManifoldsReported == 3)
                             {
+                                var manifolds = (ContactManifold*)Unsafe.AsPointer(ref continuation.DiscreteManifold);
+                                ContactManifold combinedManifold;
+                                ResolveLinearManifold(manifolds, manifolds + 1, &combinedManifold);
                                 narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation.Pair, &combinedManifold, ref todoTestCollisionCache);
+                                linear.Return(continuationIndex, pool);
                             }
                         }
                         break;
                     case ConstraintGeneratorType.Substep:
+                        {
+                            ref var continuation = ref substep.Caches[continuationId.Index];
+                            Debug.Assert(continuationId.InnerIndex >= 0 && continuationId.InnerIndex < continuation.Manifolds.Manifolds.Count);
+                            continuation.Manifolds.Manifolds[continuationId.InnerIndex] = *manifold;
+                            ++continuation.ManifoldsReported;
+
+                            if (continuation.ManifoldsReported == continuation.Manifolds.Manifolds.Count)
+                            {
+                                ContactManifold resolvedManifold;
+                                ResolveSubstepManifold(ref continuation.Manifolds, &resolvedManifold);
+                                narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation.Pair, &resolvedManifold, ref todoTestCollisionCache);
+                                substep.Return(continuationIndex, pool);
+                            }
+                        }
                         break;
                     case ConstraintGeneratorType.SubstepWithLinear:
+                        {
+                            ref var continuation = ref this.substepWithLinear.Caches[continuationId.Index];
+                            var innerIndex = continuationId.InnerIndex;
+                            switch (innerIndex)
+                                                            {
+                                case 0:
+                                    FillLinearManifoldSlotA(ref continuation.LinearManifold, manifold);
+                                    break;
+                                case 1:
+                                    FillLinearManifoldSlotB(ref continuation.LinearManifold, manifold);
+                                    break;
+                                default:
+                                    var substepIndex = innerIndex - 2;
+                                    Debug.Assert(substepIndex >= 0 && substepIndex < continuation.SubstepManifolds.Manifolds.Count);
+                                    continuation.SubstepManifolds.Manifolds[substepIndex] = *manifold;
+                                    break;
+                            }
+                            ++continuation.ManifoldsReported;
+
+                            if (continuation.ManifoldsReported == continuation.SubstepManifolds.Manifolds.Count + 2)
+                            {
+                                ContactManifold substepManifold, completeManifold;
+                                ResolveSubstepManifold(ref continuation.SubstepManifolds, &substepManifold);
+                                ResolveLinearManifold(&substepManifold, (ContactManifold*)Unsafe.AsPointer(ref continuation.LinearManifold), &completeManifold);
+                                narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation.Pair, &completeManifold, ref todoTestCollisionCache);
+                                substepWithLinear.Return(continuationIndex, pool);
+                            }
+                        }
                         break;
                 }
 

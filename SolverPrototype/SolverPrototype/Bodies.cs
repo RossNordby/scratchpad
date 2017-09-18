@@ -39,7 +39,7 @@ namespace SolverPrototype
         /// It is only updated once during the frame. It should be treated as ephemeral information.
         /// </summary>
         public Buffer<BodyInertias> Inertias;
-        public IdPool<Buffer<int>, BufferPool<int>> IdPool;
+        public IdPool<Buffer<int>> IdPool;
         protected BufferPool pool;
         public int BodyCount;
         /// <summary>
@@ -60,7 +60,7 @@ namespace SolverPrototype
             var initialCapacityInBundles = BundleIndexing.GetBundleCount(initialCapacity);
             InternalResize(initialCapacity);
 
-            IdPool = new IdPool<Buffer<int>, BufferPool<int>>(pool.SpecializeFor<int>(), initialCapacity);
+            IdPool<Buffer<int>>.Create(pool.SpecializeFor<int>(), initialCapacity, out IdPool);
         }
         
         unsafe void InternalResize(int targetBodyCapacity)
@@ -160,7 +160,7 @@ namespace SolverPrototype
             Collidables[BodyCount] = new Collidable();
             //The indices should also be set to all -1's beyond the body count.
             IndexToHandle[BodyCount] = -1;
-            IdPool.Return(handle);
+            IdPool.Return(handle, pool.SpecializeFor<int>());
             HandleToIndex[handle] = -1;
             return bodyMoved;
         }
@@ -276,7 +276,7 @@ namespace SolverPrototype
             }
             //When ensuring capacity, we assume the user wants to avoid all related resizes.
             //So we bump up the idpool's capacity, too. This is likely a massive overestimate, but it doesn't cost that much, and it does provide the necessary guarantee.
-            IdPool.EnsureCapacity(bodyCapacity);
+            IdPool.EnsureCapacity(bodyCapacity, pool.SpecializeFor<int>());
         }
         public void Compact(int bodyCapacity)
         {
@@ -285,7 +285,7 @@ namespace SolverPrototype
             {
                 InternalResize(targetBodyCapacity);
             }
-            IdPool.Compact(bodyCapacity);
+            IdPool.Compact(bodyCapacity, pool.SpecializeFor<int>());
         }
 
         public void Resize(int bodyCapacity)
@@ -295,7 +295,7 @@ namespace SolverPrototype
             {
                 InternalResize(targetBodyCapacity);
             }
-            IdPool.Resize(bodyCapacity);
+            IdPool.Resize(bodyCapacity, pool.SpecializeFor<int>());
         }
 
         /// <summary>
@@ -318,7 +318,7 @@ namespace SolverPrototype
             Inertias = new Buffer<BodyInertias>();
             HandleToIndex = new Buffer<int>();
             IndexToHandle = new Buffer<int>();
-            IdPool.Dispose();
+            IdPool.Dispose(pool.SpecializeFor<int>());
         }
 
 
