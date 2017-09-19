@@ -44,12 +44,12 @@ namespace SolverPrototypeTests.SpecializedTests
         }
         struct SubtaskFiltersTest : ICollisionSubtaskFilters
         {
-            public bool AllowCollisionTesting<TInput>(ref TInput input) where TInput : struct
+            public bool AllowCollisionTesting(CollidablePair parent, int childA, int childB)
             {
                 return true;
             }
-
-            public void Configure<TInput>(ref TInput input) where TInput : struct
+            
+            public unsafe void Configure(CollidablePair parent, int childA, int childB, ContactManifold* manifold)
             {
             }
         }

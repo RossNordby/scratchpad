@@ -54,25 +54,25 @@ namespace SolverPrototype.CollisionDetection
             int NextNodePair;
             int leafThreshold;
             private QuickList<Overlap, Buffer<Overlap>> nodePairsToTest;
-            private Action<int> pairTestAction;
-
-            public MultithreadedSelfTest()
-            {
-                pairTestAction = PairTest;
-            }
-
+            
             TOverlapHandler[] overlapHandlers;
 
-            public void SelfTest(Tree tree, TOverlapHandler[] overlapHandlers, IThreadDispatcher threadDispatcher)
+            /// <summary>
+            /// Prepares the jobs associated with a self test. Must be called before a dispatch over PairTestAction.
+            /// </summary>
+            /// <param name="tree">Tree to test against itself.</param>
+            /// <param name="overlapHandlers">Callbacks used to handle individual overlaps detected by the self test.</param>
+            /// <param name="threadCount">Number of threads to prepare jobs for.</param>
+            public void PrepareSelfTestJobs(Tree tree, TOverlapHandler[] overlapHandlers, int threadCount)
             {
                 //If there are not multiple children, there's no need to recurse.
                 //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
                 if (tree.leafCount < 2)
                     return;
 
-                Debug.Assert(overlapHandlers.Length >= threadDispatcher.ThreadCount);
+                Debug.Assert(overlapHandlers.Length >= threadCount);
                 const float jobMultiplier = 1.5f;
-                var targetJobCount = Math.Max(1, jobMultiplier * threadDispatcher.ThreadCount);
+                var targetJobCount = Math.Max(1, jobMultiplier * threadCount);
                 leafThreshold = (int)(tree.leafCount / targetJobCount);
                 this.overlapHandlers = overlapHandlers;
                 this.tree = tree;
@@ -81,16 +81,27 @@ namespace SolverPrototype.CollisionDetection
                 NextNodePair = -1;
                 //Collect jobs.
                 CollectJobsInNode(0, tree.leafCount, ref overlapHandlers[0]);
-                //Do the jobs!
-                threadDispatcher.DispatchWorkers(pairTestAction);
+            }
+
+            /// <summary>
+            /// Cleans up after a multithreaded self test.
+            /// </summary>
+            /// <param name="tree">Tree that was self tested.</param>
+            public void CompleteSelfTest(Tree tree)
+            {
                 nodePairsToTest.Dispose(tree.Pool.SpecializeFor<Overlap>());
                 this.tree = null;
                 this.overlapPool = default(BufferPool<Overlap>);
                 this.overlapHandlers = null;
             }
 
-            unsafe void PairTest(int workerIndex)
+            /// <summary>
+            /// Executes a single worker of the multithreaded self test.
+            /// </summary>
+            /// <param name="workerIndex">Index of the worker executing this set of tests.</param>
+            public unsafe void PairTest(int workerIndex)
             {
+                Debug.Assert(workerIndex >= 0 && workerIndex < overlapHandlers.Length);
                 int nextNodePairIndex;
                 //To minimize the number of worker overlap lists, perform direct load balancing by manually grabbing the next indices.
                 while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < nodePairsToTest.Count)

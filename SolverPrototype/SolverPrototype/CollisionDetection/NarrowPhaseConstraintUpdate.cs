@@ -240,7 +240,7 @@ namespace SolverPrototype.CollisionDetection
             //That said, such a pair cannot generate constraints no matter what- constraints must involve at least one body, always.
             var aIsBody = !pair.A.IsStatic;
             var bIsBody = !pair.B.IsStatic;
-            if (Callbacks.ConfigureContactManifold(workerIndex, pair, ref *manifold, out var pairMaterial) && (aIsBody || bIsBody))
+            if (Callbacks.ConfigureContactManifold(workerIndex, pair, manifold, out var pairMaterial) && (aIsBody || bIsBody))
             {
                 if (manifold->ContactCount > 0)
                 {

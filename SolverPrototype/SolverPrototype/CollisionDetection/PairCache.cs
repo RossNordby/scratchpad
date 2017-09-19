@@ -15,7 +15,7 @@ namespace SolverPrototype.CollisionDetection
 {
     //would you care for some generics
     using OverlapMapping = QuickDictionary<CollidablePair, CollidablePairPointers, Buffer<CollidablePair>, Buffer<CollidablePairPointers>, Buffer<int>, CollidablePairComparer>;
-
+    
     [StructLayout(LayoutKind.Explicit, Size = 8)]
     public struct CollidablePair
     {

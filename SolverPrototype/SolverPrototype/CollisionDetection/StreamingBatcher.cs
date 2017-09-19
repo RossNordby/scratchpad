@@ -18,21 +18,24 @@ namespace SolverPrototype.CollisionDetection
     /// <summary>
     /// Defines filters that some collision tasks may call when child tasks need to be spawned.
     /// </summary>
-    public interface ICollisionSubtaskFilters
+    public unsafe interface ICollisionSubtaskFilters
     {
         /// <summary>
         /// Checks whether further collision testing should be performed for a given subtask.
         /// </summary>
-        /// <typeparam name="TInput">Type of the input used to decide whether to allow contact generation.</typeparam>
-        /// <param name="input">Input data to be used to decide whether to allow testing.</param>
+        /// <param name="parent">Parent of the child pair being checked.</param>
+        /// <param name="childA">Index of the child belonging to collidable A in the subpair under consideration.</param>
+        /// <param name="childB">Index of the child belonging to collidable B in the subpair under consideration.</param>
         /// <returns>True if testing should proceed, false otherwise.</returns>
-        bool AllowCollisionTesting<TInput>(ref TInput input) where TInput : struct;
+        bool AllowCollisionTesting(CollidablePair parent, int childA, int childB);
         /// <summary>
         /// Provides control over subtask generated results before they are reported to the parent task.
         /// </summary>
-        /// <typeparam name="TInput">Type of the input used for configuration.</typeparam>
-        /// <param name="input">Input used by configuration.</param>
-        void Configure<TInput>(ref TInput input) where TInput : struct;
+        /// <param name="parent">Parent of the pair being configured.</param>
+        /// <param name="childA">Index of the child belonging to collidable A in the subpair under consideration.</param>
+        /// <param name="childB">Index of the child belonging to collidable B in the subpair under consideration.</param>
+        /// <param name="manifold">Manifold of the child pair to configure.</param>
+        void Configure(CollidablePair parent, int childA, int childB, ContactManifold* manifold);
     }
 
     public abstract class CollisionTask

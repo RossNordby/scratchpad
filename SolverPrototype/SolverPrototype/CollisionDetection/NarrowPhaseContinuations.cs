@@ -552,30 +552,7 @@ namespace SolverPrototype.CollisionDetection
                 substepWithLinear.Dispose(pool);
             }
         }
-
-        ConstraintGenerators[] workerConstraintGenerators;
-
-        private void PrepareConstraintGenerators(IThreadDispatcher threadDispatcher)
-        {
-            var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
-            //Resizes should be very rare, and having a single extra very small array isn't concerning.
-            //(It's not an unmanaged type because it contains nonblittable references.)
-            if (workerConstraintGenerators == null || workerConstraintGenerators.Length < threadCount)
-                Array.Resize(ref workerConstraintGenerators, threadCount);
-            for (int i = 0; i < threadCount; ++i)
-            {
-                workerConstraintGenerators[i] = new ConstraintGenerators(i, threadDispatcher != null ? threadDispatcher.GetThreadMemoryPool(i) : Pool, this);
-            }
-        }
-
-        private void DisposeConstraintGenerators(int threadCount)
-        {
-            for (int i = 0; i < threadCount; ++i)
-            {
-                workerConstraintGenerators[threadCount].Dispose();
-            }
-
-        }
+        
 
     }
 

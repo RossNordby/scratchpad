@@ -14,7 +14,7 @@ namespace SolverPrototype.CollisionDetection
         public SpringSettingsAOS SpringSettings;
     }
 
-    public interface INarrowPhaseCallbacks
+    public unsafe interface INarrowPhaseCallbacks
     {
         void Initialize(Simulation simulation);
         /// <summary>
@@ -35,7 +35,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <param name="pairMaterial">Material properties of the manifold.</param>
         /// <returns>True if a constraint should be created for the manifold, false otherwise.</returns>
-        bool ConfigureContactManifold(int workerIndex, CollidablePair pair, ref ContactManifold manifold, out PairMaterialProperties pairMaterial);
+        bool ConfigureContactManifold(int workerIndex, CollidablePair pair, ContactManifold* manifold, out PairMaterialProperties pairMaterial);
 
         //TODO: There is an argument for finer grained material tuning, both per child and per contact. Need an efficient way to do this before we commit-
         //one possibility is a material per convex manifold. For nonconvex manifolds, there would be a material property per contact.
@@ -44,14 +44,13 @@ namespace SolverPrototype.CollisionDetection
         /// <summary>
         /// Chooses whether to allow contact generation to proceed for the children of two overlapping collidables in a compound-including pair.
         /// </summary>
-        /// <param name="a">Reference to the first collidable in the pair.</param>
-        /// <param name="b">Reference to the second collidable in the pair.</param>
+        /// <param name="pair">Parent pair of the two child collidables.</param>
         /// <param name="childIndexA">Index of the child of collidable A in the pair. If collidable A is not compound, then this is always 0.</param>
         /// <param name="childIndexB">Index of the child of collidable B in the pair. If collidable B is not compound, then this is always 0.</param>
         /// <returns>True if collision detection should proceed, false otherwise.</returns>
         /// <remarks>This is called for each sub-overlap in a collidable pair involving compound collidables. If neither collidable in a pair is compound, this will not be called.
         /// For compound-including pairs, if the earlier call to AllowContactGeneration returns false for owning pair, this will not be called.</remarks>
-        bool AllowContactGeneration(int workerIndex, CollidableReference a, CollidableReference b, int childIndexA, int childIndexB);
+        bool AllowContactGeneration(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB);
         /// <summary>
         /// Provides a notification that a manifold has been created between the children of two collidables in a compound-including pair.
         /// Offers an opportunity to change the manifold's details. 
@@ -62,7 +61,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="childIndexB">Index of the child of collidable B in the pair. If collidable B is not compound, then this is always 0.</param>
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <returns>True if this manifold should be considered for constraint generation, false otherwise.</returns>
-        bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ContactManifold manifold);
+        bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ContactManifold* manifold);
                 
         /// <summary>
         /// Requests that a constraint be added to the solver between two bodies.

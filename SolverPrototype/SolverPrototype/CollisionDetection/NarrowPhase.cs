@@ -205,7 +205,7 @@ namespace SolverPrototype.CollisionDetection
 
         protected override void OnPrepare(IThreadDispatcher threadDispatcher = null)
         {
-            PrepareConstraintGenerators(threadDispatcher);
+            PrepareOverlapWorkers(threadDispatcher);
         }
 
         protected override void OnFlush(IThreadDispatcher threadDispatcher = null)
