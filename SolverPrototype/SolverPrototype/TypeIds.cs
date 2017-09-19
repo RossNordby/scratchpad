@@ -4,6 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using SolverPrototype.CollisionDetection;
+using SolverPrototype.CollisionDetection.CollisionTasks;
 
 namespace SolverPrototype
 {
@@ -20,6 +22,13 @@ namespace SolverPrototype
             TypeIds<IShape>.Register<Sphere>();
             TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
             TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
+        }
+
+        public static CollisionTaskRegistry CreateDefaultCollisionTaskRegistry()
+        {
+            var collisionTaskRegistry = new CollisionTaskRegistry();
+            collisionTaskRegistry.Register(new SpherePairCollisionTask());
+            return collisionTaskRegistry;
         }
     }
 

@@ -100,7 +100,7 @@ namespace BEPUutilities2.Memory
             /// <summary>
             /// Pool of slots available to this power level.
             /// </summary>
-            public readonly IdPool<Array<int>> Slots;
+            public IdPool<Array<int>> Slots;
 #if DEBUG
             HashSet<int> outstandingIds;
 #endif

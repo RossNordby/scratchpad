@@ -81,6 +81,8 @@ namespace SolverPrototype.CollisionDetection
         public BufferPool Pool;
         public Bodies Bodies;
         public Solver Solver;
+        public Shapes Shapes;
+        public CollisionTaskRegistry CollisionTaskRegistry;
         public ConstraintRemover ConstraintRemover;
         public FreshnessChecker FreshnessChecker;
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
@@ -189,7 +191,7 @@ namespace SolverPrototype.CollisionDetection
     {
         public TCallbacks Callbacks;
 
-        public NarrowPhase(Simulation simulation, TCallbacks callbacks,
+        public NarrowPhase(Simulation simulation, CollisionTaskRegistry collisionTaskRegistry, TCallbacks callbacks,
              int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
             : base()
         {
@@ -198,6 +200,7 @@ namespace SolverPrototype.CollisionDetection
             Solver = simulation.Solver;
             Callbacks = callbacks;
             Callbacks.Initialize(simulation);
+            CollisionTaskRegistry = collisionTaskRegistry;
             PairCache = new PairCache(simulation.BufferPool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity);
             ConstraintRemover = new ConstraintRemover(simulation.BufferPool, simulation.Bodies, simulation.Solver, simulation.ConstraintGraph, minimumRemovalCapacity: minimumPendingSize);
             FreshnessChecker = new FreshnessChecker(this);
@@ -220,13 +223,15 @@ namespace SolverPrototype.CollisionDetection
         protected override void OnDispose()
         {
             Callbacks.Dispose();
-        }        
-               
-        public void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
+        }
+
+        public unsafe void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
             var staticness = (a.packed >> 31) | ((b.packed & 0x7FFFFFFF) >> 30);
+            ref var overlapWorker = ref overlapWorkers[workerIndex];
+            var pair = new CollidablePair(a, b);
             switch (staticness)
             {
                 case 0:
@@ -234,8 +239,16 @@ namespace SolverPrototype.CollisionDetection
                         //Both references are bodies.
                         //This is a body. In order to dispatch it properly, we need to know some metadata.
                         //TODO: Once inactive bodies exist, this will need to be updated.
-                        ref var aCollidable = ref Bodies.Collidables[Bodies.HandleToIndex[a.Collidable]];
-                        ref var bCollidable = ref Bodies.Collidables[Bodies.HandleToIndex[b.Collidable]];
+                        var bodyIndexA = Bodies.HandleToIndex[a.Collidable];
+                        var bodyIndexB = Bodies.HandleToIndex[b.Collidable];
+                        ref var aCollidable = ref Bodies.Collidables[bodyIndexA];
+                        ref var bCollidable = ref Bodies.Collidables[bodyIndexB];
+                        Bodies.GetPoseByIndex(bodyIndexA, out var poseA);
+                        Bodies.GetPoseByIndex(bodyIndexB, out var poseB);
+                        var shapeTypeA = aCollidable.Shape.Type;
+                        var shapeTypeB = bCollidable.Shape.Type;
+                        Shapes[shapeTypeA].GetShapeData(aCollidable.Shape.Index, out var shapePointerA, out var shapeSizeA);
+                        Shapes[shapeTypeB].GetShapeData(aCollidable.Shape.Index, out var shapePointerB, out var shapeSizeB);
                         //Note that we never create 'unilateral' CCD pairs. That is, if either collidable in a pair enables a CCD feature, we just act like both are using it.
                         //That keeps things a little simpler. Unlike v1, we don't have to worry about the implications of 'motion clamping' here- no need for deeper configuration.
                         var useSubstepping = aCollidable.Continuity.UseSubstepping || bCollidable.Continuity.UseSubstepping;
@@ -243,7 +256,6 @@ namespace SolverPrototype.CollisionDetection
                         //Create a continuation for the pair given the CCD state.
                         if (useSubstepping && useInnerSphere)
                         {
-                            //collisionBatchers[workerIndex].Add(a, b);
                         }
                         else if (useSubstepping)
                         {
@@ -256,7 +268,9 @@ namespace SolverPrototype.CollisionDetection
                         else
                         {
                             //This pair uses no CCD beyond its speculative margin.
-                            
+                            var continuation = overlapWorker.ConstraintGenerators.AddDiscrete(ref pair);
+                            overlapWorker.Batcher.Add(shapeTypeA, shapeTypeB, shapeSizeA, shapeSizeB, shapePointerA, shapePointerB, ref poseA, ref poseB, continuation,
+                                ref overlapWorker.ConstraintGenerators, ref overlapWorker.Filters);
                         }
 
                         //Pull the velocity information for all involved bodies. We will request a number of steps that will cover the motion path.

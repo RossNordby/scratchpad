@@ -103,12 +103,27 @@ namespace SolverPrototype.Collidables
 
     public abstract class ShapeBatch
     {
+        protected RawBuffer shapesData;
+        protected int shapeDataSize;
         protected BufferPool pool;
         public abstract void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt) where TBundleSource : ICollidableBundleSource;
         public abstract void RemoveAt(int index);
 
         public abstract void ComputeBounds(int shapeIndex, ref BodyPose pose, out Vector3 min, out Vector3 max);
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
+
+        /// <summary>
+        /// Gets a raw untyped pointer to a shape's data.
+        /// </summary>
+        /// <param name="shapeIndex">Index of the shape to look up.</param>
+        /// <param name="shapePointer">Pointer to the indexed shape data.</param>
+        /// <param name="shapeSize">Size of the shape data in bytes.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void GetShapeData(int shapeIndex, out void* shapePointer, out int shapeSize)
+        {
+            shapePointer = shapesData.Memory + shapeDataSize * shapeIndex;
+            shapeSize = shapeDataSize;
+        }
     }
 
     public class ShapeBatch<TShape> : ShapeBatch where TShape : struct, IShape//TODO: When blittable is supported, shapes should be made blittable. We store them in buffers.
@@ -117,14 +132,33 @@ namespace SolverPrototype.Collidables
         internal Buffer<TShape> shapes;
         protected IdPool<Buffer<int>> idPool;
 
+        void Resize(int shapeCount, int oldCopyLength)
+        {
+            shapeDataSize = Unsafe.SizeOf<TShape>();
+            var requiredSizeInBytes = shapeCount * Unsafe.SizeOf<TShape>();
+            pool.Take(requiredSizeInBytes, out var newShapesData);
+            var newShapes = newShapesData.As<TShape>();
+#if DEBUG
+            //In debug mode, unused slots are kept at the default value. This helps catch misuse.
+            newShapes.Clear(shapes.Length, newShapes.Length - shapes.Length);
+#endif
+            if (shapesData.Allocated)
+            {
+                shapes.CopyTo(0, ref newShapes, 0, oldCopyLength);
+                pool.Return(ref shapesData);
+            }
+            else
+            {
+                Debug.Assert(oldCopyLength == 0);
+            }
+            shapes = newShapes;
+            shapesData = newShapesData;
+        }
+
         public ShapeBatch(BufferPool pool, int initialShapeCount)
         {
             this.pool = pool;
-            pool.SpecializeFor<TShape>().Take(initialShapeCount, out shapes);
-#if DEBUG
-            //In debug mode, unused slots are kept at the default value. This helps catch misuse.
-            shapes.Clear(0, shapes.Length);
-#endif
+            Resize(initialShapeCount, 0);
             IdPool<Buffer<int>>.Create(pool.SpecializeFor<int>(), initialShapeCount, out idPool);
         }
 
@@ -147,14 +181,7 @@ namespace SolverPrototype.Collidables
             var shapeIndex = idPool.Take();
             if (shapes.Length <= shapeIndex)
             {
-                pool.SpecializeFor<TShape>().Take(shapeIndex + 1, out var newSpan);
-                shapes.CopyTo(0, ref newSpan, 0, shapes.Length);
-#if DEBUG
-                //In debug mode, unused slots are kept at the default value. This helps catch misuse.
-                newSpan.Clear(shapes.Length, newSpan.Length - shapes.Length);
-#endif
-                pool.SpecializeFor<TShape>().Return(ref shapes);
-                shapes = newSpan;
+                Resize(shapeIndex + 1, shapes.Length);
             }
             Debug.Assert(SpanHelper.IsZeroed(ref shapes[shapeIndex]), "In debug mode, the slot a shape is stuck into should be cleared. If it's not, it is already in use.");
             shapes[shapeIndex] = shape;

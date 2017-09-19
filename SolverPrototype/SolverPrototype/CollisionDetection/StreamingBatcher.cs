@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace SolverPrototype.CollisionDetection
@@ -242,14 +243,22 @@ namespace SolverPrototype.CollisionDetection
         }
     }
 
+    struct RigidPair
+    {
+        public BodyPose PoseA;
+        public BodyPose PoseB;
+        public ContinuationIndex Continuation;
+    }
+
+    //Writes by the narrowphase write shape data without type knowledge, so they can't easily operate on regular packing rules. Emulate this with a pack of 1.
+    //This allows the reader to still have a quick way to interpret data rather than casting individual shapes.
+    [StructLayout(LayoutKind.Sequential, Pack = 1)]
     struct RigidPair<TShapeA, TShapeB>
             where TShapeA : struct, IShape where TShapeB : struct, IShape
     {
         public TShapeA A;
         public TShapeB B;
-        public BodyPose PoseA;
-        public BodyPose PoseB;
-        public ContinuationIndex Continuation;
+        public RigidPair Shared;
     }
 
 
@@ -283,7 +292,69 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
+        unsafe void Add<TContinuations, TFilters>(ref CollisionTaskReference reference, int pairSizeInBytes,
+            int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref BodyPose poseA, ref BodyPose poseB,
+            ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+            where TContinuations : struct, IContinuations
+            where TFilters : struct, ICollisionSubtaskFilters
+        {
+            ref var batch = ref batches[reference.TaskIndex];
+            var pairData = batch.AllocateUnsafely(pairSizeInBytes);
+            Unsafe.CopyBlockUnaligned(pairData, shapeA, (uint)shapeSizeA);
+            Unsafe.CopyBlockUnaligned(pairData += shapeSizeA, shapeB, (uint)shapeSizeA);
+            var poses = (RigidPair*)(pairData += shapeSizeB);
+            poses->PoseA = poseA;
+            poses->PoseB = poseB;
+            poses->Continuation = continuationId;
+            if (batch.Count == reference.BatchSize)
+            {
+                typeMatrix[reference.TaskIndex].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
+                batch.Count = 0;
+                batch.ByteCount = 0;
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void Add<TContinuations, TFilters>(
+            int shapeTypeIdA, int shapeTypeIdB, int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref BodyPose poseA, ref BodyPose poseB,
+            ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+            where TContinuations : struct, IContinuations
+            where TFilters : struct, ICollisionSubtaskFilters
+        {
+            //TODO: It's possible that only retrieving the actual task in the event that it's time to dispatch could save some cycles.
+            //That would imply caching the batch sizes and expected first ids, likely alongside the task indices.
+            //Value of that is questionable, since all the task-associated indirections are pretty much guaranteed to be cached.
+            ref var reference = ref typeMatrix.GetTaskReference(shapeTypeIdA, shapeTypeIdB);
+            if (reference.TaskIndex < 0)
+            {
+                //There is no task for this shape type pair. Immediately respond with an empty manifold.
+                var manifold = new ContactManifold();
+                continuations.Notify(continuationId, &manifold);
+                return;
+            }
+            ref var batch = ref batches[reference.TaskIndex];
+            var pairSize = shapeSizeA + shapeSizeB + Unsafe.SizeOf<RigidPair>();
+            if (!batch.Buffer.Allocated)
+            {
+                batch = new UntypedList(reference.BatchSize * pairSize, pool);
+                if (minimumBatchIndex > reference.TaskIndex)
+                    minimumBatchIndex = reference.TaskIndex;
+                if (maximumBatchIndex < reference.TaskIndex)
+                    maximumBatchIndex = reference.TaskIndex;
+            }
+            if (shapeTypeIdA != reference.ExpectedFirstTypeId)
+            {
+                //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
+                Add(ref reference, pairSize, shapeSizeB, shapeSizeA, shapeB, shapeA, ref poseB, ref poseA, continuationId, ref continuations, ref filters);
+            }
+            else
+            {
+                Add(ref reference, pairSize, shapeSizeA, shapeSizeB, shapeA, shapeB, ref poseA, ref poseB, continuationId, ref continuations, ref filters);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
             ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
             ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
@@ -294,9 +365,9 @@ namespace SolverPrototype.CollisionDetection
             ref var pairData = ref batch.AllocateUnsafely<RigidPair<TShapeA, TShapeB>>();
             pairData.A = shapeA;
             pairData.B = shapeB;
-            pairData.PoseA = poseA;
-            pairData.PoseB = poseB;
-            pairData.Continuation = continuationId;
+            pairData.Shared.PoseA = poseA;
+            pairData.Shared.PoseB = poseB;
+            pairData.Shared.Continuation = continuationId;
             if (batch.Count == reference.BatchSize)
             {
                 typeMatrix[reference.TaskIndex].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
@@ -304,13 +375,12 @@ namespace SolverPrototype.CollisionDetection
                 batch.ByteCount = 0;
             }
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
-             ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
-             where TShapeA : struct, IShape where TShapeB : struct, IShape
-             where TContinuations : struct, IContinuations
-             where TFilters : struct, ICollisionSubtaskFilters
+            ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+            where TShapeA : struct, IShape where TShapeB : struct, IShape
+            where TContinuations : struct, IContinuations
+            where TFilters : struct, ICollisionSubtaskFilters
         {
             //TODO: It's possible that only retrieving the actual task in the event that it's time to dispatch could save some cycles.
             //That would imply caching the batch sizes and expected first ids, likely alongside the task indices.

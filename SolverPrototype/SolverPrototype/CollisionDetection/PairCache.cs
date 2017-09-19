@@ -15,7 +15,7 @@ namespace SolverPrototype.CollisionDetection
 {
     //would you care for some generics
     using OverlapMapping = QuickDictionary<CollidablePair, CollidablePairPointers, Buffer<CollidablePair>, Buffer<CollidablePairPointers>, Buffer<int>, CollidablePairComparer>;
-    
+
     [StructLayout(LayoutKind.Explicit, Size = 8)]
     public struct CollidablePair
     {
@@ -23,6 +23,13 @@ namespace SolverPrototype.CollisionDetection
         public CollidableReference A;
         [FieldOffset(4)]
         public CollidableReference B;
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public CollidablePair(CollidableReference a, CollidableReference b)
+        {
+            A = a;
+            B = b;
+        }
     }
 
     public struct CollidablePairComparer : IEqualityComparerRef<CollidablePair>
@@ -54,7 +61,7 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         public PairCacheIndex CollisionDetectionCache;
     }
-    
+
 
     public class PairCache
     {

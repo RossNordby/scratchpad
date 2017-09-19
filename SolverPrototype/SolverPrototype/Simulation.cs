@@ -56,40 +56,37 @@ namespace SolverPrototype
         /// </summary>
         /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
         /// <param name="narrowPhaseCallbacks">Callbacks to use in the narrow phase.</param>
-        /// <param name="initialAllocationSizes">Allocation sizes to initialize the simulation with.</param>
+        /// <param name="initialAllocationSizes">Allocation sizes to initialize the simulation with. If left null, default values are chosen.</param>
+        /// <param name="collisionTaskRegistry">The set of collision tasks to use in the simulation. If left null, default types are registered.</param>
         /// <returns>New simulation.</returns>
-        public static Simulation Create<TNarrowPhaseCallbacks>(BufferPool bufferPool, TNarrowPhaseCallbacks narrowPhaseCallbacks, SimulationAllocationSizes initialAllocationSizes)
+        public static Simulation Create<TNarrowPhaseCallbacks>(BufferPool bufferPool, TNarrowPhaseCallbacks narrowPhaseCallbacks,
+            SimulationAllocationSizes? initialAllocationSizes = null, CollisionTaskRegistry collisionTaskRegistry = null)
             where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks
         {
-            var simulation = new Simulation(bufferPool, initialAllocationSizes);
-            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation, narrowPhaseCallbacks);
+            if(initialAllocationSizes == null)
+            {
+                initialAllocationSizes = new SimulationAllocationSizes
+                {
+                    Bodies = 4096,
+                    ShapesPerType = 128,
+                    CollidablesPerType = 4096,
+                    ConstraintCountPerBodyEstimate = 8,
+                    Constraints = 16384,
+                    ConstraintsPerTypeBatch = 256
+                };
+            }
+            if(collisionTaskRegistry == null)
+            {
+                collisionTaskRegistry = DefaultTypes.CreateDefaultCollisionTaskRegistry();
+            }
+            var simulation = new Simulation(bufferPool, initialAllocationSizes.Value);
+            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation, collisionTaskRegistry, narrowPhaseCallbacks);
             simulation.NarrowPhase = narrowPhase;
             simulation.BroadPhaseOverlapFinder = new CollidableOverlapFinder<TNarrowPhaseCallbacks>(narrowPhase, simulation.BroadPhase);
 
             return simulation;
         }
-
-        /// <summary>
-        /// Constructs a simulation supporting dynamic movement and constraints with the specified narrow phase callbacks and a default set of initial allocation sizes.
-        /// </summary>
-        /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
-        /// <param name="narrowPhaseCallbacks">Callbacks to use in the narrow phase.</param>
-        /// <returns>New simulation.</returns>
-        public static Simulation Create<TNarrowPhaseCallbacks>(BufferPool bufferPool, TNarrowPhaseCallbacks narrowPhaseCallbacks)
-            where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks           
-        {
-            return Create(bufferPool, narrowPhaseCallbacks, new SimulationAllocationSizes
-            {
-                Bodies = 4096,
-                ShapesPerType = 128,
-                CollidablesPerType = 4096,
-                ConstraintCountPerBodyEstimate = 8,
-                Constraints = 16384,
-                ConstraintsPerTypeBatch = 256
-            });
-        }
-
-
+        
 
         public int Add(ref BodyDescription bodyDescription)
         {

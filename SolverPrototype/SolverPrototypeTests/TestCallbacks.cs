@@ -7,7 +7,7 @@ using SolverPrototype.Constraints;
 
 namespace SolverPrototypeTests
 {
-    public struct TestCallbacks : INarrowPhaseCallbacks
+    public unsafe struct TestCallbacks : INarrowPhaseCallbacks
     {
         public void Initialize(Simulation simulation)
         {
@@ -18,18 +18,18 @@ namespace SolverPrototypeTests
             return true;
         }
 
-        public bool AllowContactGeneration(int workerIndex, CollidableReference a, CollidableReference b, int childIndexA, int childIndexB)
+        public bool AllowContactGeneration(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB)
         {
             return true;
         }
 
-        public bool ConfigureContactManifold(int workerIndex, CollidablePair pair, ref ContactManifold manifold, out PairMaterialProperties pairMaterial)
+        public bool ConfigureContactManifold(int workerIndex, CollidablePair pair, ContactManifold* manifold, out PairMaterialProperties pairMaterial)
         {
             pairMaterial = new PairMaterialProperties();
             return false;
         }
 
-        public bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ref ContactManifold manifold)
+        public bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ContactManifold* manifold)
         {
             return false;
         }
@@ -41,7 +41,7 @@ namespace SolverPrototypeTests
         public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
         {
         }
-        
+
         public void Flush(IThreadDispatcher threadDispatcher)
         {
         }
@@ -50,5 +50,5 @@ namespace SolverPrototypeTests
         {
         }
     }
-    
+
 }

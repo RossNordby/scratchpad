@@ -22,7 +22,7 @@ namespace SolverPrototype.CollisionDetection
             /// <summary>
             /// Pair which will directly produce constraints.
             /// </summary>
-            Direct = 0,
+            Discrete = 0,
             /// <summary>
             /// Pair expecting both a discrete and inner sphere manifolds.
             /// </summary>
@@ -414,14 +414,37 @@ namespace SolverPrototype.CollisionDetection
                 substepWithLinear = new ContinuationCache<SubstepWithLinearPair>(pool);
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public ContinuationIndex AddDiscrete(ref CollidablePair pair)
+            {
+                discrete.Allocate(pool, out var index) = pair;
+                return new ContinuationIndex((int)ConstraintGeneratorType.Discrete, index, 0);
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public int AddLinear(ref CollidablePair pair)
+            {
+                linear.Allocate(pool, out var index).Initialize(pair);
+                return index;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public int AddSubsteps(ref CollidablePair pair, int substepCount)
+            {
+                substep.Allocate(pool, out var index).Initialize(pool, substepCount, pair);
+                return index;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public int AddSubstepsWithLinear(ref CollidablePair pair, int substepCount)
+            {
+                substepWithLinear.Allocate(pool, out var index).Initialize(pool, substepCount, pair);
+                return index;
+            }
+
             static class CCDFeatureIdOffsets
             {
                 public const int LinearA = 1 << 16;
                 public const int LinearB = 1 << 17;
                 //Substeps are simply a series of discrete steps, so you don't want to offset them and make actual discrete contacts unshared.
             }
-
-
 
             private unsafe void FillLinearManifoldSlotA(ref ContactManifold linearManifold, ContactManifold* manifold)
             {
@@ -453,7 +476,7 @@ namespace SolverPrototype.CollisionDetection
                 var continuationIndex = continuationId.Index;
                 switch ((ConstraintGeneratorType)continuationId.Type)
                 {
-                    case ConstraintGeneratorType.Direct:
+                    case ConstraintGeneratorType.Discrete:
                         {
                             //Direct has no need for accumulating multiple reports; we can immediately dispatch.
                             ref var continuation = ref discrete.Caches[continuationIndex];

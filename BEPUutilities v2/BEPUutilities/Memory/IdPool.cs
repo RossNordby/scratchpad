@@ -28,7 +28,7 @@ namespace BEPUutilities2.Memory
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Create<TPool>(TPool pool, int initialCapacity, out IdPool<TSpan> idPool) where TPool : IMemoryPool<int, TSpan>
         {
-            idPool.nextIndex = -1;
+            idPool.nextIndex = 0;
             QuickList<int, TSpan>.Create(pool, initialCapacity, out idPool.AvailableIds);
         }
 

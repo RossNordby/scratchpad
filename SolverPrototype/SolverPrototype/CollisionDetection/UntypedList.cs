@@ -36,6 +36,16 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe byte* AllocateUnsafely(int sizeInBytes)
+        {
+            var newSize = ByteCount + sizeInBytes;
+            Count++;
+            var byteIndex = ByteCount;
+            ByteCount = newSize;
+            return Buffer.Memory + byteIndex;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref T AllocateUnsafely<T>()
         {
             var newSize = ByteCount + Unsafe.SizeOf<T>();          

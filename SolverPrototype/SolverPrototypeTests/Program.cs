@@ -16,8 +16,8 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
-            ConstraintDescriptionMappingTests.Test();
-            BatchedCollisionTests.Test();
+            //ConstraintDescriptionMappingTests.Test();
+            //BatchedCollisionTests.Test();
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();
@@ -34,7 +34,7 @@ namespace SolverPrototypeTests
             //ConstraintCacheOptimizationTests.Test();
             //SortTest.Test();
             //SpanCodegenTests.Test();
-            return;
+            //return;
 
             Console.ReadKey();
             DefaultTypes.Register();

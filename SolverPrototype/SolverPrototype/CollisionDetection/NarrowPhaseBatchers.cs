@@ -48,13 +48,12 @@ namespace SolverPrototype.CollisionDetection
 
             public OverlapWorker(int workerIndex, BufferPool pool, NarrowPhase<TCallbacks> narrowPhase)
             {
-                Batcher = new StreamingBatcher(pool, narrowPhase.collisionTaskRegistry);
+                Batcher = new StreamingBatcher(pool, narrowPhase.CollisionTaskRegistry);
                 Filters = new BatcherFilters(workerIndex, narrowPhase);
                 ConstraintGenerators = new ConstraintGenerators(workerIndex, pool, narrowPhase);
             }
         }
 
-        CollisionTaskRegistry collisionTaskRegistry;
         internal OverlapWorker[] overlapWorkers;
 
         private void PrepareOverlapWorkers(IThreadDispatcher threadDispatcher)
