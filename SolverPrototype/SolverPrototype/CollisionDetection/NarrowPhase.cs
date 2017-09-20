@@ -196,6 +196,7 @@ namespace SolverPrototype.CollisionDetection
             : base()
         {
             Pool = simulation.BufferPool;
+            Shapes = simulation.Shapes;
             Bodies = simulation.Bodies;
             Solver = simulation.Solver;
             Callbacks = callbacks;
@@ -229,7 +230,7 @@ namespace SolverPrototype.CollisionDetection
         {
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
-            var staticness = (a.packed >> 31) | ((b.packed & 0x7FFFFFFF) >> 30);
+            var staticness = (a.packed >> 31) | ((b.packed & 0x8000_0000) >> 30);
             ref var overlapWorker = ref overlapWorkers[workerIndex];
             var pair = new CollidablePair(a, b);
             switch (staticness)

@@ -104,7 +104,7 @@ namespace SolverPrototype
                 BoundingBox bodyBounds;
                 Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out bodyBounds.Min, out bodyBounds.Max);
                 Bodies.Collidables[bodyIndex].BroadPhaseIndex =
-                    BroadPhase.Add(new CollidableReference(true, typeIndex, bodyIndex), ref bodyBounds);
+                    BroadPhase.Add(new CollidableReference(false, typeIndex, bodyIndex), ref bodyBounds);
             }
             return handle;
         }

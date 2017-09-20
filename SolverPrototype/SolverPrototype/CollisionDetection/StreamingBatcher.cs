@@ -287,6 +287,7 @@ namespace SolverPrototype.CollisionDetection
             pool.SpecializeFor<UntypedList>().Take(collisionTypeMatrix.tasks.Length, out localContinuations);
             //Clearing is required ensure that we know when a batch needs to be created and when a batch needs to be disposed.
             batches.Clear(0, collisionTypeMatrix.tasks.Length);
+            localContinuations.Clear(0, collisionTypeMatrix.tasks.Length);
             minimumBatchIndex = collisionTypeMatrix.tasks.Length;
             maximumBatchIndex = -1;
         }
@@ -321,9 +322,6 @@ namespace SolverPrototype.CollisionDetection
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
         {
-            //TODO: It's possible that only retrieving the actual task in the event that it's time to dispatch could save some cycles.
-            //That would imply caching the batch sizes and expected first ids, likely alongside the task indices.
-            //Value of that is questionable, since all the task-associated indirections are pretty much guaranteed to be cached.
             ref var reference = ref typeMatrix.GetTaskReference(shapeTypeIdA, shapeTypeIdB);
             if (reference.TaskIndex < 0)
             {
@@ -382,9 +380,6 @@ namespace SolverPrototype.CollisionDetection
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
         {
-            //TODO: It's possible that only retrieving the actual task in the event that it's time to dispatch could save some cycles.
-            //That would imply caching the batch sizes and expected first ids, likely alongside the task indices.
-            //Value of that is questionable, since all the task-associated indirections are pretty much guaranteed to be cached.
             ref var reference = ref typeMatrix.GetTaskReference<TShapeA, TShapeB>();
             if (reference.TaskIndex < 0)
             {
