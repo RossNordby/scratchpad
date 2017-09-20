@@ -62,7 +62,7 @@ namespace SolverPrototype
                     ++targetIndex;
                     //Because the list is sorted, it's not possible for the swap target location to be greater than the swap source location.
                     Debug.Assert(targetIndex <= enumerator.bodyIndices[i]);
-                    SwapBodyLocation(bodies, broadPhase, graph, solver, enumerator.bodyIndices[i], ++targetIndex);
+                    SwapBodyLocation(bodies, graph, solver, enumerator.bodyIndices[i], ++targetIndex);
                 }
                 pool.Return(ref sourceIndices);
             }

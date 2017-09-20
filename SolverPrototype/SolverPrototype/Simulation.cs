@@ -134,7 +134,7 @@ namespace SolverPrototype
                     //if it avoids extraneous data storage.
                     //TODO: When deactivation exists, this will need to be updated to accommodate it.
                     //TODO: When non-body static collidables exist, this will need to be updated.
-                    Bodies.Collidables[movedLeaf.Collidable].BroadPhaseIndex = removedBroadPhaseIndex;
+                    Bodies.Collidables[Bodies.HandleToIndex[movedLeaf.Collidable]].BroadPhaseIndex = removedBroadPhaseIndex;
                 }
 
             }
@@ -142,7 +142,7 @@ namespace SolverPrototype
             {
                 //While the removed body doesn't have any constraints associated with it, the body that gets moved to fill its slot might!
                 //We're borrowing the body optimizer's logic here. You could share a bit more- the body layout optimizer has to deal with the same stuff, though it's optimized for swaps.
-                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, BroadPhase, ConstraintGraph, Solver);
+                BodyLayoutOptimizer.UpdateForBodyMemoryMove(movedBodyOriginalIndex, bodyIndex, Bodies, ConstraintGraph, Solver);
             }
 
             var constraintListWasEmpty = ConstraintGraph.RemoveBodyList(bodyIndex, movedBodyOriginalIndex);

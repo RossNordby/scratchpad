@@ -59,11 +59,6 @@ namespace SolverPrototype.CollisionDetection
             maxPointer = &nodeChild->Max.X;
         }
 
-        internal void UpdateForCollidableMemoryMove(int broadPhaseIndex, int newCollidableIndex)
-        {
-            activeLeaves[broadPhaseIndex].Collidable = newCollidableIndex;
-        }
-
         //Note that some systems (like the demos renderer bounding box line extractor) iterate over the leaves. However, they're not contiguously stored.
         //So, the user needs a way to know if the leaf index exists. Hence, a 'try' variant. If there happen to be more use cases for checking existence, a
         //dedicated 'leafexists' method would probably be a better idea.

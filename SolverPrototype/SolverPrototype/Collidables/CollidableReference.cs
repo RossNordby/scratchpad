@@ -19,17 +19,6 @@ namespace SolverPrototype.Collidables
         }
 
         /// <summary>
-        /// Gets or sets the shape type index of the collidable referred to by this instance.
-        /// </summary>
-        public int ShapeTypeIndex
-        {
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (int)((packed >> 24) & 0x0000007F); }
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            set { ValidateTypeIndex(value); packed = (packed & 0x80FFFFFF) | ((uint)value << 24); }
-        }
-
-        /// <summary>
         /// Gets or sets the handle of the collidable referred to by this instance.
         /// </summary>
         public int Collidable
@@ -49,7 +38,7 @@ namespace SolverPrototype.Collidables
 
         [Conditional("DEBUG")]
         static void ValidateCollidableIndex(int collidableIndex)
-        { 
+        {
             Debug.Assert(collidableIndex >= 0 && collidableIndex < (1 << 24),
                 "If you actually have 16777216+ collidables of a single type, this needs a redesign. Are you sure this is a correct index?");
         }

@@ -38,7 +38,7 @@ namespace SolverPrototype
                     //But this is fine; the next iteration will load from that modified data and everything will remain consistent.
                     var newLocation = targetIndex++;
                     Debug.Assert(newLocation > currentBodyIndex, "The target index should always progress ahead of the traversal. Did something get reset incorrectly?");
-                    SwapBodyLocation(bodies, broadPhase, graph, solver, connectedBodyIndex, newLocation);
+                    SwapBodyLocation(bodies, graph, solver, connectedBodyIndex, newLocation);
                     //Note that we mark the new location for traversal, since it was moved.
                     traversalStack.Add(newLocation, pool);
                 }
