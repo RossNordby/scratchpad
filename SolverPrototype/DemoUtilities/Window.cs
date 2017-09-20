@@ -96,11 +96,18 @@ namespace DemoUtilities
             window.Visible = true;
             Resolution = resolution;
             window.Resize += (form, args) => resized = true;
+            window.Closed += OnClose;
 
             window.WindowBorder = WindowBorder.Resizable;
 
             WindowMode = windowMode;
 
+        }
+
+        private void OnClose(object sender, EventArgs e)
+        {
+            //This will redundantly call window.Close, but that's fine.
+            tryToClose = true;
         }
 
         private bool windowUpdateLoopRunning;
