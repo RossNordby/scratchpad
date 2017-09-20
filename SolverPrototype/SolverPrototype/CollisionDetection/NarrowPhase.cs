@@ -101,8 +101,8 @@ namespace SolverPrototype.CollisionDetection
             ConstraintRemover.Prepare(threadDispatcher);
         }
 
-        protected abstract void OnPrepare(IThreadDispatcher threadDispatcher = null);
-        protected abstract void OnFlush(IThreadDispatcher threadDispatcher = null);
+        protected abstract void OnPrepare(IThreadDispatcher threadDispatcher);
+        protected abstract void OnFlush(IThreadDispatcher threadDispatcher);
 
         int flushJobIndex;
         QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobList;
@@ -167,7 +167,7 @@ namespace SolverPrototype.CollisionDetection
             PairCache.Postflush();
             ConstraintRemover.Postflush();
 
-            OnFlush();
+            OnFlush(threadDispatcher);
         }
 
         public void Dispose()
@@ -206,12 +206,12 @@ namespace SolverPrototype.CollisionDetection
             FreshnessChecker = new FreshnessChecker(this);
         }
 
-        protected override void OnPrepare(IThreadDispatcher threadDispatcher = null)
+        protected override void OnPrepare(IThreadDispatcher threadDispatcher)
         {
             PrepareOverlapWorkers(threadDispatcher);
         }
 
-        protected override void OnFlush(IThreadDispatcher threadDispatcher = null)
+        protected override void OnFlush(IThreadDispatcher threadDispatcher)
         {
             //TODO: Constraint generators can actually be disposed immediately once the overlap finding process completes.
             //Here, we are disposing them late- that means we suffer a little more wasted memory use. 

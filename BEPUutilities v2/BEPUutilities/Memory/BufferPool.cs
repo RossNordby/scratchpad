@@ -103,6 +103,9 @@ namespace BEPUutilities2.Memory
             public IdPool<Array<int>> Slots;
 #if DEBUG
             HashSet<int> outstandingIds;
+#if LEAKDEBUG
+            Dictionary<string, HashSet<int>> outstandingAllocators;
+#endif
 #endif
 
             public readonly int SuballocationsPerBlock;
@@ -129,6 +132,9 @@ namespace BEPUutilities2.Memory
 
 #if DEBUG
                 outstandingIds = new HashSet<int>();
+#if LEAKDEBUG
+                outstandingAllocators = new Dictionary<string, HashSet<int>>();
+#endif
 #endif
             }
 
@@ -176,6 +182,15 @@ namespace BEPUutilities2.Memory
                 Debug.Assert(outstandingIds.Count * SuballocationSize <= maximumOutstandingCapacity,
                     $"Do you actually truly really need to have {maximumOutstandingCapacity} bytes taken from this power pool, or is this a memory leak?");
                 Debug.Assert(outstandingIds.Add(slot), "Should not be able to request the same slot twice.");
+#if LEAKDEBUG
+                var allocator = new StackTrace().ToString();
+                if (!outstandingAllocators.TryGetValue(allocator, out var idsForAllocator))
+                {
+                    idsForAllocator = new HashSet<int>();
+                    outstandingAllocators.Add(allocator, idsForAllocator);
+                }
+                idsForAllocator.Add(slot);
+#endif
 #endif
             }
 
@@ -187,6 +202,22 @@ namespace BEPUutilities2.Memory
                 var indexInAllocatorBlock = buffer.Id & SuballocationsPerBlockMask;
                 Debug.Assert(outstandingIds.Remove(buffer.Id),
                     "This buffer id must have been taken from the pool previously.");
+#if LEAKDEBUG
+                bool found = false;
+                foreach(var pair in outstandingAllocators)
+                {
+                    if(pair.Value.Remove(buffer.Id))
+                    {
+                        found = true;
+                        if (pair.Value.Count == 0)
+                        {
+                            outstandingAllocators.Remove(pair.Key);
+                            break;
+                        }
+                    }
+                }
+                Debug.Assert(found, "Allocator set must contain the buffer id.");
+#endif
                 Debug.Assert(buffer.Length == SuballocationSize,
                     "A buffer taken from a pool should have a specific size.");
                 Debug.Assert(blockIndex >= 0 && blockIndex < BlockCount,
@@ -207,6 +238,9 @@ namespace BEPUutilities2.Memory
 #if DEBUG
                 //We'll assume that the caller understands that the outstanding buffers are invalidated, so should not be returned again.
                 outstandingIds.Clear();
+#if LEAKDEBUG
+                outstandingAllocators.Clear();
+#endif
 #endif
                 for (int i = 0; i < BlockCount; ++i)
                 {

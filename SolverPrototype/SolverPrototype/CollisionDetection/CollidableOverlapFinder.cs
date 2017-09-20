@@ -73,6 +73,7 @@ namespace SolverPrototype.CollisionDetection
                 }
                 Debug.Assert(threadHandlers.Length >= threadDispatcher.ThreadCount);
                 selfTestContext.PrepareSelfTestJobs(broadPhase.ActiveTree, threadHandlers, threadDispatcher.ThreadCount);
+                threadDispatcher.DispatchWorkers(workerAction);
                 selfTestContext.CompleteSelfTest(broadPhase.ActiveTree);
             }
             else
