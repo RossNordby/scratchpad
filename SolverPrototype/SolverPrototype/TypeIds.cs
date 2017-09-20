@@ -21,6 +21,7 @@ namespace SolverPrototype
         {
             TypeIds<IShape>.Register<Sphere>();
             TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
+            TypeIds<TypeBatch>.Register<ContactManifold1TypeBatch>();
             TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
         }
 

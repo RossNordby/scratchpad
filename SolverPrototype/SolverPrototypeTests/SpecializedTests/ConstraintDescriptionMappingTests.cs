@@ -93,6 +93,7 @@ namespace SolverPrototypeTests.SpecializedTests
         public static void Test()
         {
             var pool = new BufferPool();
+            DefaultTypes.Register();
             var simulation = Simulation.Create(pool, new TestCallbacks());
 
 
@@ -103,8 +104,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 simulation.Add(ref bodyDescription);
             }
             var random = new Random(5);
-            TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
-            TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
+            Test<ContactManifold1Constraint>(simulation, random, 2);
             Test<ContactManifold4Constraint>(simulation, random, 2);
             Test<BallSocket>(simulation, random, 2);
 

@@ -16,7 +16,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
-            //ConstraintDescriptionMappingTests.Test();
+            ConstraintDescriptionMappingTests.Test();
             //BatchedCollisionTests.Test();
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();

@@ -105,7 +105,7 @@ namespace DemoRenderer.Constraints
                     var typeBatch = batch.TypeBatches[typeBatchIndex];
                     var extractor = lineExtractors[typeBatch.TypeId];
                     var isContactBatch = IsContactBatch(typeBatch);
-                    if (extractor != null && (isContactBatch && showContacts) || (!isContactBatch && showConstraints))
+                    if (extractor != null && ((isContactBatch && showContacts) || (!isContactBatch && showConstraints)))
                     {
                         jobs.Add(new ThreadJob
                         {

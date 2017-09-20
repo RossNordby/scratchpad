@@ -12,7 +12,6 @@ namespace SolverPrototype.Constraints
         //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.
         //If you modify this layout, be sure to update the associated ContactManifold4Constraint.
         //Note that this layout is defined by the execution order in the prestep. The function accesses it sequentially to ensure the prefetcher can do its job.
-        //TODO: You can get rid of the per-contact OffsetB in favor of a single offset from A to B. That's an easy win for 2+ contact manifolds.
         public Vector3Wide OffsetA0;
         public Vector3Wide OffsetA1;
         public Vector3Wide OffsetA2;

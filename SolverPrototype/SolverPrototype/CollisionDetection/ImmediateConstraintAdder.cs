@@ -11,9 +11,8 @@ namespace SolverPrototype.CollisionDetection
     /// <summary>
     /// When notified of a new constraint, immediately adds it to the solver.
     /// </summary>
-    public struct ImmediateConstraintAdder<TNarrowPhase> where TNarrowPhase : NarrowPhase, new()
+    public struct ImmediateConstraintAdder
     {
-
         Simulation simulation;
 
         public void Initialize(Simulation simulation)

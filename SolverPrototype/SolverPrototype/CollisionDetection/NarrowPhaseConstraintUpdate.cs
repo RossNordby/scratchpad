@@ -191,6 +191,20 @@ namespace SolverPrototype.CollisionDetection
             {
                 //Convex
                 case 0:
+                    {
+                        ContactManifold1Constraint description;
+                        description.Contact0.OffsetA = manifold->Offset0;
+                        description.Contact0.PenetrationDepth = manifold->Depth1;
+                        description.OffsetB = manifold->OffsetB;
+                        description.FrictionCoefficient = material.FrictionCoefficient;
+                        description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
+                        description.SpringSettings = material.SpringSettings;
+                        description.Normal = manifold->ConvexNormal;
+
+                        //TODO: Check init hack.
+                        UpdateConstraint<ContactManifold1Constraint, TCollisionCache, ConstraintCache1, TBodyHandles>(
+                            workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
+                    }
                     break;
                 case 1:
                     break;
@@ -266,6 +280,6 @@ namespace SolverPrototype.CollisionDetection
                 //In the event that there are no contacts in the new manifold, the pair is left in a stale state. It will be removed by the stale removal post process. 
             }
         }
-        
+
     }
 }
