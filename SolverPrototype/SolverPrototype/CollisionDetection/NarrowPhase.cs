@@ -240,8 +240,8 @@ namespace SolverPrototype.CollisionDetection
                         //Both references are bodies.
                         //This is a body. In order to dispatch it properly, we need to know some metadata.
                         //TODO: Once inactive bodies exist, this will need to be updated.
-                        var bodyIndexA = Bodies.HandleToIndex[a.Collidable];
-                        var bodyIndexB = Bodies.HandleToIndex[b.Collidable];
+                        var bodyIndexA = Bodies.HandleToIndex[a.Handle];
+                        var bodyIndexB = Bodies.HandleToIndex[b.Handle];
                         ref var aCollidable = ref Bodies.Collidables[bodyIndexA];
                         ref var bCollidable = ref Bodies.Collidables[bodyIndexB];
                         Bodies.GetPoseByIndex(bodyIndexA, out var poseA);

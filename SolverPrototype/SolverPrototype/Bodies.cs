@@ -207,10 +207,8 @@ namespace SolverPrototype
             description.Collidable.Shape = collidable.Shape;
             description.Collidable.SpeculativeMargin = collidable.SpeculativeMargin;
         }
-        public void SetDescription(int handle, ref BodyDescription description)
+        internal void SetDescriptionByIndex(int index, ref BodyDescription description)
         {
-            ValidateExistingHandle(handle);
-            var index = HandleToIndex[handle];
             BundleIndexing.GetBundleIndices(index, out var bundleIndex, out var innerIndex);
             SetLane(ref Poses[bundleIndex], innerIndex, ref description.Pose);
             SetLane(ref LocalInertias[bundleIndex], innerIndex, ref description.LocalInertia);
@@ -218,13 +216,8 @@ namespace SolverPrototype
             ref var collidable = ref Collidables[index];
             collidable.Continuity = description.Collidable.Continuity;
             collidable.SpeculativeMargin = description.Collidable.SpeculativeMargin;
-            //TODO: If users are hitting this with any frequency, supporting the path out of the box would be a good idea.
-            //In fact, this function existing at all in the bodies set (where it lacks direct broadphase access) is questionable because of its lack of generality.
-            //Something to consider for later.
-            Debug.Assert(description.Collidable.Shape.Exists == collidable.Shape.Exists,
-                "Setting the description should not be used to add or remove collidables, only to change their shape and properties. " +
-                "The broad phase requires notification when a collidable is added or removed. " +
-                "You can remove and re-add the body to the simulation, manually notify the broadphase, or create a variant of this function that is broadphase aware.");
+            //Note that we change the shape here. If the collidable transitions from shapeless->shapeful or shapeful->shapeless, the broad phase has to be notified 
+            //so that it can create/remove an entry. That's why this function isn't public.
             collidable.Shape = description.Collidable.Shape;
         }
 

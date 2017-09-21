@@ -63,7 +63,7 @@ namespace SolverPrototype
             SimulationAllocationSizes? initialAllocationSizes = null, CollisionTaskRegistry collisionTaskRegistry = null)
             where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks
         {
-            if(initialAllocationSizes == null)
+            if (initialAllocationSizes == null)
             {
                 initialAllocationSizes = new SimulationAllocationSizes
                 {
@@ -75,7 +75,7 @@ namespace SolverPrototype
                     ConstraintsPerTypeBatch = 256
                 };
             }
-            if(collisionTaskRegistry == null)
+            if (collisionTaskRegistry == null)
             {
                 collisionTaskRegistry = DefaultTypes.CreateDefaultCollisionTaskRegistry();
             }
@@ -86,7 +86,41 @@ namespace SolverPrototype
 
             return simulation;
         }
-        
+
+
+        void AddCollidableToBroadPhase(int bodyHandle, ref BodyDescription bodyDescription, ref Collidable collidable)
+        {
+            //This body has a collidable; stick it in the broadphase.
+            //Note that we have to calculate an initial bounding box for the broad phase to be able to insert it efficiently.
+            //(In the event of batch adds, you'll want to use batched AABB calculations or just use cached values.)
+            //Note: the min and max here are in absolute coordinates, which means this is a spot that has to be updated in the event that positions use a higher precision representation.
+            BoundingBox bodyBounds;
+            Shapes[collidable.Shape.Type].ComputeBounds(collidable.Shape.Index, ref bodyDescription.Pose, out bodyBounds.Min, out bodyBounds.Max);
+            collidable.BroadPhaseIndex =
+                BroadPhase.Add(new CollidableReference(bodyDescription.Mobility, bodyHandle), ref bodyBounds);
+
+        }
+
+        void RemoveCollidableFromBroadPhase(ref Collidable collidable)
+        {
+            var removedBroadPhaseIndex = collidable.BroadPhaseIndex;
+            if (BroadPhase.RemoveAt(removedBroadPhaseIndex, out var movedLeaf))
+            {
+                //When a leaf is removed from the broad phase, another leaf will move to take its place in the leaf set.
+                //We must update the collidable->leaf index pointer to match the new position of the leaf in the broadphase.
+                //There are three possible cases for the moved leaf:
+                //1) it is an active body collidable,
+                //2) it is an inactive body collidable,
+                //3) it is a static collidable.
+                //The collidable reference we retrieved tells us whether it's a body or a static.
+                //In the event that it's a body, we can infer the activity state from the body we just removed. Any body within the same 'leaf space' as the removed body
+                //shares its activity state. This involves some significant conceptual coupling with the broad phase's implementation, but that's a price we're willing to pay
+                //if it avoids extraneous data storage.
+                //TODO: When deactivation exists, this will need to be updated to accommodate it.
+                //TODO: When non-body static collidables exist, this will need to be updated.
+                Bodies.Collidables[Bodies.HandleToIndex[movedLeaf.Handle]].BroadPhaseIndex = removedBroadPhaseIndex;
+            }
+        }
 
         public int Add(ref BodyDescription bodyDescription)
         {
@@ -95,21 +129,40 @@ namespace SolverPrototype
             ConstraintGraph.AddBodyList(bodyIndex);
             if (bodyDescription.Collidable.Shape.Exists)
             {
-                //This body has a collidable; stick it in the broadphase.
-                //Note that we have to calculate an initial bounding box for the broad phase to be able to insert it efficiently.
-                //(In the event of batch adds, you'll want to use batched AABB calculations or just use cached values.)
-                var typeIndex = bodyDescription.Collidable.Shape.Type;
-                var shapeIndex = bodyDescription.Collidable.Shape.Index;
-                //Note: the min and max here are in absolute coordinates, which means this is a spot that has to be updated in the event that positions use a higher precision representation.
-                BoundingBox bodyBounds;
-                Shapes[typeIndex].ComputeBounds(shapeIndex, ref bodyDescription.Pose, out bodyBounds.Min, out bodyBounds.Max);
-                Bodies.Collidables[bodyIndex].BroadPhaseIndex =
-                    BroadPhase.Add(new CollidableReference(false, typeIndex, bodyIndex), ref bodyBounds);
+                AddCollidableToBroadPhase(handle, ref bodyDescription, ref Bodies.Collidables[bodyIndex]);
             }
             return handle;
         }
 
-
+        public void ApplyDescription(int handle, ref BodyDescription bodyDescription)
+        {
+            Bodies.ValidateExistingHandle(handle);
+            var bodyIndex = Bodies.HandleToIndex[handle];
+            ref var collidable = ref Bodies.Collidables[bodyIndex];
+            var broadPhaseUpdateRequired = collidable.Shape.Exists != bodyDescription.Collidable.Shape.Exists;
+            Bodies.SetDescriptionByIndex(bodyIndex, ref bodyDescription);
+            if (broadPhaseUpdateRequired)
+            {
+                //A collidable has been added or removed by this description change. Which is it?
+                if (bodyDescription.Collidable.Shape.Exists)
+                {
+                    //Adding!               
+                    AddCollidableToBroadPhase(handle, ref bodyDescription, ref collidable);
+                }
+                else
+                {
+                    //Removing!
+                    RemoveCollidableFromBroadPhase(ref collidable);
+                }
+            }
+            else
+            {
+                //While we aren't adding or removing a collidable, we may be changing the mobility.
+                if (bodyDescription.Collidable.Shape.Exists)
+                    BroadPhase.activeLeaves[collidable.BroadPhaseIndex] = new CollidableReference(bodyDescription.Mobility, handle);
+            }
+        }
+        
         public void RemoveBody(int bodyHandle)
         {
             Bodies.ValidateExistingHandle(bodyHandle);
@@ -119,24 +172,7 @@ namespace SolverPrototype
             if (collidable.Shape.Exists)
             {
                 //The collidable exists, so it should be removed from the broadphase.
-                var removedBroadPhaseIndex = collidable.BroadPhaseIndex;
-                if (BroadPhase.RemoveAt(removedBroadPhaseIndex, out var movedLeaf))
-                {
-                    //When a leaf is removed from the broad phase, another leaf will move to take its place in the leaf set.
-                    //We must update the collidable->leaf index pointer to match the new position of the leaf in the broadphase.
-                    //There are three possible cases for the moved leaf:
-                    //1) it is an active body collidable,
-                    //2) it is an inactive body collidable,
-                    //3) it is a static collidable.
-                    //The collidable reference we retrieved tells us whether it's a body or a static.
-                    //In the event that it's a body, we can infer the activity state from the body we just removed. Any body within the same 'leaf space' as the removed body
-                    //shares its activity state. This involves some significant conceptual coupling with the broad phase's implementation, but that's a price we're willing to pay
-                    //if it avoids extraneous data storage.
-                    //TODO: When deactivation exists, this will need to be updated to accommodate it.
-                    //TODO: When non-body static collidables exist, this will need to be updated.
-                    Bodies.Collidables[Bodies.HandleToIndex[movedLeaf.Collidable]].BroadPhaseIndex = removedBroadPhaseIndex;
-                }
-
+                RemoveCollidableFromBroadPhase(ref collidable);
             }
             if (Bodies.RemoveAt(bodyIndex, out var movedBodyOriginalIndex))
             {

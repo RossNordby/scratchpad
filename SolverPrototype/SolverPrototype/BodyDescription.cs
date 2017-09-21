@@ -26,6 +26,25 @@ namespace SolverPrototype
         public BodyInertia LocalInertia;
         public BodyVelocity Velocity;
         public CollidableDescription Collidable;
+
+        /// <summary>
+        /// Gets the mobility state for a collidable based on this body description's mass and inertia tensor.
+        /// If all components of inverse mass and inverse inertia are zero, it is kinematic; otherwise, it is dynamic.
+        /// </summary>
+        public CollidableMobility Mobility
+        {
+            get
+            {
+                return (LocalInertia.InverseMass == 0 &&
+                        LocalInertia.InverseInertiaTensor.M11 == 0 &&
+                        LocalInertia.InverseInertiaTensor.M21 == 0 &&
+                        LocalInertia.InverseInertiaTensor.M22 == 0 &&
+                        LocalInertia.InverseInertiaTensor.M31 == 0 &&
+                        LocalInertia.InverseInertiaTensor.M32 == 0 &&
+                        LocalInertia.InverseInertiaTensor.M33 == 0) ? CollidableMobility.Kinematic : CollidableMobility.Dynamic;
+            }
+        }
+
     }
 
     public struct BodyPoses

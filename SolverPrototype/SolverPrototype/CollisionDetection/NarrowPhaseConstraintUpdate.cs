@@ -252,16 +252,21 @@ namespace SolverPrototype.CollisionDetection
             //Note that we do not check for the pair being between two statics before reporting it. The assumption is that, if the initial broadphase pair filter allowed such a pair
             //to reach this point, the user probably wants to receive some information about the resulting contact manifold.
             //That said, such a pair cannot generate constraints no matter what- constraints must involve at least one body, always.
-            var aIsBody = !pair.A.IsStatic;
-            var bIsBody = !pair.B.IsStatic;
-            if (Callbacks.ConfigureContactManifold(workerIndex, pair, manifold, out var pairMaterial) && (aIsBody || bIsBody))
+            var aMobility = pair.A.Mobility;
+            var bMobility = pair.B.Mobility;
+            if (Callbacks.ConfigureContactManifold(workerIndex, pair, manifold, out var pairMaterial) &&
+                //Note that, even if the callback says 'yeah sure create a constraint for those', it never makes sense to generate constraints between two nondynamics.
+                //It would just result in a bunch of NaNs when computing the effective mass.
+                (aMobility == CollidableMobility.Dynamic || bMobility == CollidableMobility.Dynamic))
             {
                 if (manifold->ContactCount > 0)
                 {
+                    var aIsBody = aMobility != CollidableMobility.Static;
+                    var bIsBody = bMobility != CollidableMobility.Static;
                     if (aIsBody && bIsBody)
                     {
                         //Two bodies.
-                        var bodyHandles = new TwoBodyHandles { A = pair.A.Collidable, B = pair.B.Collidable };
+                        var bodyHandles = new TwoBodyHandles { A = pair.A.Handle, B = pair.B.Handle };
                         UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, bodyHandles);
                     }
                     else
@@ -274,7 +279,7 @@ namespace SolverPrototype.CollisionDetection
                             pair.A = pair.B;
                             pair.B = tempA;
                         }
-                        UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, pair.A.Collidable);
+                        UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, pair.A.Handle);
                     }
                 }
                 //In the event that there are no contacts in the new manifold, the pair is left in a stale state. It will be removed by the stale removal post process. 
