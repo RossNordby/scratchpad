@@ -1,6 +1,7 @@
 # Q&A
 
 1. How do I make an object that can't be moved by outside influences, like other colliding dynamic bodies, but can still have a velocity?
+
 A: Use a kinematic body. To create one, set the inverse mass and all components of the inverse inertia to zero in the body description passed to Simulation.Add. Kinematic bodies have effectively infinite mass and cannot be moved by any force. You can still change their velocity directly, though.
 
 Any nonzero component in the inverse mass or inverse inertia results in a dynamic body.
@@ -10,6 +11,7 @@ Be careful when using kinematics- they are both unstoppable forces and immovable
 Also, if two kinematic bodies collide, a constraint will not be generated. Kinematics cannot respond to collisions, not even with other infinitely massive objects. They will simply continue to move along the path defined by their velocity.
 
 2. I made a body with zero inverse mass and nonzero and the simulation exploded/crashed! Why?
+
 A: While dynamic bodies with zero inverse mass and nonzero inverse inertia tensors are technically allowed, they require extreme care. It is possible for constraints to be configured such that there is no solution, resulting in a division by zero. NaN values will propagate through the simulation and make everything explode.
 
 To avoid the NaN-explosion, any constraint involving two bodies must be able to compute some local solution. For example, if two bodies have zero inverse mass but nonzero inverse inertia, you could create a ball socket joint that avoids issues by ensuring that the anchor offsets are nonzero.
