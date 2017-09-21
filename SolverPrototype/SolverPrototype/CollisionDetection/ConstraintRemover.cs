@@ -94,7 +94,7 @@ namespace SolverPrototype.CollisionDetection
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public unsafe void Add(int constraintHandle, Solver solver)
+            public unsafe void EnqueueForRemoval(int constraintHandle, Solver solver)
             {
                 ref var constraint = ref solver.HandleToConstraint[constraintHandle];
                 TypeBatchIndex typeBatchIndex;
@@ -126,10 +126,16 @@ namespace SolverPrototype.CollisionDetection
                 if (index == -1)
                 {
                     index = Batches.Count;
+                    //Note that the spans are not of equal length; just test them independently.
+                    //In the extremely unlikely event that this shows up in profiling, you can simply ensure batch handles capacity on the post-ensurecapacity Batches capacity.
                     if (Batches.Span.Length == Batches.Count)
                     {
                         var newCount = Batches.Count + 1;
                         Batches.EnsureCapacity(newCount, pool.SpecializeFor<TypeBatchIndex>());
+                    }
+                    if (BatchHandles.Span.Length == BatchHandles.Count)
+                    {
+                        var newCount = Batches.Count + 1;
                         BatchHandles.EnsureCapacity(newCount, pool.SpecializeFor<QuickList<int, Buffer<int>>>());
                     }
                     Batches.AllocateUnsafely() = typeBatchIndex;
@@ -430,7 +436,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void EnqueueRemoval(int workerIndex, int constraintHandle)
         {
-            workerCaches[workerIndex].Add(constraintHandle, solver);
+            workerCaches[workerIndex].EnqueueForRemoval(constraintHandle, solver);
         }
     }
 }

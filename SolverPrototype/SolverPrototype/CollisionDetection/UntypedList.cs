@@ -66,7 +66,6 @@ namespace SolverPrototype.CollisionDetection
             {
                 //This didn't exist at all before; create a new entry for this type.
                 pool.Take(Math.Max(newSize, minimumCount * Unsafe.SizeOf<T>()), out Buffer);
-                Debug.Assert(Buffer.Length > 0);
             }
             else
             {
@@ -75,8 +74,11 @@ namespace SolverPrototype.CollisionDetection
                     //This will bump up to the next allocated block size, so we don't have to worry about constant micro-resizes.
                     pool.Take(newSize, out var newBuffer);
                     Unsafe.CopyBlockUnaligned(newBuffer.Memory, Buffer.Memory, (uint)Buffer.Length);
+                    pool.ReturnUnsafely(ref Buffer);
+                    Buffer = newBuffer;
                 }
             }
+            Debug.Assert(Buffer.Length >= newSize);
             //If we store only byte count, we'd have to divide to get the element index.
             //If we store only count, we would have to store per-type size somewhere since the PairCache constructor doesn't have an id->type mapping.
             //So we just store both. It's pretty cheap and simple.
