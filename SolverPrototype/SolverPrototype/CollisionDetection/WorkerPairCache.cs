@@ -164,7 +164,7 @@ namespace SolverPrototype.CollisionDetection
             for (int i = 0; i < constraintCaches.Length; ++i)
             {
                 if (constraintCaches[i].Buffer.Allocated)
-                    pool.Return(ref collisionCaches[i].Buffer);
+                    pool.Return(ref constraintCaches[i].Buffer);
             }
             pool.SpecializeFor<UntypedList>().Return(ref constraintCaches);
             for (int i = 0; i < collisionCaches.Length; ++i)

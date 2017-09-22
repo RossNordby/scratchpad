@@ -234,6 +234,7 @@ namespace SolverPrototype.CollisionDetection
             workerCaches = NextWorkerCaches;
             NextWorkerCaches = temp;
 
+
         }
 
 
@@ -245,7 +246,7 @@ namespace SolverPrototype.CollisionDetection
             }
             //Note that we do not need to dispose the worker cache arrays themselves- they were just arrays pulled out of a passthrough pool.
 #if DEBUG
-            for (int i =0; i < NextWorkerCaches.Count; ++i)
+            for (int i = 0; i < NextWorkerCaches.Count; ++i)
             {
                 Debug.Assert(NextWorkerCaches[i].Equals(default(WorkerPairCache)), "Outside of the execution of the narrow phase, the 'next' caches should not be allocated.");
             }
@@ -314,7 +315,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        internal unsafe void GatherOldImpulses(int constraintType, ref ConstraintReference constraintReference, float* impulses)
+        internal unsafe void GatherOldImpulses(int constraintType, ref ConstraintReference constraintReference, float* oldImpulses, out int oldContactCount)
         {
             //Constraints cover 16 possible cases:
             //1-4 contacts: 0x3
@@ -325,6 +326,9 @@ namespace SolverPrototype.CollisionDetection
             //TODO: Note that we do not modify the friction accumulated impulses. This is just for simplicity- the impact of accumulated impulses on friction *should* be relatively
             //hard to notice compared to penetration impulses. We should, however, test this assumption.
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var inner);
+            oldContactCount = 0;
+            ContactImpulses oldImpulsesSource; //could just use a stackalloc here.
+            float* oldImpulses = &oldImpulsesSource.Impulse0;
             switch (constraintType)
             {
                 //1 body
@@ -375,6 +379,9 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 0:
                     {
                         //1 contact
+                        var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
+                        ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
+                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, oldContactCount = 1);
                     }
                     break;
                 case 8 + 1:
@@ -392,7 +399,7 @@ namespace SolverPrototype.CollisionDetection
                         //4 contacts
                         var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *impulses, 4);
+                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, oldContactCount = 4);
                     }
                     break;
                 //Nonconvex
@@ -417,7 +424,6 @@ namespace SolverPrototype.CollisionDetection
                     }
                     break;
             }
-
         }
 
         internal void ScatterNewImpulses(int constraintType, ref ConstraintReference constraintReference, ref ContactImpulses contactImpulses)
@@ -526,6 +532,12 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe void* GetConstraintCachePointer(int pairIndex)
+        {
+            ref var constraintCacheIndex = ref Mapping.Values[pairIndex].ConstraintCache;
+            return NextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
+        }
 
         /// <summary>
         /// Completes the addition of a constraint by filling in the narrowphase's pointer to the constraint and by distributing accumulated impulses.

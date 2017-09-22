@@ -90,59 +90,30 @@ namespace SolverPrototype.CollisionDetection
                 //The previous frame had a constraint for this pair.
                 ref var pointers = ref PairCache.GetPointers(index);
                 Debug.Assert(pointers.ConstraintCache.Exists, "If a pair was persisted in the narrow phase, there should be a constraint associated with it.");
-                //TODO: Mark the entry as non-stale. 
 
                 var constraintCacheIndex = pointers.ConstraintCache;
-                //TODO: Check codegen; this if statement should JIT to a single path.
-                ConstraintReference constraintReference;
-                int constraintHandle;
+                var constraintCachePointer = PairCache.GetConstraintCachePointer(index);
+                var constraintHandle = *(int*)constraintCachePointer;
                 ContactImpulses newImpulses;
+                Solver.GetConstraintReference(constraintHandle, out var constraintReference);
+                //TODO: Check codegen; this if statement should JIT to a single path.
+                //We specialize the 1-contact case since the 'redistribution' is automatic.
                 if (typeof(TConstraintCache) == typeof(ConstraintCache1))
                 {
-                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache1>(constraintCacheIndex);
-                    constraintHandle = constraintCache.ConstraintHandle;
-                    Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
-                    //If there's only one contact, assume we can directly reuse the old impulse even when the feature id wouldn't match.
-                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, &newImpulses.Impulse0);
-                }
-                else if (typeof(TConstraintCache) == typeof(ConstraintCache2))
-                {
-                    const int oldContactCount = 2;
-                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache2>(constraintCacheIndex);
-                    constraintHandle = constraintCache.ConstraintHandle;
-                    Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
-                    var oldImpulses = stackalloc float[oldContactCount];
-                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
-                    RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
-                }
-                else if (typeof(TConstraintCache) == typeof(ConstraintCache3))
-                {
-                    const int oldContactCount = 3;
-                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache3>(constraintCacheIndex);
-                    constraintHandle = constraintCache.ConstraintHandle;
-                    Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
-                    var oldImpulses = stackalloc float[oldContactCount];
-                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
-                    RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
-                }
-                else if (typeof(TConstraintCache) == typeof(ConstraintCache4))
-                {
-                    const int oldContactCount = 4;
-                    ref var constraintCache = ref PairCache.GetConstraintCache<ConstraintCache4>(constraintCacheIndex);
-                    constraintHandle = constraintCache.ConstraintHandle;
-                    Solver.GetConstraintReference(constraintCache.ConstraintHandle, out constraintReference);
-                    var oldImpulses = stackalloc float[oldContactCount];
-                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, oldImpulses);
-                    RedistributeImpulses(oldContactCount, oldImpulses, (int*)Unsafe.AsPointer(ref constraintCache.FeatureId0), manifold, &newImpulses.Impulse0);
+                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, &newImpulses.Impulse0, out var oldContactCount);
                 }
                 else
                 {
-                    throw new InvalidOperationException("Invalid constraint cache type.");
+                    ContactImpulses oldImpulses;
+                    PairCache.GatherOldImpulses(constraintCacheIndex.Type, ref constraintReference, &oldImpulses.Impulse0, out var oldContactCount);
+                    //The first slot in the constraint cache is the constraint handle; the following slots are feature ids.
+                    RedistributeImpulses(oldContactCount, &oldImpulses.Impulse0, (int*)constraintCachePointer + 1, manifold, &newImpulses.Impulse0);
                 }
 
                 PairCache.Update<TConstraintCache, TCollisionCache>(workerIndex, index, ref pointers, ref collisionCache, &manifold->FeatureId0);
                 if (manifoldTypeAsConstraintType == constraintCacheIndex.Type)
                 {
+                    //TODO: THE CONSTRAINT HANDLE IS OVERWRITTEN AND NOT REINITIALIZED BY THIS CODE PATH. NEEDS A FIX.
                     //There exists a constraint and it has the same type as the manifold. Directly apply the new description and impulses.
                     Solver.ApplyDescription(ref constraintReference, ref description);
                     //TODO: Check init hack.

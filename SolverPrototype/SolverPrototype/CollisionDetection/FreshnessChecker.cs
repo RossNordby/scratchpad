@@ -157,7 +157,8 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void EnqueueStaleRemoval(int workerIndex, int pairIndex)
         {
-            ConstraintRemover.EnqueueRemoval(workerIndex, PairCache.GetConstraintHandle(pairIndex));
+            var constraintHandle = PairCache.GetConstraintHandle(pairIndex);
+            ConstraintRemover.EnqueueRemoval(workerIndex, constraintHandle);
             ref var cache = ref PairCache.NextWorkerCaches[workerIndex];
             cache.PendingRemoves.Add(PairCache.Mapping.Keys[pairIndex], cache.pool.SpecializeFor<CollidablePair>());
         }

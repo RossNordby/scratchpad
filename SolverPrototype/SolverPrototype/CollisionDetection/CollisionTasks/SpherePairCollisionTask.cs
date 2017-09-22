@@ -309,7 +309,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Shared.Continuation, manifolds + j);
                 }
             }
-
         }
     }
 }
