@@ -30,6 +30,11 @@ namespace SolverPrototype.CollisionDetection
             A = a;
             B = b;
         }
+
+        public override string ToString()
+        {
+            return $"<{A.Handle}, {B.Handle}>";
+        }
     }
 
     public struct CollidablePairComparer : IEqualityComparerRef<CollidablePair>
@@ -38,7 +43,10 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(ref CollidablePair a, ref CollidablePair b)
         {
-            return Unsafe.As<CollidablePair, ulong>(ref a) == Unsafe.As<CollidablePair, ulong>(ref b);
+            ref var aBytes = ref Unsafe.As<CollidablePair, ulong>(ref a);
+            ref var bBytes1 = ref Unsafe.As<CollidablePair, ulong>(ref b);
+            ulong bBytes2 = b.B.packed | ((ulong)b.A.packed << 32);
+            return aBytes == bBytes1 || aBytes == bBytes2;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -294,22 +302,25 @@ namespace SolverPrototype.CollisionDetection
             //TODO: In the event that higher contact count manifolds exist for the purposes of nonconvexes, this will need to be expanded.
         }
 
-        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair, ref TCollisionCache collisionCache, ref TConstraintCache constraintCache)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair, 
+            ref TCollisionCache collisionCache, ref TConstraintCache constraintCache, int manifoldTypeAsConstraintType)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
         {
             //Note that we do not have to set any freshness bytes here; using this path means there exists no previous overlap to remove anyway.
-            return NextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache);
+            return NextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache, manifoldTypeAsConstraintType);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, ref TConstraintCache constraintCache)
+        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, 
+            ref TCollisionCache collisionCache, ref TConstraintCache constraintCache, int manifoldTypeAsConstraintType)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
         {
             //We're updating an existing pair, so we should prevent this pair from being removed.
             PairFreshness[pairIndex] = 0xFF;
-            NextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache);
+            NextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache, manifoldTypeAsConstraintType);
         }
 
 

@@ -18,6 +18,7 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             ConstraintDescriptionMappingTests.Test();
+            HeadlessDemo.Simple();
             //HeadlessDemo.Simple();
             //return;
             //BatchedCollisionTests.Test();

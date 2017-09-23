@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SolverPrototype.Collidables;
+using SolverPrototype.CollisionDetection;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;

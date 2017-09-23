@@ -125,7 +125,7 @@ namespace SolverPrototype.CollisionDetection
                     //It's exactly the same type, so we can just overwrite its properties without worry.
                     //Note that we rely on the constraint handle being stored in the first 4 bytes of the constraint cache.
                     *(int*)constraintCacheBytes = constraintHandle;
-                    PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache);
+                    PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache, manifoldTypeAsConstraintType);
                     //There exists a constraint and it has the same type as the manifold. Directly apply the new description and impulses.
                     Solver.ApplyDescription(ref constraintReference, ref description);
                     //TODO: Check init hack.
@@ -139,7 +139,7 @@ namespace SolverPrototype.CollisionDetection
                     //can be used to guarantee that consistent order. We can also defer smaller batches for the sake of limiting sync overheads. 4-16 adds within a single lock
                     //means a 4-16x reduction in lock-related overhead, assuming no contests.)
                     //2) The old constraint must be removed.
-                    PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache);
+                    PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache, manifoldTypeAsConstraintType);
                     RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
                     ConstraintRemover.EnqueueRemoval(workerIndex, constraintHandle);
                 }
@@ -149,7 +149,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 //No preexisting constraint; add a fresh constraint and pair cache entry.
                 //The pair cache entry has to be created first so that the adder has a place to put the result of the constraint add.
-                var constraintCacheIndex = PairCache.Add(workerIndex, ref pair, ref collisionCache, ref newConstraintCache);
+                var constraintCacheIndex = PairCache.Add(workerIndex, ref pair, ref collisionCache, ref newConstraintCache, manifoldTypeAsConstraintType);
                 var newImpulses = new ContactImpulses();
                 //TODO: It would be nice to avoid the impulse scatter for fully new constraints; it's going to be all zeroes regardless. Worth investigating later.
                 RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
@@ -170,11 +170,37 @@ namespace SolverPrototype.CollisionDetection
             //TODO: Descriptions will be changing to not have redundant B offsets, this will have to change to match.
             Debug.Assert(manifold->ContactCount > 0);
             //Constraint types only use 3 bits, since their contact count can never be zero.
+            //1-4 contacts: 0x3
+            //nonconvex: 0x4
+            //1 body versus 2 body: 0x8
+            //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
             var manifoldTypeAsConstraintType = ((manifold->PackedConvexityAndContactCount >> 1) & 4) | ((manifold->PackedConvexityAndContactCount & 7) - 1);
+            if (typeof(TBodyHandles) == typeof(TwoBodyHandles))
+                manifoldTypeAsConstraintType |= 0x8;
             switch (manifoldTypeAsConstraintType)
             {
+                //One body
                 //Convex
                 case 0:
+                    break;
+                case 1:
+                    break;
+                case 2:
+                    break;
+                case 3:
+                    break;
+                //Nonconvex
+                case 4 + 0:
+                    break;
+                case 4 + 1:
+                    break;
+                case 4 + 2:
+                    break;
+                case 4 + 3:
+                    break;
+                //Two body
+                //Convex
+                case 8 + 0:
                     {
                         ContactManifold1Constraint description;
                         description.Contact0.OffsetA = manifold->Offset0;
@@ -190,11 +216,11 @@ namespace SolverPrototype.CollisionDetection
                             workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
                     }
                     break;
-                case 1:
+                case 8 + 1:
                     break;
-                case 2:
+                case 8 + 2:
                     break;
-                case 3:
+                case 8 + 3:
                     {
                         ContactManifold4Constraint description;
                         var descriptionContacts = &description.Contact0;
@@ -218,13 +244,13 @@ namespace SolverPrototype.CollisionDetection
                     }
                     break;
                 //Nonconvex
-                case 4 + 0:
+                case 8 + 4 + 0:
                     break;
-                case 4 + 1:
+                case 8 + 4 + 1:
                     break;
-                case 4 + 2:
+                case 8 + 4 + 2:
                     break;
-                case 4 + 3:
+                case 8 + 4 + 3:
                     break;
 
             }

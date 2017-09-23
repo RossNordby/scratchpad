@@ -24,7 +24,7 @@ namespace SolverPrototypeTests
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
             const int width = 1;
-            const int height = 4;
+            const int height = 3;
             const int length = 1;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(0.1f), new Vector3(), 1f, shapeIndex),
@@ -56,7 +56,7 @@ namespace SolverPrototypeTests
             //Console.WriteLine($"Remove time (us): {1e6 * (addStart - removeStart) / (Stopwatch.Frequency * removeCount)}");
             //Console.WriteLine($"Add time (us): {1e6 * (addEnd - addStart) / (Stopwatch.Frequency * removeCount)}");
             BodyVelocity velocity;
-            velocity.Linear = new Vector3(0.1f, 0, 0);
+            velocity.Linear = new Vector3(10.1f, 0, 0);
             velocity.Angular = new Vector3();
             Simulation.Bodies.SetVelocity(bodyHandles[(int)(bodyHandles.Length * 0.5781230f)], ref velocity);
             Simulation.Solver.IterationCount = 6;
@@ -65,6 +65,6 @@ namespace SolverPrototypeTests
             //camera.Pitch += MathF.PI * -0.2f;
 
         }
-        
+
     }
 }

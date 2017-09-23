@@ -228,6 +228,7 @@ namespace SolverPrototype.CollisionDetection
 
         public unsafe void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
+            //Console.WriteLine($"{a.Handle}, {b.Handle}");
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
             var staticness = (a.packed >> 31) | ((b.packed & 0x8000_0000) >> 30);
