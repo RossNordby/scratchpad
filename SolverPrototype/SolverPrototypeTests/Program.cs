@@ -8,6 +8,7 @@ using SolverPrototype;
 using SolverPrototypeTests.Properties;
 using SolverPrototypeTests.SpecializedTests;
 using System;
+using System.Diagnostics;
 using System.IO;
 
 namespace SolverPrototypeTests
@@ -17,6 +18,8 @@ namespace SolverPrototypeTests
         static void Main(string[] args)
         {
             ConstraintDescriptionMappingTests.Test();
+            //HeadlessDemo.Simple();
+            //return;
             //BatchedCollisionTests.Test();
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();

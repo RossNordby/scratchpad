@@ -267,9 +267,8 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        unsafe void BuildNewConstraintCache<TConstraintCache>(int* featureIds, out TConstraintCache cache)
+        internal unsafe void FillNewConstraintCache<TConstraintCache>(int* featureIds, ref TConstraintCache cache)
         {
-            cache = default(TConstraintCache);
             //1 contact constraint caches do not store a feature id; it's pointless.
             if (typeof(TConstraintCache) == typeof(ConstraintCache2))
             {
@@ -295,22 +294,21 @@ namespace SolverPrototype.CollisionDetection
             //TODO: In the event that higher contact count manifolds exist for the purposes of nonconvexes, this will need to be expanded.
         }
 
-        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair, ref TCollisionCache collisionCache, int* featureIds)
+        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair, ref TCollisionCache collisionCache, ref TConstraintCache constraintCache)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
         {
             //Note that we do not have to set any freshness bytes here; using this path means there exists no previous overlap to remove anyway.
-            BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
             return NextWorkerCaches[workerIndex].Add(ref pair, ref collisionCache, ref constraintCache);
         }
 
-        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, int* featureIds)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, ref TCollisionCache collisionCache, ref TConstraintCache constraintCache)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
         {
             //We're updating an existing pair, so we should prevent this pair from being removed.
             PairFreshness[pairIndex] = 0xFF;
-            BuildNewConstraintCache(featureIds, out TConstraintCache constraintCache);
             NextWorkerCaches[workerIndex].Update(ref pointers, ref collisionCache, ref constraintCache);
         }
 
@@ -327,8 +325,6 @@ namespace SolverPrototype.CollisionDetection
             //hard to notice compared to penetration impulses. We should, however, test this assumption.
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var inner);
             oldContactCount = 0;
-            ContactImpulses oldImpulsesSource; //could just use a stackalloc here.
-            float* oldImpulses = &oldImpulsesSource.Impulse0;
             switch (constraintType)
             {
                 //1 body
@@ -487,6 +483,9 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 0:
                     {
                         //1 contact
+                        var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
+                        ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
+                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 1);
                     }
                     break;
                 case 8 + 1:
@@ -533,10 +532,10 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void* GetConstraintCachePointer(int pairIndex)
+        public unsafe void* GetOldConstraintCachePointer(int pairIndex)
         {
             ref var constraintCacheIndex = ref Mapping.Values[pairIndex].ConstraintCache;
-            return NextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
+            return workerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
         }
 
         /// <summary>

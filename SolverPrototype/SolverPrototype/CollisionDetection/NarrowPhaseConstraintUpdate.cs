@@ -84,6 +84,14 @@ namespace SolverPrototype.CollisionDetection
             where TCollisionCache : IPairCacheEntry
             where TDescription : IConstraintDescription<TDescription>
         {
+
+            //Kinda goofy workaround for lack of blittable generics. Just avoiding a zero init.
+            //(Sort of. In order for the stackalloc to not zero init, you have to use the ReleaseStrip build config that includes the ilopt build step.
+            //Otherwise, you'll have to wait for some corefx or coreclr change that allows you to suppress the localsinit flag.)
+            var constraintCacheBytes = stackalloc byte[Unsafe.SizeOf<TConstraintCache>()];
+            ref var newConstraintCache = ref Unsafe.As<byte, TConstraintCache>(ref *constraintCacheBytes);
+            PairCache.FillNewConstraintCache(&manifold->FeatureId0, ref newConstraintCache);
+
             var index = PairCache.IndexOf(ref pair);
             if (index >= 0)
             {
@@ -92,7 +100,7 @@ namespace SolverPrototype.CollisionDetection
                 Debug.Assert(pointers.ConstraintCache.Exists, "If a pair was persisted in the narrow phase, there should be a constraint associated with it.");
 
                 var constraintCacheIndex = pointers.ConstraintCache;
-                var constraintCachePointer = PairCache.GetConstraintCachePointer(index);
+                var constraintCachePointer = PairCache.GetOldConstraintCachePointer(index);
                 var constraintHandle = *(int*)constraintCachePointer;
                 ContactImpulses newImpulses;
                 Solver.GetConstraintReference(constraintHandle, out var constraintReference);
@@ -110,10 +118,14 @@ namespace SolverPrototype.CollisionDetection
                     RedistributeImpulses(oldContactCount, &oldImpulses.Impulse0, (int*)constraintCachePointer + 1, manifold, &newImpulses.Impulse0);
                 }
 
-                PairCache.Update<TConstraintCache, TCollisionCache>(workerIndex, index, ref pointers, ref collisionCache, &manifold->FeatureId0);
                 if (manifoldTypeAsConstraintType == constraintCacheIndex.Type)
                 {
-                    //TODO: THE CONSTRAINT HANDLE IS OVERWRITTEN AND NOT REINITIALIZED BY THIS CODE PATH. NEEDS A FIX.
+                    //Since the old constraint is the same type, we aren't going to remove the old constraint and add a new one. That means no deferred process is going
+                    //to update the constraint cache's constraint handle. The good news is that we already have a valid constraint handle from the pre-existing constraint.
+                    //It's exactly the same type, so we can just overwrite its properties without worry.
+                    //Note that we rely on the constraint handle being stored in the first 4 bytes of the constraint cache.
+                    *(int*)constraintCacheBytes = constraintHandle;
+                    PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache);
                     //There exists a constraint and it has the same type as the manifold. Directly apply the new description and impulses.
                     Solver.ApplyDescription(ref constraintReference, ref description);
                     //TODO: Check init hack.
@@ -127,6 +139,7 @@ namespace SolverPrototype.CollisionDetection
                     //can be used to guarantee that consistent order. We can also defer smaller batches for the sake of limiting sync overheads. 4-16 adds within a single lock
                     //means a 4-16x reduction in lock-related overhead, assuming no contests.)
                     //2) The old constraint must be removed.
+                    PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache);
                     RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
                     ConstraintRemover.EnqueueRemoval(workerIndex, constraintHandle);
                 }
@@ -136,7 +149,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 //No preexisting constraint; add a fresh constraint and pair cache entry.
                 //The pair cache entry has to be created first so that the adder has a place to put the result of the constraint add.
-                var constraintCacheIndex = PairCache.Add<TConstraintCache, TCollisionCache>(workerIndex, ref pair, ref collisionCache, &manifold->FeatureId0);
+                var constraintCacheIndex = PairCache.Add(workerIndex, ref pair, ref collisionCache, ref newConstraintCache);
                 var newImpulses = new ContactImpulses();
                 //TODO: It would be nice to avoid the impulse scatter for fully new constraints; it's going to be all zeroes regardless. Worth investigating later.
                 RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
