@@ -144,7 +144,6 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
             //Check the remainder of the bytes one by one. Less than 8 left, so no need to be tricky.
-            var remainderStart = job.End - remainder;
             for (int i = job.End - remainder; i < job.End; ++i)
             {
                 if (PairCache.PairFreshness[i] == 0)

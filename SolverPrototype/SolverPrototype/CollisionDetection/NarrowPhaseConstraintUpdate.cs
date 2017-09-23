@@ -178,7 +178,7 @@ namespace SolverPrototype.CollisionDetection
                     {
                         ContactManifold1Constraint description;
                         description.Contact0.OffsetA = manifold->Offset0;
-                        description.Contact0.PenetrationDepth = manifold->Depth1;
+                        description.Contact0.PenetrationDepth = manifold->Depth0;
                         description.OffsetB = manifold->OffsetB;
                         description.FrictionCoefficient = material.FrictionCoefficient;
                         description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
