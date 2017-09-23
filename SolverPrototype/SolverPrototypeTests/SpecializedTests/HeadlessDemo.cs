@@ -26,6 +26,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 time += (end - start) / (double)Stopwatch.Frequency;
             }
             Console.WriteLine($"Time per frame (us): {1e6 * time / frameCount}");
+            simpleDemo.Dispose();
         }
     }
 }

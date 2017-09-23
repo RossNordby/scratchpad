@@ -390,7 +390,7 @@ namespace BEPUutilities2.Collections
             {
                 //This table index is taken. Is this the specified element?
                 //Remember to decode the object index.
-                if (Keys[--elementIndex].Equals(element))
+                if (EqualityComparer.Equals(ref Keys[--elementIndex], ref element))
                 {
                     return true;
                 }

@@ -231,7 +231,7 @@ namespace SolverPrototype.CollisionDetection
             //Console.WriteLine($"{a.Handle}, {b.Handle}");
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
-            var staticness = (a.packed >> 31) | ((b.packed & 0x8000_0000) >> 30);
+            var staticness = (a.Packed >> 31) | ((b.Packed & 0x8000_0000) >> 30);
             ref var overlapWorker = ref overlapWorkers[workerIndex];
             var pair = new CollidablePair(a, b);
             switch (staticness)

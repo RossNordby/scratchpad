@@ -21,7 +21,7 @@ namespace SolverPrototype.Collidables
 
     public struct CollidableReference
     {
-        internal uint packed;
+        public uint Packed;
 
         /// <summary>
         /// Gets or sets whether this reference points to a static collidable. If false, the reference points to a body.
@@ -29,7 +29,7 @@ namespace SolverPrototype.Collidables
         public CollidableMobility Mobility
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (CollidableMobility)(packed >> 30); }
+            get { return (CollidableMobility)(Packed >> 30); }
         }
 
         /// <summary>
@@ -38,7 +38,7 @@ namespace SolverPrototype.Collidables
         public int Handle
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get { return (int)(packed & 0x3FFFFFFF); }
+            get { return (int)(Packed & 0x3FFFFFFF); }
         }
 
         
@@ -47,7 +47,7 @@ namespace SolverPrototype.Collidables
         {
             Debug.Assert((int)mobility >= 0 && (int)mobility <= 2, "Hey you, that mobility type doesn't exist. Or we changed something and this needs to be updated.");
             Debug.Assert(collidableHandle >= 0 && collidableHandle < 1 << 30, "Do you actually have more than 2^30 collidables? That seems unlikely.");
-            packed = ((uint)mobility << 30) | (uint)collidableHandle;
+            Packed = ((uint)mobility << 30) | (uint)collidableHandle;
         }
     }
 }

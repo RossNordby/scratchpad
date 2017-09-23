@@ -45,14 +45,14 @@ namespace SolverPrototype.CollisionDetection
         {
             ref var aBytes = ref Unsafe.As<CollidablePair, ulong>(ref a);
             ref var bBytes1 = ref Unsafe.As<CollidablePair, ulong>(ref b);
-            ulong bBytes2 = b.B.packed | ((ulong)b.A.packed << 32);
+            ulong bBytes2 = b.B.Packed | ((ulong)b.A.Packed << 32);
             return aBytes == bBytes1 || aBytes == bBytes2;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Hash(ref CollidablePair item)
         {
-            return (int)(item.A.packed ^ item.B.packed);
+            return (int)(item.A.Packed ^ item.B.Packed);
         }
     }
 
