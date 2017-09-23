@@ -156,7 +156,9 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void EnqueueStaleRemoval(int workerIndex, int pairIndex)
         {
-            var constraintHandle = PairCache.GetConstraintHandle(pairIndex);
+            //Note that we have to grab the *old* handle, because the current frame's set of constraint caches do not contain this pair.
+            //If they DID contain this pair, then it wouldn't be stale!
+            var constraintHandle = PairCache.GetOldConstraintHandle(pairIndex);
             ConstraintRemover.EnqueueRemoval(workerIndex, constraintHandle);
             ref var cache = ref PairCache.NextWorkerCaches[workerIndex];
             cache.PendingRemoves.Add(PairCache.Mapping.Keys[pairIndex], cache.pool.SpecializeFor<CollidablePair>());

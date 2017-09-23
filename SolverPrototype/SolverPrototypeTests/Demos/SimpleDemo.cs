@@ -23,11 +23,11 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 1;
-            const int height = 3;
-            const int length = 1;
+            const int width = 2;
+            const int height = 2;
+            const int length = 2;
             SimulationSetup.BuildLattice(
-                new RegularGridWithKinematicBaseBuilder(new Vector3(0.1f), new Vector3(), 1f, shapeIndex),
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 2, 1.2f), new Vector3(), 1f, shapeIndex),
                 new BallSocketConstraintBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
@@ -58,7 +58,7 @@ namespace SolverPrototypeTests
             BodyVelocity velocity;
             velocity.Linear = new Vector3(10.1f, 0, 0);
             velocity.Angular = new Vector3();
-            Simulation.Bodies.SetVelocity(bodyHandles[(int)(bodyHandles.Length * 0.5781230f)], ref velocity);
+            Simulation.Bodies.SetVelocity(bodyHandles[2], ref velocity);
             Simulation.Solver.IterationCount = 6;
             //camera.Position = new Vector3(-40, -10, 5);
             //camera.Yaw += MathF.PI * 0.65f;

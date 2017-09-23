@@ -549,6 +549,13 @@ namespace SolverPrototype.CollisionDetection
             return workerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public unsafe int GetOldConstraintHandle(int pairIndex)
+        {
+            ref var constraintCacheIndex = ref Mapping.Values[pairIndex].ConstraintCache;
+            return *(int*)workerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
+        }
+
         /// <summary>
         /// Completes the addition of a constraint by filling in the narrowphase's pointer to the constraint and by distributing accumulated impulses.
         /// </summary>
@@ -564,13 +571,6 @@ namespace SolverPrototype.CollisionDetection
             *(int*)NextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex) = constraintHandle;
             solver.GetConstraintReference(constraintHandle, out var reference);
             ScatterNewImpulses(constraintCacheIndex.Type, ref reference, ref impulses);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe int GetConstraintHandle(int pairIndex)
-        {
-            ref var constraintCacheIndex = ref Mapping.Values[pairIndex].ConstraintCache;
-            return *(int*)NextWorkerCaches[constraintCacheIndex.Worker].GetConstraintCachePointer(constraintCacheIndex);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

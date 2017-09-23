@@ -120,14 +120,11 @@ namespace SolverPrototype.CollisionDetection
         {
             switch (job.Type)
             {
-                case NarrowPhaseFlushJobType.RemoveConstraintsFromBodyLists:
-                    ConstraintRemover.RemoveConstraintsFromBodyLists();
+                case NarrowPhaseFlushJobType.UpdateBodyConstraintListsAndBatchBodyHandles:
+                    ConstraintRemover.UpdateBodyConstraintListsAndBatchBodyHandles();
                     break;
                 case NarrowPhaseFlushJobType.RemoveConstraintFromTypeBatch:
                     ConstraintRemover.RemoveConstraintsFromTypeBatch(job.Index);
-                    break;
-                case NarrowPhaseFlushJobType.RemoveBodyHandlesFromBatches:
-                    ConstraintRemover.RemoveBodyHandlesFromBatches();
                     break;
                 case NarrowPhaseFlushJobType.ReturnConstraintHandlesToPool:
                     ConstraintRemover.ReturnConstraintHandlesToPool();

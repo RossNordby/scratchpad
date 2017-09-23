@@ -44,9 +44,8 @@ namespace SolverPrototype.CollisionDetection
     }
     public enum NarrowPhaseFlushJobType
     {
-        RemoveConstraintsFromBodyLists,
+        UpdateBodyConstraintListsAndBatchBodyHandles,
         RemoveConstraintFromTypeBatch,
-        RemoveBodyHandlesFromBatches,
         ReturnConstraintHandlesToPool,
         FlushPairCacheChanges
     }
@@ -66,20 +65,12 @@ namespace SolverPrototype.CollisionDetection
         Bodies bodies;
         ConstraintConnectivityGraph constraintGraph;
         BufferPool pool;
-
-        struct BodyHandleToRemove
-        {
-            public int ConstraintBatch;
-            public int BodyHandle;
-        }
-
-
+        
         struct WorkerCache
         {
             BufferPool pool;
             internal QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> Batches;
             internal QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>> BatchHandles;
-            internal QuickList<BodyHandleToRemove, Buffer<BodyHandleToRemove>> BodyHandlesToRemove;
             //Storing this stuff by constraint batch is an option, but it would require more prefiltering that isn't free.
             int minimumCapacityPerBatch;
 
@@ -90,7 +81,6 @@ namespace SolverPrototype.CollisionDetection
                 this.minimumCapacityPerBatch = minimumCapacityPerBatch;
                 QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>>.Create(pool.SpecializeFor<TypeBatchIndex>(), batchCapacity, out Batches);
                 QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>>.Create(pool.SpecializeFor<QuickList<int, Buffer<int>>>(), batchCapacity, out BatchHandles);
-                QuickList<BodyHandleToRemove, Buffer<BodyHandleToRemove>>.Create(pool.SpecializeFor<BodyHandleToRemove>(), batchCapacity * minimumCapacityPerBatch, out BodyHandlesToRemove);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -142,36 +132,7 @@ namespace SolverPrototype.CollisionDetection
                     ref var handles = ref BatchHandles.AllocateUnsafely();
                     QuickList<int, Buffer<int>>.Create(pool.SpecializeFor<int>(), minimumCapacityPerBatch, out handles);
                 }
-                BatchHandles[index].AllocateUnsafely() = constraintHandle;
-
-                //Collect the set of body handles referenced by the constraint. Directly add them into the list from the enumerator by preallocating space and passing a pointer.
-                {
-                    var typeBatch = solver.Batches[typeBatchIndex.Batch].TypeBatches[typeBatchIndex.TypeBatch];
-                    var bodyCount = typeBatch.BodiesPerConstraint;
-                    var oldCount = BodyHandlesToRemove.Count;
-                    int newCount = oldCount + bodyCount;
-                    BodyHandlesToRemove.EnsureCapacity(newCount, pool.SpecializeFor<BodyHandleToRemove>());
-                    BodyHandlesToRemove.Count = newCount;
-                    BodyHandleEnumerator enumerator;
-                    enumerator.ConstraintBatch = typeBatchIndex.Batch;
-                    enumerator.IndexInConstraint = 0;
-                    enumerator.Output = (BodyHandleToRemove*)Unsafe.AsPointer(ref BodyHandlesToRemove[oldCount]);
-                    typeBatch.EnumerateConnectedBodyIndices(constraint.IndexInTypeBatch, ref enumerator);
-                }
-            }
-            unsafe struct BodyHandleEnumerator : IForEach<int>
-            {
-                public BodyHandleToRemove* Output;
-                public int ConstraintBatch;
-                public int IndexInConstraint;
-
-                [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                public void LoopBody(int i)
-                {
-                    ref var slot = ref Output[IndexInConstraint++];
-                    slot.BodyHandle = i;
-                    slot.ConstraintBatch = ConstraintBatch;
-                }
+                BatchHandles[index].AllocateUnsafely() = constraintHandle;                
             }
 
 
@@ -184,7 +145,6 @@ namespace SolverPrototype.CollisionDetection
                     BatchHandles[i].Dispose(intPool);
                 }
                 BatchHandles.Dispose(pool.SpecializeFor<QuickList<int, Buffer<int>>>());
-                BodyHandlesToRemove.Dispose(pool.SpecializeFor<BodyHandleToRemove>());
                 this = new WorkerCache();
             }
         }
@@ -250,9 +210,8 @@ namespace SolverPrototype.CollisionDetection
         {
             //Add the locally sequential jobs. Put them first in the hope that the usually-smaller per-typebatch jobs will balance out the remainder of the work.
             var jobPool = pool.SpecializeFor<NarrowPhaseFlushJob>();
-            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.RemoveConstraintsFromBodyLists }, jobPool);
+            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.UpdateBodyConstraintListsAndBatchBodyHandles }, jobPool);
             jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.ReturnConstraintHandlesToPool }, jobPool);
-            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.RemoveBodyHandlesFromBatches }, jobPool);
             //TODO: For deactivation, you don't actually want to create a body list removal request. The bodies would be getting removed, so it would be redundant.
             //Simple enough to adapt for that use case later. Probably need to get rid of the narrow phase specific reference.
 
@@ -293,20 +252,39 @@ namespace SolverPrototype.CollisionDetection
             QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>>.Create(pool.SpecializeFor<TypeBatchIndex>(), 16, out removedTypeBatches);
         }
 
-        //TODO: It would be wise to double check the overhead associated with having these locally sequential jobs as separate jobs. It's likely that a couple of them 
-        //(the constraint handle return and body handle removal) are fast enough that trying to share the cache lines would exceed the cost of just doing all the work on a single thread.
-        public void RemoveConstraintsFromBodyLists()
+
+        struct GraphAndBatchHandleRemovalEnumerator: IForEach<int>
         {
-            ConstraintGraphRemovalEnumerator enumerator;
+            internal ConstraintConnectivityGraph graph;
+            internal Bodies bodies;
+            internal ConstraintBatch batch;
+            internal int constraintHandle;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void LoopBody(int bodyIndex)
+            {
+                graph.RemoveConstraint(bodyIndex, constraintHandle);
+                batch.BodyHandles.Remove(bodies.IndexToHandle[bodyIndex]);
+            }
+        }
+
+        //TODO: It would be wise to double check the overhead associated with having these locally sequential jobs as separate jobs.
+        //We already combined a couple of them for simplicity... the handle return wouldn't cost much. In fact, it might be faster on net due to a lack of shared cache lines.
+        //That does mean fewer overall tasks, but greater parallelism doesn't matter if it's slower.
+        public void UpdateBodyConstraintListsAndBatchBodyHandles()
+        {
+            GraphAndBatchHandleRemovalEnumerator enumerator;
             enumerator.graph = constraintGraph;
-            //While this could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
+            enumerator.bodies = bodies;
+            //While body list removal could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
             //to guarantee that no two threads hit the same body constraint list at the same time. 
             //That is more complicated and would almost certainly be slower than this locally sequential version.
+            //Plus, we get to share the fairly expensive enumeration with body handle removal.
             for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];
                 for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
                 {
+                    enumerator.batch = solver.Batches[workerCache.Batches[batchIndex].Batch];
                     ref var handles = ref workerCache.BatchHandles[batchIndex];
                     for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
                     {
@@ -320,6 +298,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void ReturnConstraintHandlesToPool()
         {
+            var typedPool = pool.SpecializeFor<int>();
             for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];
@@ -328,25 +307,12 @@ namespace SolverPrototype.CollisionDetection
                     ref var handles = ref workerCache.BatchHandles[batchIndex];
                     for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
                     {
-                        solver.handlePool.Return(handles[handleIndex], pool.SpecializeFor<int>());
+                        solver.handlePool.Return(handles[handleIndex], typedPool);
                     }
                 }
             }
         }
-
-        public void RemoveBodyHandlesFromBatches()
-        {
-            for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
-            {
-                ref var workerCache = ref workerCaches[workerIndex];
-                for (int handleToRemoveIndex = 0; handleToRemoveIndex < workerCache.BodyHandlesToRemove.Count; ++handleToRemoveIndex)
-                {
-                    ref var toRemove = ref workerCache.BodyHandlesToRemove[handleToRemoveIndex];
-                    solver.Batches[toRemove.ConstraintBatch].BodyHandles.Remove(toRemove.BodyHandle);
-                }
-            }
-        }
-
+        
         QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> removedTypeBatches;
         SpinLock removedTypeBatchLocker = new SpinLock();
         public void RemoveConstraintsFromTypeBatch(int index)
@@ -434,6 +400,7 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void EnqueueRemoval(int workerIndex, int constraintHandle)
         {
             workerCaches[workerIndex].EnqueueForRemoval(constraintHandle, solver);
