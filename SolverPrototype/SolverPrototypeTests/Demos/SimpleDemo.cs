@@ -23,9 +23,9 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 2;
-            const int height = 2;
-            const int length = 2;
+            const int width = 4;
+            const int height = 4;
+            const int length = 4;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 2, 1.2f), new Vector3(), 1f, shapeIndex),
                 new BallSocketConstraintBuilder(),

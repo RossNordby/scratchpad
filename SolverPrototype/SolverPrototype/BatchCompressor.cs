@@ -197,6 +197,7 @@ namespace SolverPrototype
                     //The region creation phase should guarantee that this is a valid thing to do.
                     Debug.Assert(typeBatchIndex + 1 < batch.TypeBatches.Count, "The worker region generator should guarantee that the regions cover valid areas.");
                     ++typeBatchIndex;
+                    indexInTypeBatch = 0;
                     typeBatch = batch.TypeBatches[typeBatchIndex];
                 }
             }
@@ -267,30 +268,25 @@ namespace SolverPrototype
             //Build the analysis regions.
             var batch = Solver.Batches[nextBatchIndex];
 
-            var remainingConstraintCount = -nextTarget.StartIndexInTypeBatch;
+            var remainingConstraintsInBatchCount = -nextTarget.StartIndexInTypeBatch;
             for (int i = nextTarget.TypeBatchIndex; i < batch.TypeBatches.Count; ++i)
             {
-                remainingConstraintCount += batch.TypeBatches[i].ConstraintCount;
-                if (remainingConstraintCount > targetCandidateCount)
+                remainingConstraintsInBatchCount += batch.TypeBatches[i].ConstraintCount;
+                if (remainingConstraintsInBatchCount > targetCandidateCount)
                 {
-                    remainingConstraintCount = targetCandidateCount;
+                    remainingConstraintsInBatchCount = targetCandidateCount;
                     break;
                 }
             }
-            var constraintsPerWorkerBase = remainingConstraintCount / workerCount;
-            var constraintsRemainder = remainingConstraintCount - workerCount * constraintsPerWorkerBase;
-            //var DEBUGTotalConstraintsAnalyzed = 0;
+            var constraintsPerWorkerBase = remainingConstraintsInBatchCount / workerCount;
+            var constraintsRemainder = remainingConstraintsInBatchCount - workerCount * constraintsPerWorkerBase;
             for (int i = 0; i < workerCount; ++i)
             {
                 ref var context = ref workerContexts[i];
                 context.Region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
                 context.Region.Start = nextTarget;
                 nextTarget.StartIndexInTypeBatch += context.Region.ConstraintCount;
-                //DEBUGTotalConstraintsAnalyzed += region.ConstraintCount;
-            }
-
-            //if (workerContexts[0].Compressions.Count > 0)
-            //    Console.WriteLine($"Analyzed {DEBUGTotalConstraintsAnalyzed} constraints, compressing {workerContexts[0].Compressions.Count}");
+            }            
 
             //Note that it is possible for this to skip some compressions if the maximum number of compressions is hit before all candidates are visited. That's fine;
             //compressions should be rare under normal circumstances and having to wait some frames for the analysis to swing back through shouldn't be a problem.
