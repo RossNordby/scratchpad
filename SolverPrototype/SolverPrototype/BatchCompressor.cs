@@ -240,7 +240,8 @@ namespace SolverPrototype
                 nextBatchIndex = 0;
                 nextTarget = new AnalysisStart();
             }
-            else if (nextTarget.TypeBatchIndex >= Solver.Batches[nextBatchIndex].TypeBatches.Count)
+            //Note that we must handle the case where a batch has zero type batches (because we haven't compressed it yet!).
+            while (nextTarget.TypeBatchIndex >= Solver.Batches[nextBatchIndex].TypeBatches.Count)
             {
                 //Invalid type batch; move to the next batch.
                 ++nextBatchIndex;
@@ -248,13 +249,14 @@ namespace SolverPrototype
                     nextBatchIndex = 0;
                 nextTarget = new AnalysisStart();
             }
-            else if (nextTarget.StartIndexInTypeBatch >= Solver.Batches[nextBatchIndex].TypeBatches[nextTarget.TypeBatchIndex].ConstraintCount)
+            if (nextTarget.StartIndexInTypeBatch >= Solver.Batches[nextBatchIndex].TypeBatches[nextTarget.TypeBatchIndex].ConstraintCount)
             {
                 //Invalid constraint index; move to the next type batch.
                 nextTarget.StartIndexInTypeBatch = 0;
                 ++nextTarget.TypeBatchIndex;
                 //Check if we have to move to the next batch.
-                if (nextTarget.TypeBatchIndex >= Solver.Batches[nextBatchIndex].TypeBatches.Count)
+                //Note that we must handle the case where a batch has zero type batches (because we haven't compressed it yet!).
+                while (nextTarget.TypeBatchIndex >= Solver.Batches[nextBatchIndex].TypeBatches.Count)
                 {
                     nextTarget.TypeBatchIndex = 0;
                     ++nextBatchIndex;

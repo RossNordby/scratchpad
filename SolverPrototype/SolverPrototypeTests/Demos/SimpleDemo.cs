@@ -55,16 +55,28 @@ namespace SolverPrototypeTests
             //var addEnd = Stopwatch.GetTimestamp();
             //Console.WriteLine($"Remove time (us): {1e6 * (addStart - removeStart) / (Stopwatch.Frequency * removeCount)}");
             //Console.WriteLine($"Add time (us): {1e6 * (addEnd - addStart) / (Stopwatch.Frequency * removeCount)}");
-            BodyVelocity velocity;
-            velocity.Linear = new Vector3(10.1f, 0, 0);
-            velocity.Angular = new Vector3();
-            Simulation.Bodies.SetVelocity(bodyHandles[2], ref velocity);
+            //BodyVelocity velocity;
+            //velocity.Linear = new Vector3(10.1f, 0, 0);
+            //velocity.Angular = new Vector3();
+            //Simulation.Bodies.SetVelocity(bodyHandles[2], ref velocity);
             Simulation.Solver.IterationCount = 6;
             //camera.Position = new Vector3(-40, -10, 5);
             //camera.Yaw += MathF.PI * 0.65f;
             //camera.Pitch += MathF.PI * -0.2f;
 
         }
+
+        //double time;
+        //public override void Update(float dt)
+        //{
+        //    BodyVelocity velocity;
+        //    time += dt;
+        //    velocity.Linear = new Vector3((float)Math.Sin(time), 0, 0);
+        //    velocity.Angular = new Vector3();
+        //    Simulation.Bodies.SetVelocity(0, ref velocity);
+        //    base.Update(dt);
+
+        //}
 
     }
 }

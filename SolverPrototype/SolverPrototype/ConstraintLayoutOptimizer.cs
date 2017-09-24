@@ -80,7 +80,11 @@ namespace SolverPrototype
         bool WrapTypeBatch(ref Optimization o)
         {
             Debug.Assert(o.BatchIndex <= solver.Batches.Count, "Should only attempt to wrap type batch indices if the batch index is known to be valid.");
-            if (o.TypeBatchIndex >= solver.Batches[o.BatchIndex].TypeBatches.Count)
+            bool wrapped = false;
+            //Note that it's possible for a batch to contain zero type batches. This is a byproduct of only the last constraint batch ever being removed.
+            //Empty constraint batches before the last index stick around until batch compression finds them and shifts everything into a lower batch.
+            //So, here, we have to be ready to walk forward multiple batches.
+            while (o.TypeBatchIndex >= solver.Batches[o.BatchIndex].TypeBatches.Count)
             {
                 ++o.BatchIndex;
                 if (!WrapBatch(ref o))
@@ -88,9 +92,9 @@ namespace SolverPrototype
                     o.TypeBatchIndex = 0;
                     o.BundleIndex = 0;
                 }
-                return true;
+                wrapped = true;
             }
-            return false;
+            return wrapped;
         }
 
         bool WrapBundle(ref Optimization o)
