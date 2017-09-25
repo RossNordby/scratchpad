@@ -225,7 +225,15 @@ namespace SolverPrototype.CollisionDetection
 
         public unsafe void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
-            //Console.WriteLine($"{a.Handle}, {b.Handle}");
+            if(a.Handle > b.Handle)
+            {
+                //In order to guarantee contact manifold and constraint consistency across multiple frames, we must guarantee that the order of collidables submitted 
+                //is the same every time. Since the provided handles do not move for the lifespan of the collidable in the simulation, they can be used as an ordering.
+                //Simply put the lower handle in slot A always.
+                var temp = b;
+                b = a;
+                a = temp;
+            }
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
             var staticness = (a.Packed >> 31) | ((b.Packed & 0x8000_0000) >> 30);

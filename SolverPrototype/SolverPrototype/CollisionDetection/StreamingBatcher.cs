@@ -245,9 +245,13 @@ namespace SolverPrototype.CollisionDetection
 
     struct RigidPair
     {
+        /// <summary>
+        /// Stores whether the types involved in pair require that the resulting contact manifold be flipped to be consistent with the user-requested pair order.
+        /// </summary>
+        public int FlipMask;
+        public ContinuationIndex Continuation;
         public BodyPose PoseA;
         public BodyPose PoseB;
-        public ContinuationIndex Continuation;
     }
 
     //Writes by the narrowphase write shape data without type knowledge, so they can't easily operate on regular packing rules. Emulate this with a pack of 1.
@@ -295,7 +299,7 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void Add<TContinuations, TFilters>(ref CollisionTaskReference reference, int pairSizeInBytes,
             int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref BodyPose poseA, ref BodyPose poseB,
-            ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+            int flipMask, ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
         {
@@ -304,9 +308,10 @@ namespace SolverPrototype.CollisionDetection
             Unsafe.CopyBlockUnaligned(pairData, shapeA, (uint)shapeSizeA);
             Unsafe.CopyBlockUnaligned(pairData += shapeSizeA, shapeB, (uint)shapeSizeA);
             var poses = (RigidPair*)(pairData += shapeSizeB);
+            poses->FlipMask = flipMask;
             poses->PoseA = poseA;
-            poses->PoseB = poseB;
             poses->Continuation = continuationId;
+            poses->PoseB = poseB;
             if (batch.Count == reference.BatchSize)
             {
                 typeMatrix[reference.TaskIndex].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);
@@ -343,18 +348,18 @@ namespace SolverPrototype.CollisionDetection
             if (shapeTypeIdA != reference.ExpectedFirstTypeId)
             {
                 //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
-                Add(ref reference, pairSize, shapeSizeB, shapeSizeA, shapeB, shapeA, ref poseB, ref poseA, continuationId, ref continuations, ref filters);
+                Add(ref reference, pairSize, shapeSizeB, shapeSizeA, shapeB, shapeA, ref poseB, ref poseA, -1, continuationId, ref continuations, ref filters);
             }
             else
             {
-                Add(ref reference, pairSize, shapeSizeA, shapeSizeB, shapeA, shapeB, ref poseA, ref poseB, continuationId, ref continuations, ref filters);
+                Add(ref reference, pairSize, shapeSizeA, shapeSizeB, shapeA, shapeB, ref poseA, ref poseB, 0, continuationId, ref continuations, ref filters);
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
             ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
-            ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
+            int flipMask, ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
@@ -401,11 +406,11 @@ namespace SolverPrototype.CollisionDetection
             if (typeof(TShapeA) != typeof(TShapeB) && TypeIds<IShape>.GetId<TShapeA>() != reference.ExpectedFirstTypeId)
             {
                 //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
-                Add(ref reference, ref shapeB, ref shapeA, ref poseB, ref poseA, continuationId, ref continuations, ref filters);
+                Add(ref reference, ref shapeB, ref shapeA, ref poseB, ref poseA, -1, continuationId, ref continuations, ref filters);
             }
             else
             {
-                Add(ref reference, ref shapeA, ref shapeB, ref poseA, ref poseB, continuationId, ref continuations, ref filters);
+                Add(ref reference, ref shapeA, ref shapeB, ref poseA, ref poseB, 0, continuationId, ref continuations, ref filters);
             }
         }
 

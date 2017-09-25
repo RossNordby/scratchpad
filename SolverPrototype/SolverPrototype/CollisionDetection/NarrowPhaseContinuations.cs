@@ -575,7 +575,7 @@ namespace SolverPrototype.CollisionDetection
                 substepWithLinear.Dispose(pool);
             }
         }
-        
+
 
     }
 

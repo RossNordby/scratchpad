@@ -19,7 +19,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             out Vector3Wide relativeContactPosition, out Vector3Wide contactNormal, out Vector<float> depth)
         {
             Vector3Wide.Length(ref relativePositionB, out var centerDistance);
-            var inverseDistance = Vector<float>.One / centerDistance;
+            var inverseDistance = new Vector<float>(1f) / centerDistance;
             Vector3Wide.Scale(ref relativePositionB, ref inverseDistance, out contactNormal);
             var normalIsValid = Vector.GreaterThan(centerDistance, Vector<float>.Zero);
             //Arbitrarily choose the (0,1,0) if the two spheres are in the same position. Any unit length vector is equally valid.
@@ -92,12 +92,12 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         }
 
         //TODO: In the future, maybe once codegen improves a little bit, it might be a good idea to revisit this remainder gather to get rid of the redundant per-property branches.
-        //Worst case scenario, you could create a bunch of overloads for different property counts. ooooooooooooooof.
+        //Worst case scenario, you could create a bunch of overloads for different property counts. ooooooooooooooof.       
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Gather<T, TContainer>(ref Vector<T> vector, ref TContainer containers, int offsetInElements, int count) where T : struct where TContainer : struct
+        static void Gather<T, TContainer>(ref Vector<T> vector, ref T sourceStart, int count) where T : struct where TContainer : struct
         {
             Debug.Assert(count > 0 && count <= Vector<float>.Count);
-            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref containers), offsetInElements));
+            ref var start = ref Unsafe.As<T, TContainer>(ref sourceStart);
             if (Vector<T>.Count == 2)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
@@ -177,9 +177,9 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        static void Scatter<T, TContainer>(ref Vector<T> vector, ref TContainer targetContainers, int offsetInElements, int count) where T : struct where TContainer : struct
+        static void Scatter<T, TContainer>(ref Vector<T> vector, ref T targetStart, int count) where T : struct where TContainer : struct
         {
-            ref var start = ref Unsafe.As<T, TContainer>(ref Unsafe.Add(ref Unsafe.As<TContainer, T>(ref targetContainers), offsetInElements));
+            ref var start = ref Unsafe.As<T, TContainer>(ref targetStart);
             if (Vector<T>.Count == 2)
             {
                 ref var remapped = ref Unsafe.As<Vector<T>, Remap2<T>>(ref vector);
@@ -258,6 +258,8 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             }
         }
 
+        
+
         //Every single collision task type will mirror this general layout.
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
         {
@@ -282,33 +284,39 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 if (countInBundle > Vector<float>.Count)
                     countInBundle = Vector<float>.Count;
 
-                Gather(ref radiiA, ref bundleStart, 0, countInBundle);
-                Gather(ref radiiB, ref bundleStart, 1, countInBundle);
-                Gather(ref positionA.X, ref bundleStart, 2, countInBundle);
-                Gather(ref positionA.Y, ref bundleStart, 3, countInBundle);
-                Gather(ref positionA.Z, ref bundleStart, 4, countInBundle);
-                Gather(ref positionB.X, ref bundleStart, 9, countInBundle);
-                Gather(ref positionB.Y, ref bundleStart, 10, countInBundle);
-                Gather(ref positionB.Z, ref bundleStart, 11, countInBundle);
+                //TODO: In the future, once we have some more codegen options, we should try to change this- probably into an intrinsic.
+                //Or maybe an explicit AOS->(AOSOA|SOA) transition during add time- in other words, we never store the AOS representation.
+                //(That's still a gather, just moving it around a bit in the hope that it is more centralized.)
+                Gather<float, RigidPair<Sphere, Sphere>>(ref radiiA, ref bundleStart.A.Radius, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref radiiB, ref bundleStart.B.Radius, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref positionA.X, ref bundleStart.Shared.PoseA.Position.X, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref positionA.Y, ref bundleStart.Shared.PoseA.Position.Y, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref positionA.Z, ref bundleStart.Shared.PoseA.Position.Z, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref positionB.X, ref bundleStart.Shared.PoseB.Position.X, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref positionB.Y, ref bundleStart.Shared.PoseB.Position.Y, countInBundle);
+                Gather<float, RigidPair<Sphere, Sphere>>(ref positionB.Z, ref bundleStart.Shared.PoseB.Position.Z, countInBundle);
 
                 Vector3Wide.Subtract(ref positionB, ref positionA, out relativePosition);
                 SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
 
-                Scatter(ref relativePosition.X, ref *manifolds, 0, countInBundle);
-                Scatter(ref relativePosition.Y, ref *manifolds, 1, countInBundle);
-                Scatter(ref relativePosition.Z, ref *manifolds, 2, countInBundle);
-                Scatter(ref contactPosition.X, ref *manifolds, 4, countInBundle);
-                Scatter(ref contactPosition.Y, ref *manifolds, 5, countInBundle);
-                Scatter(ref contactPosition.Z, ref *manifolds, 6, countInBundle);
-                Scatter(ref depth, ref *manifolds, 16, countInBundle);
-                Scatter(ref contactNormal.X, ref *manifolds, 24, countInBundle);
-                Scatter(ref contactNormal.Y, ref *manifolds, 25, countInBundle);
-                Scatter(ref contactNormal.Z, ref *manifolds, 26, countInBundle);
+                //TODO: you could avoid the hardcoded memory indexing here by instead interpreting. (ContactManifold*)&manifolds->OffsetB.X.
+                //Might have marginally better codegen, and more importantly, it would avoid the extremely fragile memory offsets.
+                Scatter<float, ContactManifold>(ref relativePosition.X, ref manifolds->OffsetB.X, countInBundle);
+                Scatter<float, ContactManifold>(ref relativePosition.Y, ref manifolds->OffsetB.Y, countInBundle);
+                Scatter<float, ContactManifold>(ref relativePosition.Z, ref manifolds->OffsetB.Z, countInBundle);
+                Scatter<float, ContactManifold>(ref contactPosition.X, ref manifolds->Offset0.X, countInBundle);
+                Scatter<float, ContactManifold>(ref contactPosition.Y, ref manifolds->Offset0.Y, countInBundle);
+                Scatter<float, ContactManifold>(ref contactPosition.Z, ref manifolds->Offset0.Z, countInBundle);
+                Scatter<float, ContactManifold>(ref depth, ref manifolds->Depth0, countInBundle);
+                Scatter<float, ContactManifold>(ref contactNormal.X, ref manifolds->Normal0.X, countInBundle);
+                Scatter<float, ContactManifold>(ref contactNormal.Y, ref manifolds->Normal0.Y, countInBundle);
+                Scatter<float, ContactManifold>(ref contactNormal.Z, ref manifolds->Normal0.Z, countInBundle);
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Shared.Continuation, manifolds + j);
                 }
             }
         }
+
     }
 }

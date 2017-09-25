@@ -20,15 +20,16 @@ namespace SolverPrototypeTests
 
         public unsafe override void Initialize(Camera camera)
         {
+            camera.Position = new Vector3(5, 2, 15);
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 4;
-            const int height = 4;
-            const int length = 4;
+            const int width = 8;
+            const int height = 2;
+            const int length = 8;
             SimulationSetup.BuildLattice(
-                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 2, 1.2f), new Vector3(), 1f, shapeIndex),
-                new BallSocketConstraintBuilder(),
+                new RegularGridWithKinematicBaseBuilder(new Vector3(3.2f, 2, 3.2f), new Vector3(), 1f, shapeIndex),
+                new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
             SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);

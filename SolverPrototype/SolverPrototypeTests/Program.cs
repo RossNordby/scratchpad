@@ -20,9 +20,8 @@ namespace SolverPrototypeTests
             ConstraintDescriptionMappingTests.Test();
             //CollidablePairComparerTests.Test();
             //HeadlessDemo.Simple();
-            //HeadlessDemo.Simple();
+            BatchedCollisionTests.Test();
             //return;
-            //BatchedCollisionTests.Test();
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();
@@ -39,7 +38,7 @@ namespace SolverPrototypeTests
             //ConstraintCacheOptimizationTests.Test();
             //SortTest.Test();
             //SpanCodegenTests.Test();
-            //return;
+            return;
 
             //Console.ReadKey();
             DefaultTypes.Register();
