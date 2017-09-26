@@ -24,15 +24,15 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 8;
+            const int width = 300;
             const int height = 2;
-            const int length = 8;
+            const int length = 1;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(3.2f, 2, 3.2f), new Vector3(), 1f, shapeIndex),
                 new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-            SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
+            //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
             //var removeCount = constraintHandles.Length / 4;
             //var removedConstraints = new RemovedConstraint<BallSocket>[removeCount];
             //var removeStart = Stopwatch.GetTimestamp();
@@ -60,7 +60,7 @@ namespace SolverPrototypeTests
             //velocity.Linear = new Vector3(10.1f, 0, 0);
             //velocity.Angular = new Vector3();
             //Simulation.Bodies.SetVelocity(bodyHandles[2], ref velocity);
-            Simulation.Solver.IterationCount = 6;
+            Simulation.Solver.IterationCount = 100;
             //camera.Position = new Vector3(-40, -10, 5);
             //camera.Yaw += MathF.PI * 0.65f;
             //camera.Pitch += MathF.PI * -0.2f;

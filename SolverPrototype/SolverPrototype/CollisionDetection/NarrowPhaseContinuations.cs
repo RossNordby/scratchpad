@@ -473,6 +473,7 @@ namespace SolverPrototype.CollisionDetection
             public unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold)
             {
                 var todoTestCollisionCache = default(EmptyCollisionCache);
+                Debug.Assert(continuationId.Exists);
                 var continuationIndex = continuationId.Index;
                 switch ((ConstraintGeneratorType)continuationId.Type)
                 {

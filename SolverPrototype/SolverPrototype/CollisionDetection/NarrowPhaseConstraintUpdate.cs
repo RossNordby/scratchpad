@@ -142,8 +142,7 @@ namespace SolverPrototype.CollisionDetection
                     PairCache.Update(workerIndex, index, ref pointers, ref collisionCache, ref newConstraintCache, manifoldTypeAsConstraintType);
                     RequestAddConstraint(workerIndex, constraintCacheIndex, &newImpulses, ref description, bodyHandles);
                     ConstraintRemover.EnqueueRemoval(workerIndex, constraintHandle);
-                }
-
+                }                
             }
             else
             {
@@ -210,7 +209,7 @@ namespace SolverPrototype.CollisionDetection
                         description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
                         description.SpringSettings = material.SpringSettings;
                         description.Normal = manifold->ConvexNormal;
-
+                        
                         //TODO: Check init hack.
                         UpdateConstraint<ContactManifold1Constraint, TCollisionCache, ConstraintCache1, TBodyHandles>(
                             workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);

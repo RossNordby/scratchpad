@@ -205,14 +205,17 @@ namespace SolverPrototype.CollisionDetection
             {
                 ref var cache = ref NextWorkerCaches[i];
 
-                for (int j = 0; j < cache.PendingRemoves.Count; ++j)
+                //Walk backwards on the off chance that a swap can be avoided.
+                for (int j = cache.PendingRemoves.Count - 1; j >= 0; --j)
                 {
-                    Mapping.FastRemove(ref cache.PendingRemoves[j]);
+                    var removed = Mapping.FastRemove(ref cache.PendingRemoves[j]);
+                    Debug.Assert(removed);
                 }
                 for (int j = 0; j < cache.PendingAdds.Count; ++j)
                 {
                     ref var pending = ref cache.PendingAdds[j];
-                    Mapping.AddUnsafely(ref pending.Pair, ref pending.Pointers);
+                    var added = Mapping.AddUnsafely(ref pending.Pair, ref pending.Pointers);
+                    Debug.Assert(added);
                 }
             }
         }
@@ -303,7 +306,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair, 
+        internal unsafe PairCacheIndex Add<TConstraintCache, TCollisionCache>(int workerIndex, ref CollidablePair pair,
             ref TCollisionCache collisionCache, ref TConstraintCache constraintCache, int manifoldTypeAsConstraintType)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
@@ -313,7 +316,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers, 
+        internal unsafe void Update<TConstraintCache, TCollisionCache>(int workerIndex, int pairIndex, ref CollidablePairPointers pointers,
             ref TCollisionCache collisionCache, ref TConstraintCache constraintCache, int manifoldTypeAsConstraintType)
             where TConstraintCache : IPairCacheEntry
             where TCollisionCache : IPairCacheEntry
@@ -494,9 +497,9 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 0:
                     {
                         //1 contact
-                        var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 1);
+                            GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 1);
                     }
                     break;
                 case 8 + 1:
@@ -560,9 +563,9 @@ namespace SolverPrototype.CollisionDetection
         /// Completes the addition of a constraint by filling in the narrowphase's pointer to the constraint and by distributing accumulated impulses.
         /// </summary>
         /// <param name="solver">Solver containing the constraint to set the impulses of.</param>
-        /// <param name="impulses"></param>
-        /// <param name="constraintCacheIndex"></param>
-        /// <param name="constraintHandle"></param>
+        /// <param name="impulses">Warm starting impulses to apply to the contact constraint.</param>
+        /// <param name="constraintCacheIndex">Index of the constraint cache to update.</param>
+        /// <param name="constraintHandle">Constraint handle associated with the constraint cache being updated.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void CompleteConstraintAdd(Solver solver, ref ContactImpulses impulses, PairCacheIndex constraintCacheIndex, int constraintHandle)
         {

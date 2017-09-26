@@ -36,7 +36,7 @@ namespace SolverPrototype.CollisionDetection
             //(Notably, any ConstraintAdder implementation that defers adds could not share the lock, and extending the lock to cover AddConstraint would cause overhead.)
             simulation.NarrowPhase.PairCache.CompleteConstraintAdd(simulation.Solver, ref impulses, constraintCacheIndex, constraintHandle);
         }
-        
+
         public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
         {
             throw new NotImplementedException();

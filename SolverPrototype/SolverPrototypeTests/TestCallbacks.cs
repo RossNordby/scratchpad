@@ -33,9 +33,9 @@ namespace SolverPrototypeTests
         public bool ConfigureContactManifold(int workerIndex, CollidablePair pair, ContactManifold* manifold, out PairMaterialProperties pairMaterial)
         {
             pairMaterial.FrictionCoefficient = 1;
-            pairMaterial.MaximumRecoveryVelocity = 0.2f;
+            pairMaterial.MaximumRecoveryVelocity = 10.2f;
             pairMaterial.SpringSettings.NaturalFrequency = MathHelper.Pi * 30;
-            pairMaterial.SpringSettings.DampingRatio = 10;
+            pairMaterial.SpringSettings.DampingRatio = 100;
             return true;
         }
 

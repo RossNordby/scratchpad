@@ -306,11 +306,12 @@ namespace SolverPrototype.CollisionDetection
             ref var batch = ref batches[reference.TaskIndex];
             var pairData = batch.AllocateUnsafely(pairSizeInBytes);
             Unsafe.CopyBlockUnaligned(pairData, shapeA, (uint)shapeSizeA);
-            Unsafe.CopyBlockUnaligned(pairData += shapeSizeA, shapeB, (uint)shapeSizeA);
+            Unsafe.CopyBlockUnaligned(pairData += shapeSizeA, shapeB, (uint)shapeSizeB);
             var poses = (RigidPair*)(pairData += shapeSizeB);
+            Debug.Assert(continuationId.Exists);
             poses->FlipMask = flipMask;
-            poses->PoseA = poseA;
             poses->Continuation = continuationId;
+            poses->PoseA = poseA;
             poses->PoseB = poseB;
             if (batch.Count == reference.BatchSize)
             {
@@ -368,9 +369,11 @@ namespace SolverPrototype.CollisionDetection
             ref var pairData = ref batch.AllocateUnsafely<RigidPair<TShapeA, TShapeB>>();
             pairData.A = shapeA;
             pairData.B = shapeB;
+            Debug.Assert(continuationId.Exists);
+            pairData.Shared.FlipMask = flipMask;
+            pairData.Shared.Continuation = continuationId;
             pairData.Shared.PoseA = poseA;
             pairData.Shared.PoseB = poseB;
-            pairData.Shared.Continuation = continuationId;
             if (batch.Count == reference.BatchSize)
             {
                 typeMatrix[reference.TaskIndex].ExecuteBatch(ref batch, ref this, ref continuations, ref filters);

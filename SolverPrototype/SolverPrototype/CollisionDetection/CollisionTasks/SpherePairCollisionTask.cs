@@ -19,7 +19,8 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             out Vector3Wide relativeContactPosition, out Vector3Wide contactNormal, out Vector<float> depth)
         {
             Vector3Wide.Length(ref relativePositionB, out var centerDistance);
-            var inverseDistance = new Vector<float>(1f) / centerDistance;
+            //Note the negative 1. By convention, the normal points from B to A.
+            var inverseDistance = new Vector<float>(-1f) / centerDistance;
             Vector3Wide.Scale(ref relativePositionB, ref inverseDistance, out contactNormal);
             var normalIsValid = Vector.GreaterThan(centerDistance, Vector<float>.Zero);
             //Arbitrarily choose the (0,1,0) if the two spheres are in the same position. Any unit length vector is equally valid.
@@ -31,7 +32,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             //The contact normal acts as the direction from a to b.
             Vector3Wide.Scale(ref contactNormal, ref radiiA, out var extremeA);
             Vector3Wide.Scale(ref contactNormal, ref radiiB, out var extremeB);
-            //note the following subtraction: contactNormal goes from a to b, so the negation pushes the extreme point in the proper direction from b to a.
+            //note the following subtraction: contactNormal goes from b to a, so the negation pushes the extreme point in the proper direction from a to b.
             Vector3Wide.Subtract(ref relativePositionB, ref extremeB, out extremeB);
             Vector3Wide.Add(ref extremeA, ref extremeB, out relativeContactPosition);
             var scale = new Vector<float>(0.5f);
@@ -258,7 +259,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             }
         }
 
-        
 
         //Every single collision task type will mirror this general layout.
         public unsafe override void ExecuteBatch<TContinuations, TFilters>(ref UntypedList batch, ref StreamingBatcher batcher, ref TContinuations continuations, ref TFilters filters)
@@ -276,7 +276,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             Vector3Wide positionB;
             Vector3Wide contactNormal, contactPosition, relativePosition;
             Vector<float> depth;
-
+            
             for (int i = 0; i < batch.Count; i += Vector<float>.Count)
             {
                 ref var bundleStart = ref Unsafe.Add(ref start, i);

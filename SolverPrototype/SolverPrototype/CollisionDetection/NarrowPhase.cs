@@ -222,7 +222,7 @@ namespace SolverPrototype.CollisionDetection
         {
             Callbacks.Dispose();
         }
-
+        
         public unsafe void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
             if(a.Handle > b.Handle)
