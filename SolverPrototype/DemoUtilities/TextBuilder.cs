@@ -94,17 +94,21 @@ namespace DemoUtilities
                 characters.Add('-', pool);
             }
             value = Math.Round(value, decimalCount);
-            var place = Math.Floor(Math.Log10(value));
+            var place = (int)Math.Floor(Math.Log10(value));
             var multiplier = Math.Pow(0.1, place);
             var epsilon = Math.Pow(0.1, decimalCount);
 
-            for (int i = (int)place; i >= 0; --i)
+            for (int i = place; i >= 0; --i)
             {
                 AddDigit(ref value, ref multiplier, ref pool);
             }
             if (value > epsilon)
             {
                 characters.Add('.', pool);
+                for (int i = -1; i > place; --i)
+                {
+                    characters.Add('0', pool);
+                }
                 do
                 {
                     AddDigit(ref value, ref multiplier, ref pool);
@@ -118,6 +122,11 @@ namespace DemoUtilities
         public TextBuilder Append(int value)
         {
             return Append(value, 0);
+        }
+
+        public override string ToString()
+        {
+            return new string(characters.Span.Memory, 0, characters.Count);
         }
     }
 }
