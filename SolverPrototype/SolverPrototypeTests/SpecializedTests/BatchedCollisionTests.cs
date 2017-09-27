@@ -20,24 +20,24 @@ namespace SolverPrototypeTests.SpecializedTests
             public int Count;
             public unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold)
             {
-                Console.WriteLine($"Completed {continuationId}:");
-                var normals = &manifold->Normal0;
-                var offsets = &manifold->Offset0;
-                var depths = &manifold->Depth0;
-                if (manifold->Convex)
-                {
-                    for (int i = 0; i < manifold->ContactCount; ++i)
-                    {
-                        Console.WriteLine($"{i}: P: {offsets[i]}, N: {manifold->ConvexNormal}, D: {depths[i]}");
-                    }
-                }
-                else
-                {
-                    for (int i = 0; i < manifold->ContactCount; ++i)
-                    {
-                        Console.WriteLine($"{i}: P: {offsets[i]}, N: {normals[i]}, D: {depths[i]}");
-                    }
-                }
+                //Console.WriteLine($"Completed {continuationId}:");
+                //var normals = &manifold->Normal0;
+                //var offsets = &manifold->Offset0;
+                //var depths = &manifold->Depth0;
+                //if (manifold->Convex)
+                //{
+                //    for (int i = 0; i < manifold->ContactCount; ++i)
+                //    {
+                //        Console.WriteLine($"{i}: P: {offsets[i]}, N: {manifold->ConvexNormal}, D: {depths[i]}");
+                //    }
+                //}
+                //else
+                //{
+                //    for (int i = 0; i < manifold->ContactCount; ++i)
+                //    {
+                //        Console.WriteLine($"{i}: P: {offsets[i]}, N: {normals[i]}, D: {depths[i]}");
+                //    }
+                //}
                 var extra = 1e-16 * (manifold->Depth0 + manifold->Offset0.X + manifold->Normal0.X);
                 Count += 1 + (int)extra;
             }

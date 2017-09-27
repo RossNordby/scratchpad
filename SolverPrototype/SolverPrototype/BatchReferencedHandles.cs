@@ -54,33 +54,33 @@ namespace SolverPrototype
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(int handleIndex)
+        public bool Contains(int handle)
         {
-            var packedIndex = handleIndex >> shift;
-            return packedIndex < packedHandles.Length && (packedHandles[packedIndex] & (1ul << (handleIndex & mask))) > 0;
+            var packedIndex = handle >> shift;
+            return packedIndex < packedHandles.Length && (packedHandles[packedIndex] & (1ul << (handle & mask))) > 0;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Add(int handleIndex, BufferPool pool)
+        public void Add(int handle, BufferPool pool)
         {
-            var bundleIndex = handleIndex >> shift;
+            var bundleIndex = handle >> shift;
             if (bundleIndex >= packedHandles.Length)
             {
                 //Note that the bundle index may be larger than two times the current capacity, since handles are not guaranteed to be appended.
                 InternalResizeForBundleCount(pool, 1 << SpanHelper.GetContainingPowerOf2(bundleIndex + 1));
             }
             ref var bundle = ref packedHandles[bundleIndex];
-            var slot = 1ul << (handleIndex & mask);
+            var slot = 1ul << (handle & mask);
             Debug.Assert((bundle & slot) == 0, "Cannot add if it's already present!");
             //Not much point in branching to stop a single instruction that doesn't change the result.
             bundle |= slot;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Remove(int handleIndex)
+        public void Remove(int handle)
         {
-            Debug.Assert((packedHandles[handleIndex >> shift] & (1ul << (handleIndex & mask))) > 0, "If you remove a handle, it should be present.");
-            packedHandles[handleIndex >> shift] &= ~(1ul << (handleIndex & mask));
+            Debug.Assert((packedHandles[handle >> shift] & (1ul << (handle & mask))) > 0, "If you remove a handle, it should be present.");
+            packedHandles[handle >> shift] &= ~(1ul << (handle & mask));
         }
 
         public void Clear()

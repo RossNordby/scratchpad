@@ -311,8 +311,7 @@ namespace SolverPrototype
 
         }
 
-
-
+        
 
         void SortByBodyLocation(TypeBatch typeBatch, int bundleStartIndex, int constraintCount, Buffer<ConstraintLocation> handlesToConstraints, int bodyCount,
             BufferPool rawPool, IThreadDispatcher threadDispatcher)

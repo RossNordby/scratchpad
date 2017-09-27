@@ -40,9 +40,7 @@ namespace SolverPrototypeTests
             //we can't assume that every monitor has a 60hz refresh rate. One simple option here is to just measure the primary display's refresh rate ahead of time
             //and use that as the simulation timestep duration. Different displays would affect the simulation, but it wouldn't be too bad, and it would be locally consistent.
             Simulation.Timestep(1 / 60f);
-            Console.WriteLine($"FRAME {frameIndex++}");
         }
-        int frameIndex;
 
         public virtual void Render(Renderer renderer)
         {
