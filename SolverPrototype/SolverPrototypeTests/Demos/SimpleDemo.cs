@@ -16,9 +16,9 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 64;
-            const int height = 8;
-            const int length = 64;
+            const int width = 32;
+            const int height = 32;
+            const int length = 32;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f, shapeIndex),
                 new ConstraintlessLatticeBuilder(),
@@ -59,15 +59,16 @@ namespace SolverPrototypeTests
 
         }
 
-    
+
         public override void Update(Input input, float dt)
         {
             if (input.WasPushed(OpenTK.Input.Key.P))
             {
+                unsafe { var accessViolationSuppressant = stackalloc int[0]; }
                 BodyVelocity velocity;
                 velocity.Linear = new Vector3(.1f, 0, 0.1f);
                 velocity.Angular = new Vector3();
-                Simulation.Bodies.SetVelocity(0, ref velocity);
+                Simulation.Bodies.SetVelocity(64, ref velocity);
             }
             base.Update(input, dt);
 

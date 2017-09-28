@@ -19,7 +19,7 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
-            AccessViolationRepro.Test();
+            //AccessViolationRepro.Test();
             ConstraintDescriptionMappingTests.Test();
             //CollidablePairComparerTests.Test();
             //HeadlessDemo.Simple();
