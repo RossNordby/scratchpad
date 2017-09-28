@@ -43,16 +43,16 @@ namespace SolverPrototype.CollisionDetection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(ref CollidablePair a, ref CollidablePair b)
         {
-            ref var aBytes = ref Unsafe.As<CollidablePair, ulong>(ref a);
-            ref var bBytes1 = ref Unsafe.As<CollidablePair, ulong>(ref b);
-            ulong bBytes2 = b.B.Packed | ((ulong)b.A.Packed << 32);
-            return aBytes == bBytes1 || aBytes == bBytes2;
+            return Unsafe.As<CollidablePair, ulong>(ref a) == Unsafe.As<CollidablePair, ulong>(ref b);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Hash(ref CollidablePair item)
         {
-            return (int)(item.A.Packed ^ item.B.Packed);
+            const ulong p1 = 961748927UL;
+            const ulong p2 = 899809343UL;
+            var hash64 = (ulong)item.A.Packed * (p1 * p2) + (ulong)item.B.Packed * (p2);
+            return (int)(hash64 ^ (hash64 >> 32));
         }
     }
 
@@ -499,7 +499,7 @@ namespace SolverPrototype.CollisionDetection
                         //1 contact
                         var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                            GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 1);
+                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 1);
                     }
                     break;
                 case 8 + 1:

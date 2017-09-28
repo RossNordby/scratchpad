@@ -23,7 +23,7 @@ namespace SolverPrototypeTests.SpecializedTests
             {
                 //CacheBlaster.Blast();
                 var start = Stopwatch.GetTimestamp();
-                simpleDemo.Update(1 / 60f);
+                simpleDemo.Update(null, 1 / 60f);
                 var end = Stopwatch.GetTimestamp();
                 time += (end - start) / (double)Stopwatch.Frequency;
                 //Console.WriteLine($"FRAME {i}, time (us): {1e6 * simpleDemo.Simulation.Timings[simpleDemo.Simulation.NarrowPhase]}");

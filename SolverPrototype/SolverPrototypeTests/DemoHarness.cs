@@ -258,7 +258,7 @@ namespace SolverPrototypeTests
                 input.MouseLocked = false;
             }
 
-            demo.Update(dt);
+            demo.Update(input, dt);
             timeSamples.RecordFrame(demo.Simulation);
             var stats = timeSamples.PoseIntegrator.ComputeStats();
         }

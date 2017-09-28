@@ -1,4 +1,4 @@
-﻿ using BEPUutilities2;
+﻿using BEPUutilities2;
 using DemoContentLoader;
 using DemoRenderer.UI;
 using DemoUtilities;
@@ -10,6 +10,8 @@ using SolverPrototypeTests.SpecializedTests;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace SolverPrototypeTests
 {
@@ -17,11 +19,12 @@ namespace SolverPrototypeTests
     {
         static void Main(string[] args)
         {
+            AccessViolationRepro.Test();
             ConstraintDescriptionMappingTests.Test();
             //CollidablePairComparerTests.Test();
-            HeadlessDemo.Simple();
+            //HeadlessDemo.Simple();
             //BatchedCollisionTests.Test();
-            return;
+            //return;
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();

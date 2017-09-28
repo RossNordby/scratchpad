@@ -1,34 +1,26 @@
-﻿using DemoRenderer;
+﻿using BEPUutilities2;
+using DemoRenderer;
+using DemoUtilities;
 using SolverPrototype;
 using SolverPrototype.Collidables;
-using SolverPrototype.Constraints;
-using SolverPrototypeTests.SpecializedTests;
-using System;
-using System.Diagnostics;
 using System.Numerics;
 
 namespace SolverPrototypeTests
 {
     public class SimpleDemo : Demo
     {
-        //struct RemovedConstraint<TDescription>
-        //{
-        //    public TDescription Description;
-        //    public int A;
-        //    public int B;
-        //}
-
         public unsafe override void Initialize(Camera camera)
         {
-            camera.Position = new Vector3(5, 2, 15);
+            camera.Position = new Vector3(-6, 10, -6);
+            camera.Yaw = MathHelper.Pi * 3f / 4;
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 30;
-            const int height = 10;
-            const int length = 30;
+            const int width = 64;
+            const int height = 8;
+            const int length = 64;
             SimulationSetup.BuildLattice(
-                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1,1,1), 1f, shapeIndex),
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f, shapeIndex),
                 new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
@@ -57,9 +49,9 @@ namespace SolverPrototypeTests
             //Console.WriteLine($"Remove time (us): {1e6 * (addStart - removeStart) / (Stopwatch.Frequency * removeCount)}");
             //Console.WriteLine($"Add time (us): {1e6 * (addEnd - addStart) / (Stopwatch.Frequency * removeCount)}");
             //BodyVelocity velocity;
-            //velocity.Linear = new Vector3(10.1f, 0, 0);
+            //velocity.Linear = new Vector3(.1f, 0, 0.1f);
             //velocity.Angular = new Vector3();
-            //Simulation.Bodies.SetVelocity(bodyHandles[2], ref velocity);
+            //Simulation.Bodies.SetVelocity(bodyHandles[width], ref velocity);
             //Simulation.Solver.IterationCount = 100;
             //camera.Position = new Vector3(-40, -10, 5);
             //camera.Yaw += MathF.PI * 0.65f;
@@ -67,17 +59,19 @@ namespace SolverPrototypeTests
 
         }
 
-        //double time;
-        //public override void Update(float dt)
-        //{
-        //    BodyVelocity velocity;
-        //    time += dt;
-        //    velocity.Linear = new Vector3((float)Math.Sin(time), 0, 0);
-        //    velocity.Angular = new Vector3();
-        //    Simulation.Bodies.SetVelocity(0, ref velocity);
-        //    base.Update(dt);
+    
+        public override void Update(Input input, float dt)
+        {
+            if (input.WasPushed(OpenTK.Input.Key.P))
+            {
+                BodyVelocity velocity;
+                velocity.Linear = new Vector3(.1f, 0, 0.1f);
+                velocity.Angular = new Vector3();
+                Simulation.Bodies.SetVelocity(0, ref velocity);
+            }
+            base.Update(input, dt);
 
-        //}
+        }
 
     }
 }
