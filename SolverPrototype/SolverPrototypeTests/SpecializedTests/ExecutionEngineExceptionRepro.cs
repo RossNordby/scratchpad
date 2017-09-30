@@ -1,22 +1,10 @@
-﻿using BEPUutilities2;
-using BEPUutilities2.Memory;
-using DemoRenderer;
-using DemoUtilities;
-using SolverPrototype;
-using SolverPrototype.Collidables;
-using System;
-using System.Collections.Generic;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace SolverPrototypeTests.SpecializedTests
 {
-    public class AccessViolationRepro
+    public class ExecutionEngineExceptionRepro
     {
-        //This reference will get corrupted, leading to a quick access violation.
-        public object Reference = new object();
-
         public struct Wrapper
         {
             public Vector3 Vector1;
@@ -34,13 +22,12 @@ namespace SolverPrototypeTests.SpecializedTests
             SomeOtherFunction(ref wrapper);
             var v = new Vector<float>();
         }
-
-        public unsafe static int Test()
+        
+        public static int Test()
         {
-            var test = new AccessViolationRepro();
+            var test = new ExecutionEngineExceptionRepro();
             test.SomeFunction();
-            return test.Reference.GetHashCode();
+            return test.GetHashCode();
         }
     }
-
 }

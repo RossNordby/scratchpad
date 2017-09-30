@@ -26,7 +26,23 @@ namespace SolverPrototype.CollisionDetection
         public int TypeId => -1;
     }
 
-    public struct ContactImpulses
+    public struct ContactImpulses1
+    {
+        public float Impulse0;
+        public float Impulse1;
+    }
+    public struct ContactImpulses2
+    {
+        public float Impulse0;
+        public float Impulse1;
+    }
+    public struct ContactImpulses3
+    {
+        public float Impulse0;
+        public float Impulse1;
+        public float Impulse2;
+    }
+    public struct ContactImpulses4
     {
         public float Impulse0;
         public float Impulse1;

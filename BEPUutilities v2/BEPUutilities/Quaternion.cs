@@ -438,6 +438,22 @@ namespace BEPUutilities2
             return a.X != b.X || a.Y != b.Y || a.Z != b.Z || a.W != b.W;
         }
 
+        //TODO: Neither of these are good implementations. They're only here since the operator variants exist.
+        //If you need a high performance equality or hash, you'll need to implement something better than this.
+        public override bool Equals(object obj)
+        {
+            if(obj is Quaternion q)
+            {
+                return this == q;
+            }
+            return false;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
         /// <summary>
         /// Negates the components of a quaternion.
         /// </summary>

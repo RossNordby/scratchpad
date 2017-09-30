@@ -14,7 +14,7 @@ namespace SolverPrototype.CollisionDetection
         public int Count;
         public int ByteCount;
 
-        
+
 
         public UntypedList(int initialSizeInBytes, BufferPool pool)
         {
@@ -44,11 +44,11 @@ namespace SolverPrototype.CollisionDetection
             ByteCount = newSize;
             return Buffer.Memory + byteIndex;
         }
-
+    
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe ref T AllocateUnsafely<T>()
         {
-            var newSize = ByteCount + Unsafe.SizeOf<T>();          
+            var newSize = ByteCount + Unsafe.SizeOf<T>();
             //If we store only byte count, we'd have to divide to get the element index.
             //If we store only count, we would have to store per-type size somewhere since the PairCache constructor doesn't have an id->type mapping.
             //So we just store both. It's pretty cheap and simple.
@@ -59,13 +59,13 @@ namespace SolverPrototype.CollisionDetection
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe int Allocate<T>(int minimumCount, BufferPool pool)
+        public unsafe int Allocate<T>(int minimumElementCount, BufferPool pool)
         {
             var newSize = ByteCount + Unsafe.SizeOf<T>();
             if (!Buffer.Allocated)
             {
                 //This didn't exist at all before; create a new entry for this type.
-                pool.Take(Math.Max(newSize, minimumCount * Unsafe.SizeOf<T>()), out Buffer);
+                pool.Take(Math.Max(newSize, minimumElementCount * Unsafe.SizeOf<T>()), out Buffer);
             }
             else
             {

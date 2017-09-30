@@ -73,7 +73,7 @@ namespace SolverPrototype.CollisionDetection
 
     public class PairCache
     {
-        internal OverlapMapping Mapping;
+        public OverlapMapping Mapping;
 
         /// <summary>
         /// Per-pair 'freshness' flags set when a pair is added or updated by the narrow phase execution. Only initialized for the duration of the narrowphase's execution.
@@ -435,8 +435,8 @@ namespace SolverPrototype.CollisionDetection
                     break;
             }
         }
-
-        internal void ScatterNewImpulses(int constraintType, ref ConstraintReference constraintReference, ref ContactImpulses contactImpulses)
+        
+        internal void ScatterNewImpulses<TContactImpulses>(int constraintType, ref ConstraintReference constraintReference, ref TContactImpulses contactImpulses)
         {
             //Constraints cover 16 possible cases:
             //1-4 contacts: 0x3
@@ -499,7 +499,7 @@ namespace SolverPrototype.CollisionDetection
                         //1 contact
                         var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 1);
+                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref Unsafe.As<TContactImpulses, float>(ref contactImpulses), 1);
                     }
                     break;
                 case 8 + 1:
@@ -517,7 +517,7 @@ namespace SolverPrototype.CollisionDetection
                         //4 contacts
                         var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref contactImpulses.Impulse0, 4);
+                        GatherScatter.SetLane(ref bundle.Penetration0, inner, ref Unsafe.As<TContactImpulses, float>(ref contactImpulses), 4);
                     }
                     break;
                 //Nonconvex

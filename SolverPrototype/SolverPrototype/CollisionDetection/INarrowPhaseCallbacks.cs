@@ -62,33 +62,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <returns>True if this manifold should be considered for constraint generation, false otherwise.</returns>
         bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ContactManifold* manifold);
-                
-        /// <summary>
-        /// Requests that a constraint be added to the solver between two bodies.
-        /// Implementers must notify the NarrowPhase.PairCache of the constraint handle using NarrowPhase.PairCache.FillConstraintHandle.
-        /// </summary>
-        /// <typeparam name="TDescription">Type of the constraint description.</typeparam>
-        /// <param name="workerIndex">Index of the worker that generated the constraint description.</param>
-        /// <param name="constraintCacheIndex">Index of the constraint cache associated with the constraint in the pair cache.
-        /// Used to notify the narrow phase's pair cache of the constraint handle after constraint addition.</param>
-        /// <param name="impulses">Impulses associated with the new constraint. Passed back to the narrow phase to complete constraint initialization once the constraint exists.</param>
-        /// <param name="bodyHandleA">Handle of the first body in the pair.</param>
-        /// <param name="bodyHandleB">Handle of the second body in the pair.</param>
-        /// <param name="constraintDescription">Description of the constraint being added to the solver.</param>
-        void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandleA, int bodyHandleB, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>;
-        /// <summary>
-        /// Requests that a constraint be added to the solver between a body and a static collidable.
-        /// Implementers must notify the NarrowPhase.PairCache of the constraint handle using NarrowPhase.PairCache.FillConstraintHandle.
-        /// </summary>
-        /// <typeparam name="TDescription">Type of the constraint description.</typeparam>
-        /// <param name="workerIndex">Index of the worker that generated the constraint description.</param>
-        /// <param name="constraintCacheIndex">Index of the constraint cache associated with the constraint in the pair cache.
-        /// Used to notify the narrow phase's pair cache of the constraint handle after constraint addition.</param>
-        /// <param name="impulses">Impulses associated with the new constraint. Passed back to the narrow phase to complete constraint initialization once the constraint exists.</param>
-        /// <param name="bodyHandle">Handle of the body in the pair.</param>
-        /// <param name="constraintDescription">Description of the constraint being added to the solver.</param>
-        void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>;
-        
+       
         /// <summary>
         /// Performs any post-narrowphase execution tasks.
         /// </summary>

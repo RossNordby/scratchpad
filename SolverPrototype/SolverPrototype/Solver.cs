@@ -3,6 +3,7 @@ using BEPUutilities2.Memory;
 using SolverPrototype.Constraints;
 using System;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace SolverPrototype
 {
@@ -126,6 +127,7 @@ namespace SolverPrototype
         /// <param name="handle">Handle index of the constraint.</param>
         /// <param name="reference">Temporary direct reference to the type batch and index in the type batch associated with the constraint handle.
         /// May be invalidated by constraint removals.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void GetConstraintReference(int handle, out ConstraintReference reference)
         {
             ref var constraintLocation = ref HandleToConstraint[handle];
