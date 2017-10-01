@@ -19,12 +19,12 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 2;
+            const int width = 16;
             const int height = 16;
-            const int length = 2;
+            const int length = 16;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
-                new BallSocketConstraintBuilder(),
+                new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
             //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
@@ -43,6 +43,10 @@ namespace SolverPrototypeTests
         public override void Update(Input input, float dt)
         {
             Console.WriteLine($"Preframe {frameIndex++}, mapping count: {Simulation.NarrowPhase.PairCache.Mapping.Count}");
+            for (int i = 0; i < Simulation.Bodies.BodyCount; ++i)
+            {
+                Simulation.Bodies.ValidateExistingHandle(Simulation.Bodies.IndexToHandle[i]);
+            }
             if (input.WasPushed(OpenTK.Input.Key.P))
             {
                 unsafe { var accessViolationSuppressant = stackalloc int[0]; }

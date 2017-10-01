@@ -75,6 +75,7 @@ namespace SolverPrototype.Constraints
 
         [Conditional("DEBUG")]
         internal abstract void VerifySortRegion(int bundleStartIndex, int constraintCount, ref Buffer<int> sortedKeys, ref Buffer<int> sortedSourceIndices);
+        internal abstract int GetBodyIndexInstanceCount(int bodyIndex);
 
         public abstract void Initialize(TypeBatchAllocation typeBatchAllocation, int typeId);
         public abstract void EnsureCapacity(TypeBatchAllocation typeBatchAllocation);

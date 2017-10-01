@@ -134,7 +134,14 @@ namespace SolverPrototype
             reference.TypeBatch = Batches[constraintLocation.BatchIndex].GetTypeBatch(constraintLocation.TypeId);
             reference.IndexInTypeBatch = constraintLocation.IndexInTypeBatch;
         }
-
+        [Conditional("DEBUG")]
+        public void ValidateExistingHandles()
+        {
+            for (int i = 0; i < Batches.Count; ++i)
+            {
+                Batches[i].ValidateExistingHandles(bodies);
+            }
+        }
         /// <summary>
         /// Allocates a slot in a type batch for a constraint.
         /// </summary>

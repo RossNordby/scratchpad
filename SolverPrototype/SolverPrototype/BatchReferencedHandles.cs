@@ -19,7 +19,7 @@ namespace SolverPrototype
         /// 16384 bodies would only take 2KB. Even if you have 1000 batches all at that size, it's a pretty unconcerning amount of storage.
         /// (And to be clear, 1000 batches is a crazy pathological number. Most simulations will have less than 20 batches.)
         /// </remarks>
-        Buffer<ulong> packedHandles;
+        internal Buffer<ulong> packedHandles;
 
         const int shift = 6;
         const int mask = 63;

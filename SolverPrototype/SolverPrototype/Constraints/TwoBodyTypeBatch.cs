@@ -236,7 +236,25 @@ namespace SolverPrototype.Constraints
 
             }
         }
-
+        internal override int GetBodyIndexInstanceCount(int bodyIndex)
+        {
+            //This is a pure debug function; performance does not matter.
+            int count = 0;
+            for (int i = 0; i < BundleCount; ++i)
+            {
+                var bundleSize = Math.Min(Vector<float>.Count, constraintCount - (i << BundleIndexing.VectorShift));
+                for (int j = 0; j < bundleSize; ++j)
+                {
+                    if (GatherScatter.Get(ref BodyReferences[i].IndexA, j) == bodyIndex)
+                        ++count;
+                    Debug.Assert(count <= 1);
+                    if (GatherScatter.Get(ref BodyReferences[i].IndexB, j) == bodyIndex)
+                        ++count;
+                    Debug.Assert(count <= 1);
+                }
+            }
+            return count;
+        }
 
         //The following covers the common loop logic for all two body constraints. Each iteration invokes the warm start function type.
         //This abstraction should, in theory, have zero overhead if the implementation of the interface is in a struct with aggressive inlining.

@@ -19,7 +19,6 @@ namespace SolverPrototype.CollisionDetection
         internal struct PendingConstraintAddCache
         {
             BufferPool pool;
-            [StructLayout(LayoutKind.Sequential, Pack = 1)]
             struct PendingConstraint<TBodyHandles, TDescription, TContactImpulses> where TDescription : IConstraintDescription<TDescription>
             {
                 public PairCacheIndex ConstraintCacheIndex;
@@ -56,22 +55,24 @@ namespace SolverPrototype.CollisionDetection
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            unsafe void CompletePendingAdds<TBodyHandles, TDescription, TContactImpulses>(ref UntypedList list, int narrowPhaseConstraintTypeId, Solver solver, ref PairCache pairCache)
+            unsafe void CompletePendingAdds<TBodyHandles, TDescription, TContactImpulses>(ref UntypedList list, int narrowPhaseConstraintTypeId, Simulation simulation, ref PairCache pairCache)
                 where TDescription : IConstraintDescription<TDescription>
             {
                 if (list.Buffer.Allocated)
                 {
                     ref var start = ref Unsafe.As<byte, PendingConstraint<TBodyHandles, TDescription, TContactImpulses>>(ref *list.Buffer.Memory);
+                    Debug.Assert(list.Buffer.Length > Unsafe.SizeOf<PendingConstraint<TBodyHandles, TDescription, TContactImpulses>>() * list.Count);
+                    Debug.Assert(list.ByteCount == Unsafe.SizeOf<PendingConstraint<TBodyHandles, TDescription, TContactImpulses>>() * list.Count);
                     for (int i = 0; i < list.Count; ++i)
                     {
                         ref var add = ref Unsafe.Add(ref start, i);
-                        solver.Add(ref Unsafe.As<TBodyHandles, int>(ref add.BodyHandles), typeof(TBodyHandles) == typeof(TwoBodyHandles) ? 2 : 1, ref add.ConstraintDescription, out var handle);
-                        pairCache.CompleteConstraintAdd(solver, ref add.Impulses, add.ConstraintCacheIndex, handle);
+                        var handle = simulation.Add(ref Unsafe.As<TBodyHandles, int>(ref add.BodyHandles), typeof(TBodyHandles) == typeof(TwoBodyHandles) ? 2 : 1, ref add.ConstraintDescription);
+                        pairCache.CompleteConstraintAdd(simulation.Solver, ref add.Impulses, add.ConstraintCacheIndex, handle);
                     }
                     pool.Return(ref list.Buffer);
                 }
             }
-            public void Flush(Solver solver, ref PairCache pairCache)
+            public void Flush(Simulation simulation, ref PairCache pairCache)
             {
                 //This is going to be pretty horrible!
                 //There is no type information beyond the index of the cache.
@@ -83,9 +84,19 @@ namespace SolverPrototype.CollisionDetection
                 //convex vs nonconvex: 0x4
                 //1 body versus 2 body: 0x8
                 //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
-                CompletePendingAdds<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, solver, ref pairCache);
-                CompletePendingAdds<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, solver, ref pairCache);
+                CompletePendingAdds<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
+                CompletePendingAdds<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
                 pool.SpecializeFor<UntypedList>().Return(ref pendingConstraintsByType);
+            }
+
+            internal int CountConstraints()
+            {
+                int count = 0;
+                for (int i = 0; i < constraintTypeCount; ++i)
+                {
+                    count += pendingConstraintsByType[i].Count;
+                }
+                return count;
             }
         }
 
@@ -102,10 +113,20 @@ namespace SolverPrototype.CollisionDetection
         {
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
             Debug.Assert(overlapWorkers.Length >= threadCount);
+
+            int constraintCount = 0;
             for (int i = 0; i < threadCount; ++i)
             {
-                overlapWorkers[i].PendingConstraints.Flush(Solver, ref PairCache);
+                constraintCount += overlapWorkers[i].PendingConstraints.CountConstraints();
             }
+            var start = Stopwatch.GetTimestamp();
+            for (int i = 0; i < threadCount; ++i)
+            {
+                overlapWorkers[i].PendingConstraints.Flush(Simulation, ref PairCache);
+            }
+            var end = Stopwatch.GetTimestamp();
+            if (constraintCount > 0)
+                Console.WriteLine($"Flush time (us): {1e6 * (end - start) / Stopwatch.Frequency}, constraint count: {constraintCount}, time per constraint (ns): {1e9 * (end - start) / (constraintCount * Stopwatch.Frequency)}");
         }
 
     }

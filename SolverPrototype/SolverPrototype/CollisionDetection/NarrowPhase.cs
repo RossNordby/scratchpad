@@ -78,6 +78,7 @@ namespace SolverPrototype.CollisionDetection
 
     public abstract class NarrowPhase
     {
+        public Simulation Simulation;
         public BufferPool Pool;
         public Bodies Bodies;
         public Solver Solver;
@@ -140,8 +141,10 @@ namespace SolverPrototype.CollisionDetection
         public void Flush(IThreadDispatcher threadDispatcher = null)
         {
             OnPreflush(threadDispatcher);
+            var start = Stopwatch.GetTimestamp();
             FreshnessChecker.CheckFreshness(threadDispatcher);
-
+            var end = Stopwatch.GetTimestamp();
+            Console.WriteLine($"Freshness checker time (us): {1e6 * (end - start) / ((double)Stopwatch.Frequency)}");
             //Given the sizes involved, a fixed guess of 128 should be just fine for essentially any simulation. Overkill, but not in a concerning way.
             //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
             //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
@@ -194,6 +197,7 @@ namespace SolverPrototype.CollisionDetection
              int minimumMappingSize = 2048, int minimumPendingSize = 128, int minimumPerTypeCapacity = 128)
             : base()
         {
+            Simulation = simulation;
             Pool = simulation.BufferPool;
             Shapes = simulation.Shapes;
             Bodies = simulation.Bodies;

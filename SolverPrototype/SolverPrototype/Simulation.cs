@@ -316,7 +316,7 @@ namespace SolverPrototype
                 ProfilerStart(BroadPhase);
                 BroadPhase.Update();
                 ProfilerEnd(BroadPhase);
-
+                
                 ProfilerStart(BroadPhaseOverlapFinder);
                 BroadPhaseOverlapFinder.DispatchOverlaps();
                 ProfilerEnd(BroadPhaseOverlapFinder);

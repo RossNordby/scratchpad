@@ -116,6 +116,44 @@ namespace SolverPrototype
             }
             return true;
         }
+        [Conditional("DEBUG")]
+        private void ValidateBodyIndex(int bodyIndex, int expectedCount)
+        {
+            int referencesToBody = 0;
+            for (int i = 0; i < TypeBatches.Count; ++i)
+            {
+                var instancesInTypeBatch = TypeBatches[i].GetBodyIndexInstanceCount(bodyIndex);
+                Debug.Assert(instancesInTypeBatch + referencesToBody <= expectedCount,
+                    "Found an instance of a body index that wasn't expected. Possible upstream bug or memory corruption.");
+                referencesToBody += instancesInTypeBatch;
+            }
+            Debug.Assert(referencesToBody == expectedCount);
+        }
+        [Conditional("DEBUG")]
+        internal void ValidateExistingHandles(Bodies bodies)
+        {
+            for (int i = 0; i < bodies.BodyCount; ++i)
+            {
+                bodies.ValidateExistingHandle(bodies.IndexToHandle[i]);
+            }
+            for (int i = 0; i < bodies.BodyCount; ++i)
+            {
+                var handle = bodies.IndexToHandle[i];
+                if (BodyHandles.Contains(handle))
+                    ValidateBodyIndex(i, 1);
+                else
+                    ValidateBodyIndex(i, 0);
+            }
+        }
+        [Conditional("DEBUG")]
+        internal void ValidateNewHandles(ref int bodyHandles, int bodyCount, Bodies bodies)
+        {
+            Debug.Assert(CanFit(ref bodyHandles, bodyCount));
+            for (int i = 0; i < bodyCount; ++i)
+            {
+                ValidateBodyIndex(bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, i)], 0);
+            }
+        }
         public unsafe void Allocate(int handle, ref int bodyHandles, int bodyCount, Bodies bodies, TypeBatchAllocation typeBatchAllocation, int typeId, out ConstraintReference reference)
         {
             Debug.Assert(CanFit(ref bodyHandles, bodyCount));

@@ -126,7 +126,7 @@ namespace BEPUutilities2.Collections
         {
             ResizeForPower(SpanHelper.GetContainingPowerOf2(newSize), pool);
         }
-
+        
         /// <summary>
         /// Returns the resources associated with the list to pools. Any managed references still contained within the list are cleared (and some unmanaged resources may also be cleared).
         /// </summary>
