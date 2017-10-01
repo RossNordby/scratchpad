@@ -102,7 +102,8 @@ namespace SolverPrototype.CollisionDetection
         }
 
         protected abstract void OnPrepare(IThreadDispatcher threadDispatcher);
-        protected abstract void OnFlush(IThreadDispatcher threadDispatcher);
+        protected abstract void OnPreflush(IThreadDispatcher threadDispatcher);
+        protected abstract void OnPostflush(IThreadDispatcher threadDispatcher);
 
         int flushJobIndex;
         QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobList;
@@ -138,6 +139,7 @@ namespace SolverPrototype.CollisionDetection
 
         public void Flush(IThreadDispatcher threadDispatcher = null)
         {
+            OnPreflush(threadDispatcher);
             FreshnessChecker.CheckFreshness(threadDispatcher);
 
             //Given the sizes involved, a fixed guess of 128 should be just fine for essentially any simulation. Overkill, but not in a concerning way.
@@ -164,7 +166,7 @@ namespace SolverPrototype.CollisionDetection
             PairCache.Postflush();
             ConstraintRemover.Postflush();
 
-            OnFlush(threadDispatcher);
+            OnPostflush(threadDispatcher);
         }
 
         public void Dispose()
@@ -209,7 +211,11 @@ namespace SolverPrototype.CollisionDetection
             PrepareOverlapWorkers(threadDispatcher);
         }
 
-        protected override void OnFlush(IThreadDispatcher threadDispatcher)
+        protected override void OnPreflush(IThreadDispatcher threadDispatcher)
+        {
+            FlushPendingConstraintAdds(threadDispatcher);
+        }
+        protected override void OnPostflush(IThreadDispatcher threadDispatcher)
         {
             //TODO: Constraint generators can actually be disposed immediately once the overlap finding process completes.
             //Here, we are disposing them late- that means we suffer a little more wasted memory use. 

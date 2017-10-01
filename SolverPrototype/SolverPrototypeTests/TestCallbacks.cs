@@ -11,10 +11,8 @@ namespace SolverPrototypeTests
 {
     public unsafe struct TestCallbacks : INarrowPhaseCallbacks
     {
-        ImmediateConstraintAdder immediateAdder;
         public void Initialize(Simulation simulation)
         {
-            immediateAdder.Initialize(simulation);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -44,20 +42,7 @@ namespace SolverPrototypeTests
         {
             return true;
         }
-
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandleA, int bodyHandleB, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
-        {
-            immediateAdder.AddConstraint(workerIndex, constraintCacheIndex, ref impulses, bodyHandleA, bodyHandleB, ref constraintDescription);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void AddConstraint<TDescription>(int workerIndex, PairCacheIndex constraintCacheIndex, ref ContactImpulses impulses, int bodyHandle, ref TDescription constraintDescription) where TDescription : IConstraintDescription<TDescription>
-        {
-            immediateAdder.AddConstraint(workerIndex, constraintCacheIndex, ref impulses, bodyHandle, ref constraintDescription);
-        }
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Flush(IThreadDispatcher threadDispatcher)
         {

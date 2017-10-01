@@ -45,12 +45,14 @@ namespace SolverPrototype.CollisionDetection
             public StreamingBatcher Batcher;
             public BatcherFilters Filters;
             public ConstraintGenerators ConstraintGenerators;
+            public PendingConstraintAddCache PendingConstraints;
 
             public OverlapWorker(int workerIndex, BufferPool pool, NarrowPhase<TCallbacks> narrowPhase)
             {
                 Batcher = new StreamingBatcher(pool, narrowPhase.CollisionTaskRegistry);
                 Filters = new BatcherFilters(workerIndex, narrowPhase);
                 ConstraintGenerators = new ConstraintGenerators(workerIndex, pool, narrowPhase);
+                PendingConstraints = new PendingConstraintAddCache(pool);
             }
         }
 

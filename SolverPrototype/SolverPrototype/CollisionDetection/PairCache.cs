@@ -166,6 +166,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
+
         /// <summary>
         /// Flush all deferred changes from the last narrow phase execution.
         /// </summary>
@@ -327,7 +328,14 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        internal unsafe void GatherOldImpulses(int constraintType, ref ConstraintReference constraintReference, float* oldImpulses, out int oldContactCount)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal int GetContactCount(int constraintType)
+        {
+            //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
+            return constraintType & 0x3;
+        }
+
+        internal unsafe void GatherOldImpulses(int constraintType, ref ConstraintReference constraintReference, float* oldImpulses)
         {
             //Constraints cover 16 possible cases:
             //1-4 contacts: 0x3
@@ -338,7 +346,6 @@ namespace SolverPrototype.CollisionDetection
             //TODO: Note that we do not modify the friction accumulated impulses. This is just for simplicity- the impact of accumulated impulses on friction *should* be relatively
             //hard to notice compared to penetration impulses. We should, however, test this assumption.
             BundleIndexing.GetBundleIndices(constraintReference.IndexInTypeBatch, out var bundleIndex, out var inner);
-            oldContactCount = 0;
             switch (constraintType)
             {
                 //1 body
@@ -391,7 +398,7 @@ namespace SolverPrototype.CollisionDetection
                         //1 contact
                         var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, oldContactCount = 1);
+                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, 1);
                     }
                     break;
                 case 8 + 1:
@@ -409,7 +416,7 @@ namespace SolverPrototype.CollisionDetection
                         //4 contacts
                         var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
-                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, oldContactCount = 4);
+                        GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, 4);
                     }
                     break;
                 //Nonconvex
@@ -562,12 +569,13 @@ namespace SolverPrototype.CollisionDetection
         /// <summary>
         /// Completes the addition of a constraint by filling in the narrowphase's pointer to the constraint and by distributing accumulated impulses.
         /// </summary>
+        /// <typeparam name="TContactImpulses">Count-specialized type containing cached accumulated impulses.</typeparam>
         /// <param name="solver">Solver containing the constraint to set the impulses of.</param>
         /// <param name="impulses">Warm starting impulses to apply to the contact constraint.</param>
         /// <param name="constraintCacheIndex">Index of the constraint cache to update.</param>
         /// <param name="constraintHandle">Constraint handle associated with the constraint cache being updated.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void CompleteConstraintAdd(Solver solver, ref ContactImpulses impulses, PairCacheIndex constraintCacheIndex, int constraintHandle)
+        internal unsafe void CompleteConstraintAdd<TContactImpulses>(Solver solver, ref TContactImpulses impulses, PairCacheIndex constraintCacheIndex, int constraintHandle)
         {
             //Note that the update is being directed to the *next* worker caches. We have not yet performed the flush that swaps references.
             //Note that this assumes that the constraint handle is stored in the first 4 bytes of the constraint cache.

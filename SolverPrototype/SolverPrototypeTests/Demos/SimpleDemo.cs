@@ -19,9 +19,9 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 6;
-            const int height = 64;
-            const int length = 6;
+            const int width = 2;
+            const int height = 16;
+            const int length = 2;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new BallSocketConstraintBuilder(),
@@ -39,10 +39,10 @@ namespace SolverPrototypeTests
 
         }
 
-
+        int frameIndex;
         public override void Update(Input input, float dt)
         {
-            Console.WriteLine($"Mapping count: {Simulation.NarrowPhase.PairCache.Mapping.Count}");
+            Console.WriteLine($"Preframe {frameIndex++}, mapping count: {Simulation.NarrowPhase.PairCache.Mapping.Count}");
             if (input.WasPushed(OpenTK.Input.Key.P))
             {
                 unsafe { var accessViolationSuppressant = stackalloc int[0]; }
