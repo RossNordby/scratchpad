@@ -116,6 +116,7 @@ namespace SolverPrototype
             }
             return true;
         }
+
         [Conditional("DEBUG")]
         private void ValidateBodyIndex(int bodyIndex, int expectedCount)
         {
@@ -128,7 +129,8 @@ namespace SolverPrototype
                 referencesToBody += instancesInTypeBatch;
             }
             Debug.Assert(referencesToBody == expectedCount);
-        }
+        } 
+
         [Conditional("DEBUG")]
         internal void ValidateExistingHandles(Bodies bodies)
         {

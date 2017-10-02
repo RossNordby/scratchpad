@@ -19,9 +19,9 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 16;
-            const int height = 16;
-            const int length = 16;
+            const int width = 12;
+            const int height = 12;
+            const int length = 12;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new ConstraintlessLatticeBuilder(),
@@ -29,10 +29,11 @@ namespace SolverPrototypeTests
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
             //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
 
-            //BodyVelocity velocity;
-            //velocity.Linear = new Vector3(.1f, 0, 0.1f);
-            //velocity.Angular = new Vector3();
-            //Simulation.Bodies.SetVelocity(bodyHandles[width], ref velocity);
+            BodyVelocity velocity;
+            velocity.Linear = new Vector3(.1f, 0, 0.1f);
+            velocity.Angular = new Vector3();
+            Simulation.Bodies.SetVelocity(bodyHandles[width], ref velocity);
+
             //Simulation.Solver.IterationCount = 100;
 
             Console.WriteLine(Simulation.Solver.ConstraintCount);
@@ -47,14 +48,14 @@ namespace SolverPrototypeTests
             {
                 Simulation.Bodies.ValidateExistingHandle(Simulation.Bodies.IndexToHandle[i]);
             }
-            if (input.WasPushed(OpenTK.Input.Key.P))
-            {
-                unsafe { var accessViolationSuppressant = stackalloc int[0]; }
-                BodyVelocity velocity;
-                velocity.Linear = new Vector3(.1f, 0, 0.1f);
-                velocity.Angular = new Vector3();
-                Simulation.Bodies.SetVelocity(32, ref velocity);
-            }
+            //if (input.WasPushed(OpenTK.Input.Key.P))
+            //{
+            //    unsafe { var accessViolationSuppressant = stackalloc int[0]; }
+            //    BodyVelocity velocity;
+            //    velocity.Linear = new Vector3(.1f, 0, 0.1f);
+            //    velocity.Angular = new Vector3();
+            //    Simulation.Bodies.SetVelocity(32, ref velocity);
+            //}
             base.Update(input, dt);
 
         }

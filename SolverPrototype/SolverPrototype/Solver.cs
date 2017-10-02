@@ -142,35 +142,35 @@ namespace SolverPrototype
                 Batches[i].ValidateExistingHandles(bodies);
             }
         }
+
         /// <summary>
-        /// Allocates a slot in a type batch for a constraint.
+        /// Attempts to locate a spot for a new constraint. Does not perform allocation for the constraint. If no batch exists, returns the index just beyond the end of the existing list of batches.
         /// </summary>
-        /// <typeparam name="T">Type of the TypeBatch to allocate in.</typeparam>
-        /// <param name="bodyHandles">Reference to the start of a list of body handles.</param>
-        /// <param name="bodyCount">Number of bodies in the body handles list.</param>
-        /// <param name="typeId">Id of the TypeBatch type to allocate in.</param>
-        /// <param name="reference">Direct reference to the constraint type batch and index in the type batch.</param>
-        /// <returns>Allocated constraint handle.</returns>
-        public unsafe int Allocate(ref int bodyHandles, int bodyCount, int typeId, out ConstraintReference reference)
+        /// <param name="batchStartIndex">Index at which to start the search.</param>
+        /// <returns>Index of the batch that the constraint would fit in.</returns>
+        /// <remarks>This is used by the narrowphase's multithreaded constraint adders to locate a spot for a new constraint without requiring a lock. Only after a candidate is located
+        /// do those systems attempt an actual claim, limiting the duration of locks and increasing potential parallelism.</remarks>
+        internal unsafe int FindCandidateBatch(int batchStartIndex, ref int bodyHandles, int bodyCount)
         {
-            int targetBatchIndex = -1;
-            //Find the first batch that references none of the bodies that this constraint needs.
             for (int i = 0; i < Batches.Count; ++i)
             {
                 if (Batches[i].CanFit(ref bodyHandles, bodyCount))
-                {
-                    targetBatchIndex = i;
-                    break;
-                }
+                    return i;
             }
+            return Batches.Count;
+        }
+
+        internal unsafe bool TryAllocateInBatch(int typeId, int targetBatchIndex, ref int bodyHandles, int bodyCount, out int constraintHandle, out ConstraintReference reference)
+        {
             ConstraintBatch targetBatch;
-            if (targetBatchIndex == -1)
+            Debug.Assert(targetBatchIndex <= Batches.Count,
+                "It should be impossible for a target batch to be generated which is more than one slot beyond the end of the batch list. Possible misuse of FindCandidateBatch.");
+            if (targetBatchIndex == Batches.Count)
             {
                 //No batch available. Have to create a new one.
                 //Note that we have no explicit pooling. Instead, we just use the array backing the batches list as the pool. 
                 //Batches grow and shrink like a stack since the removals only ever occur when an empty batch is in the very last slot.
                 //So, all we have to do is check the backing array slot- if there's already a batch there, use it.
-                targetBatchIndex = Batches.Count;
                 if (Batches.Span.Length > Batches.Count && Batches.Span[targetBatchIndex] != null)
                 {
                     //Reusable batch found! 
@@ -184,24 +184,34 @@ namespace SolverPrototype
                     targetBatch = new ConstraintBatch(bufferPool, bodies.BodyCount, TypeCountEstimate);
                     Batches.Add(targetBatch, new PassthroughArrayPool<ConstraintBatch>());
                 }
+                //Note that if there is no constraint batch for the given index, there is no way for the constraint add to be blocked. It's guaranteed success.
             }
             else
             {
+                //A constraint batch already exists here. This may fail.
                 targetBatch = Batches[targetBatchIndex];
+                if (!targetBatch.CanFit(ref bodyHandles, bodyCount))
+                {
+                    //This batch cannot hold the constraint.
+                    constraintHandle = -1;
+                    reference = default(ConstraintReference);
+                    return false;
+                }
             }
-            var handle = handlePool.Take();
-            targetBatch.Allocate(handle, ref bodyHandles, bodyCount, bodies, TypeBatchAllocation, typeId, out reference);
+            constraintHandle = handlePool.Take();
+            targetBatch.Allocate(constraintHandle, ref bodyHandles, bodyCount, bodies, TypeBatchAllocation, typeId, out reference);
 
-            if (handle >= HandleToConstraint.Length)
+            if (constraintHandle >= HandleToConstraint.Length)
             {
                 bufferPool.SpecializeFor<ConstraintLocation>().Resize(ref HandleToConstraint, HandleToConstraint.Length * 2, HandleToConstraint.Length);
-                Debug.Assert(handle < HandleToConstraint.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
+                Debug.Assert(constraintHandle < HandleToConstraint.Length, "Handle indices should never jump by more than 1 slot, so doubling should always be sufficient.");
             }
-            HandleToConstraint[handle].IndexInTypeBatch = reference.IndexInTypeBatch;
-            HandleToConstraint[handle].TypeId = typeId;
-            HandleToConstraint[handle].BatchIndex = targetBatchIndex;
-            return handle;
+            HandleToConstraint[constraintHandle].IndexInTypeBatch = reference.IndexInTypeBatch;
+            HandleToConstraint[constraintHandle].TypeId = typeId;
+            HandleToConstraint[constraintHandle].BatchIndex = targetBatchIndex;
+            return true;
         }
+
 
         /// <summary>
         /// Applies a description to a constraint slot.
@@ -243,9 +253,16 @@ namespace SolverPrototype
         public void Add<TDescription>(ref int bodyHandles, int bodyCount, ref TDescription description, out int handle)
             where TDescription : IConstraintDescription<TDescription>
         {
-            handle = Allocate(ref bodyHandles, bodyCount, description.ConstraintTypeId, out var reference);
-            ApplyDescription(ref reference, ref description);
-
+            for (int i = 0; i <= Batches.Count; ++i)
+            {
+                if (TryAllocateInBatch(description.ConstraintTypeId, i, ref bodyHandles, bodyCount, out handle, out var reference))
+                {
+                    ApplyDescription(ref reference, ref description);
+                    return;
+                }
+            }
+            handle = -1;
+            Debug.Fail("The above allocation loop checks every batch and also one index beyond all existing batches. It should be guaranteed to succeed.");
         }
 
         //This is split out for use by the multithreaded constraint remover.
