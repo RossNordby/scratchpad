@@ -85,7 +85,7 @@ namespace SolverPrototype.CollisionDetection
         public Shapes Shapes;
         public CollisionTaskRegistry CollisionTaskRegistry;
         public ConstraintRemover ConstraintRemover;
-        public FreshnessChecker FreshnessChecker;
+        internal FreshnessChecker FreshnessChecker;
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
@@ -106,18 +106,18 @@ namespace SolverPrototype.CollisionDetection
         protected abstract void OnPreflush(IThreadDispatcher threadDispatcher);
         protected abstract void OnPostflush(IThreadDispatcher threadDispatcher);
 
-        int flushJobIndex;
-        QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobList;
+        
+                int flushJobIndex;
+        QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobs;
         Action<int> flushWorkerLoop;
         void FlushWorkerLoop(int workerIndex)
         {
             int jobIndex;
-            while ((jobIndex = Interlocked.Increment(ref flushJobIndex)) < flushJobList.Count)
+            while ((jobIndex = Interlocked.Increment(ref flushJobIndex)) < flushJobs.Count)
             {
-                ExecuteFlushJob(ref flushJobList[jobIndex]);
+                ExecuteFlushJob(ref flushJobs[jobIndex]);
             }
         }
-
         void ExecuteFlushJob(ref NarrowPhaseFlushJob job)
         {
             switch (job.Type)
@@ -141,22 +141,15 @@ namespace SolverPrototype.CollisionDetection
         public void Flush(IThreadDispatcher threadDispatcher = null)
         {
             OnPreflush(threadDispatcher);
-            var start = Stopwatch.GetTimestamp();
-            FreshnessChecker.CheckFreshness(threadDispatcher);
-            var end = Stopwatch.GetTimestamp();
-            Console.WriteLine($"Freshness checker time (us): {1e6 * (end - start) / ((double)Stopwatch.Frequency)}");
-            //Given the sizes involved, a fixed guess of 128 should be just fine for essentially any simulation. Overkill, but not in a concerning way.
-            //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
-            //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
-            QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>>.Create(Pool.SpecializeFor<NarrowPhaseFlushJob>(), 128, out flushJobList);
-            PairCache.PrepareFlushJobs(ref flushJobList);
-            ConstraintRemover.CreateFlushJobs(ref flushJobList);
+            QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>>.Create(Pool.SpecializeFor<NarrowPhaseFlushJob>(), 128, out flushJobs);
+            PairCache.PrepareFlushJobs(ref flushJobs);
+            ConstraintRemover.CreateFlushJobs(ref flushJobs);
 
             if (threadDispatcher == null)
             {
-                for (int i = 0; i < flushJobList.Count; ++i)
+                for (int i = 0; i < flushJobs.Count; ++i)
                 {
-                    ExecuteFlushJob(ref flushJobList[i]);
+                    ExecuteFlushJob(ref flushJobs[i]);
                 }
             }
             else
@@ -164,7 +157,7 @@ namespace SolverPrototype.CollisionDetection
                 flushJobIndex = -1;
                 threadDispatcher.DispatchWorkers(flushWorkerLoop);
             }
-            flushJobList.Dispose(Pool.SpecializeFor<NarrowPhaseFlushJob>());
+            flushJobs.Dispose(Pool.SpecializeFor<NarrowPhaseFlushJob>());
 
             PairCache.Postflush();
             ConstraintRemover.Postflush();
@@ -208,6 +201,7 @@ namespace SolverPrototype.CollisionDetection
             PairCache = new PairCache(simulation.BufferPool, minimumMappingSize, minimumPendingSize, minimumPerTypeCapacity);
             ConstraintRemover = new ConstraintRemover(simulation.BufferPool, simulation.Bodies, simulation.Solver, simulation.ConstraintGraph, minimumRemovalCapacity: minimumPendingSize);
             FreshnessChecker = new FreshnessChecker(this);
+            preflushWorkerLoop = PreflushWorkerLoop;
         }
 
         protected override void OnPrepare(IThreadDispatcher threadDispatcher)
@@ -215,10 +209,6 @@ namespace SolverPrototype.CollisionDetection
             PrepareOverlapWorkers(threadDispatcher);
         }
 
-        protected override void OnPreflush(IThreadDispatcher threadDispatcher)
-        {
-            FlushPendingConstraintAdds(threadDispatcher);
-        }
         protected override void OnPostflush(IThreadDispatcher threadDispatcher)
         {
             //TODO: Constraint generators can actually be disposed immediately once the overlap finding process completes.

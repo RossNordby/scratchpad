@@ -72,6 +72,9 @@ namespace SolverPrototype.CollisionDetection
                     pool.Return(ref list.Buffer);
                 }
             }
+
+
+
             public void Flush(Simulation simulation, ref PairCache pairCache)
             {
                 //This is going to be pretty horrible!

@@ -294,7 +294,15 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
 
-            QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>>.Create(pool.SpecializeFor<TypeBatchIndex>(), 16, out removedTypeBatches);
+            //Ensure that the removal list is large enough to hold every single type batch in the worst case. This prevents the need to resize during execution.
+            //That's valuable because every access to the main thread's buffer pool is a potential race condition when other tasks are also using it.
+            //We don't want to have to lock every use of the buffer pool in other tasks just because we didn't preallocate a trivial amount here.
+            int typeBatchCount = 0;
+            for (int i =0; i < solver.Batches.Count; ++i)
+            {
+                typeBatchCount += solver.Batches[i].TypeBatches.Count;
+            }
+            QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>>.Create(pool.SpecializeFor<TypeBatchIndex>(), typeBatchCount, out removedTypeBatches);
         }
 
 
@@ -306,6 +314,7 @@ namespace SolverPrototype.CollisionDetection
             //While body list removal could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
             //to guarantee that no two threads hit the same body constraint list at the same time. 
             //That is more complicated and would almost certainly be slower than this locally sequential version.
+            //Also, any shrinking resizes within a constraint graph removal would result in a 
             for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];

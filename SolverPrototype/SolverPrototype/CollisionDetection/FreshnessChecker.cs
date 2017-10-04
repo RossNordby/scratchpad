@@ -1,50 +1,37 @@
-﻿using BEPUutilities2;
+﻿using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading;
 
 namespace SolverPrototype.CollisionDetection
 {
-    public class FreshnessChecker
+    internal class FreshnessChecker
     {
-        struct FreshnessJob
-        {
-            public int Start;
-            public int End;
-        }
         int freshnessJobCount;
         int freshnessJobIndex;
-        Buffer<FreshnessJob> freshnessJobs;
-        Action<int> checkFreshnessAction;
         PairCache PairCache;
-        BufferPool Pool;
         ConstraintRemover ConstraintRemover;
 
         public FreshnessChecker(NarrowPhase narrowPhase)
         {
-            checkFreshnessAction = WorkerLoop;
             PairCache = narrowPhase.PairCache;
-            Pool = narrowPhase.Pool;
             ConstraintRemover = narrowPhase.ConstraintRemover;
         }
 
-        public void CheckFreshness(IThreadDispatcher threadDispatcher = null)
+        public void CreateJobs(int threadCount, ref QuickList<PreflushJob, Buffer<PreflushJob>> jobs, BufferPool pool)
         {
-            if (threadDispatcher != null)
+            if (threadCount > 1)
             {
                 const int jobsPerThread = 2; //TODO: Empirical tune; probably just 1.
-                freshnessJobCount = threadDispatcher.ThreadCount * jobsPerThread;
+                freshnessJobCount = Math.Min(threadCount * jobsPerThread, PairCache.Mapping.Count);
                 var pairsPerJob = PairCache.Mapping.Count / freshnessJobCount;
                 var remainder = PairCache.Mapping.Count - pairsPerJob * freshnessJobCount;
-                Pool.SpecializeFor<FreshnessJob>().Take(freshnessJobCount, out freshnessJobs);
                 int previousEnd = 0;
+                jobs.EnsureCapacity(jobs.Count + freshnessJobCount, pool.SpecializeFor<PreflushJob>());
                 for (int i = 0; i < freshnessJobCount; ++i)
                 {
-                    ref var job = ref freshnessJobs[i];
+                    ref var job = ref jobs.AllocateUnsafely();
                     job.Start = previousEnd;
                     //The end of every interval except the last one should be aligned on an 8 byte boundary.
                     var pairsInJob = i < remainder ? pairsPerJob + 1 : pairsPerJob;
@@ -55,34 +42,22 @@ namespace SolverPrototype.CollisionDetection
                 }
                 freshnessJobIndex = -1;
 
-                threadDispatcher.DispatchWorkers(checkFreshnessAction);
-                Pool.SpecializeFor<FreshnessJob>().Return(ref freshnessJobs);
             }
             else
             {
-                var job = new FreshnessJob { End = PairCache.Mapping.Count };
-                ExecuteJob(0, ref job);
+                jobs.Add(new PreflushJob { Type = PreflushJobType.CheckFreshness, Start = 0, End = PairCache.Mapping.Count }, pool.SpecializeFor<PreflushJob>());
             }
         }
 
 
-        void WorkerLoop(int workerIndex)
+        public void CheckFreshnessInRegion(int workerIndex, int startIndex, int endIndex)
         {
-            int jobIndex;
-            while ((jobIndex = Interlocked.Increment(ref freshnessJobIndex)) < freshnessJobCount)
-            {
-                ExecuteJob(workerIndex, ref freshnessJobs[jobIndex]);
-            }
-        }
-
-        void ExecuteJob(int workerIndex, ref FreshnessJob job)
-        {
-            var count = job.End - job.Start;
+            var count = endIndex - startIndex;
             var wideCount = count >> 3;
             var remainder = count - (wideCount << 3);
-            Debug.Assert((job.Start & 7) == 0 || job.Start == job.End, "Either this job is empty or the start should be 8 byte aligned for quick reading.");
+            Debug.Assert((startIndex & 7) == 0 || startIndex == endIndex, "Either this job is empty or the start should be 8 byte aligned for quick reading.");
             //We will check 8 pairs simultaneously. Since the vast majority of pairs are not stale, the ability to skip 8 at a time speeds things up.
-            ref var start = ref Unsafe.As<byte, ulong>(ref PairCache.PairFreshness[job.Start]);
+            ref var start = ref Unsafe.As<byte, ulong>(ref PairCache.PairFreshness[startIndex]);
             for (int i = 0; i < wideCount; ++i)
             {
                 ref var freshnessBatch = ref Unsafe.Add(ref start, i);
@@ -90,7 +65,7 @@ namespace SolverPrototype.CollisionDetection
                 if (freshnessBatch < 0xFFFF_FFFF_FFFF_FFFF)
                 {
                     //TODO: Test this against a simple loop.
-                    var startOfWide = job.Start + (i << 3);
+                    var startOfWide = startIndex + (i << 3);
                     if ((freshnessBatch & 0x0000_0000_FFFF_FFFF) < 0x0000_0000_FFFF_FFFF)
                     {
                         if ((freshnessBatch & 0x0000_0000_0000_FFFF) < 0x0000_0000_0000_FFFF)
@@ -144,7 +119,7 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
             //Check the remainder of the bytes one by one. Less than 8 left, so no need to be tricky.
-            for (int i = job.End - remainder; i < job.End; ++i)
+            for (int i = endIndex - remainder; i < endIndex; ++i)
             {
                 if (PairCache.PairFreshness[i] == 0)
                 {
