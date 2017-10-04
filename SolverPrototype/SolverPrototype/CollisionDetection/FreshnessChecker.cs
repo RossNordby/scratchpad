@@ -9,7 +9,6 @@ namespace SolverPrototype.CollisionDetection
     internal class FreshnessChecker
     {
         int freshnessJobCount;
-        int freshnessJobIndex;
         PairCache PairCache;
         ConstraintRemover ConstraintRemover;
 
@@ -40,8 +39,6 @@ namespace SolverPrototype.CollisionDetection
                         previousEnd = PairCache.Mapping.Count;
                     job.End = previousEnd;
                 }
-                freshnessJobIndex = -1;
-
             }
             else
             {

@@ -298,7 +298,7 @@ namespace SolverPrototype.CollisionDetection
             //That's valuable because every access to the main thread's buffer pool is a potential race condition when other tasks are also using it.
             //We don't want to have to lock every use of the buffer pool in other tasks just because we didn't preallocate a trivial amount here.
             int typeBatchCount = 0;
-            for (int i =0; i < solver.Batches.Count; ++i)
+            for (int i = 0; i < solver.Batches.Count; ++i)
             {
                 typeBatchCount += solver.Batches[i].TypeBatches.Count;
             }
@@ -306,15 +306,11 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        //TODO: It would be wise to double check the overhead associated with having these locally sequential jobs as separate jobs.
-        //We already combined a couple of them for simplicity... the handle return wouldn't cost much. In fact, it might be faster on net due to a lack of shared cache lines.
-        //That does mean fewer overall tasks, but greater parallelism doesn't matter if it's slower.
-        public void UpdateBodyConstraintListsAndBatchBodyHandles()
+        public void UpdateConstraintBookkeeping()
         {
             //While body list removal could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
             //to guarantee that no two threads hit the same body constraint list at the same time. 
             //That is more complicated and would almost certainly be slower than this locally sequential version.
-            //Also, any shrinking resizes within a constraint graph removal would result in a 
             for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
             {
                 ref var workerCache = ref workerCaches[workerIndex];
@@ -324,25 +320,20 @@ namespace SolverPrototype.CollisionDetection
                     constraintGraph.RemoveConstraint(target.BodyIndex, target.ConstraintHandle);
                     solver.Batches[target.BatchIndex].BodyHandles.Remove(target.BodyHandle);
                 }
-            }
-        }
-
-        public void ReturnConstraintHandlesToPool()
-        {
-            var typedPool = pool.SpecializeFor<int>();
-            for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
-            {
-                ref var workerCache = ref workerCaches[workerIndex];
+                //Note that the handles are also removed here. Even though the action is independent, any resizes of the internal id pool structure would share acceses to the main thread's
+                //buffer pool. Removing constraints is the other place where the main thread's buffer pool is used.
+                //Doesn't matter too much; the total cost of this stage is very low.
                 for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
                 {
                     ref var handles = ref workerCache.BatchHandles[batchIndex];
                     for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
                     {
-                        solver.handlePool.Return(handles[handleIndex], typedPool);
+                        solver.handlePool.Return(handles[handleIndex], pool.SpecializeFor<int>());
                     }
                 }
             }
         }
+
 
         QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> removedTypeBatches;
         SpinLock removedTypeBatchLocker = new SpinLock();
@@ -372,7 +363,7 @@ namespace SolverPrototype.CollisionDetection
                         //Note that we just use a spinlock here, nothing tricky- the number of typebatch/batch removals should tend to be extremely low (averaging 0),
                         //so it's not worth doing a bunch of per worker accumulators and stuff.
                         removedTypeBatchLocker.Enter(ref lockTaken);
-                        removedTypeBatches.Add(batch, pool.SpecializeFor<TypeBatchIndex>());
+                        removedTypeBatches.AddUnsafely(batch);
                         removedTypeBatchLocker.Exit();
                     }
                 }

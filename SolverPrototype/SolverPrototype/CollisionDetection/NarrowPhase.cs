@@ -106,8 +106,8 @@ namespace SolverPrototype.CollisionDetection
         protected abstract void OnPreflush(IThreadDispatcher threadDispatcher);
         protected abstract void OnPostflush(IThreadDispatcher threadDispatcher);
 
-        
-                int flushJobIndex;
+
+        int flushJobIndex;
         QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobs;
         Action<int> flushWorkerLoop;
         void FlushWorkerLoop(int workerIndex)
@@ -123,13 +123,10 @@ namespace SolverPrototype.CollisionDetection
             switch (job.Type)
             {
                 case NarrowPhaseFlushJobType.UpdateBodyConstraintListsAndBatchBodyHandles:
-                    ConstraintRemover.UpdateBodyConstraintListsAndBatchBodyHandles();
+                    ConstraintRemover.UpdateConstraintBookkeeping();
                     break;
                 case NarrowPhaseFlushJobType.RemoveConstraintFromTypeBatch:
                     ConstraintRemover.RemoveConstraintsFromTypeBatch(job.Index);
-                    break;
-                case NarrowPhaseFlushJobType.ReturnConstraintHandlesToPool:
-                    ConstraintRemover.ReturnConstraintHandlesToPool();
                     break;
                 case NarrowPhaseFlushJobType.FlushPairCacheChanges:
                     PairCache.FlushMappingChanges();
@@ -222,10 +219,10 @@ namespace SolverPrototype.CollisionDetection
         {
             Callbacks.Dispose();
         }
-        
+
         public unsafe void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
-            if(a.Handle > b.Handle)
+            if (a.Handle > b.Handle)
             {
                 //In order to guarantee contact manifold and constraint consistency across multiple frames, we must guarantee that the order of collidables submitted 
                 //is the same every time. Since the provided handles do not move for the lifespan of the collidable in the simulation, they can be used as an ordering.
