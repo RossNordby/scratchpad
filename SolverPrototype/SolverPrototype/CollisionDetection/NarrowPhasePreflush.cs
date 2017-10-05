@@ -74,6 +74,11 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         [FieldOffset(4)]
         public int WorkerCount;
+        /// <summary>
+        /// Index of the worker cache to process in a NondeterministicAddConstraints task.
+        /// </summary>
+        [FieldOffset(4)]
+        public int WorkerIndex;
     }
 
     public partial class NarrowPhase<TCallbacks>
@@ -81,6 +86,7 @@ namespace SolverPrototype.CollisionDetection
         int preflushJobIndex;
         QuickList<PreflushJob, Buffer<PreflushJob>> preflushJobs;
         Action<int> preflushWorkerLoop;
+        SpinLock constraintAddLock = new SpinLock();
         void PreflushWorkerLoop(int workerIndex)
         {
             int jobIndex;
@@ -110,7 +116,12 @@ namespace SolverPrototype.CollisionDetection
             //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
             //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
             QuickList<PreflushJob, Buffer<PreflushJob>>.Create(Pool.SpecializeFor<PreflushJob>(), 128, out preflushJobs);
-            FreshnessChecker.CreateJobs(threadDispatcher == null ? 1 : threadDispatcher.ThreadCount, ref preflushJobs, Pool);
+            var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
+            FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
+            for (int i = 0; i < threadCount; ++i)
+            {
+                preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicAddConstraints, WorkerIndex = i }, Pool.SpecializeFor<PreflushJob>());
+            }
             var start = Stopwatch.GetTimestamp();
             if (threadDispatcher == null)
             {
@@ -126,7 +137,7 @@ namespace SolverPrototype.CollisionDetection
             }
             var end = Stopwatch.GetTimestamp();
             Console.WriteLine($"Preflush time (us): {1e6 * (end - start) / ((double)Stopwatch.Frequency)}");
-            FlushPendingConstraintAdds(threadDispatcher);
+            //FlushPendingConstraintAdds(threadDispatcher);
         }
     }
 }

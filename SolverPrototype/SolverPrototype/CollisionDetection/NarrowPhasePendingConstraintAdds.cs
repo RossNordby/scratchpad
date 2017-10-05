@@ -90,9 +90,13 @@ namespace SolverPrototype.CollisionDetection
                                 {
                                     simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, 1)], constraintHandle, 1);
                                 }
+                                addLock.Exit();
                                 break;
                             }
-                            addLock.Exit();
+                            else
+                            {
+                                addLock.Exit();
+                            }
                         }
                         //The above loop only terminates once the allocation succeeds. We can now proceed with thread local work.
                         simulation.Solver.ApplyDescription(ref constraintReference, ref add.ConstraintDescription);
