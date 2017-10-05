@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using BEPUutilities2.Memory;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Threading;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -55,7 +56,54 @@ namespace SolverPrototype.CollisionDetection
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            unsafe void CompletePendingAdds<TBodyHandles, TDescription, TContactImpulses>(ref UntypedList list, int narrowPhaseConstraintTypeId, Simulation simulation, ref PairCache pairCache)
+            unsafe void NondeterministicAdd<TBodyHandles, TDescription, TContactImpulses>(
+                ref UntypedList list, int narrowPhaseConstraintTypeId, Simulation simulation, ref PairCache pairCache, ref SpinLock addLock)
+                where TDescription : IConstraintDescription<TDescription>
+            {
+                if (list.Buffer.Allocated)
+                {
+                    ref var start = ref Unsafe.As<byte, PendingConstraint<TBodyHandles, TDescription, TContactImpulses>>(ref *list.Buffer.Memory);
+                    Debug.Assert(list.Buffer.Length > Unsafe.SizeOf<PendingConstraint<TBodyHandles, TDescription, TContactImpulses>>() * list.Count);
+                    Debug.Assert(list.ByteCount == Unsafe.SizeOf<PendingConstraint<TBodyHandles, TDescription, TContactImpulses>>() * list.Count);
+                    for (int i = 0; i < list.Count; ++i)
+                    {
+                        ref var add = ref Unsafe.Add(ref start, i);
+                        int batchCandidateIndex = 0;
+                        int constraintHandle;
+                        ConstraintReference constraintReference;
+                        while (true)
+                        {
+                            ref var bodyHandles = ref Unsafe.As<TBodyHandles, int>(ref add.BodyHandles);
+                            var bodyCount = typeof(TBodyHandles) == typeof(TwoBodyHandles) ? 2 : 1;
+                            //A high probability candidate batch is identified outside of the lock in an effort to reduce lock time. This will often need to hit several constraint batches.
+                            batchCandidateIndex = simulation.Solver.FindCandidateBatch(batchCandidateIndex, ref bodyHandles, bodyCount);
+
+                            bool lockTaken = false;
+                            addLock.Enter(ref lockTaken);
+                            if (simulation.Solver.TryAllocateInBatch(add.ConstraintDescription.ConstraintTypeId, batchCandidateIndex, ref bodyHandles, bodyCount,
+                                out constraintHandle, out constraintReference))
+                            {
+                                //Note that we must perform the body list add within a lock. This protects the allocation process as well as accesses to the main pool
+                                //(which both typebatch resizing and body list resizing can cause).
+                                simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[bodyHandles], constraintHandle, 0);
+                                if (typeof(TBodyHandles) == typeof(TwoBodyHandles))
+                                {
+                                    simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, 1)], constraintHandle, 1);
+                                }
+                                break;
+                            }
+                            addLock.Exit();
+                        }
+                        //The above loop only terminates once the allocation succeeds. We can now proceed with thread local work.
+                        simulation.Solver.ApplyDescription(ref constraintReference, ref add.ConstraintDescription);
+                        pairCache.CompleteConstraintAdd(simulation.Solver, ref add.Impulses, add.ConstraintCacheIndex, constraintHandle);
+                    }
+                    pool.Return(ref list.Buffer);
+                }
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            unsafe void SequentialAdd<TBodyHandles, TDescription, TContactImpulses>(ref UntypedList list, int narrowPhaseConstraintTypeId, Simulation simulation, ref PairCache pairCache)
                 where TDescription : IConstraintDescription<TDescription>
             {
                 if (list.Buffer.Allocated)
@@ -73,9 +121,11 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
 
-
-
-            public void Flush(Simulation simulation, ref PairCache pairCache)
+            /// <summary>
+            /// Flushes pending constraints into the simulation without any form of synchronization. Adds occur in the order of manifold generation.
+            /// If the contact manifold generation is deterministic, then the result of this add will be deterministic.
+            /// </summary>
+            public void FlushSequentially(Simulation simulation, ref PairCache pairCache)
             {
                 //This is going to be pretty horrible!
                 //There is no type information beyond the index of the cache.
@@ -87,8 +137,19 @@ namespace SolverPrototype.CollisionDetection
                 //convex vs nonconvex: 0x4
                 //1 body versus 2 body: 0x8
                 //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
-                CompletePendingAdds<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
-                CompletePendingAdds<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
+                SequentialAdd<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
+                SequentialAdd<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
+                pool.SpecializeFor<UntypedList>().Return(ref pendingConstraintsByType);
+            }
+
+            /// <summary>
+            /// Flushes pending constraints into the simulation assuming parallel execution. Order is undefined and depends on the speed at which threads complete work.
+            /// Simulation result will be nondeterministic.
+            /// </summary>
+            public void FlushNondeterministically(Simulation simulation, ref PairCache pairCache, ref SpinLock addLock)
+            {
+                NondeterministicAdd<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache, ref addLock);
+                NondeterministicAdd<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache, ref addLock);
                 pool.SpecializeFor<UntypedList>().Return(ref pendingConstraintsByType);
             }
 
@@ -125,7 +186,7 @@ namespace SolverPrototype.CollisionDetection
             var start = Stopwatch.GetTimestamp();
             for (int i = 0; i < threadCount; ++i)
             {
-                overlapWorkers[i].PendingConstraints.Flush(Simulation, ref PairCache);
+                overlapWorkers[i].PendingConstraints.FlushSequentially(Simulation, ref PairCache);
             }
             var end = Stopwatch.GetTimestamp();
             if (constraintCount > 0)

@@ -17,20 +17,34 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         CheckFreshness,
         /// <summary>
-        /// Locally sequential addition of every constraint to the associated body lists.
-        /// </summary>
-        AddConstraintsToBodyLists,
-
-        /// <summary>
-        /// Adds a bunch of constraints nondeterministically by locking the batch to claim a batch slot after speculatively identifying a candidate.
+        /// Adds a bunch of constraints nondeterministically by locking when claiming a slot in the solver.
         /// </summary>
         NondeterministicAddConstraints,
 
         /// <summary>
         /// Sorts the constraints of a single type across all workers. Used by deterministic preflushes to schedule adds.
+        /// Accesses no buffer pools; memory is allocated and returned on main thread.
         /// </summary>
         DeterministicSortContactConstraintType,
+        /// <summary>
+        /// Accesses no buffer pools; memory is allocated and returned on main thread.
+        /// </summary>
         DeterministicSpeculativeConstraintBatchSearch,
+        /// <summary>
+        /// Locally sequential addition of every constraint to the associated body lists.
+        /// Modifications to constraint graph are independent of the solver changes.
+        /// Accesses main thread buffer pool when per-body lists resize.
+        /// </summary>
+        DeterministicAddConstraintsToBodyLists,
+
+        //The deterministic constraint add is split into two dispatches. The to-add sort, speculative batch search, and body list add all happen first.
+        //The actual addition process occurs afterward alongside the freshness checker.
+        //It's slower than the nondeterministic path, but that's the bullet to bite.
+
+        /// <summary>
+        /// Adds constraints to the solver in a locally sequential order determined by the previous sorts and with the help of the speculatively computed batch targets.
+        /// Accesses main thread buffer pool when type batches are created or resize.
+        /// </summary>
         DeterministicConstraintAdd,
 
     }
@@ -56,7 +70,7 @@ namespace SolverPrototype.CollisionDetection
         [FieldOffset(8)]
         public int End;
         /// <summary>
-        /// Number of worker threads containing constraints to read in the AddConstraintsToBodyLists phase.
+        /// Number of worker threads containing constraints to read in the DeterministicAddConstraintsToBodyLists phase.
         /// </summary>
         [FieldOffset(4)]
         public int WorkerCount;
@@ -82,14 +96,9 @@ namespace SolverPrototype.CollisionDetection
                 case PreflushJobType.CheckFreshness:
                     FreshnessChecker.CheckFreshnessInRegion(workerIndex, job.Start, job.End);
                     break;
-                case PreflushJobType.AddConstraintsToBodyLists:
-                    for (int i = 0; i < job.WorkerCount; ++i)
-                    {
-                        ref var cache = ref overlapWorkers[i].PendingConstraints;
-                        cache.Flush(Simulation, ref PairCache);
-                    }
-                    break;
                 case PreflushJobType.NondeterministicAddConstraints:
+                    ref var cache = ref overlapWorkers[job.WorkerIndex].PendingConstraints;
+                    cache.FlushNondeterministically(Simulation, ref PairCache, ref constraintAddLock);
                     break;
             }
         }
@@ -101,7 +110,6 @@ namespace SolverPrototype.CollisionDetection
             //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
             //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
             QuickList<PreflushJob, Buffer<PreflushJob>>.Create(Pool.SpecializeFor<PreflushJob>(), 128, out preflushJobs);
-            OnPreflush(threadDispatcher);
             FreshnessChecker.CreateJobs(threadDispatcher == null ? 1 : threadDispatcher.ThreadCount, ref preflushJobs, Pool);
             var start = Stopwatch.GetTimestamp();
             if (threadDispatcher == null)
