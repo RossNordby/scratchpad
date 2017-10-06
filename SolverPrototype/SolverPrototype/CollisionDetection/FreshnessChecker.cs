@@ -20,29 +20,35 @@ namespace SolverPrototype.CollisionDetection
 
         public void CreateJobs(int threadCount, ref QuickList<PreflushJob, Buffer<PreflushJob>> jobs, BufferPool pool)
         {
-            if (threadCount > 1)
+            if (PairCache.Mapping.Count > 0)
             {
-                const int jobsPerThread = 2; //TODO: Empirical tune; probably just 1.
-                freshnessJobCount = Math.Min(threadCount * jobsPerThread, PairCache.Mapping.Count);
-                var pairsPerJob = PairCache.Mapping.Count / freshnessJobCount;
-                var remainder = PairCache.Mapping.Count - pairsPerJob * freshnessJobCount;
-                int previousEnd = 0;
-                jobs.EnsureCapacity(jobs.Count + freshnessJobCount, pool.SpecializeFor<PreflushJob>());
-                for (int i = 0; i < freshnessJobCount; ++i)
+                if (threadCount > 1)
                 {
-                    ref var job = ref jobs.AllocateUnsafely();
-                    job.Start = previousEnd;
-                    //The end of every interval except the last one should be aligned on an 8 byte boundary.
-                    var pairsInJob = i < remainder ? pairsPerJob + 1 : pairsPerJob;
-                    previousEnd = ((previousEnd + pairsInJob + 7) >> 3) << 3;
-                    if (previousEnd > PairCache.Mapping.Count)
-                        previousEnd = PairCache.Mapping.Count;
-                    job.End = previousEnd;
+                    const int jobsPerThread = 2; //TODO: Empirical tune; probably just 1.
+                    freshnessJobCount = Math.Min(threadCount * jobsPerThread, PairCache.Mapping.Count);
+                    var pairsPerJob = PairCache.Mapping.Count / freshnessJobCount;
+                    var remainder = PairCache.Mapping.Count - pairsPerJob * freshnessJobCount;
+                    int previousEnd = 0;
+                    jobs.EnsureCapacity(jobs.Count + freshnessJobCount, pool.SpecializeFor<PreflushJob>());
+                    int jobIndex = 0;
+                    while (previousEnd < PairCache.Mapping.Count)
+                    {
+                        ref var job = ref jobs.AllocateUnsafely();
+                        job.Type = PreflushJobType.CheckFreshness;
+                        job.Start = previousEnd;
+                        //The end of every interval except the last one should be aligned on an 8 byte boundary.
+                        var pairsInJob = jobIndex < remainder ? pairsPerJob + 1 : pairsPerJob;
+                        previousEnd = ((previousEnd + pairsInJob + 7) >> 3) << 3;
+                        if (previousEnd > PairCache.Mapping.Count)
+                            previousEnd = PairCache.Mapping.Count;
+                        job.End = previousEnd;
+                        ++jobIndex;
+                    }
                 }
-            }
-            else
-            {
-                jobs.Add(new PreflushJob { Type = PreflushJobType.CheckFreshness, Start = 0, End = PairCache.Mapping.Count }, pool.SpecializeFor<PreflushJob>());
+                else
+                {
+                    jobs.Add(new PreflushJob { Type = PreflushJobType.CheckFreshness, Start = 0, End = PairCache.Mapping.Count }, pool.SpecializeFor<PreflushJob>());
+                }
             }
         }
 

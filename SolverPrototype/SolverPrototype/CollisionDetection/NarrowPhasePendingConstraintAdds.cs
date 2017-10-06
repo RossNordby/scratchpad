@@ -102,7 +102,6 @@ namespace SolverPrototype.CollisionDetection
                         simulation.Solver.ApplyDescription(ref constraintReference, ref add.ConstraintDescription);
                         pairCache.CompleteConstraintAdd(simulation.Solver, ref add.Impulses, add.ConstraintCacheIndex, constraintHandle);
                     }
-                    pool.Return(ref list.Buffer);
                 }
             }
 
@@ -121,7 +120,6 @@ namespace SolverPrototype.CollisionDetection
                         var handle = simulation.Add(ref Unsafe.As<TBodyHandles, int>(ref add.BodyHandles), typeof(TBodyHandles) == typeof(TwoBodyHandles) ? 2 : 1, ref add.ConstraintDescription);
                         pairCache.CompleteConstraintAdd(simulation.Solver, ref add.Impulses, add.ConstraintCacheIndex, handle);
                     }
-                    pool.Return(ref list.Buffer);
                 }
             }
 
@@ -143,7 +141,6 @@ namespace SolverPrototype.CollisionDetection
                 //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
                 SequentialAdd<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
                 SequentialAdd<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
-                pool.SpecializeFor<UntypedList>().Return(ref pendingConstraintsByType);
             }
 
             /// <summary>
@@ -152,8 +149,20 @@ namespace SolverPrototype.CollisionDetection
             /// </summary>
             public void FlushNondeterministically(Simulation simulation, ref PairCache pairCache, ref SpinLock addLock)
             {
+                Debug.Assert(pendingConstraintsByType.Allocated);
                 NondeterministicAdd<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache, ref addLock);
                 NondeterministicAdd<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache, ref addLock);
+            }
+
+            //Note that disposal is separated from the flushes. This is required- accessing buffer pools is a potential race condition. Performing these returns in parallel with the 
+            //freshness checker would cause bugs.
+            public void Dispose()
+            {
+                for (int i = 0; i < constraintTypeCount; ++i)
+                {
+                    if (pendingConstraintsByType[i].Buffer.Allocated)
+                        pool.Return(ref pendingConstraintsByType[i].Buffer);
+                }
                 pool.SpecializeFor<UntypedList>().Return(ref pendingConstraintsByType);
             }
 

@@ -75,7 +75,7 @@ namespace SolverPrototype.CollisionDetection
         [FieldOffset(4)]
         public int WorkerCount;
         /// <summary>
-        /// Index of the worker cache to process in a NondeterministicAddConstraints task.
+        /// Index of the worker being flushed during the NondeterministicAddConstraints phase.
         /// </summary>
         [FieldOffset(4)]
         public int WorkerIndex;
@@ -122,6 +122,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicAddConstraints, WorkerIndex = i }, Pool.SpecializeFor<PreflushJob>());
             }
+
             var start = Stopwatch.GetTimestamp();
             if (threadDispatcher == null)
             {
@@ -135,9 +136,13 @@ namespace SolverPrototype.CollisionDetection
                 preflushJobIndex = -1;
                 threadDispatcher.DispatchWorkers(preflushWorkerLoop);
             }
+            for (int i = 0; i < threadCount; ++i)
+            {
+                overlapWorkers[i].PendingConstraints.Dispose();
+            }
             var end = Stopwatch.GetTimestamp();
             Console.WriteLine($"Preflush time (us): {1e6 * (end - start) / ((double)Stopwatch.Frequency)}");
-            //FlushPendingConstraintAdds(threadDispatcher);
+            preflushJobs.Dispose(Pool.SpecializeFor<PreflushJob>());
         }
     }
 }
