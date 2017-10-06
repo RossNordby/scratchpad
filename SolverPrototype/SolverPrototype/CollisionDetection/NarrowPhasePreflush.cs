@@ -118,29 +118,37 @@ namespace SolverPrototype.CollisionDetection
             QuickList<PreflushJob, Buffer<PreflushJob>>.Create(Pool.SpecializeFor<PreflushJob>(), 128, out preflushJobs);
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
             FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
-            for (int i = 0; i < threadCount; ++i)
-            {
-                preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicAddConstraints, WorkerIndex = i }, Pool.SpecializeFor<PreflushJob>());
-            }
+
+            //Note: at the moment we use a bit of a hacky scheme where we create jobs unconditionally for the freshness checker, but the constraint adder uses 
+            //direct sequential adds when there's only one thread. 
 
             var start = Stopwatch.GetTimestamp();
-            if (threadDispatcher == null)
+            if (threadCount == 1)
             {
                 for (int i = 0; i < preflushJobs.Count; ++i)
                 {
                     ExecutePreflushJob(0, ref preflushJobs[i]);
                 }
+                overlapWorkers[0].PendingConstraints.FlushSequentially(Simulation, ref PairCache);
             }
             else
             {
+                for (int i = 0; i < threadCount; ++i)
+                {
+                    preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicAddConstraints, WorkerIndex = i }, Pool.SpecializeFor<PreflushJob>());
+                }
                 preflushJobIndex = -1;
                 threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                //for (int i = 0; i < threadCount; ++i)
+                //{
+                //    overlapWorkers[i].PendingConstraints.FlushSequentially(Simulation, ref PairCache);
+                //}
             }
+            var end = Stopwatch.GetTimestamp();
             for (int i = 0; i < threadCount; ++i)
             {
                 overlapWorkers[i].PendingConstraints.Dispose();
             }
-            var end = Stopwatch.GetTimestamp();
             Console.WriteLine($"Preflush time (us): {1e6 * (end - start) / ((double)Stopwatch.Frequency)}");
             preflushJobs.Dispose(Pool.SpecializeFor<PreflushJob>());
         }

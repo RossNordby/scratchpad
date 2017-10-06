@@ -79,23 +79,26 @@ namespace SolverPrototype.CollisionDetection
                             batchCandidateIndex = simulation.Solver.FindCandidateBatch(batchCandidateIndex, ref bodyHandles, bodyCount);
 
                             bool lockTaken = false;
-                            addLock.Enter(ref lockTaken);
-                            if (simulation.Solver.TryAllocateInBatch(add.ConstraintDescription.ConstraintTypeId, batchCandidateIndex, ref bodyHandles, bodyCount,
-                                out constraintHandle, out constraintReference))
+                            //addLock.Enter(ref lockTaken);
+                            lock (simulation)
                             {
-                                //Note that we must perform the body list add within a lock. This protects the allocation process as well as accesses to the main pool
-                                //(which both typebatch resizing and body list resizing can cause).
-                                simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[bodyHandles], constraintHandle, 0);
-                                if (typeof(TBodyHandles) == typeof(TwoBodyHandles))
+                                if (simulation.Solver.TryAllocateInBatch(add.ConstraintDescription.ConstraintTypeId, batchCandidateIndex, ref bodyHandles, bodyCount,
+                                    out constraintHandle, out constraintReference))
                                 {
-                                    simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, 1)], constraintHandle, 1);
+                                    //Note that we must perform the body list add within a lock. This protects the allocation process as well as accesses to the main pool
+                                    //(which both typebatch resizing and body list resizing can cause).
+                                    simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[bodyHandles], constraintHandle, 0);
+                                    if (typeof(TBodyHandles) == typeof(TwoBodyHandles))
+                                    {
+                                        simulation.ConstraintGraph.AddConstraint(simulation.Bodies.HandleToIndex[Unsafe.Add(ref bodyHandles, 1)], constraintHandle, 1);
+                                    }
+                                    //addLock.Exit();
+                                    break;
                                 }
-                                addLock.Exit();
-                                break;
-                            }
-                            else
-                            {
-                                addLock.Exit();
+                                else
+                                {
+                                    //addLock.Exit();
+                                }
                             }
                         }
                         //The above loop only terminates once the allocation succeeds. We can now proceed with thread local work.
