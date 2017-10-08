@@ -22,15 +22,16 @@ namespace SolverPrototype.CollisionDetection
             BufferPool pool;
             struct PendingConstraint<TBodyHandles, TDescription, TContactImpulses> where TDescription : IConstraintDescription<TDescription>
             {
-                public PairCacheIndex ConstraintCacheIndex;
+                //Note the memory ordering. Body handles come first; deterministic flushes rely the memory layout to sort pending constraints.
                 public TBodyHandles BodyHandles;
                 public TDescription ConstraintDescription;
                 public TContactImpulses Impulses;
+                public PairCacheIndex ConstraintCacheIndex;
             }
 
             //TODO: If we add in nonconvex manifolds with up to 8 contacts, this will need to change- we preallocate enough space to hold all possible narrowphase generated types.
             const int constraintTypeCount = 16;
-            Buffer<UntypedList> pendingConstraintsByType;
+            internal Buffer<UntypedList> pendingConstraintsByType;
             int minimumConstraintCountPerCache;
 
             public PendingConstraintAddCache(BufferPool pool, int minimumConstraintCountPerCache = 128)
