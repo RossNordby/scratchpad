@@ -74,7 +74,7 @@ namespace SolverPrototype.CollisionDetection
         [FieldOffset(16)]
         public int WorkerIndex;
         /// <summary>
-        /// Number of worker threads containing constraints to read in the SortContactConstraintType task.
+        /// Number of worker threads containing constraints to read in the SortContactConstraintType and NondeterministicConstraintAdd tasks.
         /// </summary>
         [FieldOffset(16)]
         public int WorkerCount;
@@ -82,7 +82,7 @@ namespace SolverPrototype.CollisionDetection
 
     public partial class NarrowPhase<TCallbacks>
     {
-        struct SortConstraintTarget
+        internal struct SortConstraintTarget
         {
             public int WorkerIndex;
             public int ByteIndexInCache;
@@ -204,17 +204,14 @@ namespace SolverPrototype.CollisionDetection
                     break;
                 case PreflushJobType.SpeculativeConstraintBatchSearch:
                     {
-                        while (true)
-                        {
-                            overlapWorkers[job.WorkerIndex].PendingConstraints.SpeculativeConstraintBatchSearch(Solver, job.TypeIndex, job.Start, job.End);
-                        }
+                        overlapWorkers[job.WorkerIndex].PendingConstraints.SpeculativeConstraintBatchSearch(Solver, job.TypeIndex, job.Start, job.End);
                     }
                     break;
                 case PreflushJobType.NondeterministicConstraintAdd:
                     {
                         for (int i = 0; i < job.WorkerCount; ++i)
                         {
-                            overlapWorkers[i].PendingConstraints.FlushNondeterministically(Simulation, ref PairCache);
+                            overlapWorkers[i].PendingConstraints.FlushWithSpeculativeBatches(Simulation, ref PairCache);
                         }
                     }
                     break;
@@ -222,12 +219,7 @@ namespace SolverPrototype.CollisionDetection
                     {
                         for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
                         {
-                            ref var typeList = ref sortedConstraints[typeIndex];
-                            for (int j = 0; j < typeList.Count; ++j)
-                            {
-                                ref var target = ref typeList[j];
-                                overlapWorkers[target.WorkerIndex].PendingConstraints.AddToSimulation(Simulation, typeIndex, target.ByteIndexInCache);
-                            }
+                            PendingConstraintAddCache.DeterministicallyAddType(typeIndex, overlapWorkers, ref sortedConstraints[typeIndex], Simulation, ref PairCache);
                         }
                     }
                     break;
@@ -288,32 +280,39 @@ namespace SolverPrototype.CollisionDetection
                     for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
                     {
                         var count = overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
-                        var jobCount = 1 + count / maximumConstraintsPerJob;
-                        var jobSize = count / jobCount;
-                        var remainder = count - jobCount * jobSize;
-                        int previousEnd = 0;
-                        for (int i = 0; i < jobCount; ++i)
+                        if (count > 0)
                         {
-                            var jobStart = previousEnd;
-                            var constraintsInJob = jobSize;
-                            if (i < remainder)
-                                ++constraintsInJob;
-                            previousEnd += constraintsInJob;
-                            preflushJobs.Add(new PreflushJob
+                            var jobCount = 1 + count / maximumConstraintsPerJob;
+                            var jobSize = count / jobCount;
+                            var remainder = count - jobCount * jobSize;
+                            int previousEnd = 0;
+                            for (int i = 0; i < jobCount; ++i)
                             {
-                                Type = PreflushJobType.SpeculativeConstraintBatchSearch,
-                                Start = jobStart,
-                                End = previousEnd,
-                                TypeIndex = typeIndex,
-                                WorkerIndex = workerIndex
-                            }, Pool.SpecializeFor<PreflushJob>());
+                                var jobStart = previousEnd;
+                                var constraintsInJob = jobSize;
+                                if (i < remainder)
+                                    ++constraintsInJob;
+                                previousEnd += constraintsInJob;
+                                preflushJobs.Add(new PreflushJob
+                                {
+                                    Type = PreflushJobType.SpeculativeConstraintBatchSearch,
+                                    Start = jobStart,
+                                    End = previousEnd,
+                                    TypeIndex = typeIndex,
+                                    WorkerIndex = workerIndex
+                                }, Pool.SpecializeFor<PreflushJob>());
+                            }
+                            Debug.Assert(previousEnd == count);
                         }
-                        Debug.Assert(previousEnd == count);
                     }
                 }
                 var start = Stopwatch.GetTimestamp();
                 preflushJobIndex = -1;
-                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                //threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                for (int i = 0; i < preflushJobs.Count; ++i)
+                {
+                    ExecutePreflushJob(0, ref preflushJobs[i]);
+                }
                 var end = Stopwatch.GetTimestamp();
                 Console.WriteLine($"Preflush phase 1 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
@@ -321,19 +320,24 @@ namespace SolverPrototype.CollisionDetection
                 //1) Locally sequential constraint adds. This is the beefiest single task, and it runs on one thread. It can be deterministic or nondeterministic.
                 //2) Freshness checker. Lots of smaller jobs that can hopefully fill the gap while the constraint adds finish. The wider the CPU, the less this will be possible.
 
+                preflushJobs.Clear(); //Note job clear. We're setting up new jobs.
                 if (Deterministic)
                 {
                     preflushJobs.Add(new PreflushJob { Type = PreflushJobType.DeterministicConstraintAdd }, Pool.SpecializeFor<PreflushJob>());
                 }
                 else
                 {
-                    preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicConstraintAdd }, Pool.SpecializeFor<PreflushJob>());
+                    preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicConstraintAdd, WorkerCount = threadCount }, Pool.SpecializeFor<PreflushJob>());
                 }
                 FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
 
                 start = Stopwatch.GetTimestamp();
                 preflushJobIndex = -1;
-                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                //threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                for (int i = 0; i < preflushJobs.Count; ++i)
+                {
+                    ExecutePreflushJob(0, ref preflushJobs[i]);
+                }
                 end = Stopwatch.GetTimestamp();
                 for (int i = 0; i < threadCount; ++i)
                 {
