@@ -30,16 +30,16 @@ namespace SolverPrototype.CollisionDetection
             }
 
             //TODO: If we add in nonconvex manifolds with up to 8 contacts, this will need to change- we preallocate enough space to hold all possible narrowphase generated types.
-            const int constraintTypeCount = 16;
+            public const int ConstraintTypeCount = 16;
             internal Buffer<UntypedList> pendingConstraintsByType;
             int minimumConstraintCountPerCache;
 
             public PendingConstraintAddCache(BufferPool pool, int minimumConstraintCountPerCache = 128)
             {
                 this.pool = pool;
-                pool.SpecializeFor<UntypedList>().Take(constraintTypeCount, out pendingConstraintsByType);
+                pool.SpecializeFor<UntypedList>().Take(ConstraintTypeCount, out pendingConstraintsByType);
                 //Have to clear the memory before use to avoid trash data sticking around.
-                pendingConstraintsByType.Clear(0, constraintTypeCount);
+                pendingConstraintsByType.Clear(0, ConstraintTypeCount);
                 this.minimumConstraintCountPerCache = minimumConstraintCountPerCache;
             }
 
@@ -162,7 +162,7 @@ namespace SolverPrototype.CollisionDetection
             //freshness checker would cause bugs.
             public void Dispose()
             {
-                for (int i = 0; i < constraintTypeCount; ++i)
+                for (int i = 0; i < ConstraintTypeCount; ++i)
                 {
                     if (pendingConstraintsByType[i].Buffer.Allocated)
                         pool.Return(ref pendingConstraintsByType[i].Buffer);
@@ -173,7 +173,7 @@ namespace SolverPrototype.CollisionDetection
             internal int CountConstraints()
             {
                 int count = 0;
-                for (int i = 0; i < constraintTypeCount; ++i)
+                for (int i = 0; i < ConstraintTypeCount; ++i)
                 {
                     count += pendingConstraintsByType[i].Count;
                 }

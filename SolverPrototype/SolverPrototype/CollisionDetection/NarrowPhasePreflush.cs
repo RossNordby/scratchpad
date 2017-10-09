@@ -24,24 +24,18 @@ namespace SolverPrototype.CollisionDetection
         /// Accesses no buffer pools; memory is allocated and returned on main thread.
         /// </summary>
         SpeculativeConstraintBatchSearch,
-        /// <summary>
-        /// Locally sequential addition of every constraint to the associated body lists.
-        /// Modifications to constraint graph are independent of the solver changes.
-        /// Accesses main thread buffer pool when per-body lists resize.
-        /// </summary>
-        AddConstraintsToBodyLists,
 
         //The deterministic constraint add is split into two dispatches. The to-add sort, speculative batch search, and body list add all happen first.
         //The actual addition process occurs afterward alongside the freshness checker.
         //It's slower than the nondeterministic path, but that's the bullet to bite.
 
         /// <summary>
-        /// Adds constraints to the solver in an order determined by the previous sorts and with the help of the speculatively computed batch targets. Locally sequential.
+        /// Adds constraints to the solver and constraint graph in an order determined by the previous sorts and with the help of the speculatively computed batch targets. Locally sequential.
         /// Accesses main thread buffer pool when type batches are created or resize.
         /// </summary>
         DeterministicConstraintAdd,
         /// <summary>
-        /// Adds constraints to the solver in an order determined by the collision detection phase. If the collision detection phase is nondeterministic due to threading, then 
+        /// Adds constraints to the solver and constraint graph in an order determined by the collision detection phase. If the collision detection phase is nondeterministic due to threading, then 
         /// this will result in nondeterministic adds to the solver.
         /// Accesses main thread buffer pool when type batches are created or resize.
         /// </summary>
@@ -59,37 +53,31 @@ namespace SolverPrototype.CollisionDetection
         [FieldOffset(0)]
         public PreflushJobType Type;
         /// <summary>
-        /// For a deterministic contact constraint sort job, the narrow phase constraint type index to sort.
-        /// </summary>
-        [FieldOffset(4)]
-        public int TypeIndexToSort;
-        /// <summary>
-        /// Start region of a CheckFreshness or DeterministicConstraintAdd job.
+        /// Start region of a CheckFreshness or SpeculativeConstraintBatchSearch job.
         /// </summary>
         [FieldOffset(4)]
         public int Start;
         /// <summary>
-        /// End region of a CheckFreshness or DeterministicConstraintAdd job.
+        /// End region of a CheckFreshness or SpeculativeConstraintBatchSearch job.
         /// </summary>
         [FieldOffset(8)]
         public int End;
         /// <summary>
-        /// Number of worker threads containing constraints to read in the SortContactConstraintType and AddConstraintsToBodyLists phases.
+        /// Narrow phase constraint type index targeted by a SpeculativeConstraintBatchSearch or SortContactConstraintType.
         /// </summary>
-        [FieldOffset(8)]
+        [FieldOffset(12)]
+        public int TypeIndex;
+        /// <summary>
+        /// Index of the worker in which a range of constraints starts. 
+        /// Used by SpeculativeConstraintBatchSearch.
+        /// </summary>
+        [FieldOffset(16)]
+        public int WorkerIndex;
+        /// <summary>
+        /// Number of worker threads containing constraints to read in the SortContactConstraintType task.
+        /// </summary>
+        [FieldOffset(16)]
         public int WorkerCount;
-        /// <summary>
-        /// Start index of a range of constraints stored across the per-worker pending constraint caches. 
-        /// Used by NondeterministicConstraintAdd and SpeculativeConstraintBatchSearch.
-        /// </summary>
-        [FieldOffset(4)]
-        public int StartingWorkerIndex;
-        /// <summary>
-        /// Number of constraints in a range stored across the per-worker pending constraint caches. 
-        /// Used by NondeterministicConstraintAdd and SpeculativeConstraintBatchSearch.
-        /// </summary>
-        [FieldOffset(8)]
-        public int ConstraintCount;
     }
 
     public partial class NarrowPhase<TCallbacks>
@@ -139,8 +127,8 @@ namespace SolverPrototype.CollisionDetection
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public unsafe ulong GetHandles(void* memory)
             {
-                //Only one body; can't just return the memory directly.
-                return 0UL + *(uint*)memory;
+                //Only one body; can't just return an 8 byte block of memory directly. Expand 4 bytes to 8.
+                return *(uint*)memory;
             }
         }
         struct TwoBodyHandleCollector : ISortingHandleCollector
@@ -191,7 +179,7 @@ namespace SolverPrototype.CollisionDetection
                     {
                         //The main thread has already allocated lists of appropriate capacities for all types that exist.
                         //We initialize and sort those lists on multiple threads.
-                        ref var list = ref sortedConstraints[job.TypeIndexToSort];
+                        ref var list = ref sortedConstraints[job.TypeIndex];
                         //One and two body constraints require separate initialization to work in a single pass with a minimum of last second branches.
                         //Use the type index to determine the body count.
                         //This follows the same convention as the GatherOldImpulses and ScatterNewImpulses of the PairCache.
@@ -200,31 +188,45 @@ namespace SolverPrototype.CollisionDetection
                         //convex vs nonconvex: 0x4
                         //1 body versus 2 body: 0x8
                         //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
-                        if (job.TypeIndexToSort >= 8)
+                        if (job.TypeIndex >= 8)
                         {
-                            BuildSortingTargets<TwoBodyHandleCollector>(ref list, job.TypeIndexToSort, job.WorkerCount);
+                            BuildSortingTargets<TwoBodyHandleCollector>(ref list, job.TypeIndex, job.WorkerCount);
                         }
                         else
                         {
-                            BuildSortingTargets<OneBodyHandleCollector>(ref list, job.TypeIndexToSort, job.WorkerCount);
+                            BuildSortingTargets<OneBodyHandleCollector>(ref list, job.TypeIndex, job.WorkerCount);
                         }
-                        
+
                         //Since duplicates are impossible (as that would imply the narrow phase generated two constraints for one pair), the non-threeway sort is used.
                         PendingConstraintComparer comparer;
                         QuickSort.Sort(ref list.Span[0], 0, list.Count - 1, ref comparer);
                     }
                     break;
-                case PreflushJobType.AddConstraintsToBodyLists:
+                case PreflushJobType.SpeculativeConstraintBatchSearch:
+                    {
+                        while (true)
+                        {
+                            overlapWorkers[job.WorkerIndex].PendingConstraints.SpeculativeConstraintBatchSearch(Solver, job.TypeIndex, job.Start, job.End);
+                        }
+                    }
+                    break;
+                case PreflushJobType.NondeterministicConstraintAdd:
                     {
                         for (int i = 0; i < job.WorkerCount; ++i)
                         {
-                            ref var workerList = ref overlapWorkers[i].PendingConstraints.pendingConstraintsByType[job.TypeIndexToSort];
-                            if (workerList.Count > 0)
+                            overlapWorkers[i].PendingConstraints.FlushNondeterministically(Simulation, ref PairCache);
+                        }
+                    }
+                    break;
+                case PreflushJobType.DeterministicConstraintAdd:
+                    {
+                        for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
+                        {
+                            ref var typeList = ref sortedConstraints[typeIndex];
+                            for (int j = 0; j < typeList.Count; ++j)
                             {
-                                int indexInBytes = 0;
-                                for (int j = 0; j < workerList.Count; ++j)
-                                {
-                                }
+                                ref var target = ref typeList[j];
+                                overlapWorkers[target.WorkerIndex].PendingConstraints.AddToSimulation(Simulation, typeIndex, target.ByteIndexInCache);
                             }
                         }
                     }
@@ -240,10 +242,89 @@ namespace SolverPrototype.CollisionDetection
             //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
             QuickList<PreflushJob, Buffer<PreflushJob>>.Create(Pool.SpecializeFor<PreflushJob>(), 128, out preflushJobs);
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
+
+
+
+            //FIRST PHASE: 
+            //1) If deterministic, sort each type batch.
+            //2) Speculatively search for best-guess constraint batches for each new constraint in parallel.
+
+            //Following the goals of the first phase, we have to responsibilities during job creation:
+            //1) Scan through the workers and allocate space for the sorting handles to be added, if deterministic.
+            //2) Speculative job creation walks through the types contained within each worker. Larger contiguous lists are subdivided into more than one job.
+            //However, we never bother creating jobs which span boundaries between workers or types. While this can decrease the size of individual jobs below a useful level in some cases,
+            //those are also the cases where the performance deficit doesn't matter. The simplicity of a single job operating only within a single list is worth more- plus, there
+            //is a slight cache miss cost to jumping to a different area of memory in the middle of a job. Bundling that cost into the overhead of a new multithreaded task isn't a terrible thing.
+
+            for (int i = 0; i < threadCount; ++i)
+            {
+                overlapWorkers[i].PendingConstraints.AllocateForSpeculativeSearch();
+            }
+            //Note that we create the sort jobs first. They tend to be individually much heftier than the constraint batch finder phase, and we'd like to be able to fill in the execution gaps.
+            if (Deterministic)
+            {
+                Pool.SpecializeFor<QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>>().Take(PendingConstraintAddCache.ConstraintTypeCount, out sortedConstraints);
+                sortedConstraints.Clear(0, PendingConstraintAddCache.ConstraintTypeCount);
+                for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
+                {
+                    int typeCount = 0;
+                    for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
+                    {
+                        typeCount += overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
+                    }
+                    if (typeCount > 0)
+                    {
+                        //Note that we don't actually add any constraint targets here- we let the actual worker threads do that. No reason not to, and it extracts a tiny bit of extra parallelism.
+                        QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>.Create(Pool.SpecializeFor<SortConstraintTarget>(), typeCount, out sortedConstraints[typeIndex]);
+                        preflushJobs.Add(new PreflushJob { Type = PreflushJobType.SortContactConstraintType, TypeIndex = typeIndex }, Pool.SpecializeFor<PreflushJob>());
+                    }
+                }
+            }
+            const int maximumConstraintsPerJob = 16; //TODO: Empirical tuning.
+
+            for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
+            {
+                for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
+                {
+                    var count = overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
+                    var jobCount = 1 + count / maximumConstraintsPerJob;
+                    var jobSize = count / jobCount;
+                    var remainder = count - jobCount * jobSize;
+                    int previousEnd = 0;
+                    for (int i = 0; i < jobCount; ++i)
+                    {
+                        var jobStart = previousEnd;
+                        var constraintsInJob = jobSize;
+                        if (i < remainder)
+                            ++constraintsInJob;
+                        previousEnd += constraintsInJob;
+                        preflushJobs.Add(new PreflushJob
+                        {
+                            Type = PreflushJobType.SpeculativeConstraintBatchSearch,
+                            Start = jobStart,
+                            End = previousEnd,
+                            TypeIndex = typeIndex,
+                            WorkerIndex = workerIndex
+                        }, Pool.SpecializeFor<PreflushJob>());
+                    }
+                    Debug.Assert(previousEnd == count);
+                }
+            }
+
+
+
+            //SECOND PHASE:
+            //1) Locally sequential constraint adds. This is the beefiest single task, and it runs on one thread. It can be deterministic or nondeterministic.
+            //2) Freshness checker. Lots of smaller jobs that can hopefully fill the gap while the constraint adds finish. The wider the CPU, the less this will be possible.
+
+
             FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
 
-            //Note: at the moment we use a bit of a hacky scheme where we create jobs unconditionally for the freshness checker, but the constraint adder uses 
-            //direct sequential adds when there's only one thread. 
+            for (int i = 0; i < threadCount; ++i)
+            {
+                overlapWorkers[i].PendingConstraints.DisposeSpeculativeSearch();
+            }
+
 
             var start = Stopwatch.GetTimestamp();
             if (threadCount == 1)
@@ -264,7 +345,7 @@ namespace SolverPrototype.CollisionDetection
             {
                 overlapWorkers[i].PendingConstraints.Dispose();
             }
-            Console.WriteLine($"Preflush time (us): {1e6 * (end - start) / ((double)Stopwatch.Frequency)}");
+            Console.WriteLine($"Preflush time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
             preflushJobs.Dispose(Pool.SpecializeFor<PreflushJob>());
         }
     }
