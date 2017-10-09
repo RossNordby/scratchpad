@@ -244,108 +244,117 @@ namespace SolverPrototype.CollisionDetection
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
 
 
-
-            //FIRST PHASE: 
-            //1) If deterministic, sort each type batch.
-            //2) Speculatively search for best-guess constraint batches for each new constraint in parallel.
-
-            //Following the goals of the first phase, we have to responsibilities during job creation:
-            //1) Scan through the workers and allocate space for the sorting handles to be added, if deterministic.
-            //2) Speculative job creation walks through the types contained within each worker. Larger contiguous lists are subdivided into more than one job.
-            //However, we never bother creating jobs which span boundaries between workers or types. While this can decrease the size of individual jobs below a useful level in some cases,
-            //those are also the cases where the performance deficit doesn't matter. The simplicity of a single job operating only within a single list is worth more- plus, there
-            //is a slight cache miss cost to jumping to a different area of memory in the middle of a job. Bundling that cost into the overhead of a new multithreaded task isn't a terrible thing.
-
-            for (int i = 0; i < threadCount; ++i)
+            if (threadCount > 1)
             {
-                overlapWorkers[i].PendingConstraints.AllocateForSpeculativeSearch();
-            }
-            //Note that we create the sort jobs first. They tend to be individually much heftier than the constraint batch finder phase, and we'd like to be able to fill in the execution gaps.
-            if (Deterministic)
-            {
-                Pool.SpecializeFor<QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>>().Take(PendingConstraintAddCache.ConstraintTypeCount, out sortedConstraints);
-                sortedConstraints.Clear(0, PendingConstraintAddCache.ConstraintTypeCount);
+                //FIRST PHASE: 
+                //1) If deterministic, sort each type batch.
+                //2) Speculatively search for best-guess constraint batches for each new constraint in parallel.
+
+                //Following the goals of the first phase, we have to responsibilities during job creation:
+                //1) Scan through the workers and allocate space for the sorting handles to be added, if deterministic.
+                //2) Speculative job creation walks through the types contained within each worker. Larger contiguous lists are subdivided into more than one job.
+                //However, we never bother creating jobs which span boundaries between workers or types. While this can decrease the size of individual jobs below a useful level in some cases,
+                //those are also the cases where the performance deficit doesn't matter. The simplicity of a single job operating only within a single list is worth more- plus, there
+                //is a slight cache miss cost to jumping to a different area of memory in the middle of a job. Bundling that cost into the overhead of a new multithreaded task isn't a terrible thing.
+
+                for (int i = 0; i < threadCount; ++i)
+                {
+                    overlapWorkers[i].PendingConstraints.AllocateForSpeculativeSearch();
+                }
+                //Note that we create the sort jobs first. They tend to be individually much heftier than the constraint batch finder phase, and we'd like to be able to fill in the execution gaps.
+                if (Deterministic)
+                {
+                    Pool.SpecializeFor<QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>>().Take(PendingConstraintAddCache.ConstraintTypeCount, out sortedConstraints);
+                    sortedConstraints.Clear(0, PendingConstraintAddCache.ConstraintTypeCount);
+                    for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
+                    {
+                        int typeCount = 0;
+                        for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
+                        {
+                            typeCount += overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
+                        }
+                        if (typeCount > 0)
+                        {
+                            //Note that we don't actually add any constraint targets here- we let the actual worker threads do that. No reason not to, and it extracts a tiny bit of extra parallelism.
+                            QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>.Create(Pool.SpecializeFor<SortConstraintTarget>(), typeCount, out sortedConstraints[typeIndex]);
+                            preflushJobs.Add(new PreflushJob { Type = PreflushJobType.SortContactConstraintType, TypeIndex = typeIndex }, Pool.SpecializeFor<PreflushJob>());
+                        }
+                    }
+                }
+                const int maximumConstraintsPerJob = 16; //TODO: Empirical tuning.
+
                 for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
                 {
-                    int typeCount = 0;
                     for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
                     {
-                        typeCount += overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
-                    }
-                    if (typeCount > 0)
-                    {
-                        //Note that we don't actually add any constraint targets here- we let the actual worker threads do that. No reason not to, and it extracts a tiny bit of extra parallelism.
-                        QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>.Create(Pool.SpecializeFor<SortConstraintTarget>(), typeCount, out sortedConstraints[typeIndex]);
-                        preflushJobs.Add(new PreflushJob { Type = PreflushJobType.SortContactConstraintType, TypeIndex = typeIndex }, Pool.SpecializeFor<PreflushJob>());
-                    }
-                }
-            }
-            const int maximumConstraintsPerJob = 16; //TODO: Empirical tuning.
-
-            for (int typeIndex = 0; typeIndex < PendingConstraintAddCache.ConstraintTypeCount; ++typeIndex)
-            {
-                for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
-                {
-                    var count = overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
-                    var jobCount = 1 + count / maximumConstraintsPerJob;
-                    var jobSize = count / jobCount;
-                    var remainder = count - jobCount * jobSize;
-                    int previousEnd = 0;
-                    for (int i = 0; i < jobCount; ++i)
-                    {
-                        var jobStart = previousEnd;
-                        var constraintsInJob = jobSize;
-                        if (i < remainder)
-                            ++constraintsInJob;
-                        previousEnd += constraintsInJob;
-                        preflushJobs.Add(new PreflushJob
+                        var count = overlapWorkers[workerIndex].PendingConstraints.pendingConstraintsByType[typeIndex].Count;
+                        var jobCount = 1 + count / maximumConstraintsPerJob;
+                        var jobSize = count / jobCount;
+                        var remainder = count - jobCount * jobSize;
+                        int previousEnd = 0;
+                        for (int i = 0; i < jobCount; ++i)
                         {
-                            Type = PreflushJobType.SpeculativeConstraintBatchSearch,
-                            Start = jobStart,
-                            End = previousEnd,
-                            TypeIndex = typeIndex,
-                            WorkerIndex = workerIndex
-                        }, Pool.SpecializeFor<PreflushJob>());
+                            var jobStart = previousEnd;
+                            var constraintsInJob = jobSize;
+                            if (i < remainder)
+                                ++constraintsInJob;
+                            previousEnd += constraintsInJob;
+                            preflushJobs.Add(new PreflushJob
+                            {
+                                Type = PreflushJobType.SpeculativeConstraintBatchSearch,
+                                Start = jobStart,
+                                End = previousEnd,
+                                TypeIndex = typeIndex,
+                                WorkerIndex = workerIndex
+                            }, Pool.SpecializeFor<PreflushJob>());
+                        }
+                        Debug.Assert(previousEnd == count);
                     }
-                    Debug.Assert(previousEnd == count);
                 }
-            }
+                var start = Stopwatch.GetTimestamp();
+                preflushJobIndex = -1;
+                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                var end = Stopwatch.GetTimestamp();
+                Console.WriteLine($"Preflush phase 1 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
+                //SECOND PHASE:
+                //1) Locally sequential constraint adds. This is the beefiest single task, and it runs on one thread. It can be deterministic or nondeterministic.
+                //2) Freshness checker. Lots of smaller jobs that can hopefully fill the gap while the constraint adds finish. The wider the CPU, the less this will be possible.
 
-
-            //SECOND PHASE:
-            //1) Locally sequential constraint adds. This is the beefiest single task, and it runs on one thread. It can be deterministic or nondeterministic.
-            //2) Freshness checker. Lots of smaller jobs that can hopefully fill the gap while the constraint adds finish. The wider the CPU, the less this will be possible.
-
-
-            FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
-
-            for (int i = 0; i < threadCount; ++i)
-            {
-                overlapWorkers[i].PendingConstraints.DisposeSpeculativeSearch();
-            }
-
-
-            var start = Stopwatch.GetTimestamp();
-            if (threadCount == 1)
-            {
-                for (int i = 0; i < preflushJobs.Count; ++i)
+                if (Deterministic)
                 {
-                    ExecutePreflushJob(0, ref preflushJobs[i]);
+                    preflushJobs.Add(new PreflushJob { Type = PreflushJobType.DeterministicConstraintAdd }, Pool.SpecializeFor<PreflushJob>());
                 }
-                overlapWorkers[0].PendingConstraints.FlushSequentially(Simulation, ref PairCache);
+                else
+                {
+                    preflushJobs.Add(new PreflushJob { Type = PreflushJobType.NondeterministicConstraintAdd }, Pool.SpecializeFor<PreflushJob>());
+                }
+                FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
+
+                start = Stopwatch.GetTimestamp();
+                preflushJobIndex = -1;
+                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                end = Stopwatch.GetTimestamp();
+                for (int i = 0; i < threadCount; ++i)
+                {
+                    overlapWorkers[i].PendingConstraints.Dispose();
+                }
+                Console.WriteLine($"Preflush phase 2 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
+
+                for (int i = 0; i < threadCount; ++i)
+                {
+                    overlapWorkers[i].PendingConstraints.DisposeSpeculativeSearch();
+                }
             }
             else
             {
-                preflushJobIndex = -1;
-                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                //Single threaded. Quite a bit simpler!
+                //Two tasks: freshness checker, and add all pending constraints.
+                FreshnessChecker.CheckFreshnessInRegion(0, 0, PairCache.Mapping.Count);
+                overlapWorkers[0].PendingConstraints.FlushSequentially(Simulation, ref PairCache);
             }
-            var end = Stopwatch.GetTimestamp();
-            for (int i = 0; i < threadCount; ++i)
-            {
-                overlapWorkers[i].PendingConstraints.Dispose();
-            }
-            Console.WriteLine($"Preflush time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
+
+
             preflushJobs.Dispose(Pool.SpecializeFor<PreflushJob>());
         }
     }

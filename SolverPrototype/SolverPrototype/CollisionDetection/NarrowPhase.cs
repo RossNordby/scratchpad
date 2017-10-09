@@ -90,6 +90,15 @@ namespace SolverPrototype.CollisionDetection
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
 
+        /// <summary>
+        /// <para>Gets or sets whether the narrowphase should attempt to retain determinism. If true, additional time is spent sorting new constraints. 
+        /// This can slightly slow down the narrow phase flush, but the simulation should then produce consistent results between runs 
+        /// (so long as all interactions with the engine are done in exactly the same order).</para>
+        /// <para>Note that this only guarantees local determinism on a single platform.
+        /// There is no guarantee that two different processors with different architectures will produce the same result due to floating point implementation differences.</para>
+        /// </summary>
+        public bool Deterministic { get; set; }
+
         protected NarrowPhase()
         {
             flushWorkerLoop = FlushWorkerLoop;
