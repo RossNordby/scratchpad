@@ -189,6 +189,7 @@ namespace BEPUutilities2.Memory
                     idsForAllocator = new HashSet<int>();
                     outstandingAllocators.Add(allocator, idsForAllocator);
                 }
+                Debug.Assert(idsForAllocator.Count < (1 << 25), "Do you actually have that many allocations for this one allocator?");
                 idsForAllocator.Add(slot);
 #endif
 #endif
@@ -204,9 +205,9 @@ namespace BEPUutilities2.Memory
                     "This buffer id must have been taken from the pool previously.");
 #if LEAKDEBUG
                 bool found = false;
-                foreach(var pair in outstandingAllocators)
+                foreach (var pair in outstandingAllocators)
                 {
-                    if(pair.Value.Remove(buffer.Id))
+                    if (pair.Value.Remove(buffer.Id))
                     {
                         found = true;
                         if (pair.Value.Count == 0)

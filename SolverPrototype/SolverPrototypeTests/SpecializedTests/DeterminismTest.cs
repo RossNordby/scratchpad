@@ -1,0 +1,75 @@
+﻿using BEPUutilities2;
+using BEPUutilities2.Memory;
+using SolverPrototype;
+using SolverPrototype.Collidables;
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using System.Text;
+
+namespace SolverPrototypeTests.SpecializedTests
+{
+    public static class DeterminismTest
+    {
+        public static BodyPose[] ExecuteSimulation(int frameCount, BufferPool bufferPool, IThreadDispatcher threadDispatcher)
+        {
+            DefaultTypes.Register();
+            var simulation = Simulation.Create(bufferPool, new TestCallbacks());
+            var shape = new Sphere(0.5f);
+            var shapeIndex = simulation.Shapes.Add(ref shape);
+            const int width = 4;
+            const int height = 4;
+            const int length = 4;
+            SimulationSetup.BuildLattice(
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
+                new ConstraintlessLatticeBuilder(),
+                width, height, length, simulation, out var bodyHandles, out var constraintHandles);
+            simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
+            simulation.NarrowPhase.Deterministic = true;
+
+            BodyVelocity velocity;
+            velocity.Linear = new Vector3(.1f, 0, 0.1f);
+            velocity.Angular = new Vector3();
+            simulation.Bodies.SetVelocity(bodyHandles[width], ref velocity);
+
+
+            for (int i = 0; i < frameCount; ++i)
+            {
+                simulation.Timestep(1 / 60f);
+                //TODO: Probably should do add/remove on bodies alone, and possibly a variant that includes SOME constraints.
+                //(not enough to limit the amount of potential nondeterminism from collisions)
+                //Then we can add/remove those. Do need to control the seed too, though.
+                //SimulationScrambling.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
+            }
+
+            var poses = new BodyPose[simulation.Bodies.BodyCount];
+            for (int i = 0; i < simulation.Bodies.BodyCount; ++i)
+            {
+                simulation.Bodies.GetPose(bodyHandles[i], out poses[i]);
+            }
+            simulation.Dispose();
+            return poses;
+        }
+
+        public static void Test()
+        {
+            const int frameCount = 1000;
+            var bufferPool = new BufferPool();
+            SimpleThreadDispatcher dispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
+            var initialPoses = ExecuteSimulation(frameCount, bufferPool, dispatcher);
+            const int testIterations = 10;
+            for (int i = 0; i < testIterations; ++i)
+            {
+                var poses = ExecuteSimulation(frameCount, bufferPool, dispatcher);
+                for (int j = 0; j < poses.Length; ++j)
+                {
+                    if (initialPoses[j].Position != poses[j].Position || initialPoses[j].Orientation != poses[j].Orientation)
+                    {
+                        Console.WriteLine($"DETERMINISM FAILURE, test {i}, body {j}. Expected <{initialPoses[j].Position}, {initialPoses[j].Orientation}>, got <{poses[j].Position}, {poses[j].Orientation}>");
+                    }
+                }
+                Console.WriteLine($"Completed iteration {i}.");
+            }
+        }
+    }
+}

@@ -315,7 +315,7 @@ namespace SolverPrototype.CollisionDetection
                 //    ExecutePreflushJob(0, ref preflushJobs[i]);
                 //}
                 var end = Stopwatch.GetTimestamp();
-                Console.WriteLine($"Preflush phase 1 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
+                //Console.WriteLine($"Preflush phase 1 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
                 //SECOND PHASE:
                 //1) Locally sequential constraint adds. This is the beefiest single task, and it runs on one thread. It can be deterministic or nondeterministic.
@@ -340,13 +340,11 @@ namespace SolverPrototype.CollisionDetection
                 //    ExecutePreflushJob(0, ref preflushJobs[i]);
                 //}
                 end = Stopwatch.GetTimestamp();
-                Console.WriteLine($"Preflush phase 2 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
+                //Console.WriteLine($"Preflush phase 2 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
                 for (int i = 0; i < threadCount; ++i)
                 {
-                    ref var pendingConstraints = ref overlapWorkers[i].PendingConstraints;
-                    pendingConstraints.Dispose();
-                    pendingConstraints.DisposeSpeculativeSearch();
+                    overlapWorkers[i].PendingConstraints.DisposeSpeculativeSearch();
                 }
                 if (Deterministic)
                 {
@@ -368,7 +366,10 @@ namespace SolverPrototype.CollisionDetection
                 FreshnessChecker.CheckFreshnessInRegion(0, 0, PairCache.Mapping.Count);
                 overlapWorkers[0].PendingConstraints.FlushSequentially(Simulation, ref PairCache);
             }
-
+            for (int i = 0; i < threadCount; ++i)
+            {
+                overlapWorkers[i].PendingConstraints.Dispose();
+            }
 
         }
     }
