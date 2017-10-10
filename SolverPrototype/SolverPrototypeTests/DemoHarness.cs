@@ -270,7 +270,7 @@ namespace SolverPrototypeTests
             demo.Render(renderer);
 #if DEBUG
             float warningHeight = 15f;
-            renderer.TextBatcher.Write(uiText.Clear().Append("Running in Debug configuration. Compile in Release configuration for performance testing."),
+            renderer.TextBatcher.Write(uiText.Clear().Append("Running in Debug configuration. Compile in Release or, better yet, ReleaseStrip configuration for performance testing."),
                 new Vector2((window.Resolution.X - GlyphBatch.MeasureLength(uiText, font, warningHeight)) * 0.5f, warningHeight), warningHeight, new Vector3(1, 0, 0), font);
 #endif            
             float textHeight = 16;

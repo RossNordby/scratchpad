@@ -158,11 +158,11 @@ namespace SolverPrototype.CollisionDetection
                         ref var constraint = ref list.AllocateUnsafely();
                         constraint.WorkerIndex = i;
                         constraint.ByteIndexInCache = indexInBytes;
-                        indexInBytes += entrySizeInBytes;
                         //Note two details:
                         //1) We rely on the layout of memory in the pending constraint add. If the body handles don't occupy the first bytes, this breaks.
                         //2) We rely on the order of body handles. The narrow phase should always guarantee a consistent order.
                         constraint.Handles = handleCollector.GetHandles(workerList.Buffer.Memory + indexInBytes);
+                        indexInBytes += entrySizeInBytes;
                     }
                 }
             }
@@ -229,15 +229,16 @@ namespace SolverPrototype.CollisionDetection
 
         protected override void OnPreflush(IThreadDispatcher threadDispatcher)
         {
-            //Given the sizes involved, a fixed guess of 128 should be just fine for essentially any simulation. Overkill, but not in a concerning way.
-            //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
-            //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
-            QuickList<PreflushJob, Buffer<PreflushJob>>.Create(Pool.SpecializeFor<PreflushJob>(), 128, out preflushJobs);
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
 
 
             if (threadCount > 1)
             {
+                //Given the sizes involved, a fixed guess of 128 should be just fine for essentially any simulation. Overkill, but not in a concerning way.
+                //Temporarily allocating 1KB of memory isn't a big deal, and we will only touch the necessary subset of it anyway.
+                //(There are pathological cases where resizes are still possible, but the constraint remover handles them by not adding unsafely.)
+                QuickList<PreflushJob, Buffer<PreflushJob>>.Create(Pool.SpecializeFor<PreflushJob>(), 128, out preflushJobs);
+
                 //FIRST PHASE: 
                 //1) If deterministic, sort each type batch.
                 //2) Speculatively search for best-guess constraint batches for each new constraint in parallel.
@@ -269,7 +270,7 @@ namespace SolverPrototype.CollisionDetection
                         {
                             //Note that we don't actually add any constraint targets here- we let the actual worker threads do that. No reason not to, and it extracts a tiny bit of extra parallelism.
                             QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>.Create(Pool.SpecializeFor<SortConstraintTarget>(), typeCount, out sortedConstraints[typeIndex]);
-                            preflushJobs.Add(new PreflushJob { Type = PreflushJobType.SortContactConstraintType, TypeIndex = typeIndex }, Pool.SpecializeFor<PreflushJob>());
+                            preflushJobs.Add(new PreflushJob { Type = PreflushJobType.SortContactConstraintType, TypeIndex = typeIndex, WorkerCount = threadCount }, Pool.SpecializeFor<PreflushJob>());
                         }
                     }
                 }
@@ -308,11 +309,11 @@ namespace SolverPrototype.CollisionDetection
                 }
                 var start = Stopwatch.GetTimestamp();
                 preflushJobIndex = -1;
-                //threadDispatcher.DispatchWorkers(preflushWorkerLoop);
-                for (int i = 0; i < preflushJobs.Count; ++i)
-                {
-                    ExecutePreflushJob(0, ref preflushJobs[i]);
-                }
+                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                //for (int i = 0; i < preflushJobs.Count; ++i)
+                //{
+                //    ExecutePreflushJob(0, ref preflushJobs[i]);
+                //}
                 var end = Stopwatch.GetTimestamp();
                 Console.WriteLine($"Preflush phase 1 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
@@ -333,22 +334,32 @@ namespace SolverPrototype.CollisionDetection
 
                 start = Stopwatch.GetTimestamp();
                 preflushJobIndex = -1;
-                //threadDispatcher.DispatchWorkers(preflushWorkerLoop);
-                for (int i = 0; i < preflushJobs.Count; ++i)
-                {
-                    ExecutePreflushJob(0, ref preflushJobs[i]);
-                }
+                threadDispatcher.DispatchWorkers(preflushWorkerLoop);
+                //for (int i = 0; i < preflushJobs.Count; ++i)
+                //{
+                //    ExecutePreflushJob(0, ref preflushJobs[i]);
+                //}
                 end = Stopwatch.GetTimestamp();
-                for (int i = 0; i < threadCount; ++i)
-                {
-                    overlapWorkers[i].PendingConstraints.Dispose();
-                }
                 Console.WriteLine($"Preflush phase 2 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
                 for (int i = 0; i < threadCount; ++i)
                 {
-                    overlapWorkers[i].PendingConstraints.DisposeSpeculativeSearch();
+                    ref var pendingConstraints = ref overlapWorkers[i].PendingConstraints;
+                    pendingConstraints.Dispose();
+                    pendingConstraints.DisposeSpeculativeSearch();
                 }
+                if (Deterministic)
+                {
+                    var targetPool = Pool.SpecializeFor<SortConstraintTarget>();
+                    for (int i = 0; i < PendingConstraintAddCache.ConstraintTypeCount; ++i)
+                    {
+                        ref var typeList = ref sortedConstraints[i];
+                        if (typeList.Span.Allocated)
+                            typeList.Dispose(targetPool);
+                    }
+                    Pool.SpecializeFor<QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>>().Return(ref sortedConstraints);
+                }
+                preflushJobs.Dispose(Pool.SpecializeFor<PreflushJob>());
             }
             else
             {
@@ -359,7 +370,6 @@ namespace SolverPrototype.CollisionDetection
             }
 
 
-            preflushJobs.Dispose(Pool.SpecializeFor<PreflushJob>());
         }
     }
 }

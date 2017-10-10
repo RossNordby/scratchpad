@@ -1,8 +1,8 @@
 # Q&A
 
-1. How do I make an object that can't be moved by outside influences, like other colliding dynamic bodies, but can still have a velocity?
+##### 1. How do I make an object that can't be moved by outside influences, like other colliding dynamic bodies, but can still have a velocity?
 
-A: Use a kinematic body. To create one, set the inverse mass and all components of the inverse inertia to zero in the body description passed to Simulation.Add. Kinematic bodies have effectively infinite mass and cannot be moved by any force. You can still change their velocity directly, though.
+Use a kinematic body. To create one, set the inverse mass and all components of the inverse inertia to zero in the body description passed to Simulation.Add. Kinematic bodies have effectively infinite mass and cannot be moved by any force. You can still change their velocity directly, though.
 
 Any nonzero component in the inverse mass or inverse inertia results in a dynamic body.
 
@@ -10,9 +10,9 @@ Be careful when using kinematics- they are both unstoppable forces and immovable
 
 Also, if two kinematic bodies collide, a constraint will not be generated. Kinematics cannot respond to collisions, not even with other infinitely massive objects. They will simply continue to move along the path defined by their velocity.
 
-2. I made a body with zero inverse mass and nonzero and the simulation exploded/crashed! Why?
+##### 2. I made a body with zero inverse mass and nonzero inverse inertia and the simulation exploded/crashed! Why?
 
-A: While dynamic bodies with zero inverse mass and nonzero inverse inertia tensors are technically allowed, they require extreme care. It is possible for constraints to be configured such that there is no solution, resulting in a division by zero. NaN values will propagate through the simulation and make everything explode.
+While dynamic bodies with zero inverse mass and nonzero inverse inertia tensors are technically allowed, they require extreme care. It is possible for constraints to be configured such that there is no solution, resulting in a division by zero. NaN values will propagate through the simulation and make everything explode.
 
 To avoid the NaN-explosion, any constraint involving two bodies must be able to compute some local solution. For example, if two bodies have zero inverse mass but nonzero inverse inertia, you could create a ball socket joint that avoids issues by ensuring that the anchor offsets are nonzero.
 
@@ -21,3 +21,25 @@ This is harder to guarantee in the general case. Consider collision constraints 
 Generally, avoid creating dynamic bodies with zero inverse mass unless you can absolutely guarantee that the involved constraints will never become degenerate. For example, if collisions are disabled, you don't have to worry about the automatically generated contact constraints, and you can tightly control what other constraints exist.
 
 (You can also just use a constraint to keep an object positioned in one spot rather than setting its inverse mass to zero!)
+
+##### 3. How can I ensure that the results of a simulation are deterministic (given the same inputs, the simulation produces the same physical result) on a single machine?
+
+Take great care to ensure that every interaction with the physics simulation is reproduced in exactly the same order on each execution. This even includes the order of adds and removes!
+
+Assuming that all external interactions with the engine are deterministic, the simulation is deterministic on a single machine when one of two conditions is met:
+1. The simulation runs with only a single thread (that is, no IThreadDispatcher is provided to the time step function).
+2. The simulation is provided multiple threads and the Simulation.NarrowPhase.Deterministic property is set to true.
+
+The narrow phase's Deterministic property defaults to false. Ensuring determinism has a slight performance impact. It should be trivial for most simulations, but large and extremely chaotic simulations may take a few hundred microseconds more per frame.
+
+##### 4. What do I do if I want determinism across different computers?
+
+Hope that they happen to have exactly the same architecture so that every single instruction produces bitwise identical results. :(
+
+If the target hardware is known to be identical (maybe a networked console game where users only play against other users of the exact same hardware), you might be fine. Sometimes, you'll even get lucky and end up with two different desktop processors that produce identical results.
+
+But, in general, the only way to guarantee cross platform determinism is to avoid generating any instructions which may differ between hardware. A common solution here is to use fixed point rather than floating point math.
+
+At the moment, BEPUphysics v2 does not support fixed point math out of the box, and it would be a pretty enormous undertaking to port it all over without destroying performance.
+
+I may look into conditionally compiled alternative scalar types in the future. I can't guarantee when or if I'll get around to it, though; don't wait for me!

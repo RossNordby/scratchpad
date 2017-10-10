@@ -76,7 +76,6 @@ namespace SolverPrototype.Constraints
             //It's a pretty minor effect either way.
             ContactPenetrationLimit1.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref projection.Normal,
                 ref accumulatedImpulses.Penetration0, ref wsvA, ref wsvB);
-            var maximumTwistImpulse = projection.PremultipliedFrictionCoefficient * accumulatedImpulses.Penetration0;
         }
 
     }
