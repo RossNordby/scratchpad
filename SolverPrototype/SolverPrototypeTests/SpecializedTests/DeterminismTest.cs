@@ -17,9 +17,9 @@ namespace SolverPrototypeTests.SpecializedTests
             var simulation = Simulation.Create(bufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = simulation.Shapes.Add(ref shape);
-            const int width = 4;
-            const int height = 4;
-            const int length = 4;
+            const int width = 8;
+            const int height = 8;
+            const int length = 8;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new ConstraintlessLatticeBuilder(),
@@ -35,7 +35,7 @@ namespace SolverPrototypeTests.SpecializedTests
 
             for (int i = 0; i < frameCount; ++i)
             {
-                simulation.Timestep(1 / 60f);
+                simulation.Timestep(1 / 60f, threadDispatcher);
                 //TODO: Probably should do add/remove on bodies alone, and possibly a variant that includes SOME constraints.
                 //(not enough to limit the amount of potential nondeterminism from collisions)
                 //Then we can add/remove those. Do need to control the seed too, though.
@@ -53,14 +53,15 @@ namespace SolverPrototypeTests.SpecializedTests
 
         public static void Test()
         {
-            const int frameCount = 1000;
+            const int frameCount = 10000;
             var bufferPool = new BufferPool();
             SimpleThreadDispatcher dispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
             var initialPoses = ExecuteSimulation(frameCount, bufferPool, dispatcher);
-            const int testIterations = 10;
+            const int testIterations = 100;
             for (int i = 0; i < testIterations; ++i)
             {
                 var poses = ExecuteSimulation(frameCount, bufferPool, dispatcher);
+                Console.WriteLine($"Completed iteration {i}; checking...");
                 for (int j = 0; j < poses.Length; ++j)
                 {
                     if (initialPoses[j].Position != poses[j].Position || initialPoses[j].Orientation != poses[j].Orientation)
@@ -68,7 +69,7 @@ namespace SolverPrototypeTests.SpecializedTests
                         Console.WriteLine($"DETERMINISM FAILURE, test {i}, body {j}. Expected <{initialPoses[j].Position}, {initialPoses[j].Orientation}>, got <{poses[j].Position}, {poses[j].Orientation}>");
                     }
                 }
-                Console.WriteLine($"Completed iteration {i}.");
+                Console.WriteLine($"Test complete.");
             }
         }
     }

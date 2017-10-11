@@ -249,7 +249,6 @@ namespace SolverPrototype
             //All other stages internally handle the availability of threading in an case-by-case way. It would be nice if every stage did so so we didn't need a dual implementation out here.
             if (threadDispatcher != null)
             {
-
                 //Note that the first behavior-affecting stage is actually the pose integrator. This is a shift from v1, where collision detection went first.
                 //This is a tradeoff:
                 //1) Any externally set velocities will be integrated without input from the solver. The v1-style external velocity control won't work as well-
@@ -295,15 +294,15 @@ namespace SolverPrototype
                 //TODO: The order of these optimizer stages is performance relevant, even though they don't have any effect on correctness.
                 //You may want to try them in different locations to see how they impact cache residency.
                 ProfilerStart(BodyLayoutOptimizer);
-                BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
+                //BodyLayoutOptimizer.IncrementalOptimize();
                 ProfilerEnd(BodyLayoutOptimizer);
 
                 ProfilerStart(ConstraintLayoutOptimizer);
-                ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
+                //ConstraintLayoutOptimizer.Update(BufferPool);
                 ProfilerEnd(ConstraintLayoutOptimizer);
 
                 ProfilerStart(SolverBatchCompressor);
-                SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
+                //SolverBatchCompressor.Compress(BufferPool);
                 ProfilerEnd(SolverBatchCompressor);
 
             }

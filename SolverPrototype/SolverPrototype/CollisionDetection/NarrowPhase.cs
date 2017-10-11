@@ -131,7 +131,7 @@ namespace SolverPrototype.CollisionDetection
         {
             switch (job.Type)
             {
-                case NarrowPhaseFlushJobType.UpdateBodyConstraintListsAndBatchBodyHandles:
+                case NarrowPhaseFlushJobType.UpdateConstraintBookkeeping:
                     ConstraintRemover.UpdateConstraintBookkeeping();
                     break;
                 case NarrowPhaseFlushJobType.RemoveConstraintFromTypeBatch:

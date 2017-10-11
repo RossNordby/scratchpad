@@ -23,6 +23,7 @@ namespace SolverPrototype.CollisionDetection
         public short WorkerIndex;
         public short WorkerBatchIndex;
     }
+
     struct TypeBatchIndex
     {
         public short TypeBatch;
@@ -44,9 +45,8 @@ namespace SolverPrototype.CollisionDetection
     }
     public enum NarrowPhaseFlushJobType
     {
-        UpdateBodyConstraintListsAndBatchBodyHandles,
+        UpdateConstraintBookkeeping,
         RemoveConstraintFromTypeBatch,
-        ReturnConstraintHandlesToPool,
         FlushPairCacheChanges
     }
 
@@ -77,7 +77,7 @@ namespace SolverPrototype.CollisionDetection
                 public int BodyHandle;
             }
 
-            BufferPool pool;
+            internal BufferPool pool;
             internal QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> Batches;
             internal QuickList<QuickList<int, Buffer<int>>, Buffer<QuickList<int, Buffer<int>>>> BatchHandles;
             internal QuickList<RemovalTarget, Buffer<RemovalTarget>> RemovalTargets;
@@ -255,8 +255,7 @@ namespace SolverPrototype.CollisionDetection
         {
             //Add the locally sequential jobs. Put them first in the hope that the usually-smaller per-typebatch jobs will balance out the remainder of the work.
             var jobPool = pool.SpecializeFor<NarrowPhaseFlushJob>();
-            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.UpdateBodyConstraintListsAndBatchBodyHandles }, jobPool);
-            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.ReturnConstraintHandlesToPool }, jobPool);
+            jobs.Add(new NarrowPhaseFlushJob { Type = NarrowPhaseFlushJobType.UpdateConstraintBookkeeping }, jobPool);
             //TODO: For deactivation, you don't actually want to create a body list removal request. The bodies would be getting removed, so it would be redundant.
             //Simple enough to adapt for that use case later. Probably need to get rid of the narrow phase specific reference.
 
@@ -334,6 +333,57 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
+        public void RemoveConstraintsFromTypeBatchDeterministically(int index, int workerIndex)
+        {
+            //Deterministic removal requires sorting removes affecting each type batch. First, create and gather the constraint references to be sorted.
+            var pool = workerCaches[workerIndex].pool;
+            ref var batchReferences = ref batches.Values[index];
+            var removalTargetsInTypeBatch = 0;
+            for (int i = 0; i < batchReferences.Count; ++i)
+            {
+                ref var reference = ref batchReferences[i];
+                ref var workerCache = ref workerCaches[reference.WorkerIndex];
+                ref var handles = ref workerCache.BatchHandles[reference.WorkerBatchIndex];
+                removalTargetsInTypeBatch += handles.Count;
+            }
+            pool.SpecializeFor<int>().Take(removalTargetsInTypeBatch, out var removalTargets);
+            int targetIndex = 0;
+            for (int i = 0; i < batchReferences.Count; ++i)
+            {
+                ref var reference = ref batchReferences[i];
+                ref var workerCache = ref workerCaches[reference.WorkerIndex];
+                ref var handles = ref workerCache.BatchHandles[reference.WorkerBatchIndex];
+                for (int j = 0; j < handles.Count; ++j)
+                {
+                    removalTargets[targetIndex++] = handles[j];
+                }
+            }
+            //Now that we have a reference to every removal target for this one type batch, sort them. Since we know the handle is unique,
+            //we know that the result will be unique (and we can use the non-threeway sort).
+            var comparer = new PrimitiveComparer<int>();
+            QuickSort.Sort(ref removalTargets[0], 0, removalTargetsInTypeBatch - 1, ref comparer);
+            var typeBatchIndices = batches.Keys[index];
+            var typeBatch = solver.Batches[typeBatchIndices.Batch].TypeBatches[typeBatchIndices.TypeBatch];
+            bool lockTaken = false;
+            for (int i = 0; i < removalTargetsInTypeBatch; ++i)
+            {
+                //Note that we look up the index in the type batch dynamically even though we could have cached it alongside batch and typebatch indices.
+                //That's because removals can change the index, so caching indices would require sorting the indices for each type batch before removing.
+                //That's very much doable, but not doing it is simpler, and the performance difference is likely trivial.
+                //TODO: Likely worth testing.
+                typeBatch.Remove(solver.HandleToConstraint[removalTargetsInTypeBatch].IndexInTypeBatch, ref solver.HandleToConstraint);
+                if (typeBatch.ConstraintCount == 0)
+                {
+                    //This batch-typebatch needs to be removed.
+                    //Note that we just use a spinlock here, nothing tricky- the number of typebatch/batch removals should tend to be extremely low (averaging 0),
+                    //so it's not worth doing a bunch of per worker accumulators and stuff.
+                    removedTypeBatchLocker.Enter(ref lockTaken);
+                    removedTypeBatches.AddUnsafely(typeBatchIndices);
+                    removedTypeBatchLocker.Exit();
+                }
+            }
+            pool.SpecializeFor<int>().Return(ref removalTargets);
+        }
 
         QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> removedTypeBatches;
         SpinLock removedTypeBatchLocker = new SpinLock();

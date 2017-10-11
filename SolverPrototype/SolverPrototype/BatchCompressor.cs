@@ -183,6 +183,7 @@ namespace SolverPrototype
                             //The compression-application phase will iterate over the workers in order. Since the analysis regions were created in order,
                             //and because the workers generate compressions in order, the application phase has a fully ordered list of compressions.
                             //This is required to avoid early compressions invalidating later compression targets.
+                            Console.WriteLine($"Found compression: {batchIndex}, {typeBatchIndex}, {i}");
                             context.Compressions.AddUnsafely(new Compression { IndexInTypeBatch = i, TargetBatch = batchIndex, TypeBatchIndex = typeBatchIndex });
                             break;
                         }
@@ -288,6 +289,7 @@ namespace SolverPrototype
                 context.Region.ConstraintCount = constraintsPerWorkerBase + (--constraintsRemainder > 0 ? 1 : 0);
                 context.Region.Start = nextTarget;
                 nextTarget.StartIndexInTypeBatch += context.Region.ConstraintCount;
+                //Console.WriteLine($"Region {i}: {context.Region.ConstraintCount} constraints in batch {nextBatchIndex}, type batch {context.Region.Start.TypeBatchIndex}, index {context.Region.Start.StartIndexInTypeBatch}");
             }            
 
             //Note that it is possible for this to skip some compressions if the maximum number of compressions is hit before all candidates are visited. That's fine;
@@ -313,6 +315,7 @@ namespace SolverPrototype
                     //Note that we do not simply remove and re-add the constraint; while that would work, it would redo a lot of work that isn't necessary.
                     //Instead, since we already know exactly where the constraint is and what constraint batch it should go to, we can avoid a lot of abstractions
                     //and do more direct copies.
+                    Console.WriteLine($"Moving {nextBatchIndex}, {compression.TypeBatchIndex}, {compression.IndexInTypeBatch} to {compression.TargetBatch}.");
                     sourceBatch.TypeBatches[compression.TypeBatchIndex].TransferConstraint(
                         nextBatchIndex, compression.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
                 }
