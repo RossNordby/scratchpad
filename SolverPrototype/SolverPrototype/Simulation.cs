@@ -294,15 +294,15 @@ namespace SolverPrototype
                 //TODO: The order of these optimizer stages is performance relevant, even though they don't have any effect on correctness.
                 //You may want to try them in different locations to see how they impact cache residency.
                 ProfilerStart(BodyLayoutOptimizer);
-                //BodyLayoutOptimizer.IncrementalOptimize();
+                BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
                 ProfilerEnd(BodyLayoutOptimizer);
 
                 ProfilerStart(ConstraintLayoutOptimizer);
-                //ConstraintLayoutOptimizer.Update(BufferPool);
+                ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
                 ProfilerEnd(ConstraintLayoutOptimizer);
 
                 ProfilerStart(SolverBatchCompressor);
-                //SolverBatchCompressor.Compress(BufferPool);
+                SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
                 ProfilerEnd(SolverBatchCompressor);
 
             }

@@ -332,70 +332,20 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
         }
-
-        public void RemoveConstraintsFromTypeBatchDeterministically(int index, int workerIndex)
-        {
-            //Deterministic removal requires sorting removes affecting each type batch. First, create and gather the constraint references to be sorted.
-            var pool = workerCaches[workerIndex].pool;
-            ref var batchReferences = ref batches.Values[index];
-            var removalTargetsInTypeBatch = 0;
-            for (int i = 0; i < batchReferences.Count; ++i)
-            {
-                ref var reference = ref batchReferences[i];
-                ref var workerCache = ref workerCaches[reference.WorkerIndex];
-                ref var handles = ref workerCache.BatchHandles[reference.WorkerBatchIndex];
-                removalTargetsInTypeBatch += handles.Count;
-            }
-            pool.SpecializeFor<int>().Take(removalTargetsInTypeBatch, out var removalTargets);
-            int targetIndex = 0;
-            for (int i = 0; i < batchReferences.Count; ++i)
-            {
-                ref var reference = ref batchReferences[i];
-                ref var workerCache = ref workerCaches[reference.WorkerIndex];
-                ref var handles = ref workerCache.BatchHandles[reference.WorkerBatchIndex];
-                for (int j = 0; j < handles.Count; ++j)
-                {
-                    removalTargets[targetIndex++] = handles[j];
-                }
-            }
-            //Now that we have a reference to every removal target for this one type batch, sort them. Since we know the handle is unique,
-            //we know that the result will be unique (and we can use the non-threeway sort).
-            var comparer = new PrimitiveComparer<int>();
-            QuickSort.Sort(ref removalTargets[0], 0, removalTargetsInTypeBatch - 1, ref comparer);
-            var typeBatchIndices = batches.Keys[index];
-            var typeBatch = solver.Batches[typeBatchIndices.Batch].TypeBatches[typeBatchIndices.TypeBatch];
-            bool lockTaken = false;
-            for (int i = 0; i < removalTargetsInTypeBatch; ++i)
-            {
-                //Note that we look up the index in the type batch dynamically even though we could have cached it alongside batch and typebatch indices.
-                //That's because removals can change the index, so caching indices would require sorting the indices for each type batch before removing.
-                //That's very much doable, but not doing it is simpler, and the performance difference is likely trivial.
-                //TODO: Likely worth testing.
-                typeBatch.Remove(solver.HandleToConstraint[removalTargetsInTypeBatch].IndexInTypeBatch, ref solver.HandleToConstraint);
-                if (typeBatch.ConstraintCount == 0)
-                {
-                    //This batch-typebatch needs to be removed.
-                    //Note that we just use a spinlock here, nothing tricky- the number of typebatch/batch removals should tend to be extremely low (averaging 0),
-                    //so it's not worth doing a bunch of per worker accumulators and stuff.
-                    removedTypeBatchLocker.Enter(ref lockTaken);
-                    removedTypeBatches.AddUnsafely(typeBatchIndices);
-                    removedTypeBatchLocker.Exit();
-                }
-            }
-            pool.SpecializeFor<int>().Return(ref removalTargets);
-        }
-
+        
         QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> removedTypeBatches;
         SpinLock removedTypeBatchLocker = new SpinLock();
         public void RemoveConstraintsFromTypeBatch(int index)
         {
+            var batch = batches.Keys[index];
+            var constraintBatch = solver.Batches[batch.Batch];
+            var typeBatch = constraintBatch.TypeBatches[batch.TypeBatch];
             ref var batchReferences = ref batches.Values[index];
             bool lockTaken = false;
             for (int i = 0; i < batchReferences.Count; ++i)
             {
                 ref var reference = ref batchReferences[i];
                 ref var workerCache = ref workerCaches[reference.WorkerIndex];
-                ref var batch = ref workerCache.Batches[reference.WorkerBatchIndex];
                 ref var handles = ref workerCache.BatchHandles[reference.WorkerBatchIndex];
                 for (int j = 0; j < handles.Count; ++j)
                 {
@@ -404,8 +354,6 @@ namespace SolverPrototype.CollisionDetection
                     //That's because removals can change the index, so caching indices would require sorting the indices for each type batch before removing.
                     //That's very much doable, but not doing it is simpler, and the performance difference is likely trivial.
                     //TODO: Likely worth testing.
-                    var constraintBatch = solver.Batches[batch.Batch];
-                    var typeBatch = constraintBatch.TypeBatches[batch.TypeBatch];
                     typeBatch.Remove(solver.HandleToConstraint[handle].IndexInTypeBatch, ref solver.HandleToConstraint);
                     if (typeBatch.ConstraintCount == 0)
                     {

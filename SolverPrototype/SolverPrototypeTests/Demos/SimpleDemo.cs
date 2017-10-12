@@ -19,9 +19,9 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 32;
-            const int height = 32;
-            const int length = 32;
+            const int width = 6;
+            const int height = 64;
+            const int length = 6;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new ConstraintlessLatticeBuilder(),
@@ -58,7 +58,6 @@ namespace SolverPrototypeTests
             //    Simulation.Bodies.SetVelocity(32, ref velocity);
             //}
             base.Update(input, dt);
-            Console.WriteLine($"Batch compressor time (us): {1e6 * Simulation.Timings[Simulation.SolverBatchCompressor]}");
 
         }
 
