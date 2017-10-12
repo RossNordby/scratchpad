@@ -28,9 +28,9 @@ Take great care to ensure that every interaction with the physics simulation is 
 
 Assuming that all external interactions with the engine are deterministic, the simulation is deterministic on a single machine when one of two conditions is met:
 1. The simulation runs with only a single thread (that is, no IThreadDispatcher is provided to the time step function).
-2. The simulation is provided multiple threads and the Simulation.NarrowPhase.Deterministic property is set to true.
+2. The simulation is provided multiple threads and the Simulation.Deterministic property is set to true.
 
-The narrow phase's Deterministic property defaults to false. Ensuring determinism has a slight performance impact. It should be trivial for most simulations, but large and extremely chaotic simulations may take a few hundred microseconds more per frame.
+The Deterministic property defaults to false. Ensuring determinism has a slight performance impact. It should be trivial for most simulations, but large and extremely chaotic simulations may take a few hundred microseconds more per frame.
 
 ##### 4. What do I do if I want determinism across different computers?
 

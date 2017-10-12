@@ -305,7 +305,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        public void UpdateConstraintBookkeeping()
+        public void UpdateConstraintBookkeeping(bool deterministic)
         {
             //While body list removal could technically be internally multithreaded, it would be pretty complex- you would have to do one dispatch per solver.Batches batch
             //to guarantee that no two threads hit the same body constraint list at the same time. 
@@ -319,20 +319,69 @@ namespace SolverPrototype.CollisionDetection
                     constraintGraph.RemoveConstraint(target.BodyIndex, target.ConstraintHandle);
                     solver.Batches[target.BatchIndex].BodyHandles.Remove(target.BodyHandle);
                 }
-                //Note that the handles are also removed here. Even though the action is independent, any resizes of the internal id pool structure would share acceses to the main thread's
-                //buffer pool. Removing constraints is the other place where the main thread's buffer pool is used.
-                //Doesn't matter too much; the total cost of this stage is very low.
-                for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
+            }
+            var intPool = pool.SpecializeFor<int>();
+
+            //Note that the handles are also removed here. Even though the action is independent, any resizes of the internal id pool structure would share acceses to the main thread's
+            //buffer pool. Removing constraints is the other place where the main thread's buffer pool is used.
+            //Doesn't matter too much; the total cost of this stage is very low.
+            if (deterministic)
+            {
+                //The batch compressor requires constraint handles to be deterministic. While that could be changed, ensuring handle determinism fits conceptually
+                //with the user-managed constraint handles- they are all deterministic, so the contact ones might as well be too.
+                int count = 0;
+                for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
                 {
-                    ref var handles = ref workerCache.BatchHandles[batchIndex];
-                    for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
+                    ref var workerCache = ref workerCaches[workerIndex];
+                    for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
                     {
-                        solver.handlePool.Return(handles[handleIndex], pool.SpecializeFor<int>());
+                        count += workerCache.BatchHandles[batchIndex].Count;
+                    }
+                }
+                if (count > 0)
+                {
+                    intPool.Take(count, out var sortedHandles);
+                    int sortIndex = 0;
+                    for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
+                    {
+                        ref var workerCache = ref workerCaches[workerIndex];
+                        for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
+                        {
+                            ref var handles = ref workerCache.BatchHandles[batchIndex];
+                            for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
+                            {
+                                sortedHandles[sortIndex++] = handles[handleIndex];
+                            }
+                        }
+                    }
+                    var comparer = new PrimitiveComparer<int>();
+                    QuickSort.Sort(ref sortedHandles[0], 0, count - 1, ref comparer);
+                    for (int i = 0; i < count; ++i)
+                    {
+                        solver.handlePool.Return(sortedHandles[i], intPool);
+                    }
+                    intPool.Return(ref sortedHandles);
+                }
+            }
+            else
+            {
+                for (int workerIndex = 0; workerIndex < threadCount; ++workerIndex)
+                {
+                    ref var workerCache = ref workerCaches[workerIndex];
+                    //If it's nondeterministic anyway, don't worry about the handle ordering.
+                    for (int batchIndex = 0; batchIndex < workerCache.BatchHandles.Count; ++batchIndex)
+                    {
+                        ref var handles = ref workerCache.BatchHandles[batchIndex];
+                        for (int handleIndex = 0; handleIndex < handles.Count; ++handleIndex)
+                        {
+                            solver.handlePool.Return(handles[handleIndex], intPool);
+                        }
                     }
                 }
             }
+
         }
-        
+
         QuickList<TypeBatchIndex, Buffer<TypeBatchIndex>> removedTypeBatches;
         SpinLock removedTypeBatchLocker = new SpinLock();
         public void RemoveConstraintsFromTypeBatch(int index)

@@ -227,7 +227,7 @@ namespace SolverPrototype.CollisionDetection
         }
 
 
-        protected override void OnPreflush(IThreadDispatcher threadDispatcher)
+        protected override void OnPreflush(IThreadDispatcher threadDispatcher, bool deterministic)
         {
             var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
 
@@ -255,7 +255,7 @@ namespace SolverPrototype.CollisionDetection
                     overlapWorkers[i].PendingConstraints.AllocateForSpeculativeSearch();
                 }
                 //Note that we create the sort jobs first. They tend to be individually much heftier than the constraint batch finder phase, and we'd like to be able to fill in the execution gaps.
-                if (Deterministic)
+                if (deterministic)
                 {
                     Pool.SpecializeFor<QuickList<SortConstraintTarget, Buffer<SortConstraintTarget>>>().Take(PendingConstraintAddCache.ConstraintTypeCount, out sortedConstraints);
                     sortedConstraints.Clear(0, PendingConstraintAddCache.ConstraintTypeCount);
@@ -322,7 +322,7 @@ namespace SolverPrototype.CollisionDetection
                 //2) Freshness checker. Lots of smaller jobs that can hopefully fill the gap while the constraint adds finish. The wider the CPU, the less this will be possible.
 
                 preflushJobs.Clear(); //Note job clear. We're setting up new jobs.
-                if (Deterministic)
+                if (deterministic)
                 {
                     preflushJobs.Add(new PreflushJob { Type = PreflushJobType.DeterministicConstraintAdd }, Pool.SpecializeFor<PreflushJob>());
                 }
@@ -346,7 +346,7 @@ namespace SolverPrototype.CollisionDetection
                 {
                     overlapWorkers[i].PendingConstraints.DisposeSpeculativeSearch();
                 }
-                if (Deterministic)
+                if (deterministic)
                 {
                     var targetPool = Pool.SpecializeFor<SortConstraintTarget>();
                     for (int i = 0; i < PendingConstraintAddCache.ConstraintTypeCount; ++i)

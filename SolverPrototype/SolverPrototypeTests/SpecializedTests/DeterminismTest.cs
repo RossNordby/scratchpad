@@ -21,11 +21,11 @@ namespace SolverPrototypeTests.SpecializedTests
             const int height = 8;
             const int length = 8;
             SimulationSetup.BuildLattice(
-                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.05f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new ConstraintlessLatticeBuilder(),
                 width, height, length, simulation, out var bodyHandles, out var constraintHandles);
             simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-            simulation.NarrowPhase.Deterministic = true;
+            simulation.Deterministic = true;
 
             BodyVelocity velocity;
             velocity.Linear = new Vector3(.1f, 0, 0.1f);
@@ -57,6 +57,7 @@ namespace SolverPrototypeTests.SpecializedTests
             var bufferPool = new BufferPool();
             SimpleThreadDispatcher dispatcher = new SimpleThreadDispatcher(Environment.ProcessorCount);
             var initialPoses = ExecuteSimulation(frameCount, bufferPool, dispatcher);
+            Console.WriteLine($"Completed initial test.");
             const int testIterations = 100;
             for (int i = 0; i < testIterations; ++i)
             {

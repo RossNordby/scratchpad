@@ -1,4 +1,5 @@
 ﻿using BEPUutilities2;
+using BEPUutilities2.Collections;
 using BEPUutilities2.Memory;
 using SolverPrototype.Collidables;
 using SolverPrototype.CollisionDetection;
@@ -32,6 +33,12 @@ namespace SolverPrototype
         /// Gets the main memory pool used to fill persistent structures and main thread ephemeral resources across the engine.
         /// </summary>
         public BufferPool BufferPool { get; private set; }
+
+        /// <summary>
+        /// Gets or sets whether to use a deterministic time step when using multithreading. When set to true, additional time is spent sorting constraint additions and transfers.
+        /// Note that this can only affect determinism locally- different processor architectures may implement instructions differently.
+        /// </summary>
+        public bool Deterministic { get; set; }
 
         protected Simulation(BufferPool bufferPool, SimulationAllocationSizes initialAllocationSizes)
         {
@@ -162,7 +169,7 @@ namespace SolverPrototype
                     BroadPhase.activeLeaves[collidable.BroadPhaseIndex] = new CollidableReference(bodyDescription.Mobility, handle);
             }
         }
-        
+
         public void RemoveBody(int bodyHandle)
         {
             Bodies.ValidateExistingHandle(bodyHandle);
@@ -245,101 +252,68 @@ namespace SolverPrototype
         {
             ProfilerClear();
             ProfilerStart(this);
-            //TODO: There are a couple of stages where the multithreaded and single threaded implementations differ by more than merely a null thread dispatcher.
-            //All other stages internally handle the availability of threading in an case-by-case way. It would be nice if every stage did so so we didn't need a dual implementation out here.
-            if (threadDispatcher != null)
-            {
-                //Note that the first behavior-affecting stage is actually the pose integrator. This is a shift from v1, where collision detection went first.
-                //This is a tradeoff:
-                //1) Any externally set velocities will be integrated without input from the solver. The v1-style external velocity control won't work as well-
-                //the user would instead have to change velocities after the pose integrator runs. This isn't perfect either, since the pose integrator is also responsible
-                //for updating the bounding boxes used for collision detection.
-                //2) By bundling bounding box calculation with pose integration, you avoid redundant pose and velocity memory accesses.
-                //3) Generated contact positions are in sync with the integrated poses. 
-                //That's often helpful for gameplay purposes- you don't have to reinterpret contact data when creating graphical effects or positioning sound sources.
+            //Note that the first behavior-affecting stage is actually the pose integrator. This is a shift from v1, where collision detection went first.
+            //This is a tradeoff:
+            //1) Any externally set velocities will be integrated without input from the solver. The v1-style external velocity control won't work as well-
+            //the user would instead have to change velocities after the pose integrator runs. This isn't perfect either, since the pose integrator is also responsible
+            //for updating the bounding boxes used for collision detection.
+            //2) By bundling bounding box calculation with pose integration, you avoid redundant pose and velocity memory accesses.
+            //3) Generated contact positions are in sync with the integrated poses. 
+            //That's often helpful for gameplay purposes- you don't have to reinterpret contact data when creating graphical effects or positioning sound sources.
 
-                //TODO: This is something that is possibly worth exposing as one of the generic type parameters. Users could just choose the order arbitrarily.
-                //Or, since you're talking about something that happens once per frame instead of once per collision pair, just provide a simple callback.
-                //(Or maybe an enum even?)
-                //#1 is a difficult problem, though. There is no fully 'correct' place to change velocities. We might just have to bite the bullet and create a
-                //inertia tensor/bounding box update separate from pose integration. If the cache gets evicted in between (virtually guaranteed unless no stages run),
-                //this basically means an extra 100-200 microseconds per frame on a processor with ~20GBps bandwidth simulating 32768 bodies.
+            //TODO: This is something that is possibly worth exposing as one of the generic type parameters. Users could just choose the order arbitrarily.
+            //Or, since you're talking about something that happens once per frame instead of once per collision pair, just provide a simple callback.
+            //(Or maybe an enum even?)
+            //#1 is a difficult problem, though. There is no fully 'correct' place to change velocities. We might just have to bite the bullet and create a
+            //inertia tensor/bounding box update separate from pose integration. If the cache gets evicted in between (virtually guaranteed unless no stages run),
+            //this basically means an extra 100-200 microseconds per frame on a processor with ~20GBps bandwidth simulating 32768 bodies.
 
-                //Note that the reason why the pose integrator comes first instead of, say, the solver, is that the solver relies on world space inertias calculated by the pose integration.
-                //If the pose integrator doesn't run first, we either need 
-                //1) complicated on demand updates of world inertia when objects are added or local inertias are changed or 
-                //2) local->world inertia calculation before the solver.                
+            //Note that the reason why the pose integrator comes first instead of, say, the solver, is that the solver relies on world space inertias calculated by the pose integration.
+            //If the pose integrator doesn't run first, we either need 
+            //1) complicated on demand updates of world inertia when objects are added or local inertias are changed or 
+            //2) local->world inertia calculation before the solver.                
 
-                ProfilerStart(PoseIntegrator);
-                PoseIntegrator.Update(dt, BufferPool, threadDispatcher);
-                ProfilerEnd(PoseIntegrator);
+            ProfilerStart(PoseIntegrator);
+            PoseIntegrator.Update(dt, BufferPool, threadDispatcher);
+            ProfilerEnd(PoseIntegrator);
 
-                ProfilerStart(BroadPhase);
-                BroadPhase.Update(threadDispatcher);
-                ProfilerEnd(BroadPhase);
+            ProfilerStart(BroadPhase);
+            BroadPhase.Update(threadDispatcher);
+            ProfilerEnd(BroadPhase);
 
-                ProfilerStart(BroadPhaseOverlapFinder);
-                BroadPhaseOverlapFinder.DispatchOverlaps(threadDispatcher);
-                ProfilerEnd(BroadPhaseOverlapFinder);
+            ProfilerStart(BroadPhaseOverlapFinder);
+            BroadPhaseOverlapFinder.DispatchOverlaps(threadDispatcher);
+            ProfilerEnd(BroadPhaseOverlapFinder);
 
-                ProfilerStart(NarrowPhase);
-                NarrowPhase.Flush(threadDispatcher);
-                ProfilerEnd(NarrowPhase);
+            ProfilerStart(NarrowPhase);
+            NarrowPhase.Flush(threadDispatcher, threadDispatcher != null && Deterministic);
+            ProfilerEnd(NarrowPhase);
 
-                ProfilerStart(Solver);
-                Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt);
-                ProfilerEnd(Solver);
-
-                //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
-                //TODO: The order of these optimizer stages is performance relevant, even though they don't have any effect on correctness.
-                //You may want to try them in different locations to see how they impact cache residency.
-                ProfilerStart(BodyLayoutOptimizer);
-                BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
-                ProfilerEnd(BodyLayoutOptimizer);
-
-                ProfilerStart(ConstraintLayoutOptimizer);
-                ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
-                ProfilerEnd(ConstraintLayoutOptimizer);
-
-                ProfilerStart(SolverBatchCompressor);
-                SolverBatchCompressor.Compress(BufferPool, threadDispatcher);
-                ProfilerEnd(SolverBatchCompressor);
-
-            }
-            else
-            {
-                ProfilerStart(PoseIntegrator);
-                PoseIntegrator.Update(dt, BufferPool);
-                ProfilerEnd(PoseIntegrator);
-
-                ProfilerStart(BroadPhase);
-                BroadPhase.Update();
-                ProfilerEnd(BroadPhase);
-                
-                ProfilerStart(BroadPhaseOverlapFinder);
-                BroadPhaseOverlapFinder.DispatchOverlaps();
-                ProfilerEnd(BroadPhaseOverlapFinder);
-
-                ProfilerStart(NarrowPhase);
-                NarrowPhase.Flush();
-                ProfilerEnd(NarrowPhase);
-
-                ProfilerStart(Solver);
+            ProfilerStart(Solver);
+            if (threadDispatcher == null)
                 Solver.Update(dt);
-                ProfilerEnd(Solver);
+            else
+                Solver.MultithreadedUpdate(threadDispatcher, BufferPool, dt);
+            ProfilerEnd(Solver);
 
-                ProfilerStart(BodyLayoutOptimizer);
+            //Note that constraint optimization should be performed after body optimization, since body optimization moves the bodies- and so affects the optimal constraint position.
+            //TODO: The order of these optimizer stages is performance relevant, even though they don't have any effect on correctness.
+            //You may want to try them in different locations to see how they impact cache residency.
+            ProfilerStart(BodyLayoutOptimizer);
+            if (threadDispatcher == null)
                 BodyLayoutOptimizer.IncrementalOptimize();
-                ProfilerEnd(BodyLayoutOptimizer);
+            else
+                BodyLayoutOptimizer.IncrementalOptimize(BufferPool, threadDispatcher);
+            ProfilerEnd(BodyLayoutOptimizer);
 
-                ProfilerStart(ConstraintLayoutOptimizer);
-                ConstraintLayoutOptimizer.Update(BufferPool);
-                ProfilerEnd(ConstraintLayoutOptimizer);
+            ProfilerStart(ConstraintLayoutOptimizer);
+            ConstraintLayoutOptimizer.Update(BufferPool, threadDispatcher);
+            ProfilerEnd(ConstraintLayoutOptimizer);
 
-                ProfilerStart(SolverBatchCompressor);
-                SolverBatchCompressor.Compress(BufferPool);
-                ProfilerEnd(SolverBatchCompressor);
-            }
+            ProfilerStart(SolverBatchCompressor);
+            SolverBatchCompressor.Compress(BufferPool, threadDispatcher, threadDispatcher != null && Deterministic);
+            ProfilerEnd(SolverBatchCompressor);
+
             ProfilerEnd(this);
         }
 

@@ -176,6 +176,7 @@ namespace SolverPrototype
             //and do more direct copies.
             //Careful here: this is a reference for the sake of not doing pointless copies, but you cannot rely on it having the same values after the completion of the transfer.
             ref var constraintLocation = ref Solver.HandleToConstraint[compression.ConstraintHandle];
+            //Console.WriteLine($"Compressing: {compression.ConstraintHandle} moving from {Solver.Batches.IndexOf(sourceBatch)} to {compression.TargetBatch}");
             sourceBatch.TypeBatches[sourceBatch.TypeIndexToTypeBatchIndex[constraintLocation.TypeId]].TransferConstraint(
                 nextBatchIndex, constraintLocation.IndexInTypeBatch, Solver, Bodies, compression.TargetBatch);
         }
@@ -200,7 +201,7 @@ namespace SolverPrototype
                 //Be careful: the jobs may require resizes on the compression count list. That requires the use of per-worker pools.
                 QuickList<Compression, Buffer<Compression>>.Create(
                     (threadDispatcher == null ? rawPool : threadDispatcher.GetThreadMemoryPool(i)).SpecializeFor<Compression>(),
-                    maximumCompressionCount, out workerCompressions[i]);
+                    Math.Max(8, maximumCompressionCount), out workerCompressions[i]);
             }
 
             //In any given compression attempt, we only optimize over one ConstraintBatch.
@@ -299,35 +300,38 @@ namespace SolverPrototype
                 {
                     totalCompressionCount += workerCompressions[i].Count;
                 }
-                QuickList<CompressionTarget, Buffer<CompressionTarget>>.Create(targetPool, totalCompressionCount, out var compressionsToSort);
-
-                for (int i = 0; i < workerCount; ++i)
+                if (totalCompressionCount > 0)
                 {
-                    ref var compressions = ref workerCompressions[i];
-                    for (int j = 0; j < compressions.Count; ++j)
+                    QuickList<CompressionTarget, Buffer<CompressionTarget>>.Create(targetPool, totalCompressionCount, out var compressionsToSort);
+
+                    for (int i = 0; i < workerCount; ++i)
                     {
-                        ref var target = ref compressionsToSort.AllocateUnsafely();
-                        target.WorkerIndex = (ushort)i;
-                        target.Index = (ushort)j;
-                        //Note that we precache the handle here rather than continually running off to pull data from the source lists. Doesn't matter much for performance in context-
-                        //there are never many compressions- but it does simplify things a little.
-                        target.ConstraintHandle = compressions[j].ConstraintHandle;
+                        ref var compressions = ref workerCompressions[i];
+                        for (int j = 0; j < compressions.Count; ++j)
+                        {
+                            ref var target = ref compressionsToSort.AllocateUnsafely();
+                            target.WorkerIndex = (ushort)i;
+                            target.Index = (ushort)j;
+                            //Note that we precache the handle here rather than continually running off to pull data from the source lists. Doesn't matter much for performance in context-
+                            //there are never many compressions- but it does simplify things a little.
+                            target.ConstraintHandle = compressions[j].ConstraintHandle;
+                        }
                     }
+
+                    var comparer = new CompressionComparer();
+                    QuickSort.Sort(ref compressionsToSort[0], 0, compressionsToSort.Count - 1, ref comparer);
+
+                    //Now that they're sorted, we can go back and apply some of them.
+                    //We can stop early- since this isn't sensitive to memory layout and we'll eventually swing back around to these type batches eventually, skipping some compressions
+                    //occasionally doesn't have any long term harm.
+                    for (int i = 0; i < compressionsToSort.Count && i < maximumCompressionCount; ++i)
+                    {
+                        ref var target = ref compressionsToSort[i];
+                        ApplyCompression(sourceBatch, ref workerCompressions[target.WorkerIndex][target.Index]);
+                    }
+
+                    compressionsToSort.Dispose(targetPool);
                 }
-
-                var comparer = new CompressionComparer();
-                QuickSort.Sort(ref compressionsToSort[0], 0, compressionsToSort.Count - 1, ref comparer);
-
-                //Now that they're sorted, we can go back and apply some of them.
-                //We can stop early- since this isn't sensitive to memory layout and we'll eventually swing back around to these type batches eventually, skipping some compressions
-                //occasionally doesn't have any long term harm.
-                for (int i = 0; i < compressionsToSort.Count && i < maximumCompressionCount; ++i)
-                {
-                    ref var target = ref compressionsToSort[i];
-                    ApplyCompression(sourceBatch, ref workerCompressions[target.WorkerIndex][target.Index]);
-                }
-
-                compressionsToSort.Dispose(targetPool);
 
             }
             else
@@ -361,6 +365,6 @@ namespace SolverPrototype
             rawPool.SpecializeFor<QuickList<Compression, Buffer<Compression>>>().Return(ref workerCompressions);
         }
 
-     
+
     }
 }

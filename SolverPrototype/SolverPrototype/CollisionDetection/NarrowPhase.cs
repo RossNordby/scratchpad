@@ -89,16 +89,7 @@ namespace SolverPrototype.CollisionDetection
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
-
-        /// <summary>
-        /// <para>Gets or sets whether the narrowphase should attempt to retain determinism. If true, additional time is spent sorting new constraints. 
-        /// This can slightly slow down the narrow phase flush, but the simulation should then produce consistent results between runs 
-        /// (so long as all interactions with the engine are done in exactly the same order).</para>
-        /// <para>Note that this only guarantees local determinism on a single platform.
-        /// There is no guarantee that two different processors with different architectures will produce the same result due to floating point implementation differences.</para>
-        /// </summary>
-        public bool Deterministic { get; set; }
-
+        
         protected NarrowPhase()
         {
             flushWorkerLoop = FlushWorkerLoop;
@@ -112,10 +103,11 @@ namespace SolverPrototype.CollisionDetection
         }
 
         protected abstract void OnPrepare(IThreadDispatcher threadDispatcher);
-        protected abstract void OnPreflush(IThreadDispatcher threadDispatcher);
+        protected abstract void OnPreflush(IThreadDispatcher threadDispatcher, bool deterministic);
         protected abstract void OnPostflush(IThreadDispatcher threadDispatcher);
 
 
+        bool deterministic;
         int flushJobIndex;
         QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>> flushJobs;
         Action<int> flushWorkerLoop;
@@ -132,7 +124,7 @@ namespace SolverPrototype.CollisionDetection
             switch (job.Type)
             {
                 case NarrowPhaseFlushJobType.UpdateConstraintBookkeeping:
-                    ConstraintRemover.UpdateConstraintBookkeeping();
+                    ConstraintRemover.UpdateConstraintBookkeeping(deterministic);
                     break;
                 case NarrowPhaseFlushJobType.RemoveConstraintFromTypeBatch:
                     ConstraintRemover.RemoveConstraintsFromTypeBatch(job.Index);
@@ -144,11 +136,13 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        public void Flush(IThreadDispatcher threadDispatcher = null)
+        public void Flush(IThreadDispatcher threadDispatcher = null, bool deterministic = false)
         {
-            OnPreflush(threadDispatcher);
+            OnPreflush(threadDispatcher, deterministic);
             QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>>.Create(Pool.SpecializeFor<NarrowPhaseFlushJob>(), 128, out flushJobs);
             PairCache.PrepareFlushJobs(ref flushJobs);
+            //We indirectly pass the determinism state; it's used by the constraint remover bookkeeping.
+            this.deterministic = deterministic;
             ConstraintRemover.CreateFlushJobs(ref flushJobs);
 
             if (threadDispatcher == null)

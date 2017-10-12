@@ -19,49 +19,49 @@ namespace BEPUutilities2.Collections
             {
                 var aTemp = Unsafe.As<T, byte>(ref a);
                 var bTemp = Unsafe.As<T, byte>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(sbyte))
             {
                 var aTemp = Unsafe.As<T, sbyte>(ref a);
                 var bTemp = Unsafe.As<T, sbyte>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(short))
             {
                 var aTemp = Unsafe.As<T, short>(ref a);
                 var bTemp = Unsafe.As<T, short>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(ushort))
             {
                 var aTemp = Unsafe.As<T, ushort>(ref a);
                 var bTemp = Unsafe.As<T, ushort>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(int))
             {
                 var aTemp = Unsafe.As<T, int>(ref a);
                 var bTemp = Unsafe.As<T, int>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(uint))
             {
                 var aTemp = Unsafe.As<T, uint>(ref a);
                 var bTemp = Unsafe.As<T, uint>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(long))
             {
                 var aTemp = Unsafe.As<T, long>(ref a);
                 var bTemp = Unsafe.As<T, long>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(ulong))
             {
                 var aTemp = Unsafe.As<T, ulong>(ref a);
                 var bTemp = Unsafe.As<T, ulong>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(IntPtr))
             {
@@ -69,7 +69,7 @@ namespace BEPUutilities2.Collections
                 {
                     var aTemp = Unsafe.As<T, IntPtr>(ref a).ToPointer();
                     var bTemp = Unsafe.As<T, IntPtr>(ref b).ToPointer();
-                    return aTemp < bTemp ? -1 : aTemp > bTemp ? 1 : 0;
+                    return aTemp < bTemp ? -1 : aTemp > bTemp ? -1 : 0;
                 }
             }
             if (typeof(T) == typeof(UIntPtr))
@@ -78,26 +78,26 @@ namespace BEPUutilities2.Collections
                 {
                     var aTemp = Unsafe.As<T, UIntPtr>(ref a).ToPointer();
                     var bTemp = Unsafe.As<T, UIntPtr>(ref b).ToPointer();
-                    return aTemp < bTemp ? -1 : aTemp > bTemp ? 1 : 0;
+                    return aTemp < bTemp ? -1 : aTemp > bTemp ? -1 : 0;
                 }
             }
             if (typeof(T) == typeof(char))
             {
                 var aTemp = Unsafe.As<T, char>(ref a);
                 var bTemp = Unsafe.As<T, char>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(double))
             {
                 var aTemp = Unsafe.As<T, double>(ref a);
                 var bTemp = Unsafe.As<T, double>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             if (typeof(T) == typeof(float))
             {
                 var aTemp = Unsafe.As<T, float>(ref a);
                 var bTemp = Unsafe.As<T, float>(ref b);
-                return aTemp > bTemp ? 1 : aTemp < bTemp ? 1 : 0;
+                return aTemp > bTemp ? 1 : aTemp < bTemp ? -1 : 0;
             }
             Debug.Assert(false, "Should only use the supported primitive types with the primitive comparer.");
             return 0;

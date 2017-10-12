@@ -27,7 +27,6 @@ namespace SolverPrototypeTests
                 new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
-            Simulation.NarrowPhase.Deterministic = true;
             //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
 
             BodyVelocity velocity;
