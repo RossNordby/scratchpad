@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 namespace SolverPrototype.Constraints
 {
-    
+
     /// <summary>
     /// Data required to project world space velocities into a constraint impulse.
     /// </summary>
@@ -25,7 +25,7 @@ namespace SolverPrototype.Constraints
     public static class ContactPenetrationLimit1
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold1PrestepData prestep, float dt,
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold1PrestepData prestep, float dt, float inverseDt, 
             out ContactPenetrationLimit1Projection projection)
         {
             //We directly take the prestep data here since the jacobians and error don't undergo any processing.
@@ -71,9 +71,12 @@ namespace SolverPrototype.Constraints
             Springiness.ComputeSpringiness(ref prestep.SpringSettings, dt, 4f, out var positionErrorToVelocity, out var effectiveMassCFMScale, out projection.SoftnessImpulseScale);
             var linear = inertiaA.InverseMass + inertiaB.InverseMass;
             //Note that we don't precompute the JT * effectiveMass term. Since the jacobians are shared, we have to do that multiply anyway.
-            projection.Penetration0.EffectiveMass = effectiveMassCFMScale / (linear + angularA0 + angularB0);         
+            projection.Penetration0.EffectiveMass = effectiveMassCFMScale / (linear + angularA0 + angularB0);
 
-            projection.Penetration0.BiasVelocity = Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
+            //If depth is negative, the bias velocity will permit motion up until the depth hits zero. This works because positionErrorToVelocity * dt will always be <=1.
+            projection.Penetration0.BiasVelocity = Vector.Min(
+                prestep.PenetrationDepth0 * new Vector<float>(inverseDt),
+                Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity));
         }
 
 

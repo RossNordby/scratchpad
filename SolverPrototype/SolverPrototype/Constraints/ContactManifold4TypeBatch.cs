@@ -73,7 +73,7 @@ namespace SolverPrototype.Constraints
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences,
-            float dt, ref ContactManifold4PrestepData prestep, out ContactManifold4Projection projection)
+            float dt, float inverseDt, ref ContactManifold4PrestepData prestep, out ContactManifold4Projection projection)
         {
             //Some speculative compression options not (yet) pursued:
             //1) Store the surface basis in a compressed fashion. It could be stored within 32 bits by using standard compression schemes, but we lack the necessary
@@ -95,7 +95,7 @@ namespace SolverPrototype.Constraints
             projection.Normal = prestep.Normal;
             Helpers.BuildOrthnormalBasis(ref prestep.Normal, out var x, out var z);
             TangentFriction.Prestep(ref x, ref z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
-            ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, ref prestep, dt, out projection.Penetration);
+            ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, ref prestep, dt, inverseDt, out projection.Penetration);
             //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
             Vector3Wide.Distance(ref prestep.OffsetA0, ref offsetToManifoldCenterA, out projection.LeverArm0);
             Vector3Wide.Distance(ref prestep.OffsetA1, ref offsetToManifoldCenterA, out projection.LeverArm1);

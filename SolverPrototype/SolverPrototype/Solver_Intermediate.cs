@@ -18,10 +18,11 @@ namespace SolverPrototype
             int syncStage = 0;
             int blockIndex;
             var endIndex = context.WorkBlocks.Count;
+            var inverseDt = 1f / context.Dt;
             while ((blockIndex = Interlocked.Increment(ref StageIndices[syncStage])) <= endIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies, context.Dt, block.StartBundle, block.End);
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies, context.Dt, inverseDt, block.StartBundle, block.End);
             }
 
             InterstageSync(ref syncStage);

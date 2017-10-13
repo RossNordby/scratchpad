@@ -311,19 +311,31 @@ namespace SolverPrototype.CollisionDetection
 
 
             }
+            struct DiscretePair
+            {
+                public CollidablePair Pair;
+                public float SpeculativeMargin;
 
-            //Discrete pairs are simply stored as collidable pairs; there is no additional cached data.
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                public void Initialize(ref CollidablePair pair, float speculativeMargin)
+                {
+                    Pair = pair;
+                    SpeculativeMargin = speculativeMargin;
+                }
+            }
             struct LinearPair
             {
                 public ContactManifold DiscreteManifold;
                 public ContactManifold LinearManifold;
                 public CollidablePair Pair;
+                public float SpeculativeMargin;
                 public int ManifoldsReported;
 
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                public void Initialize(CollidablePair pair)
+                public void Initialize(ref CollidablePair pair, float speculativeMargin)
                 {
                     Pair = pair;
+                    SpeculativeMargin = speculativeMargin;
                     ManifoldsReported = 0;
                     LinearManifold.SetConvexityAndCount(2, false);
                 }
@@ -333,13 +345,15 @@ namespace SolverPrototype.CollisionDetection
             {
                 public SubstepManifolds Manifolds;
                 public CollidablePair Pair;
+                public float SpeculativeMargin;
                 public int ManifoldsReported;
 
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                public void Initialize(BufferPool pool, int substepCapacity, CollidablePair pair)
+                public void Initialize(BufferPool pool, int substepCapacity, ref CollidablePair pair, float speculativeMargin)
                 {
                     Manifolds.Initialize(pool, substepCapacity);
                     Pair = pair;
+                    SpeculativeMargin = speculativeMargin;
                     ManifoldsReported = 0;
                 }
             }
@@ -349,14 +363,16 @@ namespace SolverPrototype.CollisionDetection
                 public SubstepManifolds SubstepManifolds;
                 public ContactManifold LinearManifold;
                 public CollidablePair Pair;
+                public float SpeculativeMargin;
                 public int ManifoldsReported;
 
                 [MethodImpl(MethodImplOptions.AggressiveInlining)]
-                public void Initialize(BufferPool pool, int substepCapacity, CollidablePair pair)
+                public void Initialize(BufferPool pool, int substepCapacity, ref CollidablePair pair, float speculativeMargin)
                 {
                     SubstepManifolds.Initialize(pool, substepCapacity);
                     Pair = pair;
                     ManifoldsReported = 0;
+                    SpeculativeMargin = speculativeMargin;
                     LinearManifold.SetConvexityAndCount(2, false);
                 }
             }
@@ -398,7 +414,7 @@ namespace SolverPrototype.CollisionDetection
                 }
             }
 
-            ContinuationCache<CollidablePair> discrete;
+            ContinuationCache<DiscretePair> discrete;
             ContinuationCache<LinearPair> linear;
             ContinuationCache<SubstepPair> substep;
             ContinuationCache<SubstepWithLinearPair> substepWithLinear;
@@ -408,34 +424,34 @@ namespace SolverPrototype.CollisionDetection
                 this.pool = pool;
                 this.workerIndex = workerIndex;
                 this.narrowPhase = narrowPhase;
-                discrete = new ContinuationCache<CollidablePair>(pool);
+                discrete = new ContinuationCache<DiscretePair>(pool);
                 linear = new ContinuationCache<LinearPair>(pool);
                 substep = new ContinuationCache<SubstepPair>(pool);
                 substepWithLinear = new ContinuationCache<SubstepWithLinearPair>(pool);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public ContinuationIndex AddDiscrete(ref CollidablePair pair)
+            public ContinuationIndex AddDiscrete(ref CollidablePair pair, float speculativeMargin)
             {
-                discrete.Allocate(pool, out var index) = pair;
+                discrete.Allocate(pool, out var index).Initialize(ref pair, speculativeMargin);
                 return new ContinuationIndex((int)ConstraintGeneratorType.Discrete, index, 0);
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int AddLinear(ref CollidablePair pair)
+            public int AddLinear(ref CollidablePair pair, float speculativeMargin)
             {
-                linear.Allocate(pool, out var index).Initialize(pair);
+                linear.Allocate(pool, out var index).Initialize(ref pair, speculativeMargin);
                 return index;
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int AddSubsteps(ref CollidablePair pair, int substepCount)
+            public int AddSubsteps(ref CollidablePair pair, int substepCount, float speculativeMargin)
             {
-                substep.Allocate(pool, out var index).Initialize(pool, substepCount, pair);
+                substep.Allocate(pool, out var index).Initialize(pool, substepCount, ref pair, speculativeMargin);
                 return index;
             }
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public int AddSubstepsWithLinear(ref CollidablePair pair, int substepCount)
+            public int AddSubstepsWithLinear(ref CollidablePair pair, int substepCount, float speculativeMargin)
             {
-                substepWithLinear.Allocate(pool, out var index).Initialize(pool, substepCount, pair);
+                substepWithLinear.Allocate(pool, out var index).Initialize(pool, substepCount, ref pair, speculativeMargin);
                 return index;
             }
 
@@ -446,6 +462,7 @@ namespace SolverPrototype.CollisionDetection
                 //Substeps are simply a series of discrete steps, so you don't want to offset them and make actual discrete contacts unshared.
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private unsafe void FillLinearManifoldSlotA(ref ContactManifold linearManifold, ContactManifold* manifold)
             {
                 //Note that linear A is always in slot 0, and linear B is always in slot 1.
@@ -460,6 +477,7 @@ namespace SolverPrototype.CollisionDetection
                 linearManifold.Normal0 = manifold->Normal0;
 
             }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private unsafe void FillLinearManifoldSlotB(ref ContactManifold linearManifold, ContactManifold* manifold)
             {
                 Debug.Assert(manifold->ContactCount == 1);
@@ -469,6 +487,37 @@ namespace SolverPrototype.CollisionDetection
                 linearManifold.Normal1 = manifold->Normal0;
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            private unsafe void RemoveDistantContacts(ContactManifold* manifold, float speculativeMargin)
+            {
+                //var contactCount = manifold->ContactCount;
+                //var depths = &manifold->Depth0;
+                ////Negative depths correspond to separation.
+                //Debug.Assert(speculativeMargin >= 0, "Negative speculative margins are nonsensical. Is something busted?");
+                //speculativeMargin = -speculativeMargin;
+                //if (manifold->Convex)
+                //{
+                //    for (int i = contactCount - 1; i >= 0; --i)
+                //    {
+                //        if (depths[i] < speculativeMargin)
+                //        {
+                //            //Console.WriteLine($"Removing contact {i}, depth: {depths[i]}, limit: {speculativeMargin}");
+                //            //ContactManifold.ConvexFastRemoveAt(manifold, i);
+                //        }
+                //    }
+                //}
+                //else
+                //{
+                //    for (int i = contactCount - 1; i >= 0; --i)
+                //    {
+                //        if (depths[i] < speculativeMargin)
+                //        {
+                //            //Console.WriteLine($"Removing NONCONVEX contact {i}, depth: {depths[i]}, limit: {speculativeMargin}");
+                //            //ContactManifold.NonconvexFastRemoveAt(manifold, i);
+                //        }
+                //    }
+                //}
+            }
 
             public unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold)
             {
@@ -481,7 +530,9 @@ namespace SolverPrototype.CollisionDetection
                         {
                             //Direct has no need for accumulating multiple reports; we can immediately dispatch.
                             ref var continuation = ref discrete.Caches[continuationIndex];
-                            narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation, manifold, ref todoTestCollisionCache);
+                            //Discrete manifolds should obey the speculative margin limitation on speculative contacts.
+                            RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
+                            narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation.Pair, manifold, ref todoTestCollisionCache);
                             discrete.Return(continuationIndex, pool);
                         }
                         break;
@@ -496,7 +547,8 @@ namespace SolverPrototype.CollisionDetection
                             switch (continuationId.InnerIndex)
                             {
                                 case 0:
-                                    //Discrete
+                                    //Discrete manifolds obey speculative margin limitations.
+                                    RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
                                     continuation.DiscreteManifold = *manifold;
                                     break;
                                 case 1:
@@ -522,6 +574,8 @@ namespace SolverPrototype.CollisionDetection
                         {
                             ref var continuation = ref substep.Caches[continuationId.Index];
                             Debug.Assert(continuationId.InnerIndex >= 0 && continuationId.InnerIndex < continuation.Manifolds.Manifolds.Count);
+                            //Every substep manifold obeys speculative margin limitations. This ensures a decent substep is chosen when reducing substeps to a final manifold.
+                            RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
                             continuation.Manifolds.Manifolds[continuationId.InnerIndex] = *manifold;
                             ++continuation.ManifoldsReported;
 
@@ -549,6 +603,8 @@ namespace SolverPrototype.CollisionDetection
                                 default:
                                     var substepIndex = innerIndex - 2;
                                     Debug.Assert(substepIndex >= 0 && substepIndex < continuation.SubstepManifolds.Manifolds.Count);
+                                    //Every substep manifold obeys speculative margin limitations. This ensures a decent substep is chosen when reducing substeps to a final manifold.
+                                    RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
                                     continuation.SubstepManifolds.Manifolds[substepIndex] = *manifold;
                                     break;
                             }

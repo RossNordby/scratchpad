@@ -266,7 +266,7 @@ namespace SolverPrototype
                 totalConstraintsScheduled += typeBatch.ConstraintCount;
             }
 
-            var analyzeStart = Stopwatch.GetTimestamp();
+            //var analyzeStart = Stopwatch.GetTimestamp();
             if (threadDispatcher != null)
             {
                 analysisJobIndex = -1;
@@ -281,14 +281,14 @@ namespace SolverPrototype
                     DoJob(ref analysisJobs[i], 0, rawPool);
                 }
             }
-            var analyzeEnd = Stopwatch.GetTimestamp();
+            //var analyzeEnd = Stopwatch.GetTimestamp();
 
             analysisJobs.Dispose(regionPool);
 
             var sourceBatch = Solver.Batches[nextBatchIndex];
             int compressionsApplied = 0;
 
-            var applyStart = Stopwatch.GetTimestamp();
+            //var applyStart = Stopwatch.GetTimestamp();
             if (deterministic)
             {
                 //In deterministic mode, we must first sort the compressions found by every thread.
@@ -348,14 +348,14 @@ namespace SolverPrototype
 
                 }
             }
-            var applyEnd = Stopwatch.GetTimestamp();
+            //var applyEnd = Stopwatch.GetTimestamp();
 
 
             //Console.WriteLine($"Batch count: {Solver.Batches.Count}, compression count: {compressionsApplied}, candidates analyzed: {totalConstraintsScheduled}");
             //var analyzeTime = 1e6 * (analyzeEnd - analyzeStart) / Stopwatch.Frequency;
             //Console.WriteLine($"Analyze time (us): {analyzeTime}, per constraint scheduled (us): {analyzeTime / totalConstraintsScheduled}");
             //var applyTime = 1e6 * (applyEnd - applyStart) / Stopwatch.Frequency;
-            //Console.WriteLine($"Apply time (us): {applyTime}, per applied: {applyTime / compressionsApplied}");
+            //Console.WriteLine($"Apply time (us): {applyTime}, per applied: {applyTime / compressionsApplied}, (maximum: {maximumCompressionCount})");
 
             for (int i = 0; i < workerCount; ++i)
             {

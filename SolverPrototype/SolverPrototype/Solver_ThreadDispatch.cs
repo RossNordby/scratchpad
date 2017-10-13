@@ -277,14 +277,14 @@ namespace SolverPrototype
         {
             void Execute(TypeBatch typeBatch, int start, int end);
         }
-        struct PrestepStageFunction : IStageFunction 
+        struct PrestepStageFunction : IStageFunction
         {
             public float Dt;
             public Bodies Bodies;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
-                typeBatch.Prestep(Bodies, Dt, start, end);
+                typeBatch.Prestep(Bodies, Dt, 1 / Dt, start, end);
             }
         }
 
@@ -597,7 +597,7 @@ namespace SolverPrototype
             {
                 context.WorkerBoundsA[i] = new WorkerBounds { Min = int.MaxValue, Max = int.MinValue };
             }
-            
+
             //While we could be a little more aggressive about culling work with this condition, it doesn't matter much. Have to do it for correctness; worker relies on it.
             if (Batches.Count > 0)
                 threadPool.DispatchWorkers(workDelegate);

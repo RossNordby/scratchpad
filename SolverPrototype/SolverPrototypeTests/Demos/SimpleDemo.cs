@@ -13,20 +13,21 @@ namespace SolverPrototypeTests
         public unsafe override void Initialize(Camera camera)
         {
             DefaultTypes.Register();
-            camera.Position = new Vector3(-30f, 30, -30f);
+            camera.Position = new Vector3(-3f, 3, -3f);
             camera.Yaw = MathHelper.Pi * 3f / 4;
             camera.Pitch = MathHelper.Pi * 0.1f;
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 6;
-            const int height = 64;
-            const int length = 6;
+            const int width = 64;
+            const int height = 16;
+            const int length = 64;
             SimulationSetup.BuildLattice(
                 new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
+            Simulation.Deterministic = false;
             //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
 
             BodyVelocity velocity;
@@ -43,11 +44,12 @@ namespace SolverPrototypeTests
         int frameIndex;
         public override void Update(Input input, float dt)
         {
-            Console.WriteLine($"Preframe {frameIndex++}, mapping count: {Simulation.NarrowPhase.PairCache.Mapping.Count}");
-            for (int i = 0; i < Simulation.Bodies.BodyCount; ++i)
-            {
-                Simulation.Bodies.ValidateExistingHandle(Simulation.Bodies.IndexToHandle[i]);
-            }
+            //Console.WriteLine($"Preframe {frameIndex++}, mapping count: {Simulation.NarrowPhase.PairCache.Mapping.Count}");
+            
+            //for (int i = 0; i < Simulation.Bodies.BodyCount; ++i)
+            //{
+            //    Simulation.Bodies.ValidateExistingHandle(Simulation.Bodies.IndexToHandle[i]);
+            //}
             //if (input.WasPushed(OpenTK.Input.Key.P))
             //{
             //    unsafe { var accessViolationSuppressant = stackalloc int[0]; }

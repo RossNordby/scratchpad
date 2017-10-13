@@ -307,14 +307,14 @@ namespace SolverPrototype.CollisionDetection
                         }
                     }
                 }
-                var start = Stopwatch.GetTimestamp();
+                //var start = Stopwatch.GetTimestamp();
                 preflushJobIndex = -1;
                 threadDispatcher.DispatchWorkers(preflushWorkerLoop);
                 //for (int i = 0; i < preflushJobs.Count; ++i)
                 //{
                 //    ExecutePreflushJob(0, ref preflushJobs[i]);
                 //}
-                var end = Stopwatch.GetTimestamp();
+                //var end = Stopwatch.GetTimestamp();
                 //Console.WriteLine($"Preflush phase 1 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
                 //SECOND PHASE:
@@ -332,14 +332,14 @@ namespace SolverPrototype.CollisionDetection
                 }
                 FreshnessChecker.CreateJobs(threadCount, ref preflushJobs, Pool);
 
-                start = Stopwatch.GetTimestamp();
+                //start = Stopwatch.GetTimestamp();
                 preflushJobIndex = -1;
                 threadDispatcher.DispatchWorkers(preflushWorkerLoop);
                 //for (int i = 0; i < preflushJobs.Count; ++i)
                 //{
                 //    ExecutePreflushJob(0, ref preflushJobs[i]);
                 //}
-                end = Stopwatch.GetTimestamp();
+                //end = Stopwatch.GetTimestamp();
                 //Console.WriteLine($"Preflush phase 2 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
 
                 for (int i = 0; i < threadCount; ++i)

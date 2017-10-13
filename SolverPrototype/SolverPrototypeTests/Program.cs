@@ -23,8 +23,8 @@ namespace SolverPrototypeTests
             //CollidablePairComparerTests.Test();
             //HeadlessDemo.Simple();
             //BatchedCollisionTests.Test();
-            DeterminismTest.Test();
-            return;
+            //DeterminismTest.Test();
+            //return;
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();

@@ -139,6 +139,7 @@ namespace SolverPrototype.CollisionDetection
         public void Flush(IThreadDispatcher threadDispatcher = null, bool deterministic = false)
         {
             OnPreflush(threadDispatcher, deterministic);
+            //var start = Stopwatch.GetTimestamp();
             QuickList<NarrowPhaseFlushJob, Buffer<NarrowPhaseFlushJob>>.Create(Pool.SpecializeFor<NarrowPhaseFlushJob>(), 128, out flushJobs);
             PairCache.PrepareFlushJobs(ref flushJobs);
             //We indirectly pass the determinism state; it's used by the constraint remover bookkeeping.
@@ -157,6 +158,8 @@ namespace SolverPrototype.CollisionDetection
                 flushJobIndex = -1;
                 threadDispatcher.DispatchWorkers(flushWorkerLoop);
             }
+            //var end = Stopwatch.GetTimestamp();
+            //Console.WriteLine($"Flush stage 3 time (us): {1e6 * (end - start) / Stopwatch.Frequency}");
             flushJobs.Dispose(Pool.SpecializeFor<NarrowPhaseFlushJob>());
 
             PairCache.Postflush();
@@ -260,6 +263,12 @@ namespace SolverPrototype.CollisionDetection
                         //That keeps things a little simpler. Unlike v1, we don't have to worry about the implications of 'motion clamping' here- no need for deeper configuration.
                         var useSubstepping = aCollidable.Continuity.UseSubstepping || bCollidable.Continuity.UseSubstepping;
                         var useInnerSphere = aCollidable.Continuity.UseInnerSphere || bCollidable.Continuity.UseInnerSphere;
+                        //Note that the pair's margin is the larger of the two involved collidables. This is based on two observations:
+                        //1) Values smaller than either contributor should never be used, because it may interfere with tuning. Difficult to choose substepping properties without a 
+                        //known minimum value for speculative margins.
+                        //2) The larger the margin, the higher the risk of ghost collisions. 
+                        //Taken together, max is implied.
+                        var speculativeMargin = Math.Max(aCollidable.SpeculativeMargin, bCollidable.SpeculativeMargin);
                         //Create a continuation for the pair given the CCD state.
                         if (useSubstepping && useInnerSphere)
                         {
@@ -275,7 +284,7 @@ namespace SolverPrototype.CollisionDetection
                         else
                         {
                             //This pair uses no CCD beyond its speculative margin.
-                            var continuation = overlapWorker.ConstraintGenerators.AddDiscrete(ref pair);
+                            var continuation = overlapWorker.ConstraintGenerators.AddDiscrete(ref pair, speculativeMargin);
                             overlapWorker.Batcher.Add(shapeTypeA, shapeTypeB, shapeSizeA, shapeSizeB, shapePointerA, shapePointerB, ref poseA, ref poseB, continuation,
                                 ref overlapWorker.ConstraintGenerators, ref overlapWorker.Filters);
                         }

@@ -37,7 +37,7 @@ namespace SolverPrototype.Constraints
     public static class ContactPenetrationLimit4
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold4PrestepData prestep, float dt,
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold4PrestepData prestep, float dt, float inverseDt,
             out ContactPenetrationLimit4Projection projection)
         {
             //We directly take the prestep data here since the jacobians and error don't undergo any processing.
@@ -101,12 +101,14 @@ namespace SolverPrototype.Constraints
             projection.Penetration0.EffectiveMass = effectiveMassCFMScale / (linear + angularA0 + angularB0);
             projection.Penetration1.EffectiveMass = effectiveMassCFMScale / (linear + angularA1 + angularB1);
             projection.Penetration2.EffectiveMass = effectiveMassCFMScale / (linear + angularA2 + angularB2);
-            projection.Penetration3.EffectiveMass = effectiveMassCFMScale / (linear + angularA3 + angularB3);            
+            projection.Penetration3.EffectiveMass = effectiveMassCFMScale / (linear + angularA3 + angularB3);
 
-            projection.Penetration0.BiasVelocity = Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
-            projection.Penetration1.BiasVelocity = Vector.Min(prestep.PenetrationDepth1 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
-            projection.Penetration2.BiasVelocity = Vector.Min(prestep.PenetrationDepth2 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
-            projection.Penetration3.BiasVelocity = Vector.Min(prestep.PenetrationDepth3 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity);
+            //If depth is negative, the bias velocity will permit motion up until the depth hits zero. This works because positionErrorToVelocity * dt will always be <=1.
+            var inverseDtVector = new Vector<float>(inverseDt);
+            projection.Penetration0.BiasVelocity = Vector.Min(prestep.PenetrationDepth0 * inverseDtVector, Vector.Min(prestep.PenetrationDepth0 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity));
+            projection.Penetration1.BiasVelocity = Vector.Min(prestep.PenetrationDepth1 * inverseDtVector, Vector.Min(prestep.PenetrationDepth1 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity));
+            projection.Penetration2.BiasVelocity = Vector.Min(prestep.PenetrationDepth2 * inverseDtVector, Vector.Min(prestep.PenetrationDepth2 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity));
+            projection.Penetration3.BiasVelocity = Vector.Min(prestep.PenetrationDepth3 * inverseDtVector, Vector.Min(prestep.PenetrationDepth3 * positionErrorToVelocity, prestep.MaximumRecoveryVelocity));
         }
 
 

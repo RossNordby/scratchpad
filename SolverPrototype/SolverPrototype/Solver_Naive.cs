@@ -17,10 +17,11 @@ namespace SolverPrototype
         void ManualNaivePrestep(int workerIndex)
         {
             int blockIndex;
+            var inverseDt = 1f / context.Dt;
             while ((blockIndex = Interlocked.Increment(ref manualNaiveBlockIndex)) <= manualNaiveExclusiveEndIndex)
             {
                 ref var block = ref context.WorkBlocks[blockIndex - 1];
-                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies, context.Dt, block.StartBundle, block.End);
+                Batches[block.BatchIndex].TypeBatches[block.TypeBatchIndex].Prestep(bodies, context.Dt, inverseDt, block.StartBundle, block.End);
             }
         }
         void ManualNaiveWarmStart(int workBlockIndex)

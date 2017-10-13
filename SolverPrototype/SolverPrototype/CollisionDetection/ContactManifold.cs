@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -168,10 +169,45 @@ namespace SolverPrototype.CollisionDetection
             PackedConvexityAndContactCount = count | ((*(int*)&convex) << 4);
         }
 
-        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void ConvexFastRemoveAt(ContactManifold* manifold, int index)
+        {
+            Debug.Assert(manifold->Convex);
+            var count = manifold->ContactCount;
 
+            var lastIndex = count - 1;
+            if (index < lastIndex)
+            {
+                var offsets = &manifold->Offset0;
+                var depths = &manifold->Depth0;
+                var featureIds = &manifold->FeatureId0;
+                offsets[index] = offsets[lastIndex];
+                depths[index] = depths[lastIndex];
+                featureIds[index] = featureIds[lastIndex];
+            }
+            manifold->SetConvexityAndCount(lastIndex, true);
+        }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void NonconvexFastRemoveAt(ContactManifold* manifold, int index)
+        {
+            Debug.Assert(!manifold->Convex);
+            var count = manifold->ContactCount;
 
+            var lastIndex = count - 1;
+            if (index < lastIndex)
+            {
+                var offsets = &manifold->Offset0;
+                var depths = &manifold->Depth0;
+                var featureIds = &manifold->FeatureId0;
+                var normals = &manifold->Normal0;
+                offsets[index] = offsets[lastIndex];
+                depths[index] = depths[lastIndex];
+                featureIds[index] = featureIds[lastIndex];
+                normals[index] = normals[lastIndex];
+            }
+            manifold->SetConvexityAndCount(lastIndex, false);
+        }
     }
 
 }

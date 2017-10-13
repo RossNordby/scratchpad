@@ -44,7 +44,7 @@ namespace SolverPrototype.Constraints
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences,
-            float dt, ref ContactManifold1PrestepData prestep, out ContactManifold1Projection projection)
+            float dt, float inverseDt, ref ContactManifold1PrestepData prestep, out ContactManifold1Projection projection)
         {
             bodies.GatherInertia(ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
             Vector3Wide.Subtract(ref prestep.OffsetA0, ref prestep.OffsetB, out var offsetToManifoldCenterB);
@@ -52,7 +52,7 @@ namespace SolverPrototype.Constraints
             projection.Normal = prestep.Normal;
             Helpers.BuildOrthnormalBasis(ref prestep.Normal, out var x, out var z);
             TangentFriction.Prestep(ref x, ref z, ref prestep.OffsetA0, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
-            ContactPenetrationLimit1.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, ref prestep, dt, out projection.Penetration);
+            ContactPenetrationLimit1.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, ref prestep, dt, inverseDt, out projection.Penetration);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
