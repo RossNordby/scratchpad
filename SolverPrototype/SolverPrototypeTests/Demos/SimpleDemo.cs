@@ -19,11 +19,11 @@ namespace SolverPrototypeTests
             Simulation = Simulation.Create(BufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = Simulation.Shapes.Add(ref shape);
-            const int width = 64;
+            const int width = 16;
             const int height = 16;
-            const int length = 64;
+            const int length = 16;
             SimulationSetup.BuildLattice(
-                new RegularGridWithKinematicBaseBuilder(new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
+                new RegularGridWithKinematicBaseBuilder(new Vector3(1.0f, 1.2f, 1.0f), new Vector3(1, 1, 1), 1f / (shape.Radius * shape.Radius * 2 / 3), shapeIndex),
                 new ConstraintlessLatticeBuilder(),
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
@@ -31,7 +31,7 @@ namespace SolverPrototypeTests
             //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
 
             BodyVelocity velocity;
-            velocity.Linear = new Vector3(.1f, 0, 0.1f);
+            velocity.Linear = new Vector3(0.05f, 0, 0.1f);
             velocity.Angular = new Vector3();
             Simulation.Bodies.SetVelocity(bodyHandles[width], ref velocity);
 

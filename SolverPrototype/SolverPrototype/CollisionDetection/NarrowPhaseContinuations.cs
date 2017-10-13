@@ -488,35 +488,67 @@ namespace SolverPrototype.CollisionDetection
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private unsafe void RemoveDistantContacts(ContactManifold* manifold, float speculativeMargin)
+            private unsafe void ReduceDistantContacts(ContactManifold* manifold, float speculativeMargin, ContactManifold* outputManifold)
             {
-                //var contactCount = manifold->ContactCount;
-                //var depths = &manifold->Depth0;
-                ////Negative depths correspond to separation.
-                //Debug.Assert(speculativeMargin >= 0, "Negative speculative margins are nonsensical. Is something busted?");
-                //speculativeMargin = -speculativeMargin;
-                //if (manifold->Convex)
-                //{
-                //    for (int i = contactCount - 1; i >= 0; --i)
-                //    {
-                //        if (depths[i] < speculativeMargin)
-                //        {
-                //            //Console.WriteLine($"Removing contact {i}, depth: {depths[i]}, limit: {speculativeMargin}");
-                //            //ContactManifold.ConvexFastRemoveAt(manifold, i);
-                //        }
-                //    }
-                //}
-                //else
-                //{
-                //    for (int i = contactCount - 1; i >= 0; --i)
-                //    {
-                //        if (depths[i] < speculativeMargin)
-                //        {
-                //            //Console.WriteLine($"Removing NONCONVEX contact {i}, depth: {depths[i]}, limit: {speculativeMargin}");
-                //            //ContactManifold.NonconvexFastRemoveAt(manifold, i);
-                //        }
-                //    }
-                //}
+                var contactCount = manifold->ContactCount;
+                var sourceDepths = &manifold->Depth0;
+                //Negative depths correspond to separation.
+                Debug.Assert(speculativeMargin >= 0, "Negative speculative margins are nonsensical. Is something busted?");
+                speculativeMargin = -speculativeMargin;
+                if (manifold->Convex)
+                {
+                    int count = 0;
+                    var sourceOffsets = &manifold->Offset0;
+                    var sourceIds = &manifold->FeatureId0;
+                    var targetOffsets = &outputManifold->Offset0;
+                    var targetDepths = &outputManifold->Depth0;
+                    var targetIds = &outputManifold->FeatureId0;
+
+                    for (int i = 0; i < contactCount; ++i)
+                    {
+                        if (sourceDepths[i] >= speculativeMargin)
+                        {
+                            var index = count++;
+                            targetOffsets[index] = sourceOffsets[i];
+                            targetDepths[index] = sourceDepths[i];
+                            targetIds[index] = sourceIds[i];
+                        }
+                    }
+                    if (count > 0)
+                    {
+                        outputManifold->ConvexNormal = manifold->ConvexNormal;
+                        outputManifold->OffsetB = manifold->OffsetB;
+                    }
+                    outputManifold->SetConvexityAndCount(count, true);
+                }
+                else
+                {
+                    int count = 0;
+                    var sourceOffsets = &manifold->Offset0;
+                    var sourceIds = &manifold->FeatureId0;
+                    var sourceNormals = &manifold->Normal0;
+                    var targetOffsets = &outputManifold->Offset0;
+                    var targetDepths = &outputManifold->Depth0;
+                    var targetIds = &outputManifold->FeatureId0;
+                    var targetNormals = &outputManifold->Normal0;
+
+                    for (int i = 0; i < contactCount; ++i)
+                    {
+                        if (sourceDepths[i] >= speculativeMargin)
+                        {
+                            var index = count++;
+                            targetOffsets[index] = sourceOffsets[i];
+                            targetDepths[index] = sourceDepths[i];
+                            targetIds[index] = sourceIds[i];
+                            targetNormals[index] = sourceNormals[i];
+                        }
+                    }
+                    if (count > 0)
+                    {
+                        outputManifold->OffsetB = manifold->OffsetB;
+                    }
+                    outputManifold->SetConvexityAndCount(count, false);
+                }
             }
 
             public unsafe void Notify(ContinuationIndex continuationId, ContactManifold* manifold)
@@ -531,8 +563,10 @@ namespace SolverPrototype.CollisionDetection
                             //Direct has no need for accumulating multiple reports; we can immediately dispatch.
                             ref var continuation = ref discrete.Caches[continuationIndex];
                             //Discrete manifolds should obey the speculative margin limitation on speculative contacts.
-                            RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
-                            narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation.Pair, manifold, ref todoTestCollisionCache);
+                            //Note that we cannot modify the manifold provided to this function; we generate our own version.
+                            ContactManifold reducedManifold;
+                            ReduceDistantContacts(manifold, continuation.SpeculativeMargin, &reducedManifold);
+                            narrowPhase.UpdateConstraintsForPair(workerIndex, ref continuation.Pair, &reducedManifold, ref todoTestCollisionCache);
                             discrete.Return(continuationIndex, pool);
                         }
                         break;
@@ -548,8 +582,7 @@ namespace SolverPrototype.CollisionDetection
                             {
                                 case 0:
                                     //Discrete manifolds obey speculative margin limitations.
-                                    RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
-                                    continuation.DiscreteManifold = *manifold;
+                                    ReduceDistantContacts(manifold, continuation.SpeculativeMargin, (ContactManifold*)Unsafe.AsPointer(ref continuation.DiscreteManifold));
                                     break;
                                 case 1:
                                     FillLinearManifoldSlotA(ref continuation.LinearManifold, manifold);
@@ -575,8 +608,7 @@ namespace SolverPrototype.CollisionDetection
                             ref var continuation = ref substep.Caches[continuationId.Index];
                             Debug.Assert(continuationId.InnerIndex >= 0 && continuationId.InnerIndex < continuation.Manifolds.Manifolds.Count);
                             //Every substep manifold obeys speculative margin limitations. This ensures a decent substep is chosen when reducing substeps to a final manifold.
-                            RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
-                            continuation.Manifolds.Manifolds[continuationId.InnerIndex] = *manifold;
+                            ReduceDistantContacts(manifold, continuation.SpeculativeMargin, (ContactManifold*)Unsafe.AsPointer(ref continuation.Manifolds.Manifolds[continuationId.InnerIndex]));
                             ++continuation.ManifoldsReported;
 
                             if (continuation.ManifoldsReported == continuation.Manifolds.Manifolds.Count)
@@ -604,8 +636,7 @@ namespace SolverPrototype.CollisionDetection
                                     var substepIndex = innerIndex - 2;
                                     Debug.Assert(substepIndex >= 0 && substepIndex < continuation.SubstepManifolds.Manifolds.Count);
                                     //Every substep manifold obeys speculative margin limitations. This ensures a decent substep is chosen when reducing substeps to a final manifold.
-                                    RemoveDistantContacts(manifold, continuation.SpeculativeMargin);
-                                    continuation.SubstepManifolds.Manifolds[substepIndex] = *manifold;
+                                    ReduceDistantContacts(manifold, continuation.SpeculativeMargin, (ContactManifold*)Unsafe.AsPointer(ref continuation.SubstepManifolds.Manifolds[substepIndex]));
                                     break;
                             }
                             ++continuation.ManifoldsReported;

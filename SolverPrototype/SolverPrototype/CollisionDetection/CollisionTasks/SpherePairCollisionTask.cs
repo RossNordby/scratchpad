@@ -266,6 +266,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             ref var start = ref Unsafe.As<byte, RigidPair<Sphere, Sphere>>(ref batch.Buffer[0]);
             var manifolds = stackalloc ContactManifold[Vector<float>.Count];
             var trustMeThisManifoldIsTotallyInitialized = &manifolds;
+            //Note that this is hoisted out of the loop. The notification function is not allowed to modify the manifold passed in, so we can do it once up front.
             for (int i = 0; i < Vector<float>.Count; ++i)
             {
                 manifolds[i].SetConvexityAndCount(1, true);
@@ -314,6 +315,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 for (int j = 0; j < countInBundle; ++j)
                 {
                     continuations.Notify(Unsafe.Add(ref bundleStart, j).Shared.Continuation, manifolds + j);
+                    Debug.Assert(manifolds[j].ContactCount == 1 && manifolds[j].Convex, "The notify function should not modify the provided manifold reference.");
                 }
             }
         }
