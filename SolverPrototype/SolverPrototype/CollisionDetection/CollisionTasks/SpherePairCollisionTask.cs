@@ -45,7 +45,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
         public SpherePairCollisionTask()
         {
             BatchSize = 32;
-            ShapeTypeIndexA = TypeIds<IShape>.GetId<Sphere>();
+            ShapeTypeIndexA = default(Sphere).TypeId;
             ShapeTypeIndexB = ShapeTypeIndexA;
         }
 

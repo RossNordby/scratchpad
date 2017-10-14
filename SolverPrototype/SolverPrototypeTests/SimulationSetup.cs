@@ -17,7 +17,6 @@ namespace SolverPrototypeTests
     }
     public interface IConstraintBuilder
     {
-        void RegisterConstraintTypes();
         void BuildConstraintsForBody(int sliceIndex, int rowIndex, int columnIndex,
             ref BodyDescription bodyDescription, ref LatticeBodyGetter ids, ref ConstraintAdder constraintAdder);
     }
@@ -118,8 +117,7 @@ namespace SolverPrototypeTests
                     }
                 }
             }
-
-            constraintBuilder.RegisterConstraintTypes();
+            
             var constraintAdder = new ConstraintAdder(simulation, new List<int>(width * height * length * 3));
             for (int sliceIndex = 0; sliceIndex < length; ++sliceIndex)
             {

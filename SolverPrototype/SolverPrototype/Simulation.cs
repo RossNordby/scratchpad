@@ -64,10 +64,9 @@ namespace SolverPrototype
         /// <param name="bufferPool">Buffer pool used to fill persistent structures and main thread ephemeral resources across the engine.</param>
         /// <param name="narrowPhaseCallbacks">Callbacks to use in the narrow phase.</param>
         /// <param name="initialAllocationSizes">Allocation sizes to initialize the simulation with. If left null, default values are chosen.</param>
-        /// <param name="collisionTaskRegistry">The set of collision tasks to use in the simulation. If left null, default types are registered.</param>
         /// <returns>New simulation.</returns>
         public static Simulation Create<TNarrowPhaseCallbacks>(BufferPool bufferPool, TNarrowPhaseCallbacks narrowPhaseCallbacks,
-            SimulationAllocationSizes? initialAllocationSizes = null, CollisionTaskRegistry collisionTaskRegistry = null)
+            SimulationAllocationSizes? initialAllocationSizes = null)
             where TNarrowPhaseCallbacks : struct, INarrowPhaseCallbacks
         {
             if (initialAllocationSizes == null)
@@ -82,12 +81,10 @@ namespace SolverPrototype
                     ConstraintsPerTypeBatch = 256
                 };
             }
-            if (collisionTaskRegistry == null)
-            {
-                collisionTaskRegistry = DefaultTypes.CreateDefaultCollisionTaskRegistry();
-            }
+    
             var simulation = new Simulation(bufferPool, initialAllocationSizes.Value);
-            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation, collisionTaskRegistry, narrowPhaseCallbacks);
+            DefaultTypes.Register(simulation.Solver.TypeBatchAllocation, out var defaultTaskRegistry);
+            var narrowPhase = new NarrowPhase<TNarrowPhaseCallbacks>(simulation, defaultTaskRegistry, narrowPhaseCallbacks);
             simulation.NarrowPhase = narrowPhase;
             simulation.BroadPhaseOverlapFinder = new CollidableOverlapFinder<TNarrowPhaseCallbacks>(narrowPhase, simulation.BroadPhase);
 

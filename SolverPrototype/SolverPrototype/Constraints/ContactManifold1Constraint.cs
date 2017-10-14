@@ -1,11 +1,11 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 namespace SolverPrototype.Constraints
 {
     public struct ContactManifold1Constraint : IConstraintDescription<ContactManifold1Constraint>
     {
-
         //TODO: In a 'real' use case, we will likely split the description for contact manifolds into two parts: mutable contact data and initialize-once spring/friction data.
         //SpringSettings and FrictionCoefficient don't usually change over the lifetime of the constraint, so there's no reason to set them every time.
         //For now, though, we'll use this combined representation.
@@ -89,9 +89,11 @@ namespace SolverPrototype.Constraints
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return TypeIds<TypeBatch>.GetId<ContactManifold1TypeBatch>();
+                return ContactManifold1TypeBatch.BatchTypeId;
             }
         }
+
+        public Type BatchType => typeof(ContactManifold1TypeBatch);
     }
 
 }

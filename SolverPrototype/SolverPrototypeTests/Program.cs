@@ -23,8 +23,9 @@ namespace SolverPrototypeTests
             //CollidablePairComparerTests.Test();
             //HeadlessDemo.Simple();
             //BatchedCollisionTests.Test();
-            DeterminismTest.Test();
-            return;
+            //TypeIdCodeGenTests.Test();
+            //DeterminismTest.Test();
+            //return;
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();
@@ -44,7 +45,6 @@ namespace SolverPrototypeTests
             //return;
 
             //Console.ReadKey();
-            DefaultTypes.Register();
             var window = new Window("pretty cool multicolored window",
                 new Int2((int)(DisplayDevice.Default.Width * 0.75f), (int)(DisplayDevice.Default.Height * 0.75f)), WindowMode.Windowed);
             var loop = new GameLoop(window);

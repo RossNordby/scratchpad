@@ -30,6 +30,8 @@ namespace SolverPrototype.Collidables
         //These functions require only an orientation because the effect of the position on the bounding box is the same for all shapes.
         //By isolating the shape from the position, we can more easily swap out the position representation for higher precision modes while only modifying the stuff that actually
         //deals with positions directly.
+
+        int TypeId { get; }
     }
 
 
@@ -251,13 +253,13 @@ namespace SolverPrototype.Collidables
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref TShape GetShape<TShape>(int shapeIndex) where TShape : struct, IShape
         {
-            var typeIndex = TypeIds<IShape>.GetId<TShape>();
-            return ref Unsafe.As<ShapeBatch, ShapeBatch<TShape>>(ref batches[typeIndex])[shapeIndex];
+            var typeId = default(TShape).TypeId;
+            return ref Unsafe.As<ShapeBatch, ShapeBatch<TShape>>(ref batches[typeId])[shapeIndex];
         }
 
         public TypedIndex Add<TShape>(ref TShape shape) where TShape : struct, IShape
         {
-            var typeId = TypeIds<IShape>.GetId<TShape>();
+            var typeId = default(TShape).TypeId;
             if (RegisteredTypeSpan <= typeId)
             {
                 if (batches.Span.Length <= typeId)

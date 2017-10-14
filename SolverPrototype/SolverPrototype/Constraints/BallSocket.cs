@@ -18,9 +18,11 @@ namespace SolverPrototype.Constraints
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return TypeIds<TypeBatch>.GetId<BallSocketTypeBatch>();
+                return BallSocketTypeBatch.BatchTypeId;
             }
         }
+
+        public Type BatchType => typeof(BallSocketTypeBatch);
 
         public void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex)
         {
@@ -202,6 +204,6 @@ namespace SolverPrototype.Constraints
     /// </summary>
     public class BallSocketTypeBatch : TwoBodyTypeBatch<BallSocketPrestepData, BallSocketProjection, Vector3Wide, BallSocketFunctions>
     {
-
+        public const int BatchTypeId = 16;
     }
 }

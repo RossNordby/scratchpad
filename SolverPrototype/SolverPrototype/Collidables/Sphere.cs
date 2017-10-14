@@ -8,7 +8,6 @@ using System.Diagnostics;
 
 namespace SolverPrototype.Collidables
 {
-
     public struct Sphere : IShape
     {
         public float Radius;
@@ -57,5 +56,7 @@ namespace SolverPrototype.Collidables
             min = new Vector3(-Radius);
             max = new Vector3(Radius);
         }
+
+        public int TypeId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 0; } }
     }
 }

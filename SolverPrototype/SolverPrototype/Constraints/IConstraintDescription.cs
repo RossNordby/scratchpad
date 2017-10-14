@@ -38,5 +38,9 @@ namespace SolverPrototype.Constraints
         /// Gets the type id of the constraint that this is a description of.
         /// </summary>
         int ConstraintTypeId { get; }
+        /// <summary>
+        /// Gets the type of the type batch which contains described constraints.
+        /// </summary>
+        Type BatchType  { get; }
     }
 }

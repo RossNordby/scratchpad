@@ -13,10 +13,6 @@ namespace SolverPrototypeTests
 {
     public struct BallSocketConstraintBuilder : IConstraintBuilder
     {
-        public void RegisterConstraintTypes()
-        {
-            TypeIds<TypeBatch>.Register<BallSocketTypeBatch>();
-        }
         static void CreateBallSocket(ref BodyPose a, ref BodyPose b, out BallSocket description)
         {
             var midpoint = 0.5f * (a.Position + b.Position);

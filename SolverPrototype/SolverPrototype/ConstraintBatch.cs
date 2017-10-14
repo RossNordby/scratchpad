@@ -33,21 +33,7 @@ namespace SolverPrototype
                 TypeIndexToTypeBatchIndex[i] = -1;
             }
         }
-
-        /// <summary>
-        /// Gets a type batch in the batch matching the given type.
-        /// Requires that there exists at least one constraint in the type batch.
-        /// </summary>
-        /// <typeparam name="T">Type of the batch to grab.</typeparam>
-        /// <returns>TypeBatch instance associated with the given type.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T GetTypeBatch<T>() where T : TypeBatch
-        {
-            var typeBatchIndex = TypeIndexToTypeBatchIndex[TypeIds<TypeBatch>.GetId<T>()];
-            var typeBatch = TypeBatches[typeBatchIndex];
-            Debug.Assert(typeof(T) == TypeBatches[typeBatchIndex].GetType(), "If the type batch we have stored for this index isn't of the expected type, then something is broken.");
-            return Unsafe.As<TypeBatch, T>(ref typeBatch);
-        }
+        
         /// <summary>
         /// Gets a type batch in the batch matching the given type id.
         /// Requires that there exists at least one constraint in the type batch.
@@ -93,7 +79,6 @@ namespace SolverPrototype
                 }
                 else
                 {
-                    Debug.Assert(TypeIds<TypeBatch>.GetType(typeId) == TypeBatches[typeBatchIndex].GetType());
                     return TypeBatches[typeBatchIndex];
                 }
             }

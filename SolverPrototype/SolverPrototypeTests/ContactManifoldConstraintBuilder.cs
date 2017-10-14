@@ -12,10 +12,6 @@ namespace SolverPrototypeTests
 {
     public struct ContactManifoldConstraintBuilder : IConstraintBuilder
     {
-        public void RegisterConstraintTypes()
-        {
-            TypeIds<TypeBatch>.Register<ContactManifold4TypeBatch>();
-        }
         static void CreateManifoldConstraint(ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ, ref Vector3 offsetB, out ContactManifold4Constraint description)
         {
             description = new ContactManifold4Constraint

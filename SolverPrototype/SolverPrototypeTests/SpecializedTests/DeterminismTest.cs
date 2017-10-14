@@ -13,7 +13,6 @@ namespace SolverPrototypeTests.SpecializedTests
     {
         public static BodyPose[] ExecuteSimulation(int frameCount, BufferPool bufferPool, IThreadDispatcher threadDispatcher)
         {
-            DefaultTypes.Register();
             var simulation = Simulation.Create(bufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
             var shapeIndex = simulation.Shapes.Add(ref shape);

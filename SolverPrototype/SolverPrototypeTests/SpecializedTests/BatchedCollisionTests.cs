@@ -68,7 +68,6 @@ namespace SolverPrototypeTests.SpecializedTests
 
         public static void Test()
         {
-            DefaultTypes.Register();
             var pool = new BufferPool();
             var registry = new CollisionTaskRegistry();
             var task = new SpherePairCollisionTask();

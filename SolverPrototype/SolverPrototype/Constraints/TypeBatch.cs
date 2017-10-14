@@ -402,12 +402,8 @@ namespace SolverPrototype.Constraints
 
         public override void Initialize(TypeBatchAllocation typeBatchAllocation, int typeId)
         {
-            InternalResize(typeBatchAllocation, typeBatchAllocation[typeId]);
-            //Including this in the typebatch is a little bit hacky; it's just useful to know the typeid without any explicit generic parameters within the type batch 
-            //when doing things like the MoveConstraint above- being able to know which type batch without external help simplifies the usage.
-            //Given that the initializer always knows the typeid, and given that the cost is an extra 4 bytes at the level of type batches, this hack is pretty low concern.
-            //Technically, this could be looked up in the ConstraintTypeIds static class by using this.GetType(), but that's a slow path.
             this.typeId = typeId;
+            InternalResize(typeBatchAllocation, typeBatchAllocation[typeId]);
         }
 
         void InternalResize(TypeBatchAllocation typeBatchAllocation, int constraintCapacity)

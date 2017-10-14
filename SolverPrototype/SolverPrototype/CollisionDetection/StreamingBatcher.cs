@@ -239,7 +239,7 @@ namespace SolverPrototype.CollisionDetection
             where TShapeA : struct, IShape
             where TShapeB : struct, IShape
         {
-            return ref GetTaskReference(TypeIds<IShape>.GetId<TShapeA>(), TypeIds<IShape>.GetId<TShapeB>());
+            return ref GetTaskReference(default(TShapeA).TypeId, default(TShapeB).TypeId);
         }
     }
 
@@ -406,7 +406,7 @@ namespace SolverPrototype.CollisionDetection
                     maximumBatchIndex = reference.TaskIndex;
             }
             //The type comparison should be a compilation constant.
-            if (typeof(TShapeA) != typeof(TShapeB) && TypeIds<IShape>.GetId<TShapeA>() != reference.ExpectedFirstTypeId)
+            if (typeof(TShapeA) != typeof(TShapeB) && default(TShapeA).TypeId != reference.ExpectedFirstTypeId)
             {
                 //The inputs need to be reordered to guarantee that the collision tasks are handed data in the proper order.
                 Add(ref reference, ref shapeB, ref shapeA, ref poseB, ref poseA, -1, continuationId, ref continuations, ref filters);

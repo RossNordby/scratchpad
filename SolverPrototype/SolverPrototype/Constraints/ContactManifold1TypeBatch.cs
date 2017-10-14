@@ -87,6 +87,6 @@ namespace SolverPrototype.Constraints
         //UnposedTwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4>
         TwoBodyTypeBatch<ContactManifold1PrestepData, ContactManifold1Projection, ContactManifold1AccumulatedImpulses, ContactManifold1Functions>
     {
-
+        public const int BatchTypeId = 8;
     }
 }

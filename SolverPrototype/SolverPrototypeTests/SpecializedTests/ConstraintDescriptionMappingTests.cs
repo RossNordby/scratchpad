@@ -93,7 +93,6 @@ namespace SolverPrototypeTests.SpecializedTests
         public static void Test()
         {
             var pool = new BufferPool();
-            DefaultTypes.Register();
             var simulation = Simulation.Create(pool, new TestCallbacks());
 
 

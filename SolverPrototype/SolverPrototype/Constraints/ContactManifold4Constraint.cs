@@ -129,11 +129,10 @@ namespace SolverPrototype.Constraints
         public int ConstraintTypeId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get
-            {
-                return TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>();
-            }
+            get => ContactManifold4TypeBatch.BatchTypeId;
         }
+
+        public Type BatchType => typeof(ContactManifold4TypeBatch);
     }
 
 }

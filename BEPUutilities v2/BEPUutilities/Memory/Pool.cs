@@ -156,6 +156,5 @@ namespace BEPUutilities2.Memory
             Return(item);
             spinLock.Exit(false);
         }
-
     }
 }

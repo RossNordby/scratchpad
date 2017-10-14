@@ -66,10 +66,17 @@ namespace DemoRenderer.Constraints
         public bool Enabled { get; set; } = true;
 
         Action<int> executeJobDelegate;
+
+        ref TypeLineExtractor AllocateSlot(int typeId)
+        {
+            if (typeId >= lineExtractors.Length)
+                Array.Resize(ref lineExtractors, typeId + 1);
+            return ref lineExtractors[typeId];
+        }
         public ConstraintLineExtractor()
         {
-            lineExtractors = new TypeLineExtractor[TypeIds<TypeBatch>.RegisteredTypeCount];
-            lineExtractors[TypeIds<TypeBatch>.GetId<BallSocketTypeBatch>()] =
+            lineExtractors = new TypeLineExtractor[32];
+            AllocateSlot(BallSocketTypeBatch.BatchTypeId) =
                 new TypeLineExtractor<BallSocketLineExtractor, BallSocketTypeBatch, TwoBodyReferences, BallSocketPrestepData, BallSocketProjection, Vector3Wide>();
             QuickList<ThreadJob, Array<ThreadJob>>.Create(new PassthroughArrayPool<ThreadJob>(), Environment.ProcessorCount * (jobsPerThread + 1), out jobs);
 
@@ -88,8 +95,8 @@ namespace DemoRenderer.Constraints
 
         bool IsContactBatch(TypeBatch typeBatch)
         {
-            var typeId = typeBatch.TypeId;
-            return typeId == TypeIds<TypeBatch>.GetId<ContactManifold4TypeBatch>();
+            //TODO: If the nonconvex contact count expands to 8, this will have to change.
+            return typeBatch.TypeId < 16;
         }
 
         internal void AddInstances(Bodies bodies, Solver solver, bool showConstraints, bool showContacts, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
