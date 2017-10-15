@@ -290,7 +290,7 @@ namespace SolverPrototype
 
         struct WarmStartStageFunction : IStageFunction
         {
-            public Buffer<BodyVelocities> Velocities;
+            public Buffer<BodyVelocity> Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {
@@ -299,7 +299,7 @@ namespace SolverPrototype
         }
         struct SolveStageFunction : IStageFunction
         {
-            public Buffer<BodyVelocities> Velocities;
+            public Buffer<BodyVelocity> Velocities;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public void Execute(TypeBatch typeBatch, int start, int end)
             {

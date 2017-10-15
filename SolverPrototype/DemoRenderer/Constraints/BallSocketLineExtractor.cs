@@ -17,8 +17,8 @@ namespace DemoRenderer.Constraints
             //Could do bundles of constraints at a time, but eh.
             var indexA = GatherScatter.Get(ref referencesBundle.IndexA, innerIndex);
             var indexB = GatherScatter.Get(ref referencesBundle.IndexB, innerIndex);
-            bodies.GetPoseByIndex(indexA, out var poseA);
-            bodies.GetPoseByIndex(indexB, out var poseB);
+            var poseA = bodies.Poses[indexA];
+            var poseB = bodies.Poses[indexB];
             Vector3Wide.GetLane(ref prestepBundle.LocalOffsetA, innerIndex, out var localOffsetA);
             Vector3Wide.GetLane(ref prestepBundle.LocalOffsetB, innerIndex, out var localOffsetB);
             Quaternion.Transform(ref localOffsetA, ref poseA.Orientation, out var worldOffsetA);

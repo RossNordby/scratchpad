@@ -81,10 +81,10 @@ namespace SolverPrototype.Constraints
         //There are very few cases where a combo constraint will have less than 3DOFs...)
         //The only reason not to do that is codegen concerns. But we may want to stop holding back just because of some hopefully-not-permanent quirks in the JIT.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences, float dt, float inverseDt, ref BallSocketPrestepData prestep,
+        public void Prestep(Bodies bodies, ref TwoBodyReferences bodyReferences, int count, float dt, float inverseDt, ref BallSocketPrestepData prestep,
             out BallSocketProjection projection)
         {
-            bodies.GatherInertiaAndPose(ref bodyReferences,
+            bodies.GatherInertiaAndPose(ref bodyReferences, count,
                 out var localPositionB, out var orientationA, out var orientationB,
                 out projection.InertiaA, out projection.InertiaB);
 

@@ -253,8 +253,8 @@ namespace SolverPrototype.CollisionDetection
                         var bodyIndexB = Bodies.HandleToIndex[b.Handle];
                         ref var aCollidable = ref Bodies.Collidables[bodyIndexA];
                         ref var bCollidable = ref Bodies.Collidables[bodyIndexB];
-                        Bodies.GetPoseByIndex(bodyIndexA, out var poseA);
-                        Bodies.GetPoseByIndex(bodyIndexB, out var poseB);
+                        var poseA = Bodies.Poses[bodyIndexA];
+                        var poseB = Bodies.Poses[bodyIndexB];
                         var shapeTypeA = aCollidable.Shape.Type;
                         var shapeTypeB = bCollidable.Shape.Type;
                         Shapes[shapeTypeA].GetShapeData(aCollidable.Shape.Index, out var shapePointerA, out var shapeSizeA);

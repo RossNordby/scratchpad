@@ -76,30 +76,30 @@ namespace BEPUutilities2
         }
 
         ///<summary>
-        /// Concatenates a rigid transform with another rigid transform.
+        /// Concatenates a rigid transform with another rigid transform. Assumes input and output do not overlap.
         ///</summary>
         ///<param name="a">The first rigid transform.</param>
         ///<param name="b">The second rigid transform.</param>
         ///<param name="combined">Concatenated rigid transform.</param>
-        public static void Multiply(ref RigidTransform a, ref RigidTransform b, out RigidTransform combined)
+        public static void MultiplyWithoutOverlap(ref RigidTransform a, ref RigidTransform b, out RigidTransform combined)
         {
             Vector3 intermediate;
             Quaternion.Transform(ref a.Position, ref b.Orientation, out intermediate);
             combined.Position = intermediate + b.Position;
-            Quaternion.Concatenate(ref a.Orientation, ref b.Orientation, out combined.Orientation);
+            Quaternion.ConcatenateWithoutOverlap(ref a.Orientation, ref b.Orientation, out combined.Orientation);
 
         }
 
         ///<summary>
-        /// Concatenates a rigid transform with another rigid transform's inverse.
+        /// Concatenates a rigid transform with another rigid transform's inverse. Assumes input and output do not overlap.
         ///</summary>
         ///<param name="a">The first rigid transform.</param>
         ///<param name="b">The second rigid transform whose inverse will be concatenated to the first.</param>
         ///<param name="combinedTransform">Combined rigid transform.</param>
-        public static void MultiplyByInverse(ref RigidTransform a, ref RigidTransform b, out RigidTransform combinedTransform)
+        public static void MultiplyByInverseWithoutOverlap(ref RigidTransform a, ref RigidTransform b, out RigidTransform combinedTransform)
         {
             Invert(ref b, out combinedTransform);
-            Multiply(ref a, ref combinedTransform, out combinedTransform);
+            MultiplyWithoutOverlap(ref a, ref combinedTransform, out combinedTransform);
         }
 
         ///<summary>

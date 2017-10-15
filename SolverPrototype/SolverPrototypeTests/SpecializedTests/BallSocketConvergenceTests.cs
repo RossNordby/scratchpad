@@ -38,8 +38,8 @@ namespace SolverPrototypeTests.SpecializedTests
 
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();
                 int sampledBodyIndex = width;
-                simulation.Bodies.GetPose(bodyHandles[sampledBodyIndex], out var samplePose);
-                simulation.Bodies.GetVelocity(bodyHandles[sampledBodyIndex], out var sampleVelocity);
+                var samplePose = simulation.Bodies.Poses[sampledBodyIndex];
+                var sampleVelocity = simulation.Bodies.Velocities[sampledBodyIndex];
                 //for (int i =0; i < simulation.Bodies.BodyCount; ++i)
                 //{
                 //    simulation.Bodies.GetPose(simulation.Bodies.IndexToHandle[i], out var pose);

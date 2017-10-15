@@ -43,10 +43,10 @@ namespace SolverPrototype.Constraints
         IConstraintFunctions<ContactManifold1PrestepData, ContactManifold1Projection, ContactManifold1AccumulatedImpulses>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences,
+        public void Prestep(Bodies bodies, ref TwoBodyReferences bodyReferences, int count,
             float dt, float inverseDt, ref ContactManifold1PrestepData prestep, out ContactManifold1Projection projection)
         {
-            bodies.GatherInertia(ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
+            bodies.GatherInertia(ref bodyReferences, count, out projection.InertiaA, out projection.InertiaB);
             Vector3Wide.Subtract(ref prestep.OffsetA0, ref prestep.OffsetB, out var offsetToManifoldCenterB);
             projection.PremultipliedFrictionCoefficient = prestep.FrictionCoefficient;
             projection.Normal = prestep.Normal;

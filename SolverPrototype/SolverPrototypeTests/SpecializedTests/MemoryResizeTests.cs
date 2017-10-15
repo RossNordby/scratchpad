@@ -135,22 +135,14 @@ namespace SolverPrototypeTests.SpecializedTests
                     var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
 
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
-                    typeBatch.BodyReferences[bundleIndex].Unpack(bundleIndex, typeBatch.ConstraintCount, out var bodyReferences);
-                    var bodyBundleIndexA = GatherScatter.Get(ref bodyReferences.BundleIndexA, innerIndex);
-                    var bodyBundleIndexB = GatherScatter.Get(ref bodyReferences.BundleIndexB, innerIndex);
-                    var innerIndexA = GatherScatter.Get(ref bodyReferences.InnerIndexA, innerIndex);
-                    var innerIndexB = GatherScatter.Get(ref bodyReferences.InnerIndexB, innerIndex);
+                    ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];
+                    var indexA = GatherScatter.Get(ref bodyReferences.IndexA, innerIndex);
+                    var indexB = GatherScatter.Get(ref bodyReferences.IndexB, innerIndex);
 
-                    var velocityA = new Vector3(
-                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexA].LinearVelocity.X, innerIndexA),
-                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexA].LinearVelocity.Y, innerIndexA),
-                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexA].LinearVelocity.Z, innerIndexA));
-                    var velocityB = new Vector3(
-                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.X, innerIndexB),
-                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.Y, innerIndexB),
-                        GatherScatter.Get(ref simulation.Bodies.Velocities[bodyBundleIndexB].LinearVelocity.Z, innerIndexB));
-                    var relativeVelocity = (velocityA - velocityB);
-                     Vector3 normal;
+                    var velocityA = simulation.Bodies.Velocities[indexA].Linear;
+                    var velocityB = simulation.Bodies.Velocities[indexB].Linear;
+                    var relativeVelocity = velocityA - velocityB;
+                    Vector3 normal;
                     unsafe { var mmhmm = &normal; }
                     GatherScatter.GetLane(ref typeBatch.PrestepData[bundleIndex].Normal.X, innerIndex, ref normal.X, 3);
                     var penetrationChange = -dt * Vector3.Dot(relativeVelocity, normal);
@@ -168,11 +160,11 @@ namespace SolverPrototypeTests.SpecializedTests
 
                 //Apply some gravity so we can simulate sorta-kinda stacking.
                 var bodyBundleCount = simulation.Bodies.BodyCount >> BundleIndexing.VectorShift;
-                var impulse = new Vector<float>(-10 * dt);
+                var impulse = -10 * dt;
                 for (int i = 0; i < bodyBundleCount; ++i)
                 {
                     //(We're using an impulse rather than direct velocity change just because we're being lazy about the kinematics.)
-                    simulation.Bodies.Velocities[i].LinearVelocity.Y += simulation.Bodies.LocalInertias[i].InverseMass * impulse;
+                    simulation.Bodies.Velocities[i].Linear.Y += simulation.Bodies.LocalInertias[i].InverseMass * impulse;
                 }
                 simulation.Solver.MultithreadedUpdate(threadDispatcher, simulation.BufferPool, dt);
                 var energyAfter = simulation.Bodies.GetBodyEnergyHeuristic();

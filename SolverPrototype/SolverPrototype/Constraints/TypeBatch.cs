@@ -84,8 +84,8 @@ namespace SolverPrototype.Constraints
         public abstract void Dispose(BufferPool rawPool);
 
         public abstract void Prestep(Bodies bodies, float dt, float inverseDt, int startBundle, int exclusiveEndBundle);
-        public abstract void WarmStart(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
-        public abstract void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities, int startBundle, int exclusiveEndBundle);
+        public abstract void WarmStart(ref Buffer<BodyVelocity> bodyVelocities, int startBundle, int exclusiveEndBundle);
+        public abstract void SolveIteration(ref Buffer<BodyVelocity> bodyVelocities, int startBundle, int exclusiveEndBundle);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Prestep(Bodies bodies, float dt, float inverseDt)
@@ -93,12 +93,12 @@ namespace SolverPrototype.Constraints
             Prestep(bodies, dt, inverseDt, 0, bundleCount);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WarmStart(ref Buffer<BodyVelocities> bodyVelocities)
+        public void WarmStart(ref Buffer<BodyVelocity> bodyVelocities)
         {
             WarmStart(ref bodyVelocities, 0, bundleCount);
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void SolveIteration(ref Buffer<BodyVelocities> bodyVelocities)
+        public void SolveIteration(ref Buffer<BodyVelocity> bodyVelocities)
         {
             SolveIteration(ref bodyVelocities, 0, bundleCount);
         }
@@ -171,21 +171,17 @@ namespace SolverPrototype.Constraints
 #endif
         }
 
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref int GetLanesInBundleCount(ref TBodyReferences bundle)
+        protected int GetCountInBundle(int bundleStartIndex)
         {
-            //We assume that the body references struct is organized in memory like Bundle0, Inner0, ... BundleN, InnerN, Count
-            //Assuming contiguous storage, Count is then located at start + stride * BodyCount.
-            var stride = Vector<int>.Count * 2;
-            var bodyCount = Unsafe.SizeOf<TBodyReferences>() / (stride * 4);
-            return ref Unsafe.Add(ref Unsafe.As<TBodyReferences, int>(ref bundle), stride * bodyCount);
+            //TODO: May want to check codegen on this. Min vs explicit branch. Theoretically, it could do this branchlessly...
+            return Math.Min(Vector<float>.Count, constraintCount - (bundleStartIndex << BundleIndexing.VectorShift));
         }
 
 
         protected abstract void RemoveBodyReferences(int bundleIndex, int innerIndex);
 
-        
+
         public unsafe sealed override int Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation)
         {
             Debug.Assert(Projection.Memory != null, "Should initialize the batch before allocating anything from it.");

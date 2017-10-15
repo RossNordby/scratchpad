@@ -32,7 +32,7 @@ namespace DemoRenderer.Shapes
             spheres.EnsureCapacity(simulation.Bodies.BodyCount, new PassthroughArrayPool<SphereInstance>());
             for (int i = 0; i < simulation.Bodies.BodyCount; ++i)
             {
-                simulation.Bodies.GetPoseByIndex(i, out var pose);
+                var pose = simulation.Bodies.Poses[i];
                 SphereInstance instance;
                 instance.Position = pose.Position;
                 instance.Radius = 0.5f;

@@ -10,6 +10,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
+using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototype
 {
@@ -44,34 +45,33 @@ namespace SolverPrototype
         }
 
 
-        void IntegrateBundles(int startBundle, int exclusiveEndBundle, float dt, ref BoundingBoxUpdater boundingBoxUpdater)
+        unsafe void IntegrateBodies(int startBundle, int exclusiveEndBundle, float dt, ref BoundingBoxUpdater boundingBoxUpdater)
         {
             ref var basePoses = ref bodies.Poses[0];
             ref var baseVelocities = ref bodies.Velocities[0];
             ref var baseLocalInertias = ref bodies.LocalInertias[0];
             ref var baseInertias = ref bodies.Inertias[0];
-            var vectorDt = new Vector<float>(dt);
-            var vectorHalfDt = new Vector<float>(dt * 0.5f);
+            var halfDt = dt * 0.5f;
             for (int i = startBundle; i < exclusiveEndBundle; ++i)
             {
                 //Integrate position with the latest linear velocity. Note that gravity is integrated afterwards.
                 ref var pose = ref Unsafe.Add(ref basePoses, i);
                 ref var velocity = ref Unsafe.Add(ref baseVelocities, i);
-                Vector3Wide.Scale(ref velocity.LinearVelocity, ref vectorDt, out var displacement);
-                Vector3Wide.Add(ref pose.Position, ref displacement, out pose.Position);
+                var displacement = velocity.Linear * dt;
+                pose.Position += displacement;
 
                 //Integrate orientation with the latest angular velocity.
                 //Note that we don't bother with conservation of angular momentum or the gyroscopic term or anything else- 
                 //it's not exactly correct, but it's stable, fast, and no one really notices. Unless they're trying to spin a multitool in space or something.
                 //(But frankly, that just looks like reality has a bug.)
-                QuaternionWide multiplier;
-                multiplier.X = vectorHalfDt * velocity.AngularVelocity.X;
-                multiplier.Y = vectorHalfDt * velocity.AngularVelocity.Y;
-                multiplier.Z = vectorHalfDt * velocity.AngularVelocity.Z;
-                multiplier.W = Vector<float>.Zero;
-                QuaternionWide.ConcatenateWithoutOverlap(ref pose.Orientation, ref multiplier, out var increment);
-                QuaternionWide.Add(ref pose.Orientation, ref increment, out pose.Orientation);
-                QuaternionWide.Normalize(ref pose.Orientation, out pose.Orientation);
+
+                //TODO: This is a pretty strong combo-hack. Check codegen.
+                Quaternion multiplier;
+                Unsafe.As<float, Vector3>(ref *&multiplier.X) = velocity.Angular * halfDt;
+                multiplier.W = 0;
+                Quaternion.ConcatenateWithoutOverlap(ref pose.Orientation, ref *&multiplier, out var increment);
+                Quaternion.Add(ref pose.Orientation, ref increment, out pose.Orientation);
+                Quaternion.Normalize(ref pose.Orientation);
 
                 //Update the inertia tensors for the new orientation.
                 //TODO: If the pose integrator is positioned at the end of an update, the first frame after any out-of-timestep orientation change or local inertia change
@@ -80,12 +80,12 @@ namespace SolverPrototype
                 //This would require a scan through all pose memory to support, but if you do it at the same time as AABB update, that's fine- that stage uses the pose too.
                 ref var localInertias = ref Unsafe.Add(ref baseLocalInertias, i);
                 ref var inertias = ref Unsafe.Add(ref baseInertias, i);
-                Matrix3x3Wide.CreateFromQuaternion(ref pose.Orientation, out var orientationMatrix);
+                Matrix3x3.CreateFromQuaternion(ref pose.Orientation, out var orientationMatrix);
                 //I^-1 = RT * Ilocal^-1 * R 
                 //NOTE: If you were willing to confuse users a little bit, the local inertia could be required to be diagonal.
                 //This would be totally fine for all the primitive types which happen to have diagonal inertias, but for more complex shapes (convex hulls, meshes), 
-                //there would need to be a reorientation step. That could be confusing, and I'm not sure if it's worth it.
-                Triangular3x3Wide.RotationSandwich(ref orientationMatrix, ref localInertias.InverseInertiaTensor, out inertias.InverseInertiaTensor);
+                //there would need to be a reorientation step. That could be confusing, and it's probably not worth it.
+                Triangular3x3.RotationSandwich(ref orientationMatrix, ref localInertias.InverseInertiaTensor, out inertias.InverseInertiaTensor);
                 //While it's a bit goofy just to copy over the inverse mass every frame even if it doesn't change,
                 //it's virtually always gathered together with the inertia tensor and it really isn't worth a whole extra external system to copy inverse masses only on demand.
                 inertias.InverseMass = localInertias.InverseMass;
@@ -108,9 +108,8 @@ namespace SolverPrototype
                 //than the v1 'just set the velocity' style.                
 
                 //Note that we avoid accelerating kinematics. Kinematics are any body with an inverse mass of zero (so a mass of ~infinity). No force can move them.
-                Vector3Wide.Add(ref gravityDt, ref velocity.LinearVelocity, out var acceleratedLinearVelocity);
-                var gravityMask = Vector.Equals(localInertias.InverseMass, Vector<float>.Zero);
-                Vector3Wide.ConditionalSelect(ref gravityMask, ref velocity.LinearVelocity, ref acceleratedLinearVelocity, out velocity.LinearVelocity);
+                if (localInertias.InverseMass > 0)
+                    velocity.Linear += gravityDt;
                 //Implementation sidenote: Why aren't kinematics all bundled together separately from dynamics to avoid this condition?
                 //Because kinematics can have a velocity- that is what distinguishes them from a static object. The solver must read velocities of all bodies involved in a constraint.
                 //Under ideal conditions, those bodies will be near in memory to increase the chances of a cache hit. If kinematics are separately bundled, the the number of cache
@@ -140,8 +139,8 @@ namespace SolverPrototype
         }
 
         float cachedDt;
-        Vector3Wide gravityDt;
-        int bundlesPerJob;
+        Vector3 gravityDt;
+        int bodiesPerJob;
         IThreadDispatcher threadDispatcher;
 
         //Note that we aren't using a very cache-friendly work distribution here.
@@ -151,20 +150,19 @@ namespace SolverPrototype
         int availableJobCount;
         void Worker(int workerIndex)
         {
-            var bodyBundleCount = bodies.BodyBundleCount;
             var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, broadPhase, threadDispatcher.GetThreadMemoryPool(workerIndex), cachedDt);
             while (true)
             {
                 var jobIndex = Interlocked.Decrement(ref availableJobCount);
                 if (jobIndex < 0)
                     break;
-                var start = jobIndex * bundlesPerJob;
-                var exclusiveEnd = start + bundlesPerJob;
-                if (exclusiveEnd > bodyBundleCount)
-                    exclusiveEnd = bodyBundleCount;
+                var start = jobIndex * bodiesPerJob;
+                var exclusiveEnd = start + bodiesPerJob;
+                if (exclusiveEnd > bodies.BodyCount)
+                    exclusiveEnd = bodies.BodyCount;
                 Debug.Assert(exclusiveEnd > start, "Jobs that would involve bundles beyond the body count should not be created.");
 
-                IntegrateBundles(start, exclusiveEnd, cachedDt, ref boundingBoxUpdater);
+                IntegrateBodies(start, exclusiveEnd, cachedDt, ref boundingBoxUpdater);
 
             }
             boundingBoxUpdater.FlushAndDispose();
@@ -173,8 +171,7 @@ namespace SolverPrototype
         public void Update(float dt, BufferPool pool, IThreadDispatcher threadDispatcher = null)
         {
             var workerCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
-            var scalarGravityDt = Gravity * dt;
-            Vector3Wide.CreateFrom(ref scalarGravityDt, out gravityDt);
+            gravityDt = Gravity * dt;
             if (threadDispatcher != null)
             {
                 //While we do technically support multithreading here, scaling is going to be really, really bad if the simulation gets kicked out of L3 cache in between frames.
@@ -184,15 +181,16 @@ namespace SolverPrototype
                 //2) the CPU supports octochannel memory and just brute forces the issue,
                 //3) whatever the application is doing doesn't evict the entire L3 cache between frames.
 
+                //Note that this bottleneck means the fact that we're working through bodies in a nonvectorized fashion (in favor of optimizing storage for solver access) is not a problem.
+
                 cachedDt = dt;
                 const int jobsPerWorker = 4;
                 var targetJobCount = workerCount * jobsPerWorker;
-                var bodyBundleCount = bodies.BodyBundleCount;
-                bundlesPerJob = bodyBundleCount / targetJobCount;
-                if (bundlesPerJob == 0)
-                    bundlesPerJob = 1;
-                availableJobCount = bodyBundleCount / bundlesPerJob;
-                if (bundlesPerJob * availableJobCount < bodyBundleCount)
+                bodiesPerJob = bodies.BodyCount / targetJobCount;
+                if (bodiesPerJob == 0)
+                    bodiesPerJob = 1;
+                availableJobCount = bodies.BodyCount / bodiesPerJob;
+                if (bodiesPerJob * availableJobCount < bodies.BodyCount)
                     ++availableJobCount;
                 this.threadDispatcher = threadDispatcher;
                 threadDispatcher.DispatchWorkers(workerDelegate);
@@ -201,7 +199,7 @@ namespace SolverPrototype
             else
             {
                 var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, broadPhase, pool, dt);
-                IntegrateBundles(0, bodies.BodyBundleCount, dt, ref boundingBoxUpdater);
+                IntegrateBodies(0, bodies.BodyCount, dt, ref boundingBoxUpdater);
                 boundingBoxUpdater.FlushAndDispose();
             }
 

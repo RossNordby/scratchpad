@@ -4,11 +4,14 @@ using System.Runtime.CompilerServices;
 
 namespace BEPUutilities2
 {
+    //TODO: The existence and functionality provided by this quaternion should be reconsidered as the system.numerics types improve.
     /// <summary>
     /// Provides XNA-like quaternion support.
     /// </summary>
     public struct Quaternion
     {
+        //TODO: This memory layout should be revisited- a Vector4 may turn out better in certain cases.
+        //We could always unsafe cast in those cases, though.
         /// <summary>
         /// X component of the quaternion.
         /// </summary>
@@ -61,29 +64,6 @@ namespace BEPUutilities2
         }
 
         /// <summary>
-        /// Multiplies two quaternions.
-        /// </summary>
-        /// <param name="a">First quaternion to multiply.</param>
-        /// <param name="b">Second quaternion to multiply.</param>
-        /// <param name="result">Product of the multiplication.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Multiply(ref Quaternion a, ref Quaternion b, out Quaternion result)
-        {
-            float x = a.X;
-            float y = a.Y;
-            float z = a.Z;
-            float w = a.W;
-            float bX = b.X;
-            float bY = b.Y;
-            float bZ = b.Z;
-            float bW = b.W;
-            result.X = x * bW + bX * w + y * bZ - z * bY;
-            result.Y = y * bW + bY * w + z * bX - x * bZ;
-            result.Z = z * bW + bZ * w + x * bY - y * bX;
-            result.W = w * bW - x * bX - y * bY - z * bZ;
-        }
-
-        /// <summary>
         /// Scales a quaternion.
         /// </summary>
         /// <param name="q">Quaternion to multiply.</param>
@@ -101,29 +81,20 @@ namespace BEPUutilities2
         /// <summary>
         /// Concatenates the transforms of two quaternions together such that the resulting quaternion, applied as an orientation to a vector v, is equivalent to
         /// transformed = (v * a) * b.
+        /// Assumes that neither input parameter overlaps the output parameter.
         /// </summary>
         /// <param name="a">First quaternion to concatenate.</param>
         /// <param name="b">Second quaternion to concatenate.</param>
         /// <param name="result">Product of the concatenation.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Concatenate(ref Quaternion a, ref Quaternion b, out Quaternion result)
+        public static void ConcatenateWithoutOverlap(ref Quaternion a, ref Quaternion b, out Quaternion result)
         {
-            float aX = a.X;
-            float aY = a.Y;
-            float aZ = a.Z;
-            float aW = a.W;
-            float bX = b.X;
-            float bY = b.Y;
-            float bZ = b.Z;
-            float bW = b.W;
-
-            result.X = aW * bX + aX * bW + aZ * bY - aY * bZ;
-            result.Y = aW * bY + aY * bW + aX * bZ - aZ * bX;
-            result.Z = aW * bZ + aZ * bW + aY * bX - aX * bY;
-            result.W = aW * bW - aX * bX - aY * bY - aZ * bZ;
-
-
+            result.X = a.W * b.X + a.X * b.W + a.Z * b.Y - a.Y * b.Z;
+            result.Y = a.W * b.Y + a.Y * b.W + a.X * b.Z - a.Z * b.X;
+            result.Z = a.W * b.Z + a.Z * b.W + a.Y * b.X - a.X * b.Y;
+            result.W = a.W * b.W - a.X * b.X - a.Y * b.Y - a.Z * b.Z;
         }
+
 
         /// <summary>
         /// Multiplies two quaternions together in opposite order.
@@ -133,8 +104,7 @@ namespace BEPUutilities2
         /// <returns>Product of the multiplication.</returns>
         public static Quaternion Concatenate(Quaternion a, Quaternion b)
         {
-            Quaternion result;
-            Concatenate(ref a, ref b, out result);
+            ConcatenateWithoutOverlap(ref a, ref b, out var result);
             return result;
         }
 
@@ -240,45 +210,28 @@ namespace BEPUutilities2
             return q;
         }
 
-
         /// <summary>
         /// Ensures the quaternion has unit length.
         /// </summary>
         /// <param name="quaternion">Quaternion to normalize.</param>
-        /// <param name="result">Normalized quaternion.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Normalize(ref Quaternion quaternion, out Quaternion result)
+        public static void Normalize(ref Quaternion quaternion)
         {
-            float inverse = (float)(1 / Math.Sqrt(quaternion.X * quaternion.X + quaternion.Y * quaternion.Y + quaternion.Z * quaternion.Z + quaternion.W * quaternion.W));
-            result.X = quaternion.X * inverse;
-            result.Y = quaternion.Y * inverse;
-            result.Z = quaternion.Z * inverse;
-            result.W = quaternion.W * inverse;
+            ref var q = ref Unsafe.As<float, Vector4>(ref quaternion.X);
+            q = q / (float)Math.Sqrt(Vector4.Dot(q, q)); //not great; MathF when available or perhaps alternatives?
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Quaternion Normalize(Quaternion quaternion)
         {
-            Quaternion toReturn;
-            float inverse = (float)(1 / Math.Sqrt(quaternion.X * quaternion.X + quaternion.Y * quaternion.Y + quaternion.Z * quaternion.Z + quaternion.W * quaternion.W));
-            toReturn.X = quaternion.X * inverse;
-            toReturn.Y = quaternion.Y * inverse;
-            toReturn.Z = quaternion.Z * inverse;
-            toReturn.W = quaternion.W * inverse;
-            return toReturn;
+            Normalize(ref quaternion);
+            return quaternion;
         }
 
-        /// <summary>
-        /// Scales the quaternion such that it has unit length.
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Normalize()
         {
-            float inverse = (float)(1 / Math.Sqrt(X * X + Y * Y + Z * Z + W * W));
-            X *= inverse;
-            Y *= inverse;
-            Z *= inverse;
-            W *= inverse;
+            Normalize(ref this);
         }
 
         /// <summary>
@@ -632,21 +585,7 @@ namespace BEPUutilities2
             result.Z = transformedZ;
 
         }
-
-
-        /// <summary>
-        /// Multiplies two quaternions.
-        /// </summary>
-        /// <param name="a">First quaternion to multiply.</param>
-        /// <param name="b">Second quaternion to multiply.</param>
-        /// <returns>Product of the multiplication.</returns>
-        public static Quaternion operator *(Quaternion a, Quaternion b)
-        {
-            Quaternion toReturn;
-            Multiply(ref a, ref b, out toReturn);
-            return toReturn;
-        }
-
+        
         /// <summary>
         /// Creates a quaternion from an axis and angle.
         /// </summary>
@@ -828,31 +767,33 @@ namespace BEPUutilities2
 
         /// <summary>
         /// Computes the rotation from the start orientation to the end orientation such that end = Quaternion.Concatenate(start, relative).
+        /// Assumes that neither input parameter overlaps with the output parameter.
         /// </summary>
         /// <param name="start">Starting orientation.</param>
         /// <param name="end">Ending orientation.</param>
         /// <param name="relative">Relative rotation from the start to the end orientation.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetRelativeRotation(ref Quaternion start, ref Quaternion end, out Quaternion relative)
+        public static void GetRelativeRotationWithoutOverlap(ref Quaternion start, ref Quaternion end, out Quaternion relative)
         {
             Quaternion startInverse;
             Conjugate(ref start, out startInverse);
-            Concatenate(ref startInverse, ref end, out relative);
+            ConcatenateWithoutOverlap(ref startInverse, ref end, out relative);
         }
 
 
         /// <summary>
         /// Transforms the rotation into the local space of the target basis such that rotation = Quaternion.Concatenate(localRotation, targetBasis)
+        /// Assumes that neither input parameter overlaps with the output parameter.
         /// </summary>
         /// <param name="rotation">Rotation in the original frame of reference.</param>
         /// <param name="targetBasis">Basis in the original frame of reference to transform the rotation into.</param>
         /// <param name="localRotation">Rotation in the local space of the target basis.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void GetLocalRotation(ref Quaternion rotation, ref Quaternion targetBasis, out Quaternion localRotation)
+        public static void GetLocalRotationWithoutOverlap(ref Quaternion rotation, ref Quaternion targetBasis, out Quaternion localRotation)
         {
             Quaternion basisInverse;
             Conjugate(ref targetBasis, out basisInverse);
-            Concatenate(ref rotation, ref basisInverse, out localRotation);
+            ConcatenateWithoutOverlap(ref rotation, ref basisInverse, out localRotation);
         }
 
         /// <summary>

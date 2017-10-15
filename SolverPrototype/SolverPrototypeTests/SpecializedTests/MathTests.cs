@@ -42,7 +42,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 q.Z = (float)random.NextDouble() * 2 - 1;
                 q.W = (float)random.NextDouble() * 2 - 1;
 
-                Quaternion.Normalize(ref q, out q);
+                Quaternion.Normalize(ref q);
 
                 for (int i = 0; i < innerIterations; ++i)
                 {
@@ -253,7 +253,7 @@ namespace SolverPrototypeTests.SpecializedTests
                     Quaternion.GetQuaternionBetweenNormalizedVectors(ref v2, ref v1, out var v2ToV1);
 
 #if DEBUG
-                    Quaternion.Concatenate(ref v1ToV2, ref v2ToV1, out var concatenated);
+                    Quaternion.ConcatenateWithoutOverlap(ref v1ToV2, ref v2ToV1, out var concatenated);
                     Quaternion.Transform(ref v1, ref v1ToV2, out var v1TransformedToV2);
                     Quaternion.Transform(ref v2, ref v2ToV1, out var v2TransformedToV1);
                     Quaternion.Transform(ref v1, ref concatenated, out var v1TransformedToV1);

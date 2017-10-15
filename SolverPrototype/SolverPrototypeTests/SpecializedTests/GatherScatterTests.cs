@@ -12,48 +12,42 @@ namespace SolverPrototypeTests.SpecializedTests
     {
         struct Context
         {
-            public Buffer<BodyVelocities> BodyVelocities;
-            public UnpackedTwoBodyReferences[] BodyReferences;
-            public int ConstraintCount;
+            public Buffer<BodyVelocity> BodyVelocities;
+            public TwoBodyReferences[] BodyReferences;
+            public int ConstraintBundleCount;
         }
         struct ConstraintBodies
         {
             public int A, B;
         }
-        static Context GetFreshContext(int constraintCount, int bodyBundleCount, Comparison<ConstraintBodies> sortComparison = null)
+        static Context GetFreshContext(int constraintBundleCount, int bodyCount, Comparison<ConstraintBodies> sortComparison = null)
         {
             Context context;
-            context.ConstraintCount = constraintCount;
+            context.ConstraintBundleCount = constraintBundleCount;
             var pool = new BufferPool();
-            pool.SpecializeFor<BodyVelocities>().Take(bodyBundleCount, out context.BodyVelocities);
-            var connections = new ConstraintBodies[constraintCount * Vector<int>.Count];
+            pool.SpecializeFor<BodyVelocity>().Take(bodyCount, out context.BodyVelocities);
+            var connections = new ConstraintBodies[constraintBundleCount * Vector<int>.Count];
             var random = new Random(5);
-            int maximumBodyIndex = bodyBundleCount * Vector<float>.Count;
 
             for (int i = 0; i < connections.Length; ++i)
             {
-                connections[i] = new ConstraintBodies { A = random.Next(maximumBodyIndex), B = random.Next(maximumBodyIndex) };
+                connections[i] = new ConstraintBodies { A = random.Next(bodyCount), B = random.Next(bodyCount) };
             }
             if (sortComparison != null)
             {
                 //Sorting the connections should increase the probability that at least one of the two bodies associated with a constraint will be in the cache already from earlier prefetches.
                 Array.Sort(connections, sortComparison);
             }
-            context.BodyReferences = new UnpackedTwoBodyReferences[constraintCount];
-            for (int iterationIndex = 0; iterationIndex < constraintCount; ++iterationIndex)
+            context.BodyReferences = new TwoBodyReferences[constraintBundleCount];
+            for (int iterationIndex = 0; iterationIndex < constraintBundleCount; ++iterationIndex)
             {
                 var baseSourceIndex = iterationIndex << BundleIndexing.VectorShift;
                 for (int i = 0; i < Vector<int>.Count; ++i)
                 {
                     var c = connections[baseSourceIndex + i];
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexA, i) = c.A >> BundleIndexing.VectorShift;
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexA, i) = c.A & BundleIndexing.VectorMask;
-                    
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].BundleIndexB, i) = c.B >> BundleIndexing.VectorShift;
-                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].InnerIndexB, i) = c.B & BundleIndexing.VectorMask;
-
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].IndexA, i) = c.A;
+                    GatherScatter.Get(ref context.BodyReferences[iterationIndex].IndexB, i) = c.B;
                 }
-                context.BodyReferences[iterationIndex].Count = Vector<int>.Count;
             }
             return context;
         }
@@ -90,9 +84,9 @@ namespace SolverPrototypeTests.SpecializedTests
         [MethodImpl(MethodImplOptions.NoInlining)]
         static void TestGather(Context context)
         {
-            for (int i = 0; i < context.ConstraintCount; ++i)
+            for (int i = 0; i < context.ConstraintBundleCount; ++i)
             {
-                GatherScatter.GatherVelocities(ref context.BodyVelocities, ref context.BodyReferences[i], out var a, out var b);
+                GatherScatter.GatherVelocities(ref context.BodyVelocities, ref context.BodyReferences[i], Vector<float>.Count, out var a, out var b);
             }
         }
 
@@ -102,9 +96,9 @@ namespace SolverPrototypeTests.SpecializedTests
         {
             var a = new BodyVelocities();
             var b = new BodyVelocities();
-            for (int i = 0; i < context.ConstraintCount; ++i)
+            for (int i = 0; i < context.ConstraintBundleCount; ++i)
             {
-                GatherScatter.ScatterVelocities(ref context.BodyVelocities, ref context.BodyReferences[i], ref a, ref b);
+                GatherScatter.ScatterVelocities(ref context.BodyVelocities, ref context.BodyReferences[i], Vector<float>.Count, ref a, ref b);
             }
         }
 
@@ -115,7 +109,7 @@ namespace SolverPrototypeTests.SpecializedTests
         {
             const int iterationCount = 1000;
             const int constraintCount = 4096 << 3;
-            const int bodyBundleCount = 1024 << 2; 
+            const int bodyBundleCount = 1024 << 2;
             Comparison<ConstraintBodies> smallestBiggestSort = (x, y) =>
             {
                 ulong Encode(ConstraintBodies bodies)

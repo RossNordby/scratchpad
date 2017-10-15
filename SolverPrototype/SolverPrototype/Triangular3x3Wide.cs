@@ -150,7 +150,7 @@ namespace SolverPrototype
             sandwich = x * v.X + y * v.Y + z * v.Z;
         }
         /// <summary>
-        /// Computes rT * m * r for a symmetric matrix m and a rotation matrix R. Assumes that the input and output do not overlap.
+        /// Computes rT * m * r for a symmetric matrix m and a rotation matrix R.
         /// </summary>
         /// <param name="r">Rotation matrix to use as the sandwich bread.</param>
         /// <param name="m">Succulent interior symmetric matrix.</param>

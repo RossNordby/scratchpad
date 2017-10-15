@@ -72,7 +72,7 @@ namespace SolverPrototype.Constraints
         IConstraintFunctions<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Prestep(Bodies bodies, ref UnpackedTwoBodyReferences bodyReferences,
+        public void Prestep(Bodies bodies, ref TwoBodyReferences bodyReferences, int count,
             float dt, float inverseDt, ref ContactManifold4PrestepData prestep, out ContactManifold4Projection projection)
         {
             //Some speculative compression options not (yet) pursued:
@@ -84,7 +84,7 @@ namespace SolverPrototype.Constraints
             //There are a couple of other instructions necessary to decode, but sqrt is by far the heaviest; it's likely a net win.
             //Be careful about the execution order here. It should be aligned with the prestep data layout to ensure prefetching works well.
 
-            bodies.GatherInertia(ref bodyReferences, out projection.InertiaA, out projection.InertiaB);
+            bodies.GatherInertia(ref bodyReferences, count, out projection.InertiaA, out projection.InertiaB);
             Vector3Wide.Add(ref prestep.OffsetA0, ref prestep.OffsetA1, out var a01);
             Vector3Wide.Add(ref prestep.OffsetA2, ref prestep.OffsetA3, out var a23);
             Vector3Wide.Add(ref a01, ref a23, out var offsetToManifoldCenterA);
