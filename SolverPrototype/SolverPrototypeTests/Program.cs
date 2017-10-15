@@ -21,11 +21,11 @@ namespace SolverPrototypeTests
         {
             //ConstraintDescriptionMappingTests.Test();
             //CollidablePairComparerTests.Test();
-            //HeadlessDemo.Simple();
+            HeadlessDemo.Simple();
             //BatchedCollisionTests.Test();
             //TypeIdCodeGenTests.Test();
             //DeterminismTest.Test();
-            //return;
+            return;
             //ScalarWideTests.Test();
             //DenseFlagTests.Test();
             //VirtualOverheadTest.Test();
