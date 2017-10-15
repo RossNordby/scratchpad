@@ -297,101 +297,7 @@ namespace SolverPrototype
             pool.SpecializeFor<Collidable>().Return(ref Collidables);          
             HandlePool.Dispose(pool.SpecializeFor<int>());
         }
-
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //void GetBundleIndices(int handle, out int bundleIndex, out int innerIndex)
-        //{
-        //    ValidateExistingHandle(handle);
-        //    var index = HandleToIndex[handle];
-        //    BundleIndexing.GetBundleIndices(index, out bundleIndex, out innerIndex);
-        //}
-
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static void SetLane(ref BodyInertias targetBundle, int innerIndex, ref BodyInertia inertia)
-        //{
-        //    ref var targetLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
-
-        //    targetLane = inertia.InverseInertiaTensor.M11;
-        //    Unsafe.Add(ref targetLane, Vector<float>.Count) = inertia.InverseInertiaTensor.M21;
-        //    Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = inertia.InverseInertiaTensor.M22;
-        //    Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = inertia.InverseInertiaTensor.M31;
-        //    Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = inertia.InverseInertiaTensor.M32;
-        //    Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = inertia.InverseInertiaTensor.M33;
-        //    Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = inertia.InverseMass;
-        //}
-
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static void GetLane(ref BodyInertias targetBundle, int innerIndex, out BodyInertia inertia)
-        //{
-        //    ref var sourceLane = ref GatherScatter.Get(ref targetBundle.InverseInertiaTensor.M11, innerIndex);
-
-        //    inertia.InverseInertiaTensor.M11 = sourceLane;
-        //    inertia.InverseInertiaTensor.M21 = Unsafe.Add(ref sourceLane, Vector<float>.Count);
-        //    inertia.InverseInertiaTensor.M22 = Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count);
-        //    inertia.InverseInertiaTensor.M31 = Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count);
-        //    inertia.InverseInertiaTensor.M32 = Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count);
-        //    inertia.InverseInertiaTensor.M33 = Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count);
-        //    inertia.InverseMass = Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count);
-        //}
-
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static unsafe void SetLane(ref BodyVelocities targetBundle, int innerIndex, ref BodyVelocity velocity)
-        //{
-        //    ref var targetLane = ref GatherScatter.Get(ref targetBundle.LinearVelocity.X, innerIndex);
-
-        //    targetLane = velocity.Linear.X;
-        //    Unsafe.Add(ref targetLane, Vector<float>.Count) = velocity.Linear.Y;
-        //    Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = velocity.Linear.Z;
-        //    Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = velocity.Angular.X;
-        //    Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = velocity.Angular.Y;
-        //    Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = velocity.Angular.Z;
-        //}
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static unsafe void GetLane(ref BodyVelocities targetBundle, int innerIndex, out BodyVelocity velocity)
-        //{
-        //    ref var sourceLane = ref GatherScatter.Get(ref targetBundle.LinearVelocity.X, innerIndex);
-
-        //    velocity.Linear = new Vector3(
-        //        sourceLane,
-        //        Unsafe.Add(ref sourceLane, Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
-        //    velocity.Angular = new Vector3(
-        //        Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count));
-        //}
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static unsafe void SetLane(ref BodyPoses targetBundle, int innerIndex, ref BodyPose pose)
-        //{
-        //    ref var targetLane = ref GatherScatter.Get(ref targetBundle.Position.X, innerIndex);
-
-        //    targetLane = pose.Position.X;
-        //    Unsafe.Add(ref targetLane, Vector<float>.Count) = pose.Position.Y;
-        //    Unsafe.Add(ref targetLane, 2 * Vector<float>.Count) = pose.Position.Z;
-        //    Unsafe.Add(ref targetLane, 3 * Vector<float>.Count) = pose.Orientation.X;
-        //    Unsafe.Add(ref targetLane, 4 * Vector<float>.Count) = pose.Orientation.Y;
-        //    Unsafe.Add(ref targetLane, 5 * Vector<float>.Count) = pose.Orientation.Z;
-        //    Unsafe.Add(ref targetLane, 6 * Vector<float>.Count) = pose.Orientation.W;
-        //}
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        //public static unsafe void GetLane(ref BodyPoses targetBundle, int innerIndex, out BodyPose pose)
-        //{
-        //    ref var sourceLane = ref GatherScatter.Get(ref targetBundle.Position.X, innerIndex);
-
-        //    pose.Position = new Vector3(
-        //        sourceLane,
-        //        Unsafe.Add(ref sourceLane, Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 2 * Vector<float>.Count));
-        //    pose.Orientation = new BEPUutilities2.Quaternion(
-        //        Unsafe.Add(ref sourceLane, 3 * Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 4 * Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 5 * Vector<float>.Count),
-        //        Unsafe.Add(ref sourceLane, 6 * Vector<float>.Count));
-        //}
-
-
-
-
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherInertiaForBody(ref float targetInertiaBase, int targetLaneIndex, int index)
         {
@@ -477,7 +383,7 @@ namespace SolverPrototype
                 ref var indexA = ref Unsafe.Add(ref baseIndexA, i);
                 GatherInertiaForBody(ref targetInertiaBaseA, i, indexA);
                 GatherPoseForBody(ref targetPositionBaseA, ref targetOrientationBaseA, i, indexA);
-                var indexB = Unsafe.Add(ref indexA, 3 * Vector<float>.Count);
+                var indexB = Unsafe.Add(ref indexA, Vector<float>.Count);
                 GatherInertiaForBody(ref targetInertiaBaseB, i, indexB);
                 GatherPoseForBody(ref targetPositionBaseB, ref targetOrientationBaseB, i, indexB);
             }
@@ -499,7 +405,7 @@ namespace SolverPrototype
             {
                 ref var indexA = ref Unsafe.Add(ref baseIndexA, i);
                 GatherInertiaForBody(ref targetInertiaBaseA, i, indexA);
-                var indexB = Unsafe.Add(ref indexA, 3 * Vector<float>.Count);
+                var indexB = Unsafe.Add(ref indexA, Vector<float>.Count);
                 GatherInertiaForBody(ref targetInertiaBaseB, i, indexB);
             }
         }

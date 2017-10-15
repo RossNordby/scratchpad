@@ -43,7 +43,7 @@ namespace SolverPrototypeTests.SpecializedTests
             var poses = new BodyPose[simulation.Bodies.BodyCount];
             for (int i = 0; i < simulation.Bodies.BodyCount; ++i)
             {
-                poses[i] = simulation.Bodies.Poses[i];
+                poses[i] = simulation.Bodies.Poses[simulation.Bodies.HandleToIndex[bodyHandles[i]]];
             }
             simulation.Dispose();
             return poses;

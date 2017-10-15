@@ -45,14 +45,14 @@ namespace SolverPrototype
         }
 
 
-        unsafe void IntegrateBodies(int startBundle, int exclusiveEndBundle, float dt, ref BoundingBoxUpdater boundingBoxUpdater)
+        unsafe void IntegrateBodies(int startIndex, int endIndex, float dt, ref BoundingBoxUpdater boundingBoxUpdater)
         {
             ref var basePoses = ref bodies.Poses[0];
             ref var baseVelocities = ref bodies.Velocities[0];
             ref var baseLocalInertias = ref bodies.LocalInertias[0];
             ref var baseInertias = ref bodies.Inertias[0];
             var halfDt = dt * 0.5f;
-            for (int i = startBundle; i < exclusiveEndBundle; ++i)
+            for (int i = startIndex; i < endIndex; ++i)
             {
                 //Integrate position with the latest linear velocity. Note that gravity is integrated afterwards.
                 ref var pose = ref Unsafe.Add(ref basePoses, i);
@@ -123,13 +123,10 @@ namespace SolverPrototype
                 //2) The number of virtual function invocations required is reduced by a factor equal to the size of the accumulator cache.
                 //Note that the accumulator caches are kept relatively small so that it is very likely that the pose and velocity of the collidable's body will still be in L1 cache
                 //when it comes time to actually compute bounding boxes.
-                var bundleBodyIndexBase = i << BundleIndexing.VectorShift;
-                for (int j = 0; j < Vector<float>.Count; ++j)
-                {
-                    //Note that any collidable that lacks a collidable, or any reference that is beyond the set of collidables, will have a specially formed index.
-                    //The accumulator will detect that and not try to add a nonexistent collidable- hence, "TryAdd".
-                    boundingBoxUpdater.TryAdd(bundleBodyIndexBase + j);
-                }
+
+                //Note that any collidable that lacks a collidable, or any reference that is beyond the set of collidables, will have a specially formed index.
+                //The accumulator will detect that and not try to add a nonexistent collidable- hence, "TryAdd".
+                boundingBoxUpdater.TryAdd(i);
 
                 //It's helpful to do the bounding box update here in the pose integrator because they share information. If the phases were split, there could be a penalty
                 //associated with loading all the body poses and velocities from memory again. Even if the L3 cache persisted, it would still be worse than looking into L1 or L2.

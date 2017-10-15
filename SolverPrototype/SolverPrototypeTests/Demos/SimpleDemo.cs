@@ -43,7 +43,7 @@ namespace SolverPrototypeTests
         public override void Update(Input input, float dt)
         {
             //Console.WriteLine($"Preframe {frameIndex++}, mapping count: {Simulation.NarrowPhase.PairCache.Mapping.Count}");
-            
+
             //for (int i = 0; i < Simulation.Bodies.BodyCount; ++i)
             //{
             //    Simulation.Bodies.ValidateExistingHandle(Simulation.Bodies.IndexToHandle[i]);
