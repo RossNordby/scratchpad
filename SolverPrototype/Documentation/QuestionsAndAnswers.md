@@ -43,3 +43,11 @@ But, in general, the only way to guarantee cross platform determinism is to avoi
 At the moment, BEPUphysics v2 does not support fixed point math out of the box, and it would be a pretty enormous undertaking to port it all over without destroying performance.
 
 I may look into conditionally compiled alternative scalar types in the future. I can't guarantee when or if I'll get around to it, though; don't wait for me!
+
+##### 5. I updated to the latest version of the physics library and simulations are producing different results than before, even though I set the Simulation.Deterministic property to true! What do?
+
+Different versions of the library are not guaranteed to produce identical simulation results. Guaranteeing cross-version determinism would constrain development to an unacceptable degree.
+
+If you need determinism of results over long periods (for example, storing game replays for later viewing), it's typically easiest to just fall back to something like storing keyframed animation. You can still use the simulation to help fill out details if you'd like- similar to a networked game receiving sparse updates from a server and filling in the details with extrapolated local simulation. There just has to be a way to correct for the gradual drift.
+
+Such a drift correcting mechanism also compensates for the differences between processor architectures, so you'd gain the ability to share the replay across different hardware as a bonus.
