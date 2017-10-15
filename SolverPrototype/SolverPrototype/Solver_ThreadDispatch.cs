@@ -307,6 +307,51 @@ namespace SolverPrototype
             }
         }
 
+        /// <summary>
+        /// Behaves like a framework SpinWait, but never voluntarily relinquishes the timeslice to off-core threads.
+        /// </summary>
+        /// <remarks><para>There are three big reasons for using this over the regular framework SpinWait:</para>
+        /// <para>1) The framework spinwait relies on spins for quite a while before resorting to any form of timeslice surrender.
+        /// Empirically, this is not ideal for the solver- if the sync condition isn't met within several nanoseconds, it will tend to be some microseconds away.
+        /// This spinwait is much more aggressive about moving to yields.</para>
+        /// <para>2) After a number of yields, the framework SpinWait will resort to calling Sleep.
+        /// This widens the potential set of schedulable threads to those not native to the current core. If we permit that transition, it is likely to evict cached solver data.
+        /// (For very large simulations, the use of Sleep(0) isn't that concerning- every iteration can be large enough to evict all of cache- 
+        /// but there still isn't much benefit to using it over yields in context.)</para>
+        /// <para>3) After a particularly long wait, the framework SpinWait resorts to Sleep(1). This is catastrophic for the solver- worse than merely interfering with cached data,
+        /// it also simply prevents the thread from being rescheduled for an extremely long period of time (potentially most of a frame!) under the default clock resolution.</para>
+        /// <para>Note that this isn't an indication that the framework SpinWait should be changed, but rather that the solver's requirements are extremely specific and don't match
+        /// a general purpose solution very well.</para></remarks>
+        struct LocalSpinWait
+        {
+            public int WaitCount;
+
+            //Empirically, being pretty aggressive about yielding produces the best results. This is pretty reasonable- 
+            //a single constraint bundle can take hundreds of nanoseconds to finish.
+            //That would be a whole lot of spinning that could be used by some other thread. At worst, we're being friendlier to other applications on the system.
+            //This thread will likely be rescheduled on the same core, so it's unlikely that we'll lose any cache warmth (that we wouldn't have lost anyway).
+            public const int YieldThreshold = 3;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void SpinOnce()
+            {
+                if (WaitCount >= YieldThreshold)
+                {
+                    Thread.Yield();
+                }
+                else
+                {
+                    //We are sacrificing one important feature of the newer framework provided waits- normalized spinning (RuntimeThread.OptimalMaxSpinWaitsPerSpinIteration).
+                    //Different platforms can spin at significantly different speeds, so a single constant value for the maximum spin duration doesn't map well to all hardware.
+                    //On the upside, we tend to be concerned about two modes- waiting a very short time, and waiting a medium amount of time.
+                    //The specific length of the 'short' time doesn't matter too much, so long as it's fairly short.
+                    Thread.SpinWait(1 << WaitCount);
+                    ++WaitCount;
+                }
+
+            }
+        }
+
 
         void InterstageSync(ref int syncStageIndex)
         {
@@ -316,35 +361,10 @@ namespace SolverPrototype
             var neededCompletionCount = context.WorkerCount * syncStageIndex;
             if (Interlocked.Increment(ref context.WorkerCompletedCount) != neededCompletionCount)
             {
-                //TODO: This is a superhack and you should assume that it will break at some point. 
-                //It should be replaced by a direct usage of Thread.Yield/Thread.SpinWait once .NET Standard 2.0 is available.
-                //Rationale: the SpinWait wait type distribution is a poor fit for this dispatch system.
-                //1) We never, ever want to Sleep(1). The only value of Sleep(1) is surrendering a timeslice to a lower priority thread, but it guarantees that the
-                //thread won't be scheduled again within a reasonable timespan. When talking about individual stages measured in a handful of microseconds, 1 millisecond is huge.
-                //2) While making use of the NextSpinWillYield property can be used to detect when we've entered the yielding phase, it doesn't provide any control over how much spinning
-                //precedes that phase nor does it allow us to avoid sleeps. 
-                //(Notably, Sleep(0) often doesn't cause much of a problem on larger simulations on single-socket systems since L2 evicted anyway, but Sleep(1) is devastating.)
-
-                //So, we take a dependency on the internal memory layout of SpinWait (by assuming it has a count int in the first 4 bytes), and also
-                //on the internal YIELD_THRESHOLD (10, so count of 11 -> yield).
-                var wait = new SpinWait();
-                ref var waitCount = ref Unsafe.As<SpinWait, int>(ref wait);
+                var spinWait = new LocalSpinWait();
                 while (Volatile.Read(ref context.WorkerCompletedCount) < neededCompletionCount)
                 {
-                    //Empirically, being pretty aggressive about yielding produces the best results. This is pretty reasonable- 
-                    //a single constraint bundle can take hundreds of nanoseconds to finish.
-                    //That would be a whole lot of spinning that could be used by some other thread. At worst, we're being friendlier to other applications on the system.
-                    //This thread will likely be rescheduled on the same core, so it's unlikely that we'll lose any cache warmth (that we wouldn't have lost anyway).
-                    if (waitCount >= 3)
-                    {
-                        waitCount = 11;
-                        Debug.Assert(wait.NextSpinWillYield, "Uh oh did SpinWait's internals change before you got a chance to update this?");
-                    }
-                    else
-                    {
-                        Debug.Assert(!wait.NextSpinWillYield, "Uh oh did SpinWait's internals change before you got a chance to update this?");
-                    }
-                    wait.SpinOnce();
+                    spinWait.SpinOnce();
                 }
             }
         }
