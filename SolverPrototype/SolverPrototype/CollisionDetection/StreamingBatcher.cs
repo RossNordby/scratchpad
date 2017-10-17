@@ -250,8 +250,8 @@ namespace SolverPrototype.CollisionDetection
         /// </summary>
         public int FlipMask;
         public ContinuationIndex Continuation;
-        public BodyPose PoseA;
-        public BodyPose PoseB;
+        public RigidPose PoseA;
+        public RigidPose PoseB;
     }
 
     //Writes by the narrowphase write shape data without type knowledge, so they can't easily operate on regular packing rules. Emulate this with a pack of 1.
@@ -298,7 +298,7 @@ namespace SolverPrototype.CollisionDetection
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         unsafe void Add<TContinuations, TFilters>(ref CollisionTaskReference reference, int pairSizeInBytes,
-            int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref BodyPose poseA, ref BodyPose poseB,
+            int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref RigidPose poseA, ref RigidPose poseB,
             int flipMask, ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
@@ -323,7 +323,7 @@ namespace SolverPrototype.CollisionDetection
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public unsafe void Add<TContinuations, TFilters>(
-            int shapeTypeIdA, int shapeTypeIdB, int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref BodyPose poseA, ref BodyPose poseB,
+            int shapeTypeIdA, int shapeTypeIdB, int shapeSizeA, int shapeSizeB, void* shapeA, void* shapeB, ref RigidPose poseA, ref RigidPose poseB,
             ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TContinuations : struct, IContinuations
             where TFilters : struct, ICollisionSubtaskFilters
@@ -359,7 +359,7 @@ namespace SolverPrototype.CollisionDetection
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref CollisionTaskReference reference,
-            ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
+            ref TShapeA shapeA, ref TShapeB shapeB, ref RigidPose poseA, ref RigidPose poseB,
             int flipMask, ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations
@@ -382,7 +382,7 @@ namespace SolverPrototype.CollisionDetection
             }
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public unsafe void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref BodyPose poseA, ref BodyPose poseB,
+        public unsafe void Add<TShapeA, TShapeB, TContinuations, TFilters>(ref TShapeA shapeA, ref TShapeB shapeB, ref RigidPose poseA, ref RigidPose poseB,
             ContinuationIndex continuationId, ref TContinuations continuations, ref TFilters filters)
             where TShapeA : struct, IShape where TShapeB : struct, IShape
             where TContinuations : struct, IContinuations

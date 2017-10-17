@@ -46,29 +46,27 @@ namespace DemoRenderer.Constraints
             job.JobLines.EnsureCapacity(job.LeafCount * 12, new PassthroughArrayPool<LineInstance>());
             for (int broadPhaseIndex = job.LeafStart; broadPhaseIndex < end; ++broadPhaseIndex)
             {
-                if (broadPhase.TryGetBoundsPointers(broadPhaseIndex, out var minFloat, out var maxFloat))
-                {
-                    var min = (Vector3*)minFloat;
-                    var max = (Vector3*)maxFloat;
-                    var v001 = new Vector3(min->X, min->Y, max->Z);
-                    var v010 = new Vector3(min->X, max->Y, min->Z);
-                    var v011 = new Vector3(min->X, max->Y, max->Z);
-                    var v100 = new Vector3(max->X, min->Y, min->Z);
-                    var v101 = new Vector3(max->X, min->Y, max->Z);
-                    var v110 = new Vector3(max->X, max->Y, min->Z);
-                    job.JobLines.AddUnsafely(new LineInstance(ref *min, ref v001, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref *min, ref v010, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref *min, ref v100, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v001, ref v011, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v001, ref v101, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v010, ref v011, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v010, ref v110, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v011, ref *max, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v100, ref v101, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v100, ref v110, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v101, ref *max, ref color));
-                    job.JobLines.AddUnsafely(new LineInstance(ref v110, ref *max, ref color));
-                }
+                broadPhase.GetActiveBoundsPointers(broadPhaseIndex, out var minFloat, out var maxFloat);
+                var min = (Vector3*)minFloat;
+                var max = (Vector3*)maxFloat;
+                var v001 = new Vector3(min->X, min->Y, max->Z);
+                var v010 = new Vector3(min->X, max->Y, min->Z);
+                var v011 = new Vector3(min->X, max->Y, max->Z);
+                var v100 = new Vector3(max->X, min->Y, min->Z);
+                var v101 = new Vector3(max->X, min->Y, max->Z);
+                var v110 = new Vector3(max->X, max->Y, min->Z);
+                job.JobLines.AddUnsafely(new LineInstance(ref *min, ref v001, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref *min, ref v010, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref *min, ref v100, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v001, ref v011, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v001, ref v101, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v010, ref v011, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v010, ref v110, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v011, ref *max, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v100, ref v101, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v100, ref v110, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v101, ref *max, ref color));
+                job.JobLines.AddUnsafely(new LineInstance(ref v110, ref *max, ref color));
             }
             var masterStart = Interlocked.Add(ref masterLinesCount, job.JobLines.Count) - job.JobLines.Count;
             job.JobLines.Span.CopyTo(0, ref job.MasterLinesSpan, masterStart, job.JobLines.Count);
@@ -78,13 +76,12 @@ namespace DemoRenderer.Constraints
 
         internal unsafe void AddInstances(BroadPhase broadPhase, ref QuickList<LineInstance, Array<LineInstance>> lines, ParallelLooper looper)
         {
-            //Note that not every leaf index is occupied. Leaf indices are designed to be like handles, so that user code doesn't need to be aware of memory layout changes
-            //when a collidable is removed. That means we'll be scanning some leaves that do not exist, but that's fine.
-            var possibleLeafCount = broadPhase.ActiveTree.LeafCount;
-            lines.EnsureCapacity(lines.Count + 12 * possibleLeafCount, new PassthroughArrayPool<LineInstance>());
+            //For now, we only pull the bounding boxes of objects that are active.
+            var activeLeafCount = broadPhase.ActiveTree.LeafCount;
+            lines.EnsureCapacity(lines.Count + 12 * activeLeafCount, new PassthroughArrayPool<LineInstance>());
             var maximumJobCount = jobsPerThread * Environment.ProcessorCount;
-            var possibleLeavesPerJob = possibleLeafCount / maximumJobCount;
-            var remainder = possibleLeafCount - possibleLeavesPerJob * maximumJobCount;
+            var possibleLeavesPerJob = activeLeafCount / maximumJobCount;
+            var remainder = activeLeafCount - possibleLeavesPerJob * maximumJobCount;
             int jobbedLeafCount = 0;
             for (int i = 0; i < maximumJobCount; ++i)
             {

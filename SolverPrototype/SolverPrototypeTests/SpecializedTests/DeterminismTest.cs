@@ -11,7 +11,7 @@ namespace SolverPrototypeTests.SpecializedTests
 {
     public static class DeterminismTest
     {
-        public static BodyPose[] ExecuteSimulation(int frameCount, BufferPool bufferPool, IThreadDispatcher threadDispatcher)
+        public static RigidPose[] ExecuteSimulation(int frameCount, BufferPool bufferPool, IThreadDispatcher threadDispatcher)
         {
             var simulation = Simulation.Create(bufferPool, new TestCallbacks());
             var shape = new Sphere(0.5f);
@@ -40,7 +40,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 //SimulationScrambling.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
             }
 
-            var poses = new BodyPose[simulation.Bodies.BodyCount];
+            var poses = new RigidPose[simulation.Bodies.BodyCount];
             for (int i = 0; i < simulation.Bodies.BodyCount; ++i)
             {
                 poses[i] = simulation.Bodies.Poses[simulation.Bodies.HandleToIndex[bodyHandles[i]]];

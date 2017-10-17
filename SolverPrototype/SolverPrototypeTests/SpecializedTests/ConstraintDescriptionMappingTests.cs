@@ -99,7 +99,7 @@ namespace SolverPrototypeTests.SpecializedTests
             const int bodyCount = 2048;
             for (int i = 0; i < bodyCount; ++i)
             {
-                var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = 1 }, Pose = new BodyPose { Orientation = BEPUutilities2.Quaternion.Identity } };
+                var bodyDescription = new BodyDescription { LocalInertia = new BodyInertia { InverseMass = 1 }, Pose = new RigidPose { Orientation = BEPUutilities2.Quaternion.Identity } };
                 simulation.Add(ref bodyDescription);
             }
             var random = new Random(5);

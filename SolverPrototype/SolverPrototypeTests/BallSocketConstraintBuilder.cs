@@ -13,7 +13,7 @@ namespace SolverPrototypeTests
 {
     public struct BallSocketConstraintBuilder : IConstraintBuilder
     {
-        static void CreateBallSocket(ref BodyPose a, ref BodyPose b, out BallSocket description)
+        static void CreateBallSocket(ref RigidPose a, ref RigidPose b, out BallSocket description)
         {
             var midpoint = 0.5f * (a.Position + b.Position);
             description.LocalOffsetA = Quaternion.Transform(midpoint - a.Position, Quaternion.Conjugate(a.Orientation));

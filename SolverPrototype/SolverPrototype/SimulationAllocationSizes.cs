@@ -10,6 +10,10 @@
         /// </summary>
         public int Bodies;
         /// <summary>
+        /// The number of statics to allocate space for.
+        /// </summary>
+        public int Statics;
+        /// <summary>
         /// Minimum number of shapes to allocate space for in each shape type batch.
         /// </summary>
         public int ShapesPerType;
@@ -34,6 +38,5 @@
         /// </summary>
         public int ConstraintCountPerBodyEstimate;
 
-       
     }
 }

@@ -9,64 +9,91 @@ namespace SolverPrototype.CollisionDetection
 {
     public unsafe class BroadPhase : IDisposable
     {
-        //For now, we only have an active tree. Later on, we'll need two trees- the second one represents all objects that do not move.
-        //That one would cover static or inactive collidables.
         internal Buffer<CollidableReference> activeLeaves;
+        internal Buffer<CollidableReference> staticLeaves;
         public Tree ActiveTree;
-        Tree.RefitAndRefineMultithreadedContext refineContext;
+        public Tree StaticTree;
+        Tree.RefitAndRefineMultithreadedContext activeRefineContext;
+        //TODO: static trees do not need to do nearly as much work as the active; this will change in the future.
+        Tree.RefitAndRefineMultithreadedContext staticRefineContext;
 
-        public BroadPhase(BufferPool pool, int initialActiveLeafCapacity = 4096)
+        public BroadPhase(BufferPool pool, int initialActiveLeafCapacity = 4096, int initialStaticLeafCapacity = 8192)
         {
             ActiveTree = new Tree(pool, initialActiveLeafCapacity);
+            StaticTree = new Tree(pool, initialStaticLeafCapacity);
             pool.SpecializeFor<CollidableReference>().Take(initialActiveLeafCapacity, out activeLeaves);
-            
-            refineContext = new Tree.RefitAndRefineMultithreadedContext();
+            pool.SpecializeFor<CollidableReference>().Take(initialStaticLeafCapacity, out staticLeaves);
+
+            activeRefineContext = new Tree.RefitAndRefineMultithreadedContext();
+            staticRefineContext = new Tree.RefitAndRefineMultithreadedContext();
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int Add(CollidableReference collidable, ref BoundingBox bounds)
+        private static int Add(CollidableReference collidable, ref BoundingBox bounds, Tree tree, ref Buffer<CollidableReference> leaves)
         {
-            //TODO: when there is a static tree, we'll need to distinguish between the two trees in the index that we return to the user.
-            var leafIndex = ActiveTree.Add(ref bounds);
-            if (leafIndex >= activeLeaves.Length)
+            var leafIndex = tree.Add(ref bounds);
+            if (leafIndex >= leaves.Length)
             {
-                ActiveTree.Pool.SpecializeFor<CollidableReference>().Resize(ref activeLeaves, ActiveTree.LeafCount + 1, activeLeaves.Length);
+                tree.Pool.SpecializeFor<CollidableReference>().Resize(ref leaves, tree.LeafCount + 1, leaves.Length);
             }
-            activeLeaves[leafIndex] = collidable;
+            leaves[leafIndex] = collidable;
             return leafIndex;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool RemoveAt(int index, out CollidableReference movedLeaf)
+        public static bool RemoveAt(int index, Tree tree, ref Buffer<CollidableReference> leaves, out CollidableReference movedLeaf)
         {
             Debug.Assert(index >= 0);
-            var movedLeafIndex = ActiveTree.RemoveAt(index);
+            var movedLeafIndex = tree.RemoveAt(index);
             if (movedLeafIndex >= 0)
             {
-                movedLeaf = activeLeaves[movedLeafIndex];
-                activeLeaves[index] = movedLeaf;
+                movedLeaf = leaves[movedLeafIndex];
+                leaves[index] = movedLeaf;
                 return true;
             }
             movedLeaf = new CollidableReference();
             return false;
         }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public int AddActive(CollidableReference collidable, ref BoundingBox bounds)
+        {
+            return Add(collidable, ref bounds, ActiveTree, ref activeLeaves);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool RemoveActiveAt(int index, out CollidableReference movedLeaf)
+        {
+            return RemoveAt(index, ActiveTree, ref activeLeaves, out movedLeaf);
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GetBoundsPointers(int broadPhaseIndex, out float* minPointer, out float* maxPointer)
+        public int AddStatic(CollidableReference collidable, ref BoundingBox bounds)
         {
-            var leaf = ActiveTree.Leaves[broadPhaseIndex];
-            var nodeChild = (&ActiveTree.nodes[leaf.NodeIndex].A) + leaf.ChildIndex;
+            return Add(collidable, ref bounds, StaticTree, ref staticLeaves);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool RemoveStaticAt(int index, out CollidableReference movedLeaf)
+        {
+            return RemoveAt(index, StaticTree, ref staticLeaves, out movedLeaf);
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        static void GetBoundsPointers(int broadPhaseIndex, Tree tree, out float* minPointer, out float* maxPointer)
+        {
+            var leaf = tree.Leaves[broadPhaseIndex];
+            var nodeChild = (&tree.nodes[leaf.NodeIndex].A) + leaf.ChildIndex;
             minPointer = &nodeChild->Min.X;
             maxPointer = &nodeChild->Max.X;
         }
-
-        //Note that some systems (like the demos renderer bounding box line extractor) iterate over the leaves. However, they're not contiguously stored.
-        //So, the user needs a way to know if the leaf index exists. Hence, a 'try' variant. If there happen to be more use cases for checking existence, a
-        //dedicated 'leafexists' method would probably be a better idea.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetBoundsPointers(int broadPhaseIndex, out float* minPointer, out float* maxPointer)
+        public void GetActiveBoundsPointers(int index, out float* minPointer, out float* maxPointer)
         {
-            GetBoundsPointers(broadPhaseIndex, out minPointer, out maxPointer);
-            return true;
+            GetBoundsPointers(index, ActiveTree, out minPointer, out maxPointer);
+        }
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void GetStaticBoundsPointers(int index, out float* minPointer, out float* maxPointer)
+        {
+            GetBoundsPointers(index, StaticTree, out minPointer, out maxPointer);
         }
 
         int frameIndex;
@@ -76,11 +103,24 @@ namespace SolverPrototype.CollisionDetection
                 frameIndex = 0;
             if (threadDispatcher != null)
             {
-                refineContext.RefitAndRefine(ActiveTree, threadDispatcher, frameIndex);
+                activeRefineContext.RefitAndRefine(ActiveTree, threadDispatcher, frameIndex);
             }
             else
             {
                 ActiveTree.RefitAndRefine(frameIndex);
+            }
+
+            //TODO: for now, the inactive/static tree is simply updated like another active tree. This is enormously inefficient compared to the ideal-
+            //by nature, static and inactive objects do not move every frame!
+            //This should be replaced by a dedicated inactive/static refinement approach. It should also run alongside the active tree to extract more parallelism;
+            //in other words, generate jobs from both trees and dispatch over all of them together. No internal dispatch.
+            if (threadDispatcher != null)
+            {
+                staticRefineContext.RefitAndRefine(StaticTree, threadDispatcher, frameIndex);
+            }
+            else
+            {
+                StaticTree.RefitAndRefine(frameIndex);
             }
         }
 
@@ -93,5 +133,6 @@ namespace SolverPrototype.CollisionDetection
         {
             ActiveTree.Dispose();
         }
+
     }
 }

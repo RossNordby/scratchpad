@@ -42,7 +42,7 @@ namespace SolverPrototype
         /// </summary>
         public Buffer<Collidable> Collidables;
 
-        public Buffer<BodyPose> Poses;
+        public Buffer<RigidPose> Poses;
         public Buffer<BodyVelocity> Velocities;
         public Buffer<BodyInertia> LocalInertias;
         /// <summary>
@@ -67,8 +67,8 @@ namespace SolverPrototype
             Debug.Assert(targetBodyCapacity > 0, "Resize is not meant to be used as Dispose. If you want to return everything to the pool, use Dispose instead.");
             //Note that we base the bundle capacities on the body capacity. This simplifies the conditions on allocation
             targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(targetBodyCapacity);
-            Debug.Assert(Poses.Length != BufferPool<BodyPoses>.GetLowestContainingElementCount(targetBodyCapacity), "Should not try to use internal resize of the result won't change the size.");
-            pool.SpecializeFor<BodyPose>().Resize(ref Poses, targetBodyCapacity, BodyCount);
+            Debug.Assert(Poses.Length != BufferPool<RigidPoses>.GetLowestContainingElementCount(targetBodyCapacity), "Should not try to use internal resize of the result won't change the size.");
+            pool.SpecializeFor<RigidPose>().Resize(ref Poses, targetBodyCapacity, BodyCount);
             pool.SpecializeFor<BodyVelocity>().Resize(ref Velocities, targetBodyCapacity, BodyCount);
             pool.SpecializeFor<BodyInertia>().Resize(ref LocalInertias, targetBodyCapacity, BodyCount);
             pool.SpecializeFor<BodyInertia>().Resize(ref Inertias, targetBodyCapacity, BodyCount);
@@ -288,7 +288,7 @@ namespace SolverPrototype
         /// <remarks>The object can be reused if it is reinitialized by using EnsureCapacity or Resize.</remarks>
         public void Dispose()
         {
-            pool.SpecializeFor<BodyPose>().Return(ref Poses);
+            pool.SpecializeFor<RigidPose>().Return(ref Poses);
             pool.SpecializeFor<BodyVelocity>().Return(ref Velocities);
             pool.SpecializeFor<BodyInertia>().Return(ref LocalInertias);
             pool.SpecializeFor<BodyInertia>().Return(ref Inertias);
@@ -412,7 +412,7 @@ namespace SolverPrototype
 
         //This looks a little different because it's used by AABB calculation, not constraint pairs.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void GatherDataForBounds(ref int start, int count, out BodyPoses poses, out BodyVelocities velocities, out Vector<int> shapeIndices, out Vector<float> maximumExpansion)
+        internal void GatherDataForBounds(ref int start, int count, out RigidPoses poses, out BodyVelocities velocities, out Vector<int> shapeIndices, out Vector<float> maximumExpansion)
         {
             Debug.Assert(count <= Vector<float>.Count);
             ref var targetPositionBase = ref Unsafe.As<Vector<float>, float>(ref poses.Position.X);

@@ -22,7 +22,7 @@ namespace SolverPrototypeTests
         {
             bodyDescription = new BodyDescription
             {
-                Pose = new BodyPose
+                Pose = new RigidPose
                 {
                     Position = new Vector3(columnIndex, rowIndex, sliceIndex) * Spacing + Origin,
                     Orientation = BEPUutilities2.Quaternion.Identity

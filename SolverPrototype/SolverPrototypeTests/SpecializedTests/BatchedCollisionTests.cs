@@ -75,8 +75,8 @@ namespace SolverPrototypeTests.SpecializedTests
             var continuations = new ContinuationsTest();
             var filters = new SubtaskFiltersTest();
             var sphere = new Sphere(1);
-            var poseA = new BodyPose { Position = new Vector3(0, 0, 0), Orientation = BEPUutilities2.Quaternion.Identity };
-            var poseB = new BodyPose { Position = new Vector3(0, 1, 0), Orientation = BEPUutilities2.Quaternion.Identity };
+            var poseA = new RigidPose { Position = new Vector3(0, 0, 0), Orientation = BEPUutilities2.Quaternion.Identity };
+            var poseB = new RigidPose { Position = new Vector3(0, 1, 0), Orientation = BEPUutilities2.Quaternion.Identity };
             Action<int> action = iterationCount =>
             {
                 var batcher = new StreamingBatcher(pool, registry);

@@ -7,6 +7,14 @@ using System.Runtime.CompilerServices;
 
 namespace SolverPrototype.Constraints
 {
+    //TODO: At the moment, we have a TypeBatch instance for every individual type batch, which means a reference type that has to be tracked by the GC.
+    //While vtables are going to be involved at some point, you could get rid of the extra instances by just keeping a single array with unique instances of the
+    //type batches. In other words, you're using it as an array of function pointers.
+    //The actual constraint data would be held in blittable value types, which isn't much of a change.
+    //This would be very similar to how other systems like the narrow phase and bounding box updater work.
+    //Fairly low value change; almost no impact on performance. Might be worth doing if you ever do a heavy refactor to support things like a jacobi fallback solver though.
+    //(Jacobi fallback would operate on almost all the exact same data, but simply handles the velocity scatter in a different way.)
+    //One downside: the typebatch would have to do a cast on the incoming data. Not a big deal.
     public abstract class TypeBatch
     {
         //TODO: Having this in the base class actually complicates the implementation of some special constraint types. Consider an 'articulation' subsolver that involves

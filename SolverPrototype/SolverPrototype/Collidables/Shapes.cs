@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System;
 using System.Diagnostics;
 using SolverPrototype.CollisionDetection;
+using BEPUutilities2;
 
 namespace SolverPrototype.Collidables
 {
@@ -55,7 +56,7 @@ namespace SolverPrototype.Collidables
         /// </summary>
         /// <param name="collidablesStartIndex">Start index of the bundle in the collidables set to gather bounding box relevant data for.</param>
         void GatherCollidableBundle(int collidablesStartIndex, int count, out Vector<int> shapeIndices, out Vector<float> maximumExpansion,
-            out BodyPoses poses, out BodyVelocities velocities);
+            out RigidPoses poses, out BodyVelocities velocities);
         /// <summary>
         /// Scatters the calculated bounds into the target memory locations.
         /// </summary>
@@ -74,7 +75,7 @@ namespace SolverPrototype.Collidables
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void GatherCollidableBundle(int collidablesStartIndex, int count, out Vector<int> shapeIndices, out Vector<float> maximumExpansion, out BodyPoses poses, out BodyVelocities velocities)
+        public void GatherCollidableBundle(int collidablesStartIndex, int count, out Vector<int> shapeIndices, out Vector<float> maximumExpansion, out RigidPoses poses, out BodyVelocities velocities)
         {
             Bodies.GatherDataForBounds(ref BodyIndices[collidablesStartIndex], count, out poses, out velocities, out shapeIndices, out maximumExpansion);
         }
@@ -91,7 +92,7 @@ namespace SolverPrototype.Collidables
                 //Note that we're hardcoding a relationship between the broadphase implementation and AABB calculation. This increases coupling and makes it harder to swap
                 //broadphases, but in practice, I don't think a single person besides me ever created a broad phase for v1, and there was only ever a single broad phase implementation 
                 //that was worth using at any given time. Abstraction for the sake of abstraction at the cost of virtual calls everywhere isn't worth it.
-                BroadPhase.TryGetBoundsPointers(Bodies.Collidables[BodyIndices[startIndex + i]].BroadPhaseIndex, out var minPointer, out var maxPointer);
+                BroadPhase.GetActiveBoundsPointers(Bodies.Collidables[BodyIndices[startIndex + i]].BroadPhaseIndex, out var minPointer, out var maxPointer);
                 //TODO: Check codegen.
                 *minPointer = Unsafe.Add(ref minBase, i);
                 *(minPointer + 1) = Unsafe.Add(ref minBase, i + Vector<float>.Count);
@@ -111,7 +112,7 @@ namespace SolverPrototype.Collidables
         public abstract void ComputeBounds<TBundleSource>(ref TBundleSource source, float dt) where TBundleSource : ICollidableBundleSource;
         public abstract void RemoveAt(int index);
 
-        public abstract void ComputeBounds(int shapeIndex, ref BodyPose pose, out Vector3 min, out Vector3 max);
+        public abstract void ComputeBounds(int shapeIndex, ref RigidPose pose, out Vector3 min, out Vector3 max);
         //TODO: Clear/EnsureCapacity/Resize/Compact/Dispose
 
         /// <summary>
@@ -220,7 +221,7 @@ namespace SolverPrototype.Collidables
             }
         }
 
-        public override void ComputeBounds(int shapeIndex, ref BodyPose pose, out Vector3 min, out Vector3 max)
+        public override void ComputeBounds(int shapeIndex, ref RigidPose pose, out Vector3 min, out Vector3 max)
         {
             shapes[shapeIndex].GetBounds(ref pose.Orientation, out min, out max);
             min += pose.Position;
@@ -248,6 +249,19 @@ namespace SolverPrototype.Collidables
             //This list pretty much will never resize unless something really strange happens, and since batches use virtual calls, we have to allow storage of reference types.
             QuickList<ShapeBatch, Array<ShapeBatch>>.Create(new PassthroughArrayPool<ShapeBatch>(), 16, out batches);
             this.pool = pool;
+        }
+
+        /// <summary>
+        /// Computes a bounding box for a single shape.
+        /// </summary>
+        /// <param name="pose">Pose to calculate the bounding box of.</param>
+        /// <param name="shapeIndex">Index of the shape.</param>
+        /// <param name="bounds">Bounding box of the specified shape with the specified pose.</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void UpdateBounds(ref RigidPose pose, ref TypedIndex shapeIndex, out BoundingBox bounds)
+        {
+            //Note: the min and max here are in absolute coordinates, which means this is a spot that has to be updated in the event that positions use a higher precision representation.
+            batches[shapeIndex.Type].ComputeBounds(shapeIndex.Index, ref pose, out bounds.Min, out bounds.Max);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

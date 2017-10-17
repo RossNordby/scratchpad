@@ -78,7 +78,7 @@ namespace SolverPrototypeTests
 
     public static class SimulationSetup
     {
-        public static void BuildBasis(ref BodyPose a, ref BodyPose b, out Vector3 offsetB, out Vector3 x, out Vector3 y, out Vector3 z)
+        public static void BuildBasis(ref RigidPose a, ref RigidPose b, out Vector3 offsetB, out Vector3 x, out Vector3 y, out Vector3 z)
         {
             offsetB = b.Position - a.Position;
             y = Vector3.Normalize(-offsetB);

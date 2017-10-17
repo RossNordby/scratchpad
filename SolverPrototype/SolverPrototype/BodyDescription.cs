@@ -3,7 +3,7 @@ using System.Numerics;
 
 namespace SolverPrototype
 {
-    public struct BodyPose
+    public struct RigidPose
     {
         public Vector3 Position;
         public BEPUutilities2.Quaternion Orientation;
@@ -22,7 +22,7 @@ namespace SolverPrototype
 
     public struct BodyDescription
     {
-        public BodyPose Pose;
+        public RigidPose Pose;
         public BodyInertia LocalInertia;
         public BodyVelocity Velocity;
         public CollidableDescription Collidable;
@@ -47,7 +47,13 @@ namespace SolverPrototype
 
     }
 
-    public struct BodyPoses
+    public struct StaticDescription
+    {
+        public RigidPose Pose;
+        public CollidableDescription Collidable;
+    }
+
+    public struct RigidPoses
     {
         public Vector3Wide Position;
         //Note that we store a quaternion rather than a matrix3x3. While this often requires some overhead when performing vector transforms or extracting basis vectors, 
