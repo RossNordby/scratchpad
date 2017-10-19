@@ -28,10 +28,10 @@ namespace SolverPrototype.CollisionDetection
             }
             else
             {
-                TestLeafAgainstNode2(leafIndex, ref leafMin, ref leafMax, nodeIndex, ref results);
+                TestLeafAgainstNode(leafIndex, ref leafMin, ref leafMax, nodeIndex, ref results);
             }
         }
-        unsafe void TestLeafAgainstNode2<TOverlapHandler>(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, ref TOverlapHandler results)
+        unsafe void TestLeafAgainstNode<TOverlapHandler>(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, ref TOverlapHandler results)
             where TOverlapHandler : IOverlapHandler
         {
             var node = nodes + nodeIndex;
@@ -61,18 +61,18 @@ namespace SolverPrototype.CollisionDetection
             {
                 if (b.Index >= 0)
                 {
-                    GetOverlapsBetweenDifferentNodes2(nodes + a.Index, nodes + b.Index, ref results);
+                    GetOverlapsBetweenDifferentNodes(nodes + a.Index, nodes + b.Index, ref results);
                 }
                 else
                 {
                     //leaf B versus node A.
-                    TestLeafAgainstNode2(Encode(b.Index), ref b.Min, ref b.Max, a.Index, ref results);
+                    TestLeafAgainstNode(Encode(b.Index), ref b.Min, ref b.Max, a.Index, ref results);
                 }
             }
             else if (b.Index >= 0)
             {
                 //leaf A versus node B.
-                TestLeafAgainstNode2(Encode(a.Index), ref a.Min, ref a.Max, b.Index, ref results);
+                TestLeafAgainstNode(Encode(a.Index), ref a.Min, ref a.Max, b.Index, ref results);
             }
             else
             {
@@ -87,7 +87,7 @@ namespace SolverPrototype.CollisionDetection
             return BoundingBox.Intersects(ref a.Min, ref a.Max, ref b.Min, ref b.Max);
         }
 
-        unsafe void GetOverlapsBetweenDifferentNodes2<TOverlapHandler>(Node* a, Node* b, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
+        unsafe void GetOverlapsBetweenDifferentNodes<TOverlapHandler>(Node* a, Node* b, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
         {
             //There are no shared children, so test them all.
 
@@ -119,7 +119,7 @@ namespace SolverPrototype.CollisionDetection
 
         }
 
-        unsafe void GetOverlapsInNode2<TOverlapHandler>(Node* node, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
+        unsafe void GetOverlapsInNode<TOverlapHandler>(Node* node, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
         {
 
             ref var a = ref node->A;
@@ -128,9 +128,9 @@ namespace SolverPrototype.CollisionDetection
             var ab = Intersects(ref a, ref b);
 
             if (a.Index >= 0)
-                GetOverlapsInNode2(nodes + a.Index, ref results);
+                GetOverlapsInNode(nodes + a.Index, ref results);
             if (b.Index >= 0)
-                GetOverlapsInNode2(nodes + b.Index, ref results);
+                GetOverlapsInNode(nodes + b.Index, ref results);
 
             //Test all different nodes.
             if (ab)
@@ -147,7 +147,7 @@ namespace SolverPrototype.CollisionDetection
             if (LeafCount < 2)
                 return;
 
-            GetOverlapsInNode2(nodes, ref results);
+            GetOverlapsInNode(nodes, ref results);
 
 
         }

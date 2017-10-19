@@ -4,6 +4,7 @@ using SolverPrototype.Collidables;
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace SolverPrototype.CollisionDetection
 {
@@ -16,16 +17,13 @@ namespace SolverPrototype.CollisionDetection
     //generic parameters, so instead we just explicitly create a type-aware overlap finder to help the broad phase.
     public class CollidableOverlapFinder<TCallbacks> : CollidableOverlapFinder where TCallbacks : struct, INarrowPhaseCallbacks
     {
-        struct OverlapHandler : IOverlapHandler
+        struct SelfOverlapHandler : IOverlapHandler
         {
-            //TODO: Once we have a second tree, we'll need to have a second handler type which can pull from two different leaf sources.
-            //No reason to try to make one type do both- that would just result in a bunch of last second branches that could be avoided by using the proper
-            //handler upon dispatch. 
             public NarrowPhase<TCallbacks> NarrowPhase;
             public Buffer<CollidableReference> Leaves;
             public int WorkerIndex;
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public OverlapHandler(Buffer<CollidableReference> leaves, NarrowPhase<TCallbacks> narrowPhase, int workerIndex)
+            public SelfOverlapHandler(Buffer<CollidableReference> leaves, NarrowPhase<TCallbacks> narrowPhase, int workerIndex)
             {
                 Leaves = leaves;
                 NarrowPhase = narrowPhase;
@@ -37,14 +35,38 @@ namespace SolverPrototype.CollisionDetection
                 NarrowPhase.HandleOverlap(WorkerIndex, Leaves[indexA], Leaves[indexB]);
             }
         }
-        Tree.MultithreadedSelfTest<OverlapHandler> selfTestContext;
+        struct IntertreeOverlapHandler : IOverlapHandler
+        {
+            public NarrowPhase<TCallbacks> NarrowPhase;
+            public Buffer<CollidableReference> LeavesA;
+            public Buffer<CollidableReference> LeavesB;
+            public int WorkerIndex;
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public IntertreeOverlapHandler(Buffer<CollidableReference> leavesA, Buffer<CollidableReference> leavesB, NarrowPhase<TCallbacks> narrowPhase, int workerIndex)
+            {
+                LeavesA = leavesA;
+                LeavesB = leavesB;
+                NarrowPhase = narrowPhase;
+                WorkerIndex = workerIndex;
+            }
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public void Handle(int indexA, int indexB)
+            {
+                NarrowPhase.HandleOverlap(WorkerIndex, LeavesA[indexA], LeavesB[indexB]);
+            }
+        }
+        Tree.MultithreadedSelfTest<SelfOverlapHandler> selfTestContext;
+        Tree.MultithreadedIntertreeTest<IntertreeOverlapHandler> intertreeTestContext;
         NarrowPhase<TCallbacks> narrowPhase;
         BroadPhase broadPhase;
-        OverlapHandler[] threadHandlers;
+        SelfOverlapHandler[] selfHandlers;
+        IntertreeOverlapHandler[] intertreeHandlers;
         Action<int> workerAction;
+        int nextJobIndex;
         public CollidableOverlapFinder(NarrowPhase<TCallbacks> narrowPhase, BroadPhase broadPhase)
         {
-            selfTestContext = new Tree.MultithreadedSelfTest<OverlapHandler>();
+            selfTestContext = new Tree.MultithreadedSelfTest<SelfOverlapHandler>(narrowPhase.Pool);
+            intertreeTestContext = new Tree.MultithreadedIntertreeTest<IntertreeOverlapHandler>(narrowPhase.Pool);
             this.narrowPhase = narrowPhase;
             this.broadPhase = broadPhase;
             workerAction = Worker;
@@ -52,7 +74,28 @@ namespace SolverPrototype.CollisionDetection
 
         void Worker(int workerIndex)
         {
-            selfTestContext.PairTest(workerIndex);
+            Debug.Assert(workerIndex >= 0 && workerIndex < intertreeHandlers.Length && workerIndex < selfHandlers.Length);
+
+            var totalJobCount = selfTestContext.JobCount + intertreeTestContext.JobCount;
+            while (true)
+            {
+                var jobIndex = Interlocked.Increment(ref nextJobIndex);
+                if (jobIndex < selfTestContext.JobCount)
+                {
+                    //This is a self test job.
+                    selfTestContext.ExecuteJob(jobIndex, workerIndex);
+                }
+                else if (jobIndex < totalJobCount)
+                {
+                    //This is an intertree test job.
+                    intertreeTestContext.ExecuteJob(jobIndex - selfTestContext.JobCount, workerIndex);
+                }
+                else
+                {
+                    //No more jobs remain;
+                    break;
+                }
+            }
             ref var worker = ref narrowPhase.overlapWorkers[workerIndex];
             worker.Batcher.Flush(ref worker.ConstraintGenerators, ref worker.Filters);
         }
@@ -62,24 +105,29 @@ namespace SolverPrototype.CollisionDetection
             narrowPhase.Prepare(threadDispatcher);
             if (threadDispatcher != null)
             {
-                if (threadHandlers == null || threadHandlers.Length < threadDispatcher.ThreadCount)
+                if (intertreeHandlers == null || intertreeHandlers.Length < threadDispatcher.ThreadCount)
                 {
                     //This initialization/resize should occur extremely rarely.
-                    threadHandlers = new OverlapHandler[threadDispatcher.ThreadCount];
-                    for (int i = 0; i < threadHandlers.Length; ++i)
+                    selfHandlers = new SelfOverlapHandler[threadDispatcher.ThreadCount];
+                    intertreeHandlers = new IntertreeOverlapHandler[threadDispatcher.ThreadCount];
+                    for (int i = 0; i < intertreeHandlers.Length; ++i)
                     {
-                        threadHandlers[i] = new OverlapHandler(broadPhase.activeLeaves, narrowPhase, i);
+                        selfHandlers[i] = new SelfOverlapHandler(broadPhase.activeLeaves, narrowPhase, i);
                     }
                 }
-                Debug.Assert(threadHandlers.Length >= threadDispatcher.ThreadCount);
-                selfTestContext.PrepareSelfTestJobs(broadPhase.ActiveTree, threadHandlers, threadDispatcher.ThreadCount);
+                Debug.Assert(intertreeHandlers.Length >= threadDispatcher.ThreadCount);
+                selfTestContext.PrepareJobs(broadPhase.ActiveTree, selfHandlers, threadDispatcher.ThreadCount);
+                intertreeTestContext.PrepareJobs(broadPhase.ActiveTree, broadPhase.StaticTree, intertreeHandlers, threadDispatcher.ThreadCount);
+                nextJobIndex = -1;
                 threadDispatcher.DispatchWorkers(workerAction);
-                selfTestContext.CompleteSelfTest(broadPhase.ActiveTree);
+                selfTestContext.CompleteSelfTest();
+                intertreeTestContext.CompleteSelfTest();
             }
             else
             {
-                var overlapHandler = new OverlapHandler { NarrowPhase = narrowPhase, Leaves = broadPhase.activeLeaves, WorkerIndex = 0 };
+                var overlapHandler = new SelfOverlapHandler { NarrowPhase = narrowPhase, Leaves = broadPhase.activeLeaves, WorkerIndex = 0 };
                 broadPhase.ActiveTree.GetSelfOverlaps(ref overlapHandler);
+                broadPhase.ActiveTree.GetOverlaps(broadPhase.StaticTree, ref overlapHandler);
                 ref var worker = ref narrowPhase.overlapWorkers[0];
                 worker.Batcher.Flush(ref worker.ConstraintGenerators, ref worker.Filters);
 
@@ -89,3 +137,4 @@ namespace SolverPrototype.CollisionDetection
 
     }
 }
+

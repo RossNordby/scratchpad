@@ -40,105 +40,110 @@ namespace SolverPrototype.CollisionDetection
         //With such a scheme, you would still want to somehow collect an initial set of jobs to give workers something to munch on, but you don't need lots of jobs per worker anymore.
         //So, if you had a 128 core machine, you could get away with still having ~256 jobs- which you can probably collect in less than 20us even on lower frequency processors 
         //(like the ones you'd find in a 128 core machine).
+        
         public class MultithreadedSelfTest<TOverlapHandler> where TOverlapHandler : struct, IOverlapHandler
         {
-            struct Overlap
+            struct Job
             {
                 public int A;
                 public int B;
             }
 
-            private Tree tree;
-            private BufferPool<Overlap> overlapPool;
+            public BufferPool Pool;
 
             int NextNodePair;
             int leafThreshold;
-            private QuickList<Overlap, Buffer<Overlap>> nodePairsToTest;
-            
-            TOverlapHandler[] overlapHandlers;
+            private QuickList<Job, Buffer<Job>> jobs;
+            public int JobCount => jobs.Count;
+            public Tree Tree;
+            public TOverlapHandler[] OverlapHandlers;
+
+            public MultithreadedSelfTest(BufferPool pool)
+            {
+                Pool = pool;
+            }
 
             /// <summary>
-            /// Prepares the jobs associated with a self test. Must be called before a dispatch over PairTestAction.
+            /// Prepares the jobs associated with a self test. Must be called before a dispatch over PairTest.
             /// </summary>
             /// <param name="tree">Tree to test against itself.</param>
             /// <param name="overlapHandlers">Callbacks used to handle individual overlaps detected by the self test.</param>
             /// <param name="threadCount">Number of threads to prepare jobs for.</param>
-            public void PrepareSelfTestJobs(Tree tree, TOverlapHandler[] overlapHandlers, int threadCount)
+            public void PrepareJobs(Tree tree, TOverlapHandler[] overlapHandlers, int threadCount)
             {
                 //If there are not multiple children, there's no need to recurse.
                 //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
                 if (tree.leafCount < 2)
                     return;
 
-                Debug.Assert(overlapHandlers.Length >= threadCount);
+                Debug.Assert(OverlapHandlers.Length >= threadCount);
                 const float jobMultiplier = 1.5f;
                 var targetJobCount = Math.Max(1, jobMultiplier * threadCount);
                 leafThreshold = (int)(tree.leafCount / targetJobCount);
-                this.overlapHandlers = overlapHandlers;
-                this.tree = tree;
-                this.overlapPool = tree.Pool.SpecializeFor<Overlap>();
-                QuickList<Overlap, Buffer<Overlap>>.Create(tree.Pool.SpecializeFor<Overlap>(), (int)(targetJobCount * 2), out nodePairsToTest);
+                QuickList<Job, Buffer<Job>>.Create(Pool.SpecializeFor<Job>(), (int)(targetJobCount * 2), out jobs);
                 NextNodePair = -1;
+                this.OverlapHandlers = overlapHandlers;
+                this.Tree = tree;
                 //Collect jobs.
-                CollectJobsInNode(0, tree.leafCount, ref overlapHandlers[0]);
+                CollectJobsInNode(0, tree.leafCount, ref OverlapHandlers[0]);
             }
 
             /// <summary>
             /// Cleans up after a multithreaded self test.
             /// </summary>
-            /// <param name="tree">Tree that was self tested.</param>
-            public void CompleteSelfTest(Tree tree)
+            public void CompleteSelfTest()
             {
-                nodePairsToTest.Dispose(tree.Pool.SpecializeFor<Overlap>());
-                this.tree = null;
-                this.overlapPool = default(BufferPool<Overlap>);
-                this.overlapHandlers = null;
+                jobs.Dispose(Pool.SpecializeFor<Job>());
             }
 
+            public unsafe void ExecuteJob(int jobIndex, int workerIndex)
+            {
+                ref var overlap = ref jobs[jobIndex];
+                if (overlap.A >= 0)
+                {
+                    if (overlap.A == overlap.B)
+                    {
+                        //Same node.
+                        Tree.GetOverlapsInNode(Tree.nodes + overlap.A, ref OverlapHandlers[workerIndex]);
+                    }
+                    else if (overlap.B >= 0)
+                    {
+                        //Different nodes.
+                        Tree.GetOverlapsBetweenDifferentNodes(Tree.nodes + overlap.A, Tree.nodes + overlap.B, ref OverlapHandlers[workerIndex]);
+                    }
+                    else
+                    {
+                        //A is an internal node, B is a leaf.
+                        var leafIndex = Encode(overlap.B);
+                        var leaf = Tree.leaves + leafIndex;
+                        ref var childOwningLeaf = ref (&Tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
+                        Tree.TestLeafAgainstNode(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.A, ref OverlapHandlers[workerIndex]);
+                    }
+                }
+                else
+                {
+                    //A is a leaf, B is internal.
+                    var leafIndex = Encode(overlap.A);
+                    var leaf = Tree.leaves + leafIndex;
+                    ref var childOwningLeaf = ref (&Tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
+                    Tree.TestLeafAgainstNode(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.B, ref OverlapHandlers[workerIndex]);
+
+                    //NOTE THAT WE DO NOT HANDLE THE CASE THAT BOTH A AND B ARE LEAVES HERE.
+                    //The collection routine should take care of that, since it has more convenient access to bounding boxes and because a single test isn't worth an atomic increment.
+                }
+            }
             /// <summary>
             /// Executes a single worker of the multithreaded self test.
             /// </summary>
             /// <param name="workerIndex">Index of the worker executing this set of tests.</param>
             public unsafe void PairTest(int workerIndex)
             {
-                Debug.Assert(workerIndex >= 0 && workerIndex < overlapHandlers.Length);
+                Debug.Assert(workerIndex >= 0 && workerIndex < OverlapHandlers.Length);
                 int nextNodePairIndex;
                 //To minimize the number of worker overlap lists, perform direct load balancing by manually grabbing the next indices.
-                while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < nodePairsToTest.Count)
+                while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < jobs.Count)
                 {
-                    var overlap = nodePairsToTest[nextNodePairIndex];
-                    if (overlap.A >= 0)
-                    {
-                        if (overlap.A == overlap.B)
-                        {
-                            //Same node.
-                            tree.GetOverlapsInNode2(tree.nodes + overlap.A, ref overlapHandlers[workerIndex]);
-                        }
-                        else if (overlap.B >= 0)
-                        {
-                            //Different nodes.
-                            tree.GetOverlapsBetweenDifferentNodes2(tree.nodes + overlap.A, tree.nodes + overlap.B, ref overlapHandlers[workerIndex]);
-                        }
-                        else
-                        {
-                            //A is an internal node, B is a leaf.
-                            var leafIndex = Encode(overlap.B);
-                            var leaf = tree.leaves + leafIndex;
-                            ref var childOwningLeaf = ref (&tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
-                            tree.TestLeafAgainstNode2(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.A, ref overlapHandlers[workerIndex]);
-                        }
-                    }
-                    else
-                    {
-                        //A is a leaf, B is internal.
-                        var leafIndex = Encode(overlap.A);
-                        var leaf = tree.leaves + leafIndex;
-                        ref var childOwningLeaf = ref (&tree.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
-                        tree.TestLeafAgainstNode2(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.B, ref overlapHandlers[workerIndex]);
-
-                        //NOTE THAT WE DO NOT HANDLE THE CASE THAT BOTH A AND B ARE LEAVES HERE.
-                        //The collection routine should take care of that, since it has more convenient access to bounding boxes and because a single test isn't worth an atomic increment.
-                    }
+                    ExecuteJob(nextNodePairIndex, workerIndex);                    
                 }
             }
 
@@ -151,7 +156,7 @@ namespace SolverPrototype.CollisionDetection
                 else
                 {
                     if (nodeLeafCount <= leafThreshold)
-                        nodePairsToTest.Add(new Overlap { A = Encode(leafIndex), B = nodeIndex }, overlapPool);
+                        jobs.Add(new Job { A = Encode(leafIndex), B = nodeIndex }, Pool.SpecializeFor<Job>());
                     else
                         TestLeafAgainstNode(leafIndex, ref leafMin, ref leafMax, nodeIndex, ref results);
                 }
@@ -159,7 +164,7 @@ namespace SolverPrototype.CollisionDetection
 
             unsafe void TestLeafAgainstNode(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, ref TOverlapHandler results)
             {
-                var node = tree.nodes + nodeIndex;
+                var node = Tree.nodes + nodeIndex;
                 ref var a = ref node->A;
                 ref var b = ref node->B;
                 //Despite recursion, leafBounds should remain in L1- it'll be used all the way down the recursion from here.
@@ -188,9 +193,9 @@ namespace SolverPrototype.CollisionDetection
                     if (b.Index >= 0)
                     {
                         if (a.LeafCount + b.LeafCount <= leafThreshold)
-                            nodePairsToTest.Add(new Overlap { A = a.Index, B = b.Index }, overlapPool);
+                            jobs.Add(new Job { A = a.Index, B = b.Index }, Pool.SpecializeFor<Job>());
                         else
-                            GetJobsBetweenDifferentNodes(tree.nodes + a.Index, tree.nodes + b.Index, ref results);
+                            GetJobsBetweenDifferentNodes(Tree.nodes + a.Index, Tree.nodes + b.Index, ref results);
 
                     }
                     else
@@ -247,11 +252,11 @@ namespace SolverPrototype.CollisionDetection
             {
                 if (leafCount <= leafThreshold)
                 {
-                    nodePairsToTest.Add(new Overlap { A = nodeIndex, B = nodeIndex }, overlapPool);
+                    jobs.Add(new Job { A = nodeIndex, B = nodeIndex }, Pool.SpecializeFor<Job>());
                     return;
                 }
 
-                var node = tree.nodes + nodeIndex;
+                var node = Tree.nodes + nodeIndex;
                 ref var a = ref node->A;
                 ref var b = ref node->B;
 
