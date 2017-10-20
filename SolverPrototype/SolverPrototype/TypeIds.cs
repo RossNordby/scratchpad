@@ -20,6 +20,7 @@ namespace SolverPrototype
         public static void Register(TypeBatchAllocation typeBatchAllocation, out CollisionTaskRegistry defaultTaskRegistry)
         {
             typeBatchAllocation.Register<BallSocket>();
+            typeBatchAllocation.Register<ContactManifold1OneBodyConstraint>();
             typeBatchAllocation.Register<ContactManifold1Constraint>();
             typeBatchAllocation.Register<ContactManifold4Constraint>();
 

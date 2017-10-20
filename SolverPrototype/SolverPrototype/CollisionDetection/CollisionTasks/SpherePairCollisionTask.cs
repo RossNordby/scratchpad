@@ -28,13 +28,18 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             contactNormal.Y = Vector.ConditionalSelect(normalIsValid, contactNormal.Y, Vector<float>.One);
             contactNormal.Z = Vector.ConditionalSelect(normalIsValid, contactNormal.Z, Vector<float>.Zero);
             depth = radiiA + radiiB - centerDistance;
-            //The position should be placed at the average of the extremePoint(a, a->b) and extremePoint(b, b->a). That puts it in the middle of the overlapping or nonoverlapping interval.
-            //The contact normal acts as the direction from a to b.
-            Vector3Wide.Scale(ref contactNormal, ref radiiA, out var extremeA);
-            Vector3Wide.Scale(ref contactNormal, ref radiiB, out var extremeB);
-            //note the following subtraction: contactNormal goes from b to a, so the negation pushes the extreme point in the proper direction from a to b.
-            Vector3Wide.Subtract(ref relativePositionB, ref extremeB, out extremeB);
-            Vector3Wide.Add(ref extremeA, ref extremeB, out relativeContactPosition);
+
+            //The contact position relative to object A is computed as the average of the extreme point along the normal toward the opposing sphere on each sphere, averaged.
+            //In other words:
+            //contactPosition = (positionA + (-normal) * radiusA + positionB + normal * radiusB) / 2
+            //Note the use of the negative normal for the contribution from sphere A- the normal is calibrated to point from B to A.
+            //Now, because both positions are relative to positionA:
+            //relativeContactPosition = (-normal * radiusA + relativePositionB + normal * radiusB) / 2
+            //relativeContactPosition = (relativePositionB + (normal * radiusB - normal * radiusA)) / 2
+            //relativeContactPosition = (relativePositionB + normal * (radiusB - radiusA)) / 2
+            var radiusDifference = radiiB - radiiA;
+            Vector3Wide.Scale(ref contactNormal, ref radiusDifference, out var offsetFromB);
+            Vector3Wide.Add(ref relativePositionB, ref offsetFromB, out relativeContactPosition);
             var scale = new Vector<float>(0.5f);
             Vector3Wide.Scale(ref relativeContactPosition, ref scale, out relativeContactPosition);
         }
@@ -277,7 +282,7 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
             Vector3Wide positionB;
             Vector3Wide contactNormal, contactPosition, relativePosition;
             Vector<float> depth;
-            
+
             for (int i = 0; i < batch.Count; i += Vector<float>.Count)
             {
                 ref var bundleStart = ref Unsafe.Add(ref start, i);
@@ -300,8 +305,6 @@ namespace SolverPrototype.CollisionDetection.CollisionTasks
                 Vector3Wide.Subtract(ref positionB, ref positionA, out relativePosition);
                 SpherePairTester.Test(ref radiiA, ref radiiB, ref relativePosition, out contactPosition, out contactNormal, out depth);
 
-                //TODO: you could avoid the hardcoded memory indexing here by instead interpreting. (ContactManifold*)&manifolds->OffsetB.X.
-                //Might have marginally better codegen, and more importantly, it would avoid the extremely fragile memory offsets.
                 Scatter<float, ContactManifold>(ref relativePosition.X, ref manifolds->OffsetB.X, countInBundle);
                 Scatter<float, ContactManifold>(ref relativePosition.Y, ref manifolds->OffsetB.Y, countInBundle);
                 Scatter<float, ContactManifold>(ref relativePosition.Z, ref manifolds->OffsetB.Z, countInBundle);

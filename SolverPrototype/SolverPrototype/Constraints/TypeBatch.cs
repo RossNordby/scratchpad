@@ -150,7 +150,7 @@ namespace SolverPrototype.Constraints
             var stride = Vector<int>.Count;
             //We assume that the body references struct is organized in memory like Bundle0, Inner0, ... BundleN, InnerN, Count
             //Assuming contiguous storage, Count is then located at start + stride * BodyCount.
-            var bodyCount = Unsafe.SizeOf<TBodyReferences>() / (stride * 4);
+            var bodyCount = Unsafe.SizeOf<TBodyReferences>() / (stride * sizeof(int));
             targetLane = *bodyIndices;
             for (int i = 1; i < bodyCount; ++i)
             {
@@ -162,17 +162,24 @@ namespace SolverPrototype.Constraints
             //Loop through the indices of the bundle and confirm that none of the indices are the same.
             for (int i = 0; i <= innerIndex; ++i)
             {
-                var aIndex = Unsafe.Add(ref start, i);
-                var bIndex = Unsafe.Add(ref start, i + Vector<int>.Count);
+                var indices = stackalloc int[bodyCount * 2];
+                for (int j = 0; j < bodyCount; ++j)
+                {
+                    indices[j] = Unsafe.Add(ref start, i + stride * j);
+                }
                 for (int j = i + 1; j <= innerIndex; ++j)
                 {
-                    var aIndex2 = Unsafe.Add(ref start, j);
-                    var bIndex2 = Unsafe.Add(ref start, j + Vector<int>.Count);
-                    Debug.Assert(!(
-                        aIndex == bIndex || aIndex2 == bIndex2 ||
-                        aIndex == aIndex2 || aIndex == bIndex2 ||
-                        bIndex == aIndex2 || bIndex == bIndex2),
-                        "A bundle should not share any body references. If an add causes redundant body references, something upstream broke.");
+                    for (int k = 0; k < bodyCount; ++k)
+                    {
+                        indices[bodyCount + k] = Unsafe.Add(ref start, j + stride * k);
+                    }
+                    for (int k = 0; k < bodyCount * 2; ++k)
+                    {
+                        for (int l = k + 1; l < bodyCount * 2; ++l)
+                        {
+                            Debug.Assert(indices[k] != indices[l], "A bundle should not share any body references. If an add causes redundant body references, something upstream broke.");
+                        }
+                    }
                 }
 
             }
@@ -186,7 +193,7 @@ namespace SolverPrototype.Constraints
             return Math.Min(Vector<float>.Count, constraintCount - (bundleStartIndex << BundleIndexing.VectorShift));
         }
 
-        
+
         public unsafe sealed override int Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation)
         {
             Debug.Assert(Projection.Memory != null, "Should initialize the batch before allocating anything from it.");
