@@ -41,7 +41,7 @@ namespace SolverPrototype.CollisionDetection
             }
         }
 
-        unsafe void DispatchTestForLeafVersusNode<TOverlapHandler>(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, Tree treeB, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
+        unsafe void DispatchTestForLeafAgainstNode<TOverlapHandler>(int leafIndex, ref Vector3 leafMin, ref Vector3 leafMax, int nodeIndex, Tree treeB, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
         {
             if (nodeIndex < 0)
             {
@@ -67,11 +67,11 @@ namespace SolverPrototype.CollisionDetection
             var bIntersects = BoundingBox.Intersects(ref leafMin, ref leafMax, ref b.Min, ref b.Max);
             if (aIntersects)
             {
-                DispatchTestForLeafVersusNode(leafIndex, ref leafMin, ref leafMax, a.Index, treeB, ref results);
+                DispatchTestForLeafAgainstNode(leafIndex, ref leafMin, ref leafMax, a.Index, treeB, ref results);
             }
             if (bIntersects)
             {
-                DispatchTestForLeafVersusNode(leafIndex, ref leafMin, ref leafMax, bIndex, treeB, ref results);
+                DispatchTestForLeafAgainstNode(leafIndex, ref leafMin, ref leafMax, bIndex, treeB, ref results);
             }
         }
 
@@ -150,11 +150,11 @@ namespace SolverPrototype.CollisionDetection
                 var abIntersects = Intersects(ref a->A, ref b->B);
                 if (aaIntersects)
                 {
-                    DispatchTestForNodes(ref a->A, ref b->A, ref overlapHandler);
+                    DispatchTestForNodes(ref a->A, ref b->A, treeB, ref overlapHandler);
                 }
                 if (abIntersects)
                 {
-                    DispatchTestForNodes(ref a->A, ref b->B, ref overlapHandler);
+                    DispatchTestForNodes(ref a->A, ref b->B, treeB, ref overlapHandler);
                 }
             }
             else if (leafCount >= 2 && treeB.leafCount == 1)
@@ -166,11 +166,11 @@ namespace SolverPrototype.CollisionDetection
                 var baIntersects = Intersects(ref a->B, ref b->A);
                 if (aaIntersects)
                 {
-                    DispatchTestForNodes(ref a->A, ref b->A, ref overlapHandler);
+                    DispatchTestForNodes(ref a->A, ref b->A, treeB, ref overlapHandler);
                 }
                 if (baIntersects)
                 {
-                    DispatchTestForNodes(ref a->B, ref b->A, ref overlapHandler);
+                    DispatchTestForNodes(ref a->B, ref b->A, treeB, ref overlapHandler);
                 }
             }
             else
@@ -178,7 +178,7 @@ namespace SolverPrototype.CollisionDetection
                 Debug.Assert(leafCount == 1 && treeB.leafCount == 1);
                 if (Intersects(ref nodes->A, ref treeB.nodes->A))
                 {
-                    DispatchTestForNodes(ref nodes->A, ref treeB.nodes->A, ref overlapHandler);
+                    DispatchTestForNodes(ref nodes->A, ref treeB.nodes->A, treeB, ref overlapHandler);
                 }
             }
         }

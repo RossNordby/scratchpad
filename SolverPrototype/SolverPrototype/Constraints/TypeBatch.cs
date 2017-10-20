@@ -186,10 +186,7 @@ namespace SolverPrototype.Constraints
             return Math.Min(Vector<float>.Count, constraintCount - (bundleStartIndex << BundleIndexing.VectorShift));
         }
 
-
-        protected abstract void RemoveBodyReferences(int bundleIndex, int innerIndex);
-
-
+        
         public unsafe sealed override int Allocate(int handle, int* bodyIndices, TypeBatchAllocation typeBatchAllocation)
         {
             Debug.Assert(Projection.Memory != null, "Should initialize the batch before allocating anything from it.");
@@ -472,6 +469,20 @@ namespace SolverPrototype.Constraints
             accumulatedImpulseBundleSize = Unsafe.SizeOf<TAccumulatedImpulse>();
         }
 
+        protected void RemoveBodyReferences(int bundleIndex, int innerIndex)
+        {
+            ref var bundle = ref BodyReferences[bundleIndex];
+            //This is a little defensive; in the event that the body set actually scales down, you don't want to end up with invalid pointers in some lanes.
+            //TODO: This may need to change depending on how we handle kinematic/static/inactive storage and encoding.
+            GatherScatter.ClearLane<TBodyReferences, int>(ref bundle, innerIndex);
+        }
 
+        public sealed override void UpdateForBodyMemoryMove(int indexInTypeBatch, int bodyIndexInConstraint, int newBodyLocation)
+        {
+            BundleIndexing.GetBundleIndices(indexInTypeBatch, out var constraintBundleIndex, out var constraintInnerIndex);
+            //Note that this relies on the bodyreferences memory layout. It uses the stride of vectors to skip to the next body based on the bodyIndexInConstraint.
+            ref var bundle = ref Unsafe.As<TBodyReferences, Vector<int>>(ref BodyReferences[constraintBundleIndex]);
+            GatherScatter.Get(ref bundle, constraintInnerIndex + bodyIndexInConstraint * Vector<int>.Count) = newBodyLocation;
+        }
     }
 }

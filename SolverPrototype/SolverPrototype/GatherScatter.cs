@@ -141,7 +141,7 @@ namespace SolverPrototype
                 b = oldA;
             }
         }
-
+        
         /// <summary>
         /// Clears a bundle lane using the default value of the specified type. The bundle must be a contiguous block of Vector types, all sharing the same type,
         /// and the first vector must start at the address pointed to by the bundle reference.
@@ -263,6 +263,64 @@ namespace SolverPrototype
                     Unsafe.Add(ref sourceLinearBX, 3 * Vector<float>.Count),
                     Unsafe.Add(ref sourceLinearBX, 4 * Vector<float>.Count),
                     Unsafe.Add(ref sourceLinearBX, 5 * Vector<float>.Count));
+
+                //Note that no attempt is made to avoid writing to kinematic or null velocities.
+                //Loading the necessary data for the condition and branching to avoid the write takes longer than just writing it.
+                //No constraint should actually result in a change to the velocity of a kinematic or null body since they have infinite inertia.
+
+                //TODO: CHECK THE ABOVE ASSUMPTION. With more recent changes, it may be that doing a test could be worth it. Most likely it would require the body indices
+                //to directly contain a flag regarding the kinematic-ness of the body... Loading more data to avoid writing data is kinda silly.
+                //Doing such a thing would require keeping the body references list in sync with any changes to the body's kinematic state. Not impossible- such transition management
+                //is already required for some systems. Still not wonderful.
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void GatherVelocities(ref Buffer<BodyVelocity> velocities, ref Vector<int> references, int count, out BodyVelocities velocitiesA)
+        {
+            ref var targetLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);
+
+            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
+            ref var baseIndexA = ref Unsafe.As<Vector<int>, int>(ref references);
+
+            for (int i = 0; i < count; ++i)
+            {
+                ref var indexA = ref Unsafe.Add(ref baseIndexA, i);
+                {
+                    ref var sourceVelocities = ref velocities[indexA];
+                    ref var linearX = ref Unsafe.Add(ref targetLinearAX, i);
+                    linearX = sourceVelocities.Linear.X;
+                    Unsafe.Add(ref linearX, Vector<float>.Count) = sourceVelocities.Linear.Y;
+                    Unsafe.Add(ref linearX, 2 * Vector<float>.Count) = sourceVelocities.Linear.Z;
+                    Unsafe.Add(ref linearX, 3 * Vector<float>.Count) = sourceVelocities.Angular.X;
+                    Unsafe.Add(ref linearX, 4 * Vector<float>.Count) = sourceVelocities.Angular.Y;
+                    Unsafe.Add(ref linearX, 5 * Vector<float>.Count) = sourceVelocities.Angular.Z;
+                }
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static unsafe void ScatterVelocities(ref Buffer<BodyVelocity> velocities, ref Vector<int> references, int count, ref BodyVelocities velocitiesA)
+        {
+            ref var baseTargetIndexA = ref Unsafe.As<Vector<int>, int>(ref references);
+            ref var baseSourceLinearAX = ref Unsafe.As<Vector<float>, float>(ref velocitiesA.LinearVelocity.X);            
+
+            for (int i = 0; i < count; ++i)
+            {
+                //We'll use the memory layout of the BodyVelocities struct. 
+                //Grab the pointer to the row within the velocities bundle, and use a stride of Vector<float>.Count to reach the next velocity entry.
+                ref var sourceLinearAX = ref Unsafe.Add(ref baseSourceLinearAX, i);
+                var indexA = Unsafe.Add(ref baseTargetIndexA, i);
+                ref var targetA = ref velocities[indexA];
+                //TODO: There are some codegen variants we could try here. Field/unsafe access likely not any better, but given the frequency of this path's use, it might be worth checking.
+                targetA.Linear = new Vector3(
+                    sourceLinearAX,
+                    Unsafe.Add(ref sourceLinearAX, Vector<float>.Count),
+                    Unsafe.Add(ref sourceLinearAX, 2 * Vector<float>.Count));
+                targetA.Angular = new Vector3(
+                    Unsafe.Add(ref sourceLinearAX, 3 * Vector<float>.Count),
+                    Unsafe.Add(ref sourceLinearAX, 4 * Vector<float>.Count),
+                    Unsafe.Add(ref sourceLinearAX, 5 * Vector<float>.Count));
 
                 //Note that no attempt is made to avoid writing to kinematic or null velocities.
                 //Loading the necessary data for the condition and branching to avoid the write takes longer than just writing it.

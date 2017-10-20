@@ -29,7 +29,7 @@ namespace SolverPrototypeTests
             Simulation.Deterministic = true;
 
 
-            var staticShape = new Sphere(10);
+            var staticShape = new Sphere(19);
             var staticShapeIndex = Simulation.Shapes.Add(ref staticShape);
             var staticDescription = new StaticDescription
             {

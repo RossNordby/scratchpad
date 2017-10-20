@@ -77,7 +77,7 @@ namespace SolverPrototype.CollisionDetection
            ref TDescription description, TBodyHandles bodyHandles) where TDescription : IConstraintDescription<TDescription>
         {
             //Note that this branch is (was?) JIT constant.
-            if (typeof(TBodyHandles) != typeof(TwoBodyHandles) && typeof(TBodyHandles) == typeof(int))
+            if (typeof(TBodyHandles) != typeof(TwoBodyHandles) && typeof(TBodyHandles) != typeof(int))
             {
                 throw new InvalidOperationException("Invalid body handles type; the narrow phase should only use TwoBodyHandles or int.");
             }
@@ -183,6 +183,19 @@ namespace SolverPrototype.CollisionDetection
                 //One body
                 //Convex
                 case 0:
+                    {
+                        ContactManifold1OneBodyConstraint description;
+                        description.Contact0.OffsetA = manifold->Offset0;
+                        description.Contact0.PenetrationDepth = manifold->Depth0;
+                        description.FrictionCoefficient = material.FrictionCoefficient;
+                        description.MaximumRecoveryVelocity = material.MaximumRecoveryVelocity;
+                        description.SpringSettings = material.SpringSettings;
+                        description.Normal = manifold->ConvexNormal;
+
+                        //TODO: Check init hack.
+                        UpdateConstraint<TBodyHandles, ContactManifold1OneBodyConstraint, ContactImpulses1, TCollisionCache, ConstraintCache1>(
+                            workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
+                    }
                     break;
                 case 1:
                     break;

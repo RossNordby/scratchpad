@@ -36,6 +36,8 @@ namespace SolverPrototype
         /// Remaps a body index to its handle.
         /// </summary>
         public Buffer<int> IndexToHandle;
+
+
         /// <summary>
         /// The set of collidables owned by each body. Speculative margins, continuity settings, and shape indices can be changed directly.
         /// Shape indices cannot transition between pointing at a shape and pointing at nothing or vice versa without notifying the broad phase of the collidable addition or removal.
@@ -294,10 +296,10 @@ namespace SolverPrototype
             pool.SpecializeFor<BodyInertia>().Return(ref Inertias);
             pool.SpecializeFor<int>().Return(ref HandleToIndex);
             pool.SpecializeFor<int>().Return(ref IndexToHandle);
-            pool.SpecializeFor<Collidable>().Return(ref Collidables);          
+            pool.SpecializeFor<Collidable>().Return(ref Collidables);
             HandlePool.Dispose(pool.SpecializeFor<int>());
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void GatherInertiaForBody(ref float targetInertiaBase, int targetLaneIndex, int index)
         {
@@ -407,6 +409,21 @@ namespace SolverPrototype
                 GatherInertiaForBody(ref targetInertiaBaseA, i, indexA);
                 var indexB = Unsafe.Add(ref indexA, Vector<float>.Count);
                 GatherInertiaForBody(ref targetInertiaBaseB, i, indexB);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void GatherInertia(ref Vector<int> references, int count,
+            out BodyInertias inertiaA)
+        {
+            ref var targetInertiaBaseA = ref Unsafe.As<Vector<float>, float>(ref inertiaA.InverseInertiaTensor.M11);
+
+            //Grab the base references for the body indices. Note that we make use of the references memory layout again.
+            ref var baseIndexA = ref Unsafe.As<Vector<int>, int>(ref references);
+
+            for (int i = 0; i < count; ++i)
+            {
+                GatherInertiaForBody(ref targetInertiaBaseA, i, Unsafe.Add(ref baseIndexA, i));
             }
         }
 

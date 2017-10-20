@@ -137,9 +137,10 @@ namespace SolverPrototype.CollisionDetection
             }
             else
             {
-                var overlapHandler = new SelfOverlapHandler { NarrowPhase = narrowPhase, Leaves = broadPhase.activeLeaves, WorkerIndex = 0 };
-                broadPhase.ActiveTree.GetSelfOverlaps(ref overlapHandler);
-                broadPhase.ActiveTree.GetOverlaps(broadPhase.StaticTree, ref overlapHandler);
+                var selfTestHandler = new SelfOverlapHandler(broadPhase.activeLeaves, narrowPhase, 0);
+                broadPhase.ActiveTree.GetSelfOverlaps(ref selfTestHandler);
+                var intertreeHandler =  new IntertreeOverlapHandler(broadPhase.activeLeaves, broadPhase.staticLeaves, narrowPhase, 0);
+                broadPhase.ActiveTree.GetOverlaps(broadPhase.StaticTree, ref intertreeHandler);
                 ref var worker = ref narrowPhase.overlapWorkers[0];
                 worker.Batcher.Flush(ref worker.ConstraintGenerators, ref worker.Filters);
 
