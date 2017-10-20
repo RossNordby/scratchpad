@@ -40,27 +40,82 @@ namespace SolverPrototype.CollisionDetection
             /// </summary>
             /// <param name="overlapHandlers">Callbacks used to handle individual overlaps detected by the self test.</param>
             /// <param name="threadCount">Number of threads to prepare jobs for.</param>
-            public void PrepareJobs(Tree treeA, Tree treeB, TOverlapHandler[] overlapHandlers, int threadCount)
+            public unsafe void PrepareJobs(Tree treeA, Tree treeB, TOverlapHandler[] overlapHandlers, int threadCount)
             {
-                Debug.Assert(OverlapHandlers.Length >= threadCount);
+                if (treeA.leafCount == 0 || treeB.leafCount == 0)
+                {
+                    //If either tree has zero leaves, no intertree test is required.
+                    //Since this context has a count property for scheduling purposes that reads the jobs list, clear it to ensure no spurious jobs are executed. 
+                    jobs = new QuickList<Job, Buffer<Job>>();
+                    return;
+                }
+                Debug.Assert(overlapHandlers.Length >= threadCount);
                 const float jobMultiplier = 1.5f;
                 var targetJobCount = Math.Max(1, jobMultiplier * threadCount);
-                leafThreshold = (int)(tree.leafCount / targetJobCount);
+                //TODO: Not a lot of thought was put into this leaf threshold for intertree. Probably better options.
+                leafThreshold = (int)((treeA.leafCount + treeB.leafCount) / targetJobCount);
                 QuickList<Job, Buffer<Job>>.Create(Pool.SpecializeFor<Job>(), (int)(targetJobCount * 2), out jobs);
                 NextNodePair = -1;
                 this.OverlapHandlers = overlapHandlers;
                 this.TreeA = treeA;
                 this.TreeB = treeB;
                 //Collect jobs.
-                CollectJobsInNode(0, tree.leafCount, ref OverlapHandlers[0]);
+                if (treeA.leafCount >= 2 && treeB.leafCount >= 2)
+                {
+                    //Both trees have complete nodes; we can use a general case.
+                    GetJobsBetweenDifferentNodes(treeA.nodes, treeB.nodes, ref OverlapHandlers[0]);
+                }
+                else if (treeA.leafCount == 1 && treeB.leafCount >= 2)
+                {
+                    //Tree A is degenerate; needs a special case.
+                    var a = treeA.nodes;
+                    var b = treeB.nodes;
+                    var aaIntersects = Intersects(ref a->A, ref b->A);
+                    var abIntersects = Intersects(ref a->A, ref b->B);
+                    if (aaIntersects)
+                    {
+                        DispatchTestForNodes(ref a->A, ref b->A, ref OverlapHandlers[0]);
+                    }
+                    if (abIntersects)
+                    {
+                        DispatchTestForNodes(ref a->A, ref b->B, ref OverlapHandlers[0]);
+                    }
+                }
+                else if (treeA.leafCount >= 2 && treeB.leafCount == 1)
+                {
+                    //Tree B is degenerate; needs a special case.
+                    var a = treeA.nodes;
+                    var b = treeB.nodes;
+                    var aaIntersects = Intersects(ref a->A, ref b->A);
+                    var baIntersects = Intersects(ref a->B, ref b->A);
+                    if (aaIntersects)
+                    {
+                        DispatchTestForNodes(ref a->A, ref b->A, ref OverlapHandlers[0]);
+                    }
+                    if (baIntersects)
+                    {
+                        DispatchTestForNodes(ref a->B, ref b->A, ref OverlapHandlers[0]);
+                    }
+                }
+                else
+                {
+                    Debug.Assert(treeA.leafCount == 1 && treeB.leafCount == 1);
+                    if (Intersects(ref treeA.nodes->A, ref treeB.nodes->A))
+                    {
+                        DispatchTestForNodes(ref treeA.nodes->A, ref treeB.nodes->A, ref OverlapHandlers[0]);
+                    }
+                }
+
             }
 
             /// <summary>
             /// Cleans up after a multithreaded self test.
             /// </summary>
-            public void CompleteSelfTest()
+            public void CompleteTest()
             {
-                jobs.Dispose(Pool.SpecializeFor<Job>());
+                //Note that we don't allocate a job list if there aren't any jobs.
+                if (jobs.Span.Allocated)
+                    jobs.Dispose(Pool.SpecializeFor<Job>());
             }
 
             public unsafe void ExecuteJob(int jobIndex, int workerIndex)
@@ -79,7 +134,7 @@ namespace SolverPrototype.CollisionDetection
                         var leafIndex = Encode(overlap.B);
                         var leaf = TreeB.leaves + leafIndex;
                         ref var childOwningLeaf = ref (&TreeB.nodes[leaf->NodeIndex].A)[leaf->ChildIndex];
-                        TreeB.TestLeafAgainstNode(leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, overlap.A, TreeA, ref OverlapHandlers[workerIndex]);
+                        TreeA.TestNodeAgainstLeaf(overlap.A, leafIndex, ref childOwningLeaf.Min, ref childOwningLeaf.Max, ref OverlapHandlers[workerIndex]);
                     }
                 }
                 else
@@ -220,5 +275,6 @@ namespace SolverPrototype.CollisionDetection
 
             }
         }
+
     }
 }

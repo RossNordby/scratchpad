@@ -81,6 +81,7 @@ namespace SolverPrototype.CollisionDetection
         public Simulation Simulation;
         public BufferPool Pool;
         public Bodies Bodies;
+        public Statics Statics;
         public Solver Solver;
         public Shapes Shapes;
         public CollisionTaskRegistry CollisionTaskRegistry;
@@ -89,7 +90,7 @@ namespace SolverPrototype.CollisionDetection
         //TODO: It is possible that some types will benefit from per-overlap data, like separating axes. For those, we should have type-dedicated overlap dictionaries.
         //The majority of type pairs, however, only require a constraint handle.
         public PairCache PairCache;
-        
+
         protected NarrowPhase()
         {
             flushWorkerLoop = FlushWorkerLoop;
@@ -197,6 +198,7 @@ namespace SolverPrototype.CollisionDetection
             Pool = simulation.BufferPool;
             Shapes = simulation.Shapes;
             Bodies = simulation.Bodies;
+            Statics = simulation.Statics;
             Solver = simulation.Solver;
             Callbacks = callbacks;
             Callbacks.Initialize(simulation);
@@ -228,101 +230,98 @@ namespace SolverPrototype.CollisionDetection
 
         public unsafe void HandleOverlap(int workerIndex, CollidableReference a, CollidableReference b)
         {
-            if (a.Handle > b.Handle)
+            //In order to guarantee contact manifold and constraint consistency across multiple frames, we must guarantee that the order of collidables submitted 
+            //is the same every time. Since the provided handles do not move for the lifespan of the collidable in the simulation, they can be used as an ordering.
+            //Between two bodies, simply put the lower handle in slot A always.
+            //If one of the two objects is static, stick it in the second slot.       
+            var aMobility = a.Mobility;
+            var bMobility = b.Mobility;
+            if ((aMobility != CollidableMobility.Static && bMobility != CollidableMobility.Static && a.Handle > b.Handle) ||
+                aMobility == CollidableMobility.Static)
             {
-                //In order to guarantee contact manifold and constraint consistency across multiple frames, we must guarantee that the order of collidables submitted 
-                //is the same every time. Since the provided handles do not move for the lifespan of the collidable in the simulation, they can be used as an ordering.
-                //Simply put the lower handle in slot A always.
                 var temp = b;
                 b = a;
                 a = temp;
             }
+            Debug.Assert(aMobility != CollidableMobility.Static || bMobility != CollidableMobility.Static, "Broad phase should not be able to generate static-static pairs.");
             if (!Callbacks.AllowContactGeneration(workerIndex, a, b))
                 return;
-            var staticness = (a.Packed >> 31) | ((b.Packed & 0x8000_0000) >> 30);
             ref var overlapWorker = ref overlapWorkers[workerIndex];
             var pair = new CollidablePair(a, b);
-            switch (staticness)
+            if (aMobility != CollidableMobility.Static && bMobility != CollidableMobility.Static)
             {
-                case 0:
-                    {
-                        //Both references are bodies.
-                        //This is a body. In order to dispatch it properly, we need to know some metadata.
-                        //TODO: Once inactive bodies exist, this will need to be updated.
-                        var bodyIndexA = Bodies.HandleToIndex[a.Handle];
-                        var bodyIndexB = Bodies.HandleToIndex[b.Handle];
-                        ref var aCollidable = ref Bodies.Collidables[bodyIndexA];
-                        ref var bCollidable = ref Bodies.Collidables[bodyIndexB];
-                        var poseA = Bodies.Poses[bodyIndexA];
-                        var poseB = Bodies.Poses[bodyIndexB];
-                        var shapeTypeA = aCollidable.Shape.Type;
-                        var shapeTypeB = bCollidable.Shape.Type;
-                        Shapes[shapeTypeA].GetShapeData(aCollidable.Shape.Index, out var shapePointerA, out var shapeSizeA);
-                        Shapes[shapeTypeB].GetShapeData(aCollidable.Shape.Index, out var shapePointerB, out var shapeSizeB);
-                        //Note that we never create 'unilateral' CCD pairs. That is, if either collidable in a pair enables a CCD feature, we just act like both are using it.
-                        //That keeps things a little simpler. Unlike v1, we don't have to worry about the implications of 'motion clamping' here- no need for deeper configuration.
-                        var useSubstepping = aCollidable.Continuity.UseSubstepping || bCollidable.Continuity.UseSubstepping;
-                        var useInnerSphere = aCollidable.Continuity.UseInnerSphere || bCollidable.Continuity.UseInnerSphere;
-                        //Note that the pair's margin is the larger of the two involved collidables. This is based on two observations:
-                        //1) Values smaller than either contributor should never be used, because it may interfere with tuning. Difficult to choose substepping properties without a 
-                        //known minimum value for speculative margins.
-                        //2) The larger the margin, the higher the risk of ghost collisions. 
-                        //Taken together, max is implied.
-                        var speculativeMargin = Math.Max(aCollidable.SpeculativeMargin, bCollidable.SpeculativeMargin);
-                        //Create a continuation for the pair given the CCD state.
-                        if (useSubstepping && useInnerSphere)
-                        {
-                        }
-                        else if (useSubstepping)
-                        {
-
-                        }
-                        else if (useInnerSphere)
-                        {
-
-                        }
-                        else
-                        {
-                            //This pair uses no CCD beyond its speculative margin.
-                            var continuation = overlapWorker.ConstraintGenerators.AddDiscrete(ref pair, speculativeMargin);
-                            overlapWorker.Batcher.Add(shapeTypeA, shapeTypeB, shapeSizeA, shapeSizeB, shapePointerA, shapePointerB, ref poseA, ref poseB, continuation,
-                                ref overlapWorker.ConstraintGenerators, ref overlapWorker.Filters);
-                        }
-
-                        //Pull the velocity information for all involved bodies. We will request a number of steps that will cover the motion path.
-                        //number of substeps = min(maximum substep count, 1 + floor(estimated displacement / step length)), where
-                        //estimated displacement = dt * (length(linear velocity A - linear velocity B) +
-                        //                               maximum radius A * (length(angular velocity A) + maximum radius B * length(angular velocity B)) 
-                        //Once we have a number of 
-                        //We use the minimum step length of each contributing collidable. Treat non-substepping collidables as having a step length of infinity.
-                        var stepLengthA = aCollidable.Continuity.UseSubstepping ? aCollidable.Continuity.MaximumStepLength : float.MaxValue;
-                        var stepLengthB = bCollidable.Continuity.UseSubstepping ? bCollidable.Continuity.MaximumStepLength : float.MaxValue;
-                        float stepLength = stepLengthA < stepLengthB ? stepLengthA : stepLengthB;
-
-                    }
-                    break;
-                case 1:
-                    {
-                        //Collidable a is a body, b is a static.
-                        //TODO: Once non-body collidables exist, this will need to be updated.
-                    }
-                    break;
-                case 2:
-                    {
-                        //Collidable a is a static, b is a body.
-                        //TODO: Once non-body collidables exist, this will need to be updated.
-                    }
-                    break;
-                case 3:
-                    {
-                        //Both collidables are statics. This is a bit of a weird situation- under normal conditions, static bodies will belong to the 
-                        //'inactive' broad phase tree, and the inactive tree is not tested against itself. The user must have configured this static to be in the active tree to act
-                        //as a detector or something along those lines.
-                        //TODO: Once non-body collidables exist, this will need to be updated.
-                    }
-                    break;
+                //Both references are bodies.
+                var bodyIndexA = Bodies.HandleToIndex[a.Handle];
+                var bodyIndexB = Bodies.HandleToIndex[b.Handle];
+                AddBatchEntries(ref overlapWorker, ref pair,
+                    ref Bodies.Collidables[bodyIndexA], ref Bodies.Collidables[bodyIndexB],
+                    ref Bodies.Poses[bodyIndexA], ref Bodies.Poses[bodyIndexB],
+                    ref Bodies.Velocities[bodyIndexA], ref Bodies.Velocities[bodyIndexB]);
+            }
+            else
+            {
+                //Since we disallow 2-static pairs and we guarantee the second slot holds the static if it exists, we know that A is a body and B is a static.
+                Debug.Assert(aMobility != CollidableMobility.Static && bMobility == CollidableMobility.Static);
+                
+                var bodyIndex = Bodies.HandleToIndex[a.Handle];
+                var staticIndex = Statics.HandleToIndex[b.Handle];
+                //TODO: Ideally, the compiler would see this and optimize away the relevant math in AddBatchEntries. That's a longshot, though. May want to abuse some generics to force it.
+                var zeroVelocity = default(BodyVelocity);
+                AddBatchEntries(ref overlapWorker, ref pair, 
+                    ref Bodies.Collidables[bodyIndex], ref Statics.Collidables[staticIndex], 
+                    ref Bodies.Poses[bodyIndex], ref Statics.Poses[staticIndex], 
+                    ref Bodies.Velocities[bodyIndex], ref zeroVelocity);
             }
 
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private unsafe void AddBatchEntries(ref OverlapWorker overlapWorker, 
+            ref CollidablePair pair, ref Collidable aCollidable, ref Collidable bCollidable, 
+            ref RigidPose poseA, ref RigidPose poseB, ref BodyVelocity velocityA, ref BodyVelocity velocityB)
+        {
+            var shapeTypeA = aCollidable.Shape.Type;
+            var shapeTypeB = bCollidable.Shape.Type;
+            Shapes[shapeTypeA].GetShapeData(aCollidable.Shape.Index, out var shapePointerA, out var shapeSizeA);
+            Shapes[shapeTypeB].GetShapeData(bCollidable.Shape.Index, out var shapePointerB, out var shapeSizeB);
+            //Note that we never create 'unilateral' CCD pairs. That is, if either collidable in a pair enables a CCD feature, we just act like both are using it.
+            //That keeps things a little simpler. Unlike v1, we don't have to worry about the implications of 'motion clamping' here- no need for deeper configuration.
+            var useSubstepping = aCollidable.Continuity.UseSubstepping || bCollidable.Continuity.UseSubstepping;
+            var useInnerSphere = aCollidable.Continuity.UseInnerSphere || bCollidable.Continuity.UseInnerSphere;
+            //Note that the pair's margin is the larger of the two involved collidables. This is based on two observations:
+            //1) Values smaller than either contributor should never be used, because it may interfere with tuning. Difficult to choose substepping properties without a 
+            //known minimum value for speculative margins.
+            //2) The larger the margin, the higher the risk of ghost collisions. 
+            //Taken together, max is implied.
+            var speculativeMargin = Math.Max(aCollidable.SpeculativeMargin, bCollidable.SpeculativeMargin);
+            //Create a continuation for the pair given the CCD state.
+            if (useSubstepping && useInnerSphere)
+            {
+            }
+            else if (useSubstepping)
+            {
+
+            }
+            else if (useInnerSphere)
+            {
+
+            }
+            else
+            {
+                //This pair uses no CCD beyond its speculative margin.
+                var continuation = overlapWorker.ConstraintGenerators.AddDiscrete(ref pair, speculativeMargin);
+                overlapWorker.Batcher.Add(shapeTypeA, shapeTypeB, shapeSizeA, shapeSizeB, shapePointerA, shapePointerB, ref poseA, ref poseB, continuation,
+                    ref overlapWorker.ConstraintGenerators, ref overlapWorker.Filters);
+            }
+            ////Pull the velocity information for all involved bodies. We will request a number of steps that will cover the motion path.
+            ////number of substeps = min(maximum substep count, 1 + floor(estimated displacement / step length)), where
+            ////estimated displacement = dt * (length(linear velocity A - linear velocity B) +
+            ////                               maximum radius A * (length(angular velocity A) + maximum radius B * length(angular velocity B)) 
+            ////Once we have a number of 
+            ////We use the minimum step length of each contributing collidable. Treat non-substepping collidables as having a step length of infinity.
+            //var stepLengthA = aCollidable.Continuity.UseSubstepping ? aCollidable.Continuity.MaximumStepLength : float.MaxValue;
+            //var stepLengthB = bCollidable.Continuity.UseSubstepping ? bCollidable.Continuity.MaximumStepLength : float.MaxValue;
+            //float stepLength = stepLengthA < stepLengthB ? stepLengthA : stepLengthB;
         }
     }
 }

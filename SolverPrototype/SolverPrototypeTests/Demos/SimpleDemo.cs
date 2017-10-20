@@ -27,7 +27,20 @@ namespace SolverPrototypeTests
                 width, height, length, Simulation, out var bodyHandles, out var constraintHandles);
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
             Simulation.Deterministic = true;
-            //SimulationScrambling.AddRemoveChurn<BallSocket>(Simulation, 100, bodyHandles, constraintHandles);
+
+
+            var staticShape = new Sphere(10);
+            var staticShapeIndex = Simulation.Shapes.Add(ref staticShape);
+            var staticDescription = new StaticDescription
+            {
+                Collidable = new CollidableDescription
+                {
+                    Continuity = new ContinuousDetectionSettings { Mode = ContinuousDetectionMode.Discrete },
+                    Shape = staticShapeIndex,
+                    SpeculativeMargin = 0.1f
+                }, Pose = new RigidPose { Position = new Vector3(0, -20, 0), Orientation = BEPUutilities2.Quaternion.Identity }
+            };
+            Simulation.Add(ref staticDescription);
 
             ref var velocity = ref Simulation.Bodies.Velocities[Simulation.Bodies.HandleToIndex[bodyHandles[width]]];
             velocity.Linear = new Vector3(0.1f, 0, 0.1f);

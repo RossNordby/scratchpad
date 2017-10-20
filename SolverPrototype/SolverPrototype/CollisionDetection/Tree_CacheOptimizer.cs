@@ -211,6 +211,7 @@ namespace SolverPrototype.CollisionDetection
             return success;
         }
 
+
         public unsafe bool TryLockSwapTargetThreadSafe(ref int swapTargetIndex, int swapperIndex, int swapperParentIndex)
         {
             Debug.Assert(nodes[swapperIndex].RefineFlag == 1, "The swapper should be locked.");

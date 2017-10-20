@@ -40,7 +40,7 @@ namespace SolverPrototype.CollisionDetection
         //With such a scheme, you would still want to somehow collect an initial set of jobs to give workers something to munch on, but you don't need lots of jobs per worker anymore.
         //So, if you had a 128 core machine, you could get away with still having ~256 jobs- which you can probably collect in less than 20us even on lower frequency processors 
         //(like the ones you'd find in a 128 core machine).
-        
+
         public class MultithreadedSelfTest<TOverlapHandler> where TOverlapHandler : struct, IOverlapHandler
         {
             struct Job
@@ -74,9 +74,12 @@ namespace SolverPrototype.CollisionDetection
                 //If there are not multiple children, there's no need to recurse.
                 //This provides a guarantee that there are at least 2 children in each internal node considered by GetOverlapsInNode.
                 if (tree.leafCount < 2)
+                {
+                    //We clear it out to avoid keeping any old job counts. The count property is used for scheduling, so incorrect values could break the job scheduler.
+                    jobs = new QuickList<Job, Buffer<Job>>();
                     return;
-
-                Debug.Assert(OverlapHandlers.Length >= threadCount);
+                }
+                Debug.Assert(overlapHandlers.Length >= threadCount);
                 const float jobMultiplier = 1.5f;
                 var targetJobCount = Math.Max(1, jobMultiplier * threadCount);
                 leafThreshold = (int)(tree.leafCount / targetJobCount);
@@ -93,7 +96,9 @@ namespace SolverPrototype.CollisionDetection
             /// </summary>
             public void CompleteSelfTest()
             {
-                jobs.Dispose(Pool.SpecializeFor<Job>());
+                //Note that a tree with 0 or 1 entries won't have any jobs.
+                if (jobs.Span.Allocated)
+                    jobs.Dispose(Pool.SpecializeFor<Job>());
             }
 
             public unsafe void ExecuteJob(int jobIndex, int workerIndex)
@@ -143,7 +148,7 @@ namespace SolverPrototype.CollisionDetection
                 //To minimize the number of worker overlap lists, perform direct load balancing by manually grabbing the next indices.
                 while ((nextNodePairIndex = Interlocked.Increment(ref NextNodePair)) < jobs.Count)
                 {
-                    ExecuteJob(nextNodePairIndex, workerIndex);                    
+                    ExecuteJob(nextNodePairIndex, workerIndex);
                 }
             }
 

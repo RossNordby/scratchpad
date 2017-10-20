@@ -265,6 +265,7 @@ namespace SolverPrototype.CollisionDetection
             //That said, such a pair cannot generate constraints no matter what- constraints must involve at least one body, always.
             var aMobility = pair.A.Mobility;
             var bMobility = pair.B.Mobility;
+            Debug.Assert(aMobility != CollidableMobility.Static, "The broad phase should not generate static-static pairs ever, and any static collidable should be in slot B.");
             if (Callbacks.ConfigureContactManifold(workerIndex, pair, manifold, out var pairMaterial) &&
                 //Note that, even if the callback says 'yeah sure create a constraint for those', it never makes sense to generate constraints between two nondynamics.
                 //It would just result in a bunch of NaNs when computing the effective mass.
@@ -272,24 +273,17 @@ namespace SolverPrototype.CollisionDetection
             {
                 if (manifold->ContactCount > 0)
                 {
-                    var aIsBody = aMobility != CollidableMobility.Static;
-                    var bIsBody = bMobility != CollidableMobility.Static;
-                    if (aIsBody && bIsBody)
+                    if (bMobility != CollidableMobility.Static)
                     {
                         //Two bodies.
+                        Debug.Assert(pair.A.Mobility != CollidableMobility.Static && pair.B.Mobility != CollidableMobility.Static);
                         var bodyHandles = new TwoBodyHandles { A = pair.A.Handle, B = pair.B.Handle };
                         UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, bodyHandles);
                     }
                     else
                     {
                         //One of the two collidables is static.
-                        //Ensure that the body is always in the first slot for the sake of constraint generation.
-                        if (bIsBody)
-                        {
-                            var tempA = pair.A;
-                            pair.A = pair.B;
-                            pair.B = tempA;
-                        }
+                        Debug.Assert(pair.A.Mobility != CollidableMobility.Static && pair.B.Mobility == CollidableMobility.Static);
                         UpdateConstraintForManifold(workerIndex, ref pair, manifold, ref collisionCache, ref pairMaterial, pair.A.Handle);
                     }
                 }

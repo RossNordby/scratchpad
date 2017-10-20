@@ -1,5 +1,6 @@
 ﻿using BEPUutilities2;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
@@ -90,7 +91,6 @@ namespace SolverPrototype.CollisionDetection
         unsafe void GetOverlapsBetweenDifferentNodes<TOverlapHandler>(Node* a, Node* b, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
         {
             //There are no shared children, so test them all.
-
             ref var aa = ref a->A;
             ref var ab = ref a->B;
             ref var ba = ref b->A;
@@ -116,7 +116,6 @@ namespace SolverPrototype.CollisionDetection
             {
                 DispatchTestForNodes(ref ab, ref bb, ref results);
             }
-
         }
 
         unsafe void GetOverlapsInNode<TOverlapHandler>(Node* node, ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
@@ -139,7 +138,7 @@ namespace SolverPrototype.CollisionDetection
             }
 
         }
- 
+
         public unsafe void GetSelfOverlaps<TOverlapHandler>(ref TOverlapHandler results) where TOverlapHandler : IOverlapHandler
         {
             //If there are less than two leaves, there can't be any overlap.
@@ -148,8 +147,6 @@ namespace SolverPrototype.CollisionDetection
                 return;
 
             GetOverlapsInNode(nodes, ref results);
-
-
         }
 
     }

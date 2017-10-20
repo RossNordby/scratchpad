@@ -114,14 +114,26 @@ namespace SolverPrototype.CollisionDetection
                     {
                         selfHandlers[i] = new SelfOverlapHandler(broadPhase.activeLeaves, narrowPhase, i);
                     }
+                    for (int i = 0; i < intertreeHandlers.Length; ++i)
+                    {
+                        intertreeHandlers[i] = new IntertreeOverlapHandler(broadPhase.activeLeaves, broadPhase.staticLeaves, narrowPhase, i);
+                    }
                 }
                 Debug.Assert(intertreeHandlers.Length >= threadDispatcher.ThreadCount);
                 selfTestContext.PrepareJobs(broadPhase.ActiveTree, selfHandlers, threadDispatcher.ThreadCount);
                 intertreeTestContext.PrepareJobs(broadPhase.ActiveTree, broadPhase.StaticTree, intertreeHandlers, threadDispatcher.ThreadCount);
                 nextJobIndex = -1;
-                threadDispatcher.DispatchWorkers(workerAction);
+                //threadDispatcher.DispatchWorkers(workerAction);
+                for (int i = 0; i < selfTestContext.JobCount; ++i)
+                {
+                    selfTestContext.ExecuteJob(i, 0);
+                }
+                for (int i = 0; i < intertreeTestContext.JobCount; ++i)
+                {
+                    intertreeTestContext.ExecuteJob(i, 0);
+                }
                 selfTestContext.CompleteSelfTest();
-                intertreeTestContext.CompleteSelfTest();
+                intertreeTestContext.CompleteTest();
             }
             else
             {

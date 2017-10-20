@@ -199,10 +199,12 @@ FakesAssemblies/
 GeneratedArtifacts/
 _Pvt_Extensions/
 ModelManifest.xml
+
+# Some more VS stuff.
+*.VC.db
+*.VC.opendb
+*.ide-shm
+*.ide-wal
+*.lock
+
 /SolverPrototype/SolverPrototypeTests/log.txt
-/SolverPrototype/SolverPrototypeTests/log.txt
-/SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.opendb
-/SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
-/SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.opendb
-/SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
-/SolverPrototype/.vs/SolverPrototype/v15/Browse.VC.db
