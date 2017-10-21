@@ -3,10 +3,10 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
 
-    public struct ContactPenetrationLimitProjection
+    public struct PenetrationLimitProjection
     {
         //Note that these are just the raw jacobians, no precomputation with the JT*EffectiveMass.
         public Vector3Wide AngularA;
@@ -18,15 +18,15 @@ namespace SolverPrototype.Constraints
     /// <summary>
     /// Data required to project world space velocities into a constraint impulse.
     /// </summary>
-    public struct ContactPenetrationLimit4Projection
+    public struct PenetrationLimit4Projection
     {
         //Note that the data is interleaved to match the access order. We solve each constraint one at a time internally.
         //Also, the normal and inertias are shared across all constraints.
-        public ContactPenetrationLimitProjection Penetration0;
+        public PenetrationLimitProjection Penetration0;
         public Vector<float> SoftnessImpulseScale;
-        public ContactPenetrationLimitProjection Penetration1;
-        public ContactPenetrationLimitProjection Penetration2;
-        public ContactPenetrationLimitProjection Penetration3;
+        public PenetrationLimitProjection Penetration1;
+        public PenetrationLimitProjection Penetration2;
+        public PenetrationLimitProjection Penetration3;
     }
 
 
@@ -34,11 +34,11 @@ namespace SolverPrototype.Constraints
     /// Four convex-sourced contact penetration limits solved together. Internally implemented using SI solver. 
     /// Batching saves on redundant data.
     /// </summary>
-    public static class ContactPenetrationLimit4
+    public static class PenetrationLimit4
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref ContactManifold4PrestepData prestep, float dt, float inverseDt,
-            out ContactPenetrationLimit4Projection projection)
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal, ref Contact4PrestepData prestep, float dt, float inverseDt,
+            out PenetrationLimit4Projection projection)
         {
             //We directly take the prestep data here since the jacobians and error don't undergo any processing.
 
@@ -116,7 +116,7 @@ namespace SolverPrototype.Constraints
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ApplyImpulse(ref ContactPenetrationLimitProjection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
+        public static void ApplyImpulse(ref PenetrationLimitProjection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
             ref Vector<float> correctiveImpulse,
             ref BodyVelocities wsvA, ref BodyVelocities wsvB)
         {
@@ -138,7 +138,7 @@ namespace SolverPrototype.Constraints
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WarmStart(
-            ref ContactPenetrationLimit4Projection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
+            ref PenetrationLimit4Projection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
             ref Vector<float> accumulatedImpulse0,
             ref Vector<float> accumulatedImpulse1,
             ref Vector<float> accumulatedImpulse2,
@@ -152,7 +152,7 @@ namespace SolverPrototype.Constraints
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA, ref BodyVelocities wsvB,
-            ref ContactPenetrationLimitProjection projection,
+            ref PenetrationLimitProjection projection,
             ref Vector3Wide normal, ref Vector<float> softnessImpulseScale,
             ref Vector<float> accumulatedImpulse, out Vector<float> correctiveCSI)
         {
@@ -172,7 +172,7 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Solve(ref ContactPenetrationLimit4Projection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
+        public static void Solve(ref PenetrationLimit4Projection projection, ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref Vector3Wide normal,
             ref Vector<float> accumulatedImpulse0,
             ref Vector<float> accumulatedImpulse1,
             ref Vector<float> accumulatedImpulse2,

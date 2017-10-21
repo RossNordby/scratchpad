@@ -1,37 +1,34 @@
-﻿using System;
+﻿using SolverPrototype.CollisionDetection;
+using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Quaternion = BEPUutilities2.Quaternion;
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
 
-    public struct ManifoldContactDataAOS
+    public struct ManifoldContactData
     {
         //TODO: Arguably storing this to match the prestep layout would be a better idea for contiguity. Consider it later.
         public Vector3 OffsetA;
         public float PenetrationDepth;
     }
-    public struct SpringSettingsAOS
-    {
-        public float NaturalFrequency;
-        public float DampingRatio;
-    }
 
-    public struct ContactManifold4Constraint : IConstraintDescription<ContactManifold4Constraint>
+
+    public struct Contact4 : IConstraintDescription<Contact4>
     {
 
         //TODO: In a 'real' use case, we will likely split the description for contact manifolds into two parts: mutable contact data and initialize-once spring/friction data.
         //SpringSettings and FrictionCoefficient don't usually change over the lifetime of the constraint, so there's no reason to set them every time.
         //For now, though, we'll use this combined representation.
-        public ManifoldContactDataAOS Contact0;
-        public ManifoldContactDataAOS Contact1;
-        public ManifoldContactDataAOS Contact2;
-        public ManifoldContactDataAOS Contact3;
+        public ManifoldContactData Contact0;
+        public ManifoldContactData Contact1;
+        public ManifoldContactData Contact2;
+        public ManifoldContactData Contact3;
         public Vector3 OffsetB;
         public float FrictionCoefficient;
         public Vector3 Normal;
-        public SpringSettingsAOS SpringSettings;
+        public SpringSettings SpringSettings;
         public float MaximumRecoveryVelocity;
 
         public void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex)
@@ -47,8 +44,8 @@ namespace SolverPrototype.Constraints
             //At the end of the day, the important thing is that this mapping is kept localized so that not every system needs to be aware of it.
 
             //Note that we use an unsafe cast.
-            Debug.Assert(batch is ContactManifold4TypeBatch, "The type batch passed to the description must match the description's expected type.");
-            var typedBatch = Unsafe.As<ContactManifold4TypeBatch>(batch);
+            Debug.Assert(batch is Contact4TypeBatch, "The type batch passed to the description must match the description's expected type.");
+            var typedBatch = Unsafe.As<Contact4TypeBatch>(batch);
             ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].OffsetA0.X, innerIndex);
             lane = Contact0.OffsetA.X;
             Unsafe.Add(ref lane, Vector<float>.Count) = Contact0.OffsetA.Y;
@@ -87,10 +84,10 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void BuildDescription(TypeBatch batch, int bundleIndex, int innerIndex, out ContactManifold4Constraint description)
+        public void BuildDescription(TypeBatch batch, int bundleIndex, int innerIndex, out Contact4 description)
         {
-            Debug.Assert(batch is ContactManifold4TypeBatch, "The type batch passed to the description must match the description's expected type.");
-            var typedBatch = Unsafe.As<ContactManifold4TypeBatch>(batch);
+            Debug.Assert(batch is Contact4TypeBatch, "The type batch passed to the description must match the description's expected type.");
+            var typedBatch = Unsafe.As<Contact4TypeBatch>(batch);
             ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].OffsetA0.X, innerIndex);
             description.Contact0.OffsetA.X = lane;
             description.Contact0.OffsetA.Y = Unsafe.Add(ref lane, Vector<float>.Count);
@@ -129,10 +126,10 @@ namespace SolverPrototype.Constraints
         public int ConstraintTypeId
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => ContactManifold4TypeBatch.BatchTypeId;
+            get => Contact4TypeBatch.BatchTypeId;
         }
 
-        public Type BatchType => typeof(ContactManifold4TypeBatch);
+        public Type BatchType => typeof(Contact4TypeBatch);
     }
 
 }

@@ -102,7 +102,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 for (int i = 0; i < constraintHandles.Length; ++i)
                 {
                     simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
-                    var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
+                    var typeBatch = constraint.TypeBatch as Contact4TypeBatch;
 
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
                     ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];

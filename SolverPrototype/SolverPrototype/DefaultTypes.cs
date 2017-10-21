@@ -1,11 +1,7 @@
-﻿using SolverPrototype.Collidables;
-using SolverPrototype.Constraints;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
+﻿using SolverPrototype.Constraints;
 using SolverPrototype.CollisionDetection;
 using SolverPrototype.CollisionDetection.CollisionTasks;
+using SolverPrototype.Constraints.Contact;
 
 namespace SolverPrototype
 {
@@ -20,9 +16,9 @@ namespace SolverPrototype
         public static void Register(TypeBatchAllocation typeBatchAllocation, out CollisionTaskRegistry defaultTaskRegistry)
         {
             typeBatchAllocation.Register<BallSocket>();
-            typeBatchAllocation.Register<ContactManifold1OneBodyConstraint>();
-            typeBatchAllocation.Register<ContactManifold1Constraint>();
-            typeBatchAllocation.Register<ContactManifold4Constraint>();
+            typeBatchAllocation.Register<Contact1OneBody>();
+            typeBatchAllocation.Register<Contact1>();
+            typeBatchAllocation.Register<Contact4>();
 
             defaultTaskRegistry = new CollisionTaskRegistry();
             defaultTaskRegistry.Register(new SpherePairCollisionTask());

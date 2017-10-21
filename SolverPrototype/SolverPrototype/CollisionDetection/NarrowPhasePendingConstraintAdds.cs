@@ -93,9 +93,9 @@ namespace SolverPrototype.CollisionDetection
                 //convex vs nonconvex: 0x4
                 //1 body versus 2 body: 0x8
                 //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
-                SequentialAddToSimulation<int, ContactManifold1OneBodyConstraint, ContactImpulses1>(ref pendingConstraintsByType[0 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
-                SequentialAddToSimulation<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
-                SequentialAddToSimulation<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
+                SequentialAddToSimulation<int, Contact1OneBodyConstraint, ContactImpulses1>(ref pendingConstraintsByType[0 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
+                SequentialAddToSimulation<TwoBodyHandles, Contact1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
+                SequentialAddToSimulation<TwoBodyHandles, Contact4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
             }
 
 
@@ -179,9 +179,9 @@ namespace SolverPrototype.CollisionDetection
                 //convex vs nonconvex: 0x4
                 //1 body versus 2 body: 0x8
                 //TODO: Very likely that we'll expand the nonconvex manifold maximum to 8 contacts, so this will need to be adjusted later.
-                SequentialAddToSimulationSpeculative<int, ContactManifold1OneBodyConstraint, ContactImpulses1>(ref pendingConstraintsByType[0 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
-                SequentialAddToSimulationSpeculative<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
-                SequentialAddToSimulationSpeculative<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
+                SequentialAddToSimulationSpeculative<int, Contact1OneBodyConstraint, ContactImpulses1>(ref pendingConstraintsByType[0 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
+                SequentialAddToSimulationSpeculative<TwoBodyHandles, Contact1Constraint, ContactImpulses1>(ref pendingConstraintsByType[8 + 0 + 0], 8 + 0 + 0, simulation, ref pairCache);
+                SequentialAddToSimulationSpeculative<TwoBodyHandles, Contact4Constraint, ContactImpulses4>(ref pendingConstraintsByType[8 + 0 + 3], 8 + 0 + 3, simulation, ref pairCache);
             }
 
 
@@ -219,7 +219,7 @@ namespace SolverPrototype.CollisionDetection
                     case 0:
                         for (int i = 0; i < constraintsOfType.Count; ++i)
                         {
-                            DeterministicAdd<int, ContactManifold1OneBodyConstraint, ContactImpulses1>(typeIndex, ref constraintsOfType[i], overlapWorkers, simulation, ref pairCache);
+                            DeterministicAdd<int, Contact1OneBodyConstraint, ContactImpulses1>(typeIndex, ref constraintsOfType[i], overlapWorkers, simulation, ref pairCache);
                         }
                         break;
                     case 1:
@@ -242,7 +242,7 @@ namespace SolverPrototype.CollisionDetection
                     case 8 + 0:
                         for (int i = 0; i < constraintsOfType.Count; ++i)
                         {
-                            DeterministicAdd<TwoBodyHandles, ContactManifold1Constraint, ContactImpulses1>(typeIndex, ref constraintsOfType[i], overlapWorkers, simulation, ref pairCache);
+                            DeterministicAdd<TwoBodyHandles, Contact1Constraint, ContactImpulses1>(typeIndex, ref constraintsOfType[i], overlapWorkers, simulation, ref pairCache);
                         }
                         break;
                     case 8 + 1:
@@ -252,7 +252,7 @@ namespace SolverPrototype.CollisionDetection
                     case 8 + 3:
                         for (int i = 0; i < constraintsOfType.Count; ++i)
                         {
-                            DeterministicAdd<TwoBodyHandles, ContactManifold4Constraint, ContactImpulses4>(typeIndex, ref constraintsOfType[i], overlapWorkers, simulation, ref pairCache);
+                            DeterministicAdd<TwoBodyHandles, Contact4Constraint, ContactImpulses4>(typeIndex, ref constraintsOfType[i], overlapWorkers, simulation, ref pairCache);
                         }
                         break;
                     //Nonconvex

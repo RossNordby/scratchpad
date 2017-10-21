@@ -353,7 +353,7 @@ namespace SolverPrototype.CollisionDetection
                 case 0:
                     {
                         //1 contact
-                        var batch = Unsafe.As<TypeBatch, ContactManifold1OneBodyTypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, Contact1OneBodyTypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
                         GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, 1);
                     }
@@ -399,7 +399,7 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 0:
                     {
                         //1 contact
-                        var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, Contact1TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
                         GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, 1);
                     }
@@ -417,7 +417,7 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 3:
                     {
                         //4 contacts
-                        var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, Contact4TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
                         GatherScatter.GetLane(ref bundle.Penetration0, inner, ref *oldImpulses, 4);
                     }
@@ -464,7 +464,7 @@ namespace SolverPrototype.CollisionDetection
                 case 0:
                     {
                         //1 contact
-                        var batch = Unsafe.As<TypeBatch, ContactManifold1OneBodyTypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, Contact1OneBodyTypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
                         GatherScatter.SetLane(ref bundle.Penetration0, inner, ref Unsafe.As<TContactImpulses, float>(ref contactImpulses), 1);
                     }
@@ -510,7 +510,7 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 0:
                     {
                         //1 contact
-                        var batch = Unsafe.As<TypeBatch, ContactManifold1TypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, Contact1TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
                         GatherScatter.SetLane(ref bundle.Penetration0, inner, ref Unsafe.As<TContactImpulses, float>(ref contactImpulses), 1);
                     }
@@ -528,7 +528,7 @@ namespace SolverPrototype.CollisionDetection
                 case 8 + 3:
                     {
                         //4 contacts
-                        var batch = Unsafe.As<TypeBatch, ContactManifold4TypeBatch>(ref constraintReference.TypeBatch);
+                        var batch = Unsafe.As<TypeBatch, Contact4TypeBatch>(ref constraintReference.TypeBatch);
                         ref var bundle = ref batch.AccumulatedImpulses[bundleIndex];
                         GatherScatter.SetLane(ref bundle.Penetration0, inner, ref Unsafe.As<TContactImpulses, float>(ref contactImpulses), 4);
                     }

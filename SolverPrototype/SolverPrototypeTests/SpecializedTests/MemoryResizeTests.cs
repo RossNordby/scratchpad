@@ -82,7 +82,7 @@ namespace SolverPrototypeTests.SpecializedTests
             SimulationScrambling.ScrambleBodies(simulation);
             SimulationScrambling.ScrambleConstraints(simulation.Solver);
             SimulationScrambling.ScrambleBodyConstraintLists(simulation);
-            SimulationScrambling.AddRemoveChurn<ContactManifold4Constraint>(simulation, 1000, bodyHandles, constraintHandles);
+            SimulationScrambling.AddRemoveChurn<Contact4Constraint>(simulation, 1000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
 
@@ -90,7 +90,7 @@ namespace SolverPrototypeTests.SpecializedTests
             const int internalCompressionIterations = 10;
             for (int i = 0; i < iterations; ++i)
             {
-                SimulationScrambling.AddRemoveChurn<ContactManifold4Constraint>(simulation, 10, bodyHandles, constraintHandles);
+                SimulationScrambling.AddRemoveChurn<Contact4Constraint>(simulation, 10, bodyHandles, constraintHandles);
                 GC.Collect(3, GCCollectionMode.Forced, true);
                 var start = Stopwatch.GetTimestamp();
                 for (int j = 0; j < internalCompressionIterations; ++j)
@@ -132,7 +132,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 for (int i = 0; i < constraintHandles.Length; ++i)
                 {
                     simulation.Solver.GetConstraintReference(constraintHandles[i], out var constraint);
-                    var typeBatch = constraint.TypeBatch as ContactManifold4TypeBatch;
+                    var typeBatch = constraint.TypeBatch as Contact4TypeBatch;
 
                     BundleIndexing.GetBundleIndices(constraint.IndexInTypeBatch, out var bundleIndex, out var innerIndex);
                     ref var bodyReferences = ref typeBatch.BodyReferences[bundleIndex];

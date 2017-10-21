@@ -2,7 +2,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
     //For in depth explanations of constraints, check the Inequality1DOF.cs implementation.
     //The details are omitted for brevity in other implementations.

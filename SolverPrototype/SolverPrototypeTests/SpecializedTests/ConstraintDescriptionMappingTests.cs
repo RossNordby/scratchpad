@@ -103,8 +103,8 @@ namespace SolverPrototypeTests.SpecializedTests
                 simulation.Add(ref bodyDescription);
             }
             var random = new Random(5);
-            Test<ContactManifold1Constraint>(simulation, random, 2);
-            Test<ContactManifold4Constraint>(simulation, random, 2);
+            Test<Contact1Constraint>(simulation, random, 2);
+            Test<Contact4Constraint>(simulation, random, 2);
             Test<BallSocket>(simulation, random, 2);
 
             pool.Clear();

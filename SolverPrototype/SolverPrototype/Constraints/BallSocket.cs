@@ -1,4 +1,4 @@
-﻿using BEPUutilities2.Memory;
+﻿using SolverPrototype.CollisionDetection;
 using System;
 using System.Diagnostics;
 using System.Numerics;
@@ -11,7 +11,7 @@ namespace SolverPrototype.Constraints
     {
         public Vector3 LocalOffsetA;
         public Vector3 LocalOffsetB;
-        public SpringSettingsAOS SpringSettings;
+        public SpringSettings SpringSettings;
 
         public int ConstraintTypeId
         {
@@ -57,7 +57,7 @@ namespace SolverPrototype.Constraints
     {
         public Vector3Wide LocalOffsetA;
         public Vector3Wide LocalOffsetB;
-        public SpringSettings SpringSettings;
+        public SpringSettingsWide SpringSettings;
     }
 
     public struct BallSocketProjection

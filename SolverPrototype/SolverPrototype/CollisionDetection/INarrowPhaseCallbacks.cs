@@ -11,7 +11,13 @@ namespace SolverPrototype.CollisionDetection
     {
         public float FrictionCoefficient;
         public float MaximumRecoveryVelocity;
-        public SpringSettingsAOS SpringSettings;
+        public SpringSettings SpringSettings;
+    }
+     
+    public struct SpringSettings
+    {
+        public float NaturalFrequency;
+        public float DampingRatio;
     }
 
     public unsafe interface INarrowPhaseCallbacks
@@ -62,7 +68,7 @@ namespace SolverPrototype.CollisionDetection
         /// <param name="manifold">Set of contacts detected between the collidables.</param>
         /// <returns>True if this manifold should be considered for constraint generation, false otherwise.</returns>
         bool ConfigureContactManifold(int workerIndex, CollidablePair pair, int childIndexA, int childIndexB, ContactManifold* manifold);
-       
+
         /// <summary>
         /// Performs any post-narrowphase execution tasks.
         /// </summary>

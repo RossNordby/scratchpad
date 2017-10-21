@@ -46,7 +46,7 @@ namespace SolverPrototype.Constraints
     {
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettings springSettings, ref Vector<float> maximumRecoveryVelocity,
+        public static void Prestep(ref BodyInertias inertiaA, ref BodyInertias inertiaB, ref TwoBody1DOFJacobians jacobians, ref SpringSettingsWide springSettings, ref Vector<float> maximumRecoveryVelocity,
             ref Vector<float> positionError, float dt, float inverseDt, out Projection2Body1DOF projection)
         {
             //unsoftened effective mass = (J * M^-1 * JT)^-1

@@ -27,7 +27,7 @@ namespace SolverPrototypeTests.SpecializedTests
             SimulationScrambling.ScrambleBodies(simulation);
             SimulationScrambling.ScrambleConstraints(simulation.Solver);
             SimulationScrambling.ScrambleBodyConstraintLists(simulation);
-            SimulationScrambling.AddRemoveChurn<ContactManifold4Constraint>(simulation, 100000, bodyHandles, constraintHandles);
+            SimulationScrambling.AddRemoveChurn<Contact4Constraint>(simulation, 100000, bodyHandles, constraintHandles);
 
             var threadDispatcher = new SimpleThreadDispatcher(8);
             //var threadDispatcher = new NotQuiteAThreadDispatcher(8);
@@ -50,13 +50,13 @@ namespace SolverPrototypeTests.SpecializedTests
                 var batch = simulation.Solver.Batches[batchIndex];
                 for (int typeBatchIndex = 0; typeBatchIndex < batch.TypeBatches.Count; ++typeBatchIndex)
                 {
-                    var typeBatch = (ContactManifold4TypeBatch)batch.TypeBatches[typeBatchIndex];
+                    var typeBatch = (Contact4TypeBatch)batch.TypeBatches[typeBatchIndex];
                     int[] sortKeys = new int[typeBatch.ConstraintCount];
                     int previous = -1;
                     //Console.WriteLine($"Batch {batchIndex}, type batch {typeBatchIndex}: ");
                     for (int i = 0; i < sortKeys.Length; ++i)
                     {
-                        sortKeys[i] = ContactManifold4TypeBatch.GetSortKey(i, ref typeBatch.BodyReferences);
+                        sortKeys[i] = Contact4TypeBatch.GetSortKey(i, ref typeBatch.BodyReferences);
                         if (sortKeys[i] <= previous)
                         {
                             Console.WriteLine("Not sorted!");

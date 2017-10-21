@@ -1,12 +1,12 @@
 ﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
     /// <summary>
     /// Handles the solve iterations of a bunch of 1DOF two body inequality constraints.
     /// </summary>
-    public static class ContactPenetrationLimit
+    public static class PenetrationLimit
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ComputeJacobiansAndError(ref ContactData contact, out TwoBody1DOFJacobians jacobians, out Vector<float> error)

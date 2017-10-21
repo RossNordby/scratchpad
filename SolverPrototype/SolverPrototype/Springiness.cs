@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace SolverPrototype
 {
-    public struct SpringSettings
+    public struct SpringSettingsWide
     {
         //Be careful when fiddling with the memory layout. It's aligned with execution order.
         public Vector<float> NaturalFrequency;
@@ -26,7 +26,7 @@ namespace SolverPrototype
         /// <param name="effectiveMassCFMScale">Scaling factor to apply to the effective mass to get the softened effective mass.</param>
         /// <param name="softnessImpulseScale">Scaling factor to apply to the accumulated impulse during the solve to soften the target velocity.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeSpringiness(ref SpringSettings settings, float dt,
+        public static void ComputeSpringiness(ref SpringSettingsWide settings, float dt,
             out Vector<float> positionErrorToVelocity, out Vector<float> effectiveMassCFMScale, out Vector<float> softnessImpulseScale)
         {
             //For more information behind these values, check the Inequality1DOF constraint comments.
@@ -58,7 +58,7 @@ namespace SolverPrototype
         /// <param name="effectiveMassCFMScale">Scaling factor to apply to the effective mass to get the softened effective mass.</param>
         /// <param name="softnessImpulseScale">Scaling factor to apply to the accumulated impulse during the solve to soften the target velocity.</param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ComputeSpringiness(ref SpringSettings settings, float dt, float constraintCount,
+        public static void ComputeSpringiness(ref SpringSettingsWide settings, float dt, float constraintCount,
             out Vector<float> positionErrorToVelocity, out Vector<float> effectiveMassCFMScale, out Vector<float> softnessImpulseScale)
         {
             //The only difference between this implementation and the above implementation is that CFM is scaled by constraintCount.

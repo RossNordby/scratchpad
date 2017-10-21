@@ -3,9 +3,9 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
-    public struct ContactPenetrationLimitOneBodyProjection
+    public struct PenetrationLimitOneBodyProjection
     {
         //Note that these are just the raw jacobians, no precomputation with the JT*EffectiveMass.
         public Vector3Wide AngularA;
@@ -18,7 +18,7 @@ namespace SolverPrototype.Constraints
     /// Four convex-sourced contact penetration limits solved together. Internally implemented using SI solver. 
     /// Batching saves on redundant data.
     /// </summary>
-    public static class ContactPenetrationLimit1OneBody
+    public static class PenetrationLimit1OneBody
     {
         /// <summary>
         /// Data required to project world space velocities into a constraint impulse.
@@ -27,11 +27,11 @@ namespace SolverPrototype.Constraints
         {
             //Note that the data is interleaved to match the access order. We solve each constraint one at a time internally.
             //Also, the normal and inertias are shared across all constraints.
-            public ContactPenetrationLimitOneBodyProjection Penetration0;
+            public PenetrationLimitOneBodyProjection Penetration0;
             public Vector<float> SoftnessImpulseScale;
         }
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Prestep(ref BodyInertias inertiaA, ref Vector3Wide normal, ref ContactManifold1OneBodyPrestepData prestep, float dt, float inverseDt,
+        public static void Prestep(ref BodyInertias inertiaA, ref Vector3Wide normal, ref Contact1OneBodyPrestepData prestep, float dt, float inverseDt,
             out Projection projection)
         {
             Vector3Wide.CrossWithoutOverlap(ref prestep.OffsetA0, ref normal, out projection.Penetration0.AngularA);
@@ -57,7 +57,7 @@ namespace SolverPrototype.Constraints
         /// Transforms an impulse from constraint space to world space, uses it to modify the cached world space velocities of the bodies.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ApplyImpulse(ref ContactPenetrationLimitOneBodyProjection projection, ref BodyInertias inertiaA, ref Vector3Wide normal,
+        public static void ApplyImpulse(ref PenetrationLimitOneBodyProjection projection, ref BodyInertias inertiaA, ref Vector3Wide normal,
             ref Vector<float> correctiveImpulse,
             ref BodyVelocities wsvA)
         {
@@ -80,7 +80,7 @@ namespace SolverPrototype.Constraints
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void ComputeCorrectiveImpulse(ref BodyVelocities wsvA,
-            ref ContactPenetrationLimitOneBodyProjection projection,
+            ref PenetrationLimitOneBodyProjection projection,
             ref Vector3Wide normal, ref Vector<float> softnessImpulseScale,
             ref Vector<float> accumulatedImpulse, out Vector<float> correctiveCSI)
         {

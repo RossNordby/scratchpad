@@ -140,7 +140,7 @@ namespace SolverPrototypeTests.SpecializedTests
             //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 20, 20, 20, 20, initializationThreadPool, writer);
             //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 16, 16, 16, 30, initializationThreadPool, writer);
             //Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 13, 13, 13, 45, initializationThreadPool, writer);
-            Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, ContactManifold4Constraint>(bodyBuilder, constraintBuilder, 10, 10, 10, 700, initializationThreadPool, writer);
+            Subtest<RegularGridWithKinematicBaseBuilder, ContactManifoldConstraintBuilder, Contact4Constraint>(bodyBuilder, constraintBuilder, 10, 10, 10, 700, initializationThreadPool, writer);
 
             //var bodyBuilder = new RegularGridWithKinematicBaseBuilder(new Vector3(1), new Vector3());
             //var constraintBuilder = new BallSocketConstraintBuilder();

@@ -2,7 +2,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
     /// <summary>
     /// Handles the tangent friction implementation for one body contact constraints.

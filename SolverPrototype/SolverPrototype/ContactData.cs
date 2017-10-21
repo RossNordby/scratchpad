@@ -9,6 +9,6 @@ namespace SolverPrototype
         public Vector3Wide OffsetB;
         public Vector3Wide Normal;
         public Vector<float> PenetrationDepth;
-        public SpringSettings SpringSettings;
+        public SpringSettingsWide SpringSettings;
     }
 }

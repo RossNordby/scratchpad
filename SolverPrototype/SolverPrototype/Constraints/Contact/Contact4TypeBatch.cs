@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
 
-    public struct ContactManifold4PrestepData
+    public struct Contact4PrestepData
     {
         //NOTE: Prestep data memory layout is relied upon by the constraint description for marginally more efficient setting and getting.
         //If you modify this layout, be sure to update the associated ContactManifold4Constraint.
@@ -21,7 +21,7 @@ namespace SolverPrototype.Constraints
         //In a convex manifold, all contacts share the same normal and tangents.
         public Vector3Wide Normal;
         //All contacts also share the spring settings.
-        public SpringSettings SpringSettings;
+        public SpringSettingsWide SpringSettings;
         public Vector<float> MaximumRecoveryVelocity;
         public Vector<float> PenetrationDepth0;
         public Vector<float> PenetrationDepth1;
@@ -29,7 +29,7 @@ namespace SolverPrototype.Constraints
         public Vector<float> PenetrationDepth3;
     }
 
-    public struct ContactManifold4AccumulatedImpulses
+    public struct Contact4AccumulatedImpulses
     {
         public Vector2Wide Tangent;
         public Vector<float> Penetration0;
@@ -48,14 +48,14 @@ namespace SolverPrototype.Constraints
     //In fact, a hypothetical CLR and machine that supported AVX512 would hit memory bandwidth limits on the older implementation that used 2032 bytes per bundle for projection data...
     //on a single thread.
 
-    public struct ContactManifold4Projection
+    public struct Contact4Projection
     {
         public BodyInertias InertiaA;
         public BodyInertias InertiaB;
         public Vector<float> PremultipliedFrictionCoefficient;
         public Vector3Wide Normal;
         public TangentFrictionProjection Tangent;
-        public ContactPenetrationLimit4Projection Penetration;
+        public PenetrationLimit4Projection Penetration;
         //Lever arms aren't included in the twist projection because the number of arms required varies independently of the twist projection itself.
         public Vector<float> LeverArm0;
         public Vector<float> LeverArm1;
@@ -68,12 +68,12 @@ namespace SolverPrototype.Constraints
     //relative to a manually inlined version. That isn't fundamental. With any luck, future compilers will change things. 
     //Since the difference is less than 5%, we'll use the loopbodystructdelegate approach for other constraints until the incremental performance improvement 
     //of manual inlining is worth it.
-    public struct ContactManifold4Functions :
-        IConstraintFunctions<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses>
+    public struct Contact4Functions :
+        IConstraintFunctions<Contact4PrestepData, Contact4Projection, Contact4AccumulatedImpulses>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Prestep(Bodies bodies, ref TwoBodyReferences bodyReferences, int count,
-            float dt, float inverseDt, ref ContactManifold4PrestepData prestep, out ContactManifold4Projection projection)
+            float dt, float inverseDt, ref Contact4PrestepData prestep, out Contact4Projection projection)
         {
             //Some speculative compression options not (yet) pursued:
             //1) Store the surface basis in a compressed fashion. It could be stored within 32 bits by using standard compression schemes, but we lack the necessary
@@ -95,7 +95,7 @@ namespace SolverPrototype.Constraints
             projection.Normal = prestep.Normal;
             Helpers.BuildOrthnormalBasis(ref prestep.Normal, out var x, out var z);
             TangentFriction.Prestep(ref x, ref z, ref offsetToManifoldCenterA, ref offsetToManifoldCenterB, ref projection.InertiaA, ref projection.InertiaB, out projection.Tangent);
-            ContactPenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, ref prestep, dt, inverseDt, out projection.Penetration);
+            PenetrationLimit4.Prestep(ref projection.InertiaA, ref projection.InertiaB, ref prestep.Normal, ref prestep, dt, inverseDt, out projection.Penetration);
             //Just assume the lever arms for B are the same. It's a good guess. (The only reason we computed the offset B is because we didn't want to go into world space.)
             Vector3Wide.Distance(ref prestep.OffsetA0, ref offsetToManifoldCenterA, out projection.LeverArm0);
             Vector3Wide.Distance(ref prestep.OffsetA1, ref offsetToManifoldCenterA, out projection.LeverArm1);
@@ -105,11 +105,11 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WarmStart(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref ContactManifold4Projection projection, ref ContactManifold4AccumulatedImpulses accumulatedImpulses)
+        public void WarmStart(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Contact4Projection projection, ref Contact4AccumulatedImpulses accumulatedImpulses)
         {
             Helpers.BuildOrthnormalBasis(ref projection.Normal, out var x, out var z);
             TangentFriction.WarmStart(ref x, ref z, ref projection.Tangent, ref projection.InertiaA, ref projection.InertiaB, ref accumulatedImpulses.Tangent, ref wsvA, ref wsvB);
-            ContactPenetrationLimit4.WarmStart(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB,
+            PenetrationLimit4.WarmStart(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB,
                 ref projection.Normal,
                 ref accumulatedImpulses.Penetration0,
                 ref accumulatedImpulses.Penetration1,
@@ -119,7 +119,7 @@ namespace SolverPrototype.Constraints
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Solve(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref ContactManifold4Projection projection, ref ContactManifold4AccumulatedImpulses accumulatedImpulses)
+        public void Solve(ref BodyVelocities wsvA, ref BodyVelocities wsvB, ref Contact4Projection projection, ref Contact4AccumulatedImpulses accumulatedImpulses)
         {
             Helpers.BuildOrthnormalBasis(ref projection.Normal, out var x, out var z);
             var maximumTangentImpulse = projection.PremultipliedFrictionCoefficient *
@@ -128,7 +128,7 @@ namespace SolverPrototype.Constraints
             //Note that we solve the penetration constraints after the friction constraints. 
             //This makes the penetration constraints more authoritative at the cost of the first iteration of the first frame of an impact lacking friction influence.
             //It's a pretty minor effect either way.
-            ContactPenetrationLimit4.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref projection.Normal,
+            PenetrationLimit4.Solve(ref projection.Penetration, ref projection.InertiaA, ref projection.InertiaB, ref projection.Normal,
                 ref accumulatedImpulses.Penetration0,
                 ref accumulatedImpulses.Penetration1,
                 ref accumulatedImpulses.Penetration2,
@@ -146,9 +146,9 @@ namespace SolverPrototype.Constraints
     /// <summary>
     /// Handles the solve iterations of a bunch of 4-contact convex manifold constraints.
     /// </summary>
-    public class ContactManifold4TypeBatch :
+    public class Contact4TypeBatch :
         //UnposedTwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4>
-        TwoBodyTypeBatch<ContactManifold4PrestepData, ContactManifold4Projection, ContactManifold4AccumulatedImpulses, ContactManifold4Functions>
+        TwoBodyTypeBatch<Contact4PrestepData, Contact4Projection, Contact4AccumulatedImpulses, Contact4Functions>
     {
         public const int BatchTypeId = 11;
     }

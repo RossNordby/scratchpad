@@ -18,7 +18,7 @@ namespace SolverPrototypeTests
             var midpoint = 0.5f * (a.Position + b.Position);
             description.LocalOffsetA = Quaternion.Transform(midpoint - a.Position, Quaternion.Conjugate(a.Orientation));
             description.LocalOffsetB = Quaternion.Transform(midpoint - b.Position, Quaternion.Conjugate(b.Orientation));
-            description.SpringSettings = new SpringSettingsAOS
+            description.SpringSettings = new SpringSettings
             {
                 NaturalFrequency = (float)(Math.PI * 0.5f * 60),
                 DampingRatio = 0.1f

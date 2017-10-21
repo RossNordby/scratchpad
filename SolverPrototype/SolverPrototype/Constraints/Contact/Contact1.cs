@@ -1,18 +1,20 @@
-﻿using System;
+﻿using SolverPrototype.CollisionDetection;
+using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-namespace SolverPrototype.Constraints
+namespace SolverPrototype.Constraints.Contact
 {
-    public struct ContactManifold1OneBodyConstraint : IConstraintDescription<ContactManifold1OneBodyConstraint>
+    public struct Contact1 : IConstraintDescription<Contact1>
     {
         //TODO: In a 'real' use case, we will likely split the description for contact manifolds into two parts: mutable contact data and initialize-once spring/friction data.
         //SpringSettings and FrictionCoefficient don't usually change over the lifetime of the constraint, so there's no reason to set them every time.
         //For now, though, we'll use this combined representation.
-        public ManifoldContactDataAOS Contact0;
+        public ManifoldContactData Contact0;
+        public Vector3 OffsetB;
         public float FrictionCoefficient;
         public Vector3 Normal;
-        public SpringSettingsAOS SpringSettings;
+        public SpringSettings SpringSettings;
         public float MaximumRecoveryVelocity;
 
         public void ApplyDescription(TypeBatch batch, int bundleIndex, int innerIndex)
@@ -28,50 +30,58 @@ namespace SolverPrototype.Constraints
             //At the end of the day, the important thing is that this mapping is kept localized so that not every system needs to be aware of it.
 
             //Note that we use an unsafe cast.
-            Debug.Assert(batch is ContactManifold1OneBodyTypeBatch, "The type batch passed to the description must match the description's expected type.");
-            var typedBatch = Unsafe.As<ContactManifold1OneBodyTypeBatch>(batch);
+            Debug.Assert(batch is Contact1TypeBatch, "The type batch passed to the description must match the description's expected type.");
+            var typedBatch = Unsafe.As<Contact1TypeBatch>(batch);
             ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].OffsetA0.X, innerIndex);
             lane = Contact0.OffsetA.X;
             Unsafe.Add(ref lane, Vector<float>.Count) = Contact0.OffsetA.Y;
             Unsafe.Add(ref lane, 2 * Vector<float>.Count) = Contact0.OffsetA.Z;
-            
-            Unsafe.Add(ref lane, 3 * Vector<float>.Count) = FrictionCoefficient;
 
-            Unsafe.Add(ref lane, 4 * Vector<float>.Count) = Normal.X;
-            Unsafe.Add(ref lane, 5 * Vector<float>.Count) = Normal.Y;
-            Unsafe.Add(ref lane, 6 * Vector<float>.Count) = Normal.Z;
+            Unsafe.Add(ref lane, 3 * Vector<float>.Count) = OffsetB.X;
+            Unsafe.Add(ref lane, 4 * Vector<float>.Count) = OffsetB.Y;
+            Unsafe.Add(ref lane, 5 * Vector<float>.Count) = OffsetB.Z;
 
-            Unsafe.Add(ref lane, 7 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
-            Unsafe.Add(ref lane, 8 * Vector<float>.Count) = SpringSettings.DampingRatio;
-            Unsafe.Add(ref lane, 9 * Vector<float>.Count) = MaximumRecoveryVelocity;
+            Unsafe.Add(ref lane, 6 * Vector<float>.Count) = FrictionCoefficient;
 
-            Unsafe.Add(ref lane, 10 * Vector<float>.Count) = Contact0.PenetrationDepth;
+            Unsafe.Add(ref lane, 7 * Vector<float>.Count) = Normal.X;
+            Unsafe.Add(ref lane, 8 * Vector<float>.Count) = Normal.Y;
+            Unsafe.Add(ref lane, 9 * Vector<float>.Count) = Normal.Z;
+
+            Unsafe.Add(ref lane, 10 * Vector<float>.Count) = SpringSettings.NaturalFrequency;
+            Unsafe.Add(ref lane, 11 * Vector<float>.Count) = SpringSettings.DampingRatio;
+            Unsafe.Add(ref lane, 12 * Vector<float>.Count) = MaximumRecoveryVelocity;
+
+            Unsafe.Add(ref lane, 13 * Vector<float>.Count) = Contact0.PenetrationDepth;
 
 
 
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void BuildDescription(TypeBatch batch, int bundleIndex, int innerIndex, out ContactManifold1OneBodyConstraint description)
+        public void BuildDescription(TypeBatch batch, int bundleIndex, int innerIndex, out Contact1 description)
         {
-            Debug.Assert(batch is ContactManifold1OneBodyTypeBatch, "The type batch passed to the description must match the description's expected type.");
-            var typedBatch = Unsafe.As<ContactManifold1OneBodyTypeBatch>(batch);
+            Debug.Assert(batch is Contact1TypeBatch, "The type batch passed to the description must match the description's expected type.");
+            var typedBatch = Unsafe.As<Contact1TypeBatch>(batch);
             ref var lane = ref GatherScatter.Get(ref typedBatch.PrestepData[bundleIndex].OffsetA0.X, innerIndex);
             description.Contact0.OffsetA.X = lane;
             description.Contact0.OffsetA.Y = Unsafe.Add(ref lane, Vector<float>.Count);
             description.Contact0.OffsetA.Z = Unsafe.Add(ref lane, 2 * Vector<float>.Count);
-            
-            description.FrictionCoefficient = Unsafe.Add(ref lane, 3 * Vector<float>.Count);
 
-            description.Normal.X = Unsafe.Add(ref lane, 4 * Vector<float>.Count);
-            description.Normal.Y = Unsafe.Add(ref lane, 5 * Vector<float>.Count);
-            description.Normal.Z = Unsafe.Add(ref lane, 6 * Vector<float>.Count);
+            description.OffsetB.X = Unsafe.Add(ref lane, 3 * Vector<float>.Count);
+            description.OffsetB.Y = Unsafe.Add(ref lane, 4 * Vector<float>.Count);
+            description.OffsetB.Z = Unsafe.Add(ref lane, 5 * Vector<float>.Count);
 
-            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 7 * Vector<float>.Count);
-            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 8 * Vector<float>.Count);
-            description.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 9 * Vector<float>.Count);
+            description.FrictionCoefficient = Unsafe.Add(ref lane, 6 * Vector<float>.Count);
 
-            description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 10 * Vector<float>.Count);
+            description.Normal.X = Unsafe.Add(ref lane, 7 * Vector<float>.Count);
+            description.Normal.Y = Unsafe.Add(ref lane, 8 * Vector<float>.Count);
+            description.Normal.Z = Unsafe.Add(ref lane, 9 * Vector<float>.Count);
+
+            description.SpringSettings.NaturalFrequency = Unsafe.Add(ref lane, 10 * Vector<float>.Count);
+            description.SpringSettings.DampingRatio = Unsafe.Add(ref lane, 11 * Vector<float>.Count);
+            description.MaximumRecoveryVelocity = Unsafe.Add(ref lane, 12 * Vector<float>.Count);
+
+            description.Contact0.PenetrationDepth = Unsafe.Add(ref lane, 13 * Vector<float>.Count);
 
         }
 
@@ -80,11 +90,11 @@ namespace SolverPrototype.Constraints
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get
             {
-                return ContactManifold1OneBodyTypeBatch.BatchTypeId;
+                return Contact1TypeBatch.BatchTypeId;
             }
         }
 
-        public Type BatchType => typeof(ContactManifold1OneBodyTypeBatch);
+        public Type BatchType => typeof(Contact1TypeBatch);
     }
 
 }

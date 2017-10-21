@@ -1,23 +1,20 @@
-﻿using BEPUutilities2;
-using SolverPrototype;
+﻿using SolverPrototype;
 using SolverPrototype.CollisionDetection;
-using SolverPrototype.Constraints;
+using SolverPrototype.Constraints.Contact;
 using System;
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using Quaternion = BEPUutilities2.Quaternion;
 
 namespace SolverPrototypeTests
 {
     public struct ContactManifoldConstraintBuilder : IConstraintBuilder
     {
-        static void CreateManifoldConstraint(ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ, ref Vector3 offsetB, out ContactManifold4Constraint description)
+        static void CreateManifoldConstraint(ref Vector3 unitX, ref Vector3 unitY, ref Vector3 unitZ, ref Vector3 offsetB, out Contact4 description)
         {
-            description = new ContactManifold4Constraint
+            description = new Contact4
             {
                 //By convention, normal faces from B to A.
-                SpringSettings = new SpringSettingsAOS
+                SpringSettings = new SpringSettings
                 {
                     NaturalFrequency = (float)(Math.PI * 2 * 60),
                     DampingRatio = 100f,

@@ -184,7 +184,7 @@ namespace SolverPrototype.CollisionDetection
                 //Convex
                 case 0:
                     {
-                        ContactManifold1OneBodyConstraint description;
+                        Contact1OneBodyConstraint description;
                         description.Contact0.OffsetA = manifold->Offset0;
                         description.Contact0.PenetrationDepth = manifold->Depth0;
                         description.FrictionCoefficient = material.FrictionCoefficient;
@@ -193,7 +193,7 @@ namespace SolverPrototype.CollisionDetection
                         description.Normal = manifold->ConvexNormal;
 
                         //TODO: Check init hack.
-                        UpdateConstraint<TBodyHandles, ContactManifold1OneBodyConstraint, ContactImpulses1, TCollisionCache, ConstraintCache1>(
+                        UpdateConstraint<TBodyHandles, Contact1OneBodyConstraint, ContactImpulses1, TCollisionCache, ConstraintCache1>(
                             workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
                     }
                     break;
@@ -216,7 +216,7 @@ namespace SolverPrototype.CollisionDetection
                 //Convex
                 case 8 + 0:
                     {
-                        ContactManifold1Constraint description;
+                        Contact1Constraint description;
                         description.Contact0.OffsetA = manifold->Offset0;
                         description.Contact0.PenetrationDepth = manifold->Depth0;
                         description.OffsetB = manifold->OffsetB;
@@ -226,7 +226,7 @@ namespace SolverPrototype.CollisionDetection
                         description.Normal = manifold->ConvexNormal;
 
                         //TODO: Check init hack.
-                        UpdateConstraint<TBodyHandles, ContactManifold1Constraint, ContactImpulses1, TCollisionCache, ConstraintCache1>(
+                        UpdateConstraint<TBodyHandles, Contact1Constraint, ContactImpulses1, TCollisionCache, ConstraintCache1>(
                             workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
                     }
                     break;
@@ -236,7 +236,7 @@ namespace SolverPrototype.CollisionDetection
                     break;
                 case 8 + 3:
                     {
-                        ContactManifold4Constraint description;
+                        Contact4Constraint description;
                         var descriptionContacts = &description.Contact0;
                         var offsets = &manifold->Offset0;
                         var depths = &manifold->Depth0;
@@ -253,7 +253,7 @@ namespace SolverPrototype.CollisionDetection
                         description.Normal = manifold->ConvexNormal;
 
                         //TODO: Check init hack.
-                        UpdateConstraint<TBodyHandles, ContactManifold4Constraint, ContactImpulses4, TCollisionCache, ConstraintCache4>(
+                        UpdateConstraint<TBodyHandles, Contact4Constraint, ContactImpulses4, TCollisionCache, ConstraintCache4>(
                             workerIndex, ref pair, manifold, manifoldTypeAsConstraintType, ref collisionCache, ref *&description, bodyHandles);
                     }
                     break;
