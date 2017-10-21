@@ -155,8 +155,8 @@ namespace SolverPrototype
                     break;
                 var start = jobIndex * bodiesPerJob;
                 var exclusiveEnd = start + bodiesPerJob;
-                if (exclusiveEnd > bodies.BodyCount)
-                    exclusiveEnd = bodies.BodyCount;
+                if (exclusiveEnd > bodies.Count)
+                    exclusiveEnd = bodies.Count;
                 Debug.Assert(exclusiveEnd > start, "Jobs that would involve bundles beyond the body count should not be created.");
 
                 IntegrateBodies(start, exclusiveEnd, cachedDt, ref boundingBoxUpdater);
@@ -183,11 +183,11 @@ namespace SolverPrototype
                 cachedDt = dt;
                 const int jobsPerWorker = 4;
                 var targetJobCount = workerCount * jobsPerWorker;
-                bodiesPerJob = bodies.BodyCount / targetJobCount;
+                bodiesPerJob = bodies.Count / targetJobCount;
                 if (bodiesPerJob == 0)
                     bodiesPerJob = 1;
-                availableJobCount = bodies.BodyCount / bodiesPerJob;
-                if (bodiesPerJob * availableJobCount < bodies.BodyCount)
+                availableJobCount = bodies.Count / bodiesPerJob;
+                if (bodiesPerJob * availableJobCount < bodies.Count)
                     ++availableJobCount;
                 this.threadDispatcher = threadDispatcher;
                 threadDispatcher.DispatchWorkers(workerDelegate);
@@ -196,7 +196,7 @@ namespace SolverPrototype
             else
             {
                 var boundingBoxUpdater = new BoundingBoxUpdater(bodies, shapes, broadPhase, pool, dt);
-                IntegrateBodies(0, bodies.BodyCount, dt, ref boundingBoxUpdater);
+                IntegrateBodies(0, bodies.Count, dt, ref boundingBoxUpdater);
                 boundingBoxUpdater.FlushAndDispose();
             }
 

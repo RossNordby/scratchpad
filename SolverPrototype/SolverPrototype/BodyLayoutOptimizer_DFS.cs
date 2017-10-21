@@ -81,7 +81,7 @@ namespace SolverPrototype
             //First, attempt to continue any previous traversals.
             do
             {
-                if (islandEnumerator.targetIndex >= bodies.BodyCount)
+                if (islandEnumerator.targetIndex >= bodies.Count)
                 {
                     //The target index has walked outside the bounds of the body set. While we could wrap around and continue, that would a different heuristic
                     //for swapping and visitation- currently we use 'to the right' which isn't well defined on a ring.

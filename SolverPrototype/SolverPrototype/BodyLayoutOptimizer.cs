@@ -121,11 +121,11 @@ namespace SolverPrototype
 
             //This optimization routine requires much less overhead than other options, like full island traversals. We only request the connections of a single body,
             //and the swap count is limited to the number of connected bodies.
-            int optimizationCount = (int)Math.Max(1, Math.Round(bodies.BodyCount * optimizationFraction));
+            int optimizationCount = (int)Math.Max(1, Math.Round(bodies.Count * optimizationFraction));
             for (int i = 0; i < optimizationCount; ++i)
             {
                 //No point trying to optimize the last two bodies. No optimizations are possible.
-                if (nextBodyIndex >= bodies.BodyCount - 2)
+                if (nextBodyIndex >= bodies.Count - 2)
                     nextBodyIndex = 0;
 
                 var enumerator = new IncrementalEnumerator();
@@ -328,10 +328,10 @@ namespace SolverPrototype
             while (Interlocked.Decrement(ref remainingOptimizationAttemptCount) >= 0)
             {
                 enumerator.HighestNeededClaimCount = 0;
-                Debug.Assert(worker.Index < bodies.BodyCount - 2, "The scheduler shouldn't produce optimizations targeting the last two slots- no swaps are possible.");
+                Debug.Assert(worker.Index < bodies.Count - 2, "The scheduler shouldn't produce optimizations targeting the last two slots- no swaps are possible.");
                 var optimizationTarget = worker.Index++;
                 //There's no reason to target the last two slots. No swaps are possible.
-                if (worker.Index >= bodies.BodyCount - 2)
+                if (worker.Index >= bodies.Count - 2)
                     worker.Index = 0;
                 enumerator.slotIndex = optimizationTarget + 1;
                 //We don't want to let other threads yank the claim origin away from us while we're enumerating over its connections. That would be complicated to deal with.
@@ -361,7 +361,7 @@ namespace SolverPrototype
             //You might want to fall back to single threaded based on some empirical testing.
 
             //Don't bother optimizing if no optimizations can be performed. This condition is assumed during worker execution.
-            if (bodies.BodyCount <= 2)
+            if (bodies.Count <= 2)
                 return;
             //Note that, while we COULD aggressively downsize the claims array in response to body count, we'll instead let it stick around unless the bodies allocations change.
             ResizeForBodiesCapacity(pool);
@@ -369,12 +369,12 @@ namespace SolverPrototype
             pool.SpecializeFor<Worker>().Take(threadPool.ThreadCount, out workers);
 
             //Note that we ignore the last two slots as optimization targets- no swaps are possible.
-            if (nextBodyIndex >= bodies.BodyCount - 2)
+            if (nextBodyIndex >= bodies.Count - 2)
                 nextBodyIndex = 0;
             //Each worker is assigned a start location evenly spaced from other workers. The less interference, the better.
-            var spacingBetweenWorkers = bodies.BodyCount / threadPool.ThreadCount;
+            var spacingBetweenWorkers = bodies.Count / threadPool.ThreadCount;
             var spacingRemainder = spacingBetweenWorkers - spacingBetweenWorkers * threadPool.ThreadCount;
-            int optimizationCount = (int)Math.Max(1, Math.Round(bodies.BodyCount * optimizationFraction));
+            int optimizationCount = (int)Math.Max(1, Math.Round(bodies.Count * optimizationFraction));
             var optimizationsPerWorker = optimizationCount / threadPool.ThreadCount;
             var optimizationsRemainder = optimizationCount - optimizationsPerWorker * threadPool.ThreadCount;
             int nextStartIndex = nextBodyIndex;
@@ -391,11 +391,11 @@ namespace SolverPrototype
                 //Note that we just wrap to zero rather than taking into acount the amount of spill. 
                 //No real downside, and ensures that the potentially longest distance pulls get done.
                 //Also note that we ignore the last two slots as optimization targets- no swaps are possible.
-                if (nextStartIndex >= bodies.BodyCount - 2)
+                if (nextStartIndex >= bodies.Count - 2)
                     nextStartIndex = 0;
             }
             //Every worker moves forward from its start location by decrementing the optimization count to claim an optimization job.
-            remainingOptimizationAttemptCount = Math.Min(bodies.BodyCount, optimizationCount);
+            remainingOptimizationAttemptCount = Math.Min(bodies.Count, optimizationCount);
 
             threadPool.DispatchWorkers(incrementalOptimizeWorkDelegate);
 

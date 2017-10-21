@@ -54,7 +54,7 @@ namespace SolverPrototype
         public Buffer<BodyInertia> Inertias;
         public IdPool<Buffer<int>> HandlePool;
         protected BufferPool pool;
-        public int BodyCount;
+        public int Count;
 
         public unsafe Bodies(BufferPool pool, int initialCapacity = 4096)
         {
@@ -70,18 +70,18 @@ namespace SolverPrototype
             //Note that we base the bundle capacities on the body capacity. This simplifies the conditions on allocation
             targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(targetBodyCapacity);
             Debug.Assert(Poses.Length != BufferPool<RigidPoses>.GetLowestContainingElementCount(targetBodyCapacity), "Should not try to use internal resize of the result won't change the size.");
-            pool.SpecializeFor<RigidPose>().Resize(ref Poses, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<BodyVelocity>().Resize(ref Velocities, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<BodyInertia>().Resize(ref LocalInertias, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<BodyInertia>().Resize(ref Inertias, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, BodyCount);
-            pool.SpecializeFor<Collidable>().Resize(ref Collidables, targetBodyCapacity, BodyCount);
+            pool.SpecializeFor<RigidPose>().Resize(ref Poses, targetBodyCapacity, Count);
+            pool.SpecializeFor<BodyVelocity>().Resize(ref Velocities, targetBodyCapacity, Count);
+            pool.SpecializeFor<BodyInertia>().Resize(ref LocalInertias, targetBodyCapacity, Count);
+            pool.SpecializeFor<BodyInertia>().Resize(ref Inertias, targetBodyCapacity, Count);
+            pool.SpecializeFor<int>().Resize(ref IndexToHandle, targetBodyCapacity, Count);
+            pool.SpecializeFor<int>().Resize(ref HandleToIndex, targetBodyCapacity, Count);
+            pool.SpecializeFor<Collidable>().Resize(ref Collidables, targetBodyCapacity, Count);
             //Initialize all the indices beyond the copied region to -1.
-            Unsafe.InitBlock(((int*)HandleToIndex.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - BodyCount)));
-            Unsafe.InitBlock(((int*)IndexToHandle.Memory) + BodyCount, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - BodyCount)));
+            Unsafe.InitBlock(((int*)HandleToIndex.Memory) + Count, 0xFF, (uint)(sizeof(int) * (HandleToIndex.Length - Count)));
+            Unsafe.InitBlock(((int*)IndexToHandle.Memory) + Count, 0xFF, (uint)(sizeof(int) * (IndexToHandle.Length - Count)));
             //Collidables beyond the body count should all point to nothing, which corresponds to zero.
-            Collidables.Clear(BodyCount, Collidables.Length - BodyCount);
+            Collidables.Clear(Count, Collidables.Length - Count);
             //Note that we do NOT modify the idpool's internal queue size here. We lazily handle that during adds, and during explicit calls to EnsureCapacity, Compact, and Resize.
             //The idpool's internal queue will often be nowhere near as large as the actual body size except in corner cases, so in the usual case, being lazy saves a little space.
             //If the user wants to guarantee zero resizes, EnsureCapacity provides them the option to do so.
@@ -89,7 +89,7 @@ namespace SolverPrototype
 
         public unsafe int Add(ref BodyDescription bodyDescription)
         {
-            if (BodyCount == HandleToIndex.Length)
+            if (Count == HandleToIndex.Length)
             {
                 Debug.Assert(HandleToIndex.Allocated, "The backing memory of the bodies set should be initialized before use. Did you dispose and then not call EnsureCapacity/Resize?");
                 //Out of room; need to resize.
@@ -98,7 +98,7 @@ namespace SolverPrototype
             }
             Debug.Assert(Math.Abs(bodyDescription.Pose.Orientation.Length() - 1) < 1e-6f, "Orientation should be initialized to a unit length quaternion.");
             var handle = HandlePool.Take();
-            var index = BodyCount++;
+            var index = Count++;
             HandleToIndex[handle] = index;
             IndexToHandle[index] = handle;
             ref var collidable = ref Collidables[index];
@@ -122,17 +122,17 @@ namespace SolverPrototype
         /// <returns>True if a body was moved, false otherwise.</returns>
         public bool RemoveAt(int bodyIndex, out int movedBodyOriginalIndex)
         {
-            Debug.Assert(bodyIndex >= 0 && bodyIndex < BodyCount);
+            Debug.Assert(bodyIndex >= 0 && bodyIndex < Count);
             var handle = IndexToHandle[bodyIndex];
             //Move the last body into the removed slot.
             //This does introduce disorder- there may be value in a second overload that preserves order, but it would require large copies.
             //In the event that so many adds and removals are performed at once that they destroy contiguity, it may be better to just
             //explicitly sort after the fact rather than attempt to retain contiguity incrementally. Handle it as a batch, in other words.
-            --BodyCount;
-            bool bodyMoved = bodyIndex < BodyCount;
+            --Count;
+            bool bodyMoved = bodyIndex < Count;
             if (bodyMoved)
             {
-                movedBodyOriginalIndex = BodyCount;
+                movedBodyOriginalIndex = Count;
                 //Copy the memory state of the last element down.
                 Poses[bodyIndex] = Poses[movedBodyOriginalIndex];
                 Velocities[bodyIndex] = Velocities[movedBodyOriginalIndex];
@@ -150,9 +150,9 @@ namespace SolverPrototype
                 movedBodyOriginalIndex = -1;
             }
             //We rely on the collidable references being nonexistent beyond the body count.
-            Collidables[BodyCount] = new Collidable();
+            Collidables[Count] = new Collidable();
             //The indices should also be set to all -1's beyond the body count.
-            IndexToHandle[BodyCount] = -1;
+            IndexToHandle[Count] = -1;
             HandlePool.Return(handle, pool.SpecializeFor<int>());
             HandleToIndex[handle] = -1;
             return bodyMoved;
@@ -245,7 +245,7 @@ namespace SolverPrototype
         /// </summary>
         public unsafe void Clear()
         {
-            BodyCount = 0;
+            Count = 0;
             //Empty out all the index-handle mappings.
             Unsafe.InitBlock(HandleToIndex.Memory, 0xFF, (uint)(sizeof(int) * HandleToIndex.Length));
             Unsafe.InitBlock(IndexToHandle.Memory, 0xFF, (uint)(sizeof(int) * IndexToHandle.Length));
@@ -266,7 +266,7 @@ namespace SolverPrototype
         }
         public void Compact(int bodyCapacity)
         {
-            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
+            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, Count));
             if (IndexToHandle.Length > targetBodyCapacity)
             {
                 InternalResize(targetBodyCapacity);
@@ -276,7 +276,7 @@ namespace SolverPrototype
 
         public void Resize(int bodyCapacity)
         {
-            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, BodyCount));
+            var targetBodyCapacity = BufferPool<int>.GetLowestContainingElementCount(Math.Max(bodyCapacity, Count));
             if (IndexToHandle.Length != targetBodyCapacity)
             {
                 InternalResize(targetBodyCapacity);
@@ -456,7 +456,7 @@ namespace SolverPrototype
         public float GetBodyEnergyHeuristic()
         {
             float accumulated = 0;
-            for (int index = 0; index <= BodyCount; ++index)
+            for (int index = 0; index <= Count; ++index)
             {
                 accumulated += Vector3.Dot(Velocities[index].Linear, Velocities[index].Linear);
                 accumulated += Vector3.Dot(Velocities[index].Angular, Velocities[index].Angular);

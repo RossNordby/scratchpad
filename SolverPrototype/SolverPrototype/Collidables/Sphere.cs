@@ -57,6 +57,10 @@ namespace SolverPrototype.Collidables
             max = new Vector3(Radius);
         }
 
-        public int TypeId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return 0; } }
+        /// <summary>
+        /// Type id of sphere shapes.
+        /// </summary>
+        public const int Id = 0;
+        public int TypeId { [MethodImpl(MethodImplOptions.AggressiveInlining)] get { return Id; } }
     }
 }

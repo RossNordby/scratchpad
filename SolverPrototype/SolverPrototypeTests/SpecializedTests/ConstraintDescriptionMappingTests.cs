@@ -45,7 +45,7 @@ namespace SolverPrototypeTests.SpecializedTests
                     int bodyHandleForConstraint;
                     do
                     {
-                        bodyHandleForConstraint = simulation.Bodies.IndexToHandle[random.Next(simulation.Bodies.BodyCount)];
+                        bodyHandleForConstraint = simulation.Bodies.IndexToHandle[random.Next(simulation.Bodies.Count)];
                     } while (Array.IndexOf(constraintBodyHandles, bodyHandleForConstraint, 0, indexInConstraint) >= 0);
 
                     constraintBodyHandles[indexInConstraint] = bodyHandleForConstraint;

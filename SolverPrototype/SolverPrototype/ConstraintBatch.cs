@@ -119,11 +119,11 @@ namespace SolverPrototype
         [Conditional("DEBUG")]
         internal void ValidateExistingHandles(Bodies bodies)
         {
-            for (int i = 0; i < bodies.BodyCount; ++i)
+            for (int i = 0; i < bodies.Count; ++i)
             {
                 bodies.ValidateExistingHandle(bodies.IndexToHandle[i]);
             }
-            for (int i = 0; i < bodies.BodyCount; ++i)
+            for (int i = 0; i < bodies.Count; ++i)
             {
                 var handle = bodies.IndexToHandle[i];
                 if (BodyHandles.Contains(handle))

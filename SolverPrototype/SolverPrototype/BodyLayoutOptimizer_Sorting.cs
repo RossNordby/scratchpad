@@ -42,7 +42,7 @@ namespace SolverPrototype
 
             //Note that this first implementation really does not care about performance. Just looking for the performance impact on the solver at this point.
 
-            if (sortingBodyIndex >= bodies.BodyCount - 1)
+            if (sortingBodyIndex >= bodies.Count - 1)
                 sortingBodyIndex = 0;
 
             var enumerator = new CollectingEnumerator();

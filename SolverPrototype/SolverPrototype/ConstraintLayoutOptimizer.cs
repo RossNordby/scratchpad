@@ -184,7 +184,7 @@ namespace SolverPrototype
 
             var typeBatch = solver.Batches[target.BatchIndex].TypeBatches[target.TypeBatchIndex];
             SortByBodyLocation(typeBatch, target.BundleIndex, Math.Min(typeBatch.ConstraintCount - target.BundleIndex * Vector<int>.Count, maximumRegionSizeInConstraints),
-                solver.HandleToConstraint, bodies.BodyCount, bufferPool, threadDispatcher);
+                solver.HandleToConstraint, bodies.Count, bufferPool, threadDispatcher);
 
         }
 

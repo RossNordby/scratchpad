@@ -40,8 +40,8 @@ namespace SolverPrototypeTests.SpecializedTests
                 //SimulationScrambling.AddRemoveChurn(simulation, 100, bodyHandles, constraintHandles);
             }
 
-            var poses = new RigidPose[simulation.Bodies.BodyCount];
-            for (int i = 0; i < simulation.Bodies.BodyCount; ++i)
+            var poses = new RigidPose[simulation.Bodies.Count];
+            for (int i = 0; i < simulation.Bodies.Count; ++i)
             {
                 poses[i] = simulation.Bodies.Poses[simulation.Bodies.HandleToIndex[bodyHandles[i]]];
             }

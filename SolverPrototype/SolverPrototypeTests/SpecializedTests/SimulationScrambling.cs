@@ -21,7 +21,7 @@ namespace SolverPrototypeTests.SpecializedTests
             //That is, move the memory location of bodies (and constraints, within type batches) to maximize the number of accesses to already-cached bodies.
 
             Random random = new Random(5);
-            for (int i = simulation.Bodies.BodyCount - 1; i >= 1; --i)
+            for (int i = simulation.Bodies.Count - 1; i >= 1; --i)
             {
                 //This helper function handles the updates that have to be performed across all body-sensitive systems.
                 BodyLayoutOptimizer.SwapBodyLocation(simulation.Bodies, simulation.ConstraintGraph, simulation.Solver, i, random.Next(i));
@@ -45,7 +45,7 @@ namespace SolverPrototypeTests.SpecializedTests
             Random random = new Random(5);
             //Body lists are isolated enough that we don't have to worry about a bunch of internal bookkeeping. Just pull the list and mess with it.
             //Note that we cannot change the order of bodies within constraints! That would change behavior.
-            for (int bodyIndex = 0; bodyIndex < simulation.Bodies.BodyCount; ++bodyIndex)
+            for (int bodyIndex = 0; bodyIndex < simulation.Bodies.Count; ++bodyIndex)
             {
                 ref var list = ref simulation.ConstraintGraph.GetConstraintList(bodyIndex);
                 for (int i = 0; i < list.Count - 1; ++i)
@@ -165,7 +165,7 @@ namespace SolverPrototypeTests.SpecializedTests
             }
 
             Debug.Assert(removedConstraints.Count + constraintCount == originalConstraintCount, "Must not have lost (or gained) any constraints!");
-            Debug.Assert(removedBodies.Count + simulation.Bodies.BodyCount == originalBodyCount, "Must not have lost (or gained) any bodies!");
+            Debug.Assert(removedBodies.Count + simulation.Bodies.Count == originalBodyCount, "Must not have lost (or gained) any bodies!");
 
         }
         static void FastRemoveAt<T>(List<T> list, int index)
@@ -199,7 +199,7 @@ namespace SolverPrototypeTests.SpecializedTests
             List<int> removedConstraints, List<int> removedBodies, Random random) where T : IConstraintDescription<T>
         {
             //Remove a body.
-            var removedBodyIndex = random.Next(simulation.Bodies.BodyCount);
+            var removedBodyIndex = random.Next(simulation.Bodies.Count);
             //All constraints associated with the body have to be removed first.
             ref var constraintList = ref simulation.ConstraintGraph.GetConstraintList(removedBodyIndex);
             for (int i = constraintList.Count - 1; i >= 0; --i)
@@ -282,7 +282,7 @@ namespace SolverPrototypeTests.SpecializedTests
             //Take a snapshot of the body descriptions.
             var bodyDescriptions = new BodyDescription[bodyHandles.Length];
             var constraintDescriptions = new CachedConstraint<T>[constraintHandles.Length];
-            Debug.Assert(simulation.Bodies.BodyCount == bodyHandles.Length);
+            Debug.Assert(simulation.Bodies.Count == bodyHandles.Length);
             int originalConstraintCount = 0;
             foreach (var batch in simulation.Solver.Batches)
             {
@@ -332,7 +332,7 @@ namespace SolverPrototypeTests.SpecializedTests
 
             Validate(simulation, removedConstraints, removedBodies, bodyHandles.Length, originalConstraintCount);
 
-            var constraintActionProbability = originalConstraintCount > 0 ? 1 - (double)simulation.Bodies.BodyCount / originalConstraintCount : 0;
+            var constraintActionProbability = originalConstraintCount > 0 ? 1 - (double)simulation.Bodies.Count / originalConstraintCount : 0;
 
             var timer = Stopwatch.StartNew();
             for (int iterationIndex = 0; iterationIndex < iterations; ++iterationIndex)
@@ -391,7 +391,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 }
             }
             Debug.Assert(newConstraintCount == originalConstraintCount, "Best have the same number of constraints if we actually added them all back!");
-            Debug.Assert(bodyHandles.Length == simulation.Bodies.BodyCount, "And bodies, too!");
+            Debug.Assert(bodyHandles.Length == simulation.Bodies.Count, "And bodies, too!");
 
             return timer.Elapsed.TotalSeconds;
         }

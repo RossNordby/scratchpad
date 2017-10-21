@@ -181,7 +181,7 @@ namespace SolverPrototype
                 else
                 {
                     //No reusable batch found. Create a new one.
-                    targetBatch = new ConstraintBatch(bufferPool, bodies.BodyCount, TypeCountEstimate);
+                    targetBatch = new ConstraintBatch(bufferPool, bodies.Count, TypeCountEstimate);
                     Batches.Add(targetBatch, new PassthroughArrayPool<ConstraintBatch>());
                 }
                 //Note that if there is no constraint batch for the given index, there is no way for the constraint add to be blocked. It's guaranteed success.

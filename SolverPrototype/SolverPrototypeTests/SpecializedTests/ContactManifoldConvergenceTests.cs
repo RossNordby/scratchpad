@@ -129,7 +129,7 @@ namespace SolverPrototypeTests.SpecializedTests
                 }
 
                 //Apply some gravity so we can simulate sorta-kinda stacking.
-                var bodyBundleCount = simulation.Bodies.BodyCount >> BundleIndexing.VectorShift;
+                var bodyBundleCount = simulation.Bodies.Count >> BundleIndexing.VectorShift;
                 var impulse = -10 * dt;
                 for (int i = 0; i < bodyBundleCount; ++i)
                 {
