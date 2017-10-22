@@ -13,7 +13,6 @@ namespace SolverPrototype.Constraints.Contact
         public Vector<float> BiasVelocity;
     }
 
-
     /// <summary>
     /// Four convex-sourced contact penetration limits solved together. Internally implemented using SI solver. 
     /// Batching saves on redundant data.
