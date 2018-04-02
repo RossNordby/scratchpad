@@ -3,7 +3,11 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.0</TargetFramework>
-    <!--<RuntimeFrameworkVersion>2.0.0-preview3-25518-01</RuntimeFrameworkVersion>-->
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.10.13" />
+    <PackageReference Include="BEPUphysics" Version="1.5.1" />
+  </ItemGroup>
 
 </Project>
