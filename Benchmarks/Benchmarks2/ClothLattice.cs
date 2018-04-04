@@ -7,13 +7,14 @@ using System.Numerics;
 
 namespace Benchmarks2
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128, id: nameof(ClothLattice) + " v2")]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 4, invocationCount: 384, id: nameof(ClothLattice) + " v2")]
     public class ClothLattice : Demo
     {
         public override void IterationSetup()
         {
             CommonSetup();
             Simulation.PoseIntegrator.Gravity = new Vector3(0, -10, 0);
+            Simulation.Solver.IterationCount = 8;
 
             //Build a grid of shapes to be connected.
             var clothNodeShape = new Sphere(0.5f);

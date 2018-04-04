@@ -208,3 +208,4 @@ ModelManifest.xml
 *.lock
 
 /SolverPrototype/SolverPrototypeTests/log.txt
+/Benchmarks/BenchmarkDotNet.Artifacts/results
