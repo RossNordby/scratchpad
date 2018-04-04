@@ -10,6 +10,7 @@ namespace Benchmarks2
             BenchmarkRunner.Run<Pyramids>();
             BenchmarkRunner.Run<ShapePile>();
             BenchmarkRunner.Run<LotsOfStatics>();
+            BenchmarkRunner.Run<ClothLattice>();
         }
     }
 }

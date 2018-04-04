@@ -22,7 +22,7 @@ namespace Benchmarks2
         }
         protected Simulation Simulation;
         BufferPool bufferPool;
-        SimpleThreadDispatcher threadDispatcher;
+        protected SimpleThreadDispatcher threadDispatcher;
 
         protected void CommonSetup()
         {

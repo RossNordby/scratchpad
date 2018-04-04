@@ -6,7 +6,7 @@ using BEPUutilities;
 
 namespace Benchmarks1
 {
-    [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 1024)]
+    [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128)]
     public class ShapePile : Demo
     {
         public override void IterationSetup()
@@ -42,8 +42,14 @@ namespace Benchmarks1
                     }
                 }
             }
-            
+
             Space.Add(new Box(new Vector3(0, -0.5f, 0), 200, 1, 200));
+
+            //Primarily interested in the more complex simulation that occurs after everything has collapsed.
+            for (int i = 0; i < 256; ++i)
+            {
+                Space.Update();
+            }
         }
     }
 }

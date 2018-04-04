@@ -10,7 +10,7 @@ using System.Text;
 
 namespace Benchmarks2
 {
-    [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 1024)]
+    [SimpleJob(launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128)]
     public class ShapePile : Demo
     {
         public override void IterationSetup()
@@ -72,7 +72,7 @@ namespace Benchmarks2
                     }
                 }
             }
-            
+
             var staticShape = new Box(200, 1, 200);
             var staticShapeIndex = Simulation.Shapes.Add(ref staticShape);
 
@@ -92,6 +92,11 @@ namespace Benchmarks2
             };
             Simulation.Statics.Add(ref staticDescription);
 
+            //Primarily interested in the more complex simulation that occurs after everything has collapsed.
+            for (int i = 0; i < 256; ++i)
+            {
+                Simulation.Timestep(1 / 60f, threadDispatcher);
+            }
         }
     }
 }
