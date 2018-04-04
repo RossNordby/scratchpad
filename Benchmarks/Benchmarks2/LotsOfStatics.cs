@@ -11,7 +11,7 @@ using System.Text;
 
 namespace Benchmarks2
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128)]
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128, id: nameof(LotsOfStatics) + " v2")]
     public class LotsOfStatics : Demo
     {
         public override void IterationSetup()
