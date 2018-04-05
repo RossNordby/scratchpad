@@ -206,6 +206,7 @@ ModelManifest.xml
 *.ide-shm
 *.ide-wal
 *.lock
+.vs/
 
 /SolverPrototype/SolverPrototypeTests/log.txt
 /Benchmarks/BenchmarkDotNet.Artifacts/results
