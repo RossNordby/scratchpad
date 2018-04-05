@@ -7,8 +7,8 @@ using System.Numerics;
 
 namespace Benchmarks2
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 4, invocationCount: 384, id: nameof(ClothLattice) + " v2")]
-    public class ClothLattice : Demo
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 4, invocationCount: 384, id: nameof(ClothLattice2))]
+    public class ClothLattice2 : Demo
     {
         public override void IterationSetup()
         {

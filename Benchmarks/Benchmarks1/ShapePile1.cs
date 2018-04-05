@@ -7,8 +7,8 @@ using BEPUutilities;
 
 namespace Benchmarks1
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 2, invocationCount: 128, id: nameof(ShapePile) + " v1")]
-    public class ShapePile : Demo
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 2, invocationCount: 128, id: nameof(ShapePile1))]
+    public class ShapePile1 : Demo
     {
         public override void IterationSetup()
         {

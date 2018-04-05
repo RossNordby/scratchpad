@@ -5,8 +5,8 @@ using BEPUutilities;
 
 namespace Benchmarks1
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 2, invocationCount: 64, id: nameof(Pyramids) + " v1")]
-    public class Pyramids : Demo
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 2, invocationCount: 64, id: nameof(Pyramids1))]
+    public class Pyramids1 : Demo
     {
         public override void IterationSetup()
         {

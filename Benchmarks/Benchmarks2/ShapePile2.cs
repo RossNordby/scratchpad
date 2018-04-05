@@ -10,8 +10,8 @@ using System.Text;
 
 namespace Benchmarks2
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128, id: nameof(ShapePile) + " v2")]
-    public class ShapePile : Demo
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 128, id: nameof(ShapePile2))]
+    public class ShapePile2 : Demo
     {
         public override void IterationSetup()
         {

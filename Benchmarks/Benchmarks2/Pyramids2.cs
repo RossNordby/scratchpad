@@ -6,8 +6,8 @@ using System.Numerics;
 
 namespace Benchmarks2
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 64, id: nameof(Pyramids) + " v2")]
-    public class Pyramids : Demo
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 8, invocationCount: 64, id: nameof(Pyramids2))]
+    public class Pyramids2 : Demo
     {
         public override void IterationSetup()
         {

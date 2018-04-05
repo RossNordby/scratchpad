@@ -6,10 +6,10 @@ namespace Benchmarks1
     {
         static void Main(string[] args)
         {
-            BenchmarkRunner.Run<Pyramids>();
-            BenchmarkRunner.Run<ShapePile>();
-            BenchmarkRunner.Run<LotsOfStatics>();
-            BenchmarkRunner.Run<ClothLattice>();
+            BenchmarkRunner.Run<Pyramids1>();
+            BenchmarkRunner.Run<ShapePile1>();
+            BenchmarkRunner.Run<LotsOfStatics1>();
+            BenchmarkRunner.Run<ClothLattice1>();
         }
     }
 }

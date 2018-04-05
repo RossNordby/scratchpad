@@ -6,8 +6,8 @@ using BEPUutilities;
 
 namespace Benchmarks1
 {
-    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 2, invocationCount: 384, id: nameof(ClothLattice) + " v1")]
-    public class ClothLattice : Demo
+    [SimpleJob(RunStrategy.Monitoring, launchCount: 1, warmupCount: 1, targetCount: 2, invocationCount: 384, id: nameof(ClothLattice1))]
+    public class ClothLattice1 : Demo
     {
         public override void IterationSetup()
         {
