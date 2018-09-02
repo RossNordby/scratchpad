@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Attributes.Jobs;
+﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using BepuPhysics;
 using BepuPhysics.Collidables;
@@ -17,7 +17,7 @@ namespace Benchmarks2
 
             var boxShape = new Box(1, 1, 1);
             boxShape.ComputeInertia(1, out var boxInertia);
-            var boxIndex = Simulation.Shapes.Add(ref boxShape);
+            var boxIndex = Simulation.Shapes.Add(boxShape);
             const int pyramidCount = 20;
             for (int pyramidIndex = 0; pyramidIndex < pyramidCount; ++pyramidIndex)
             {
@@ -41,13 +41,13 @@ namespace Benchmarks2
                             Activity = new BodyActivityDescription { MinimumTimestepCountUnderThreshold = 32, SleepThreshold = 0 }, //Note no sleeping.
                             Collidable = new CollidableDescription { Shape = boxIndex, SpeculativeMargin = .1f }
                         };
-                        Simulation.Bodies.Add(ref bodyDescription);
+                        Simulation.Bodies.Add(bodyDescription);
                     }
                 }
             }
 
             var staticShape = new Box(200, 1, 200);
-            var staticShapeIndex = Simulation.Shapes.Add(ref staticShape);
+            var staticShapeIndex = Simulation.Shapes.Add(staticShape);
 
             var staticDescription = new StaticDescription
             {
@@ -63,7 +63,7 @@ namespace Benchmarks2
                     Orientation = BepuUtilities.Quaternion.Identity
                 }
             };
-            Simulation.Statics.Add(ref staticDescription);
+            Simulation.Statics.Add(staticDescription);
         }
 
     }

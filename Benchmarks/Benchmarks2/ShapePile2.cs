@@ -1,4 +1,4 @@
-﻿using BenchmarkDotNet.Attributes.Jobs;
+﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using BepuPhysics;
 using BepuPhysics.Collidables;
@@ -24,9 +24,9 @@ namespace Benchmarks2
             box.ComputeInertia(1, out var boxInertia);
             capsule.ComputeInertia(1, out var capsuleInertia);
             sphere.ComputeInertia(1, out var sphereInertia);
-            var boxIndex = Simulation.Shapes.Add(ref box);
-            var capsuleIndex = Simulation.Shapes.Add(ref capsule);
-            var sphereIndex = Simulation.Shapes.Add(ref sphere);
+            var boxIndex = Simulation.Shapes.Add(box);
+            var capsuleIndex = Simulation.Shapes.Add(capsule);
+            var sphereIndex = Simulation.Shapes.Add(sphere);
             const int width = 16;
             const int height = 16;
             const int length = 16;
@@ -67,14 +67,14 @@ namespace Benchmarks2
                                 bodyDescription.LocalInertia = sphereInertia;
                                 break;
                         }
-                        Simulation.Bodies.Add(ref bodyDescription);
+                        Simulation.Bodies.Add(bodyDescription);
 
                     }
                 }
             }
 
             var staticShape = new Box(200, 1, 200);
-            var staticShapeIndex = Simulation.Shapes.Add(ref staticShape);
+            var staticShapeIndex = Simulation.Shapes.Add(staticShape);
 
             var staticDescription = new StaticDescription
             {
@@ -90,7 +90,7 @@ namespace Benchmarks2
                     Orientation = BepuUtilities.Quaternion.Identity
                 }
             };
-            Simulation.Statics.Add(ref staticDescription);
+            Simulation.Statics.Add(staticDescription);
 
             //Primarily interested in the more complex simulation that occurs after everything has collapsed.
             for (int i = 0; i < 256; ++i)

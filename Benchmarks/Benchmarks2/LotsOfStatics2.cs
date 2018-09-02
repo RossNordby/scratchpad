@@ -1,5 +1,4 @@
-﻿using BenchmarkDotNet.Attributes.Exporters;
-using BenchmarkDotNet.Attributes.Jobs;
+﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Engines;
 using BepuPhysics;
 using BepuPhysics.Collidables;
@@ -21,7 +20,7 @@ namespace Benchmarks2
             Simulation.Solver.IterationCount = 8;
             var shape = new Box(1, 1, 1);
             shape.ComputeInertia(1, out var sphereInertia);
-            var shapeIndex = Simulation.Shapes.Add(ref shape);
+            var shapeIndex = Simulation.Shapes.Add(shape);
             const int width = 64;
             const int height = 1;
             const int length = 64;
@@ -49,14 +48,14 @@ namespace Benchmarks2
 
                         bodyDescription.Collidable.Shape = shapeIndex;
                         bodyDescription.LocalInertia = sphereInertia;
-                        Simulation.Bodies.Add(ref bodyDescription);
+                        Simulation.Bodies.Add(bodyDescription);
 
                     }
                 }
             }
 
             var staticShape = new Box(1, 1, 1);
-            var staticShapeIndex = Simulation.Shapes.Add(ref staticShape);
+            var staticShapeIndex = Simulation.Shapes.Add(staticShape);
             const int staticGridWidth = 96;
             const float staticSpacing = 1.2f;
             var gridOffset = -0.5f * staticGridWidth * staticSpacing;
@@ -81,7 +80,7 @@ namespace Benchmarks2
                             Orientation = BepuUtilities.Quaternion.CreateFromAxisAngle(Vector3.Normalize(new Vector3(1 + i, i * j % 10, -10 + -j)), (i ^ j) * 0.5f * (MathHelper.PiOver4))
                         }
                     };
-                    Simulation.Statics.Add(ref staticDescription);
+                    Simulation.Statics.Add(staticDescription);
                 }
             }
 
