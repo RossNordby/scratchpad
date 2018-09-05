@@ -213,6 +213,50 @@ namespace CodegenTests
             return Unsafe.As<Vector<float>, float>(ref toReturn);
         }
 
+        public static unsafe float ManuallyInlinedNumericsWithLoadCaching(void* setupData, int innerIterationCount)
+        {
+            ref var baseValue = ref Unsafe.AsRef<VNumerics>(setupData);
+            Vector<float> accumulatorX = new Vector<float>(0f);
+            Vector<float> accumulatorY = new Vector<float>(0f);
+            Vector<float> accumulatorZ = new Vector<float>(0f);
+            for (int i = 0; i < innerIterationCount; ++i)
+            {
+                ref var value = ref Unsafe.Add(ref baseValue, i);
+                var x = value.X;
+                var y = value.Y;
+                var z = value.Z;
+                var r0x = x + x;
+                var r0y = y + y;
+                var r0z = z + z;
+                var r1x = x + x;
+                var r1y = y + y;
+                var r1z = z + z;
+                var r2x = x + x;
+                var r2y = y + y;
+                var r2z = z + z;
+                var r3x = x + x;
+                var r3y = y + y;
+                var r3z = z + z;
+
+                var i0x = r0x + r1x;
+                var i0y = r0y + r1y;
+                var i0z = r0z + r1z;
+                var i1x = r2x + r3x;
+                var i1y = r2y + r3y;
+                var i1z = r2z + r3z;
+
+                var i2x = i0x + i1x;
+                var i2y = i0y + i1y;
+                var i2z = i0z + i1z;
+
+                accumulatorX = i2x + accumulatorX;
+                accumulatorY = i2y + accumulatorY;
+                accumulatorZ = i2z + accumulatorZ;
+            }
+            var toReturn = accumulatorX + accumulatorY + accumulatorZ;
+            return Unsafe.As<Vector<float>, float>(ref toReturn);
+        }
+
         public static unsafe float AddFunctionNumerics(void* setupData, int innerIterationCount)
         {
             ref var baseValue = ref Unsafe.AsRef<VNumerics>(setupData);
@@ -383,6 +427,7 @@ namespace CodegenTests
             }
             var numericsHandle = GCHandle.Alloc(numericsValues, GCHandleType.Pinned);
             Test(innerIterationCount, outerIterationCount, 1024, nameof(ManuallyInlinedNumerics), Unsafe.AsPointer(ref numericsValues[0]), ManuallyInlinedNumerics);
+            Test(innerIterationCount, outerIterationCount, 1024, nameof(ManuallyInlinedNumericsWithLoadCaching), Unsafe.AsPointer(ref numericsValues[0]), ManuallyInlinedNumericsWithLoadCaching);
             Test(innerIterationCount, outerIterationCount, 1024, nameof(AddFunctionNumerics), Unsafe.AsPointer(ref numericsValues[0]), AddFunctionNumerics);
             Test(innerIterationCount, outerIterationCount, 1024, nameof(OperatorNumerics), Unsafe.AsPointer(ref numericsValues[0]), OperatorNumerics);
             numericsHandle.Free();
