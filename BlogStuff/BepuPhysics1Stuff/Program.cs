@@ -7,7 +7,7 @@ namespace BepuPhysics1Stuff
 
         static void Main(string[] args)
         {
-            ValueTypes.Boop();
+            //ValueTypes.Boop();
             //var demo = new SelfCollidingClothDemo();
             //for (int i = 0; i < 100000; ++i)
             //{

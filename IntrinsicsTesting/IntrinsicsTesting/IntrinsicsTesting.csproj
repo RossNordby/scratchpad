@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RuntimeFrameworkVersion>3.0.0-preview1-26829-01</RuntimeFrameworkVersion>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <!--<TargetFramework>netcoreapp2.1</TargetFramework>-->
+    <LangVersion>7.3</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!--<DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <RuntimeIdentifiers>win10-x64</RuntimeIdentifiers>-->
+    <TieredCompilation>false</TieredCompilation>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.6.0-preview1-26903-01" />
+  </ItemGroup>
+
+</Project>
