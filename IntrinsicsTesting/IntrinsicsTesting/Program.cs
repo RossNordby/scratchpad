@@ -35,6 +35,83 @@ namespace CodegenTests
             }
         }
 
+        [StructLayout(LayoutKind.Explicit, Size = 256 / 8)]
+        public struct Vector256
+        {
+        }
+
+        public unsafe struct VAvxPointer
+        {
+            public Vector256 X;
+            public Vector256 Y;
+            public Vector256 Z;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static void Add(VAvxPointer* a, VAvxPointer* b, VAvxPointer* result)
+            {
+                var ax = Avx.LoadVector256((float*)&a->X);
+                var ay = Avx.LoadVector256((float*)&a->Y);
+                var az = Avx.LoadVector256((float*)&a->Z);
+                var bx = Avx.LoadVector256((float*)&b->X);
+                var by = Avx.LoadVector256((float*)&b->Y);
+                var bz = Avx.LoadVector256((float*)&b->Z);
+                var rx = Avx.Add(ax, bx);
+                var ry = Avx.Add(ay, by);
+                var rz = Avx.Add(az, bz);
+                Avx.Store((float*)&result->X, rx);
+                Avx.Store((float*)&result->Y, ry);
+                Avx.Store((float*)&result->Z, rz);
+            }
+
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static VAvxPointer operator +(in VAvxPointer a, in VAvxPointer b)
+            {
+                var aPointer = (VAvxPointer*)Unsafe.AsPointer(ref Unsafe.AsRef(a));
+                var bPointer = (VAvxPointer*)Unsafe.AsPointer(ref Unsafe.AsRef(b));
+                var ax = Avx.LoadVector256((float*)&aPointer->X);
+                var ay = Avx.LoadVector256((float*)&aPointer->Y);
+                var az = Avx.LoadVector256((float*)&aPointer->Z);
+                var bx = Avx.LoadVector256((float*)&bPointer->X);
+                var by = Avx.LoadVector256((float*)&bPointer->Y);
+                var bz = Avx.LoadVector256((float*)&bPointer->Z);
+                var rx = Avx.Add(ax, bx);
+                var ry = Avx.Add(ay, by);
+                var rz = Avx.Add(az, bz);
+                VAvxPointer result;
+                Avx.Store((float*)&result.X, rx);
+                Avx.Store((float*)&result.Y, ry);
+                Avx.Store((float*)&result.Z, rz);
+                return result;
+            }
+        }
+
+        public unsafe ref struct VAvxRefStruct
+        {
+            public Vector256 X;
+            public Vector256 Y;
+            public Vector256 Z;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public static VAvxRefStruct operator +(VAvxRefStruct a, VAvxRefStruct b)
+            {
+                var ax = Avx.LoadVector256((float*)&a.X);
+                var ay = Avx.LoadVector256((float*)&a.Y);
+                var az = Avx.LoadVector256((float*)&a.Z);
+                var bx = Avx.LoadVector256((float*)&b.X);
+                var by = Avx.LoadVector256((float*)&b.Y);
+                var bz = Avx.LoadVector256((float*)&b.Z);
+                var rx = Avx.Add(ax, bx);
+                var ry = Avx.Add(ay, by);
+                var rz = Avx.Add(az, bz);
+                VAvxRefStruct result;
+                Avx.Store((float*)&result.X, rx);
+                Avx.Store((float*)&result.Y, ry);
+                Avx.Store((float*)&result.Z, rz);
+                return result;
+            }
+        }
+
         public struct VNumerics
         {
             public Vector<float> X;
@@ -169,6 +246,71 @@ namespace CodegenTests
             }
             var axy = Avx.Add(accumulator.X, accumulator.Y);
             var toReturn = Avx.Add(axy, accumulator.Z);
+            return Unsafe.As<Vector256<float>, float>(ref toReturn);
+        }
+
+
+        public static unsafe float AddFunctionAVXPointer(void* setupData, int innerIterationCount)
+        {
+            var values = (VAvxPointer*)setupData;
+            VAvxPointer accumulator = default;
+            VAvxPointer r0 = default, r1 = default, r2 = default, r3 = default, i0 = default, i1 = default, i2 = default;
+            for (int j = 0; j < innerIterationCount; ++j)
+            {
+                var value = values + j;
+                VAvxPointer.Add(value, value, &r0);
+                VAvxPointer.Add(value, value, &r1);
+                VAvxPointer.Add(value, value, &r2);
+                VAvxPointer.Add(value, value, &r3);
+                VAvxPointer.Add(&r0, &r1, &i0);
+                VAvxPointer.Add(&r2, &r3, &i1);
+                VAvxPointer.Add(&i0, &i1, &i2);
+                VAvxPointer.Add(&i2, &accumulator, &accumulator);
+            }
+            var axy = Avx.Add(Unsafe.As<Vector256, Vector256<float>>(ref accumulator.X), Unsafe.As<Vector256, Vector256<float>>(ref accumulator.Y));
+            var toReturn = Avx.Add(axy, Unsafe.As<Vector256, Vector256<float>>(ref accumulator.Z));
+            return Unsafe.As<Vector256<float>, float>(ref toReturn);
+        }
+
+        public static unsafe float OperatorAVXPointer(void* setupData, int innerIterationCount)
+        {
+            ref var baseValue = ref Unsafe.AsRef<VAvxPointer>(setupData);
+            VAvxPointer accumulator = default;
+            for (int j = 0; j < innerIterationCount; ++j)
+            {
+                ref var value = ref Unsafe.Add(ref baseValue, j);
+                var r0 = value + value;
+                var r1 = value + value;
+                var r2 = value + value;
+                var r3 = value + value;
+                var i0 = r0 + r1;
+                var i1 = r2 + r3;
+                var i2 = i0 + i1;
+                accumulator += i2;
+            }
+            var axy = Avx.Add(Unsafe.As<Vector256, Vector256<float>>(ref accumulator.X), Unsafe.As<Vector256, Vector256<float>>(ref accumulator.Y));
+            var toReturn = Avx.Add(axy, Unsafe.As<Vector256, Vector256<float>>(ref accumulator.Z));
+            return Unsafe.As<Vector256<float>, float>(ref toReturn);
+        }
+
+        public static unsafe float OperatorAVXRefStruct(void* setupData, int innerIterationCount)
+        {
+            var values = (VAvxRefStruct*)setupData;
+            VAvxRefStruct accumulator = default;
+            for (int j = 0; j < innerIterationCount; ++j)
+            {
+                var value = values[j];
+                var r0 = value + value;
+                var r1 = value + value;
+                var r2 = value + value;
+                var r3 = value + value;
+                var i0 = r0 + r1;
+                var i1 = r2 + r3;
+                var i2 = i0 + i1;
+                accumulator += i2;
+            }
+            var axy = Avx.Add(Unsafe.As<Vector256, Vector256<float>>(ref accumulator.X), Unsafe.As<Vector256, Vector256<float>>(ref accumulator.Y));
+            var toReturn = Avx.Add(axy, Unsafe.As<Vector256, Vector256<float>>(ref accumulator.Z));
             return Unsafe.As<Vector256<float>, float>(ref toReturn);
         }
 
@@ -403,7 +545,7 @@ namespace CodegenTests
 
         unsafe static void Main(string[] args)
         {
-            const int outerIterationCount = 1 << 15;
+            const int outerIterationCount = 1 << 13;
             const int innerIterationCount = 1 << 10;
 
             Console.WriteLine($"Floats");
@@ -445,8 +587,16 @@ namespace CodegenTests
             Test(innerIterationCount, outerIterationCount, 1024, nameof(ManuallyInlinedAVX), Unsafe.AsPointer(ref avxValues[0]), ManuallyInlinedAVX);
             Test(innerIterationCount, outerIterationCount, 1024, nameof(AddFunctionAVX), Unsafe.AsPointer(ref avxValues[0]), AddFunctionAVX);
             Test(innerIterationCount, outerIterationCount, 1024, nameof(OperatorAVX), Unsafe.AsPointer(ref avxValues[0]), OperatorAVX);
-            avxHandle.Free();
 
+            Console.WriteLine();
+            Console.WriteLine("Platform intrinsics AVX Pointer");
+            Test(innerIterationCount, outerIterationCount, 1024, nameof(AddFunctionAVXPointer), Unsafe.AsPointer(ref avxValues[0]), AddFunctionAVXPointer);
+            Test(innerIterationCount, outerIterationCount, 1024, nameof(OperatorAVXPointer), Unsafe.AsPointer(ref avxValues[0]), OperatorAVXPointer);
+     
+            Console.WriteLine();
+            Console.WriteLine("Platform intrinsics AVX Ref Struct");
+            Test(innerIterationCount, outerIterationCount, 1024, nameof(OperatorAVXRefStruct), Unsafe.AsPointer(ref avxValues[0]), OperatorAVXRefStruct);
+            avxHandle.Free();
 
         }
     }
