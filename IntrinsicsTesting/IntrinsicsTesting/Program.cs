@@ -36,8 +36,7 @@ namespace IntrinsicsTesting
             Console.WriteLine($"Accumulator: {accumulator}");
             Console.WriteLine($"{name} time (ms): {(end - start) * 1e3 / Stopwatch.Frequency}");
         }
-
-
+        
         unsafe static void Main(string[] args)
         {
             const int warmUpIterationCount = 1 << 10;
