@@ -16,5 +16,10 @@ namespace GoingWide
         }
                 
         public abstract void Execute();
+
+        public void Reset()
+        {
+            pool.Reset();
+        }
     }
 }

@@ -16,6 +16,7 @@ namespace GoingWide
             {
                 benchmark.Execute();
             }
+            benchmark.Reset();
             var minimumTime = double.MaxValue;
             var maximumTime = double.MinValue;
             for (int j = 0; j < runCount; ++j)
@@ -26,6 +27,7 @@ namespace GoingWide
                     benchmark.Execute();
                 }
                 var end = Stopwatch.GetTimestamp();
+                benchmark.Reset();
                 var time = (end - start) / (double)Stopwatch.Frequency;
 
                 Console.WriteLine($"Time per iteration (ms): {1e3 * time / iterationCount}");
@@ -41,6 +43,7 @@ namespace GoingWide
         {
             const int runCount = 5;
             const int iterationCount = 10;
+            Run<SOA>(runCount, iterationCount);
             Run<AOSScalar>(runCount, iterationCount);
             Run<AOSSSE>(runCount, iterationCount);
             Run<AOSNumerics>(runCount, iterationCount);
