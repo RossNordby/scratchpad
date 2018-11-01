@@ -17,9 +17,9 @@ namespace GoingWide
         Vector3SOA CreateVector()
         {
             Vector3SOA v;
-            v.X = (ScalarWide*)pool.Allocate(4 * LaneCount);
-            v.Y = (ScalarWide*)pool.Allocate(4 * LaneCount);
-            v.Z = (ScalarWide*)pool.Allocate(4 * LaneCount);
+            v.X = (ScalarWideU*)pool.Allocate(4 * LaneCount);
+            v.Y = (ScalarWideU*)pool.Allocate(4 * LaneCount);
+            v.Z = (ScalarWideU*)pool.Allocate(4 * LaneCount);
             return v;
         }
         public SOA()

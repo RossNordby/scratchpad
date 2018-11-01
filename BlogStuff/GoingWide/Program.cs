@@ -43,7 +43,10 @@ namespace GoingWide
             const int iterationCount = 10;
             Run<AOSScalar>(runCount, iterationCount);
             Run<AOSSSE>(runCount, iterationCount);
-            Run<AOSOA>(runCount, iterationCount);
+            Run<AOSNumerics>(runCount, iterationCount);
+            Run<AOSOAU>(runCount, iterationCount);
+            Run<AOSOALS>(runCount, iterationCount);
+            Run<AOSOANumerics>(runCount, iterationCount);
         }
     }
 }

@@ -6,14 +6,14 @@ using System.Runtime.Intrinsics.X86;
 namespace GoingWide
 {
     [StructLayout(LayoutKind.Explicit, Size = BundleSize * 4)]
-    public unsafe struct ScalarWide
+    public unsafe struct ScalarWideU
     {
         public const int BundleSize = 8;
         const bool AllowAVX = true;
         const bool AllowSSE = true;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Add(ScalarWide* aBundle, ScalarWide* bBundle, ScalarWide* resultBundle)
+        public static void Add(ScalarWideU* aBundle, ScalarWideU* bBundle, ScalarWideU* resultBundle)
         {
             if (AllowAVX && Avx.IsSupported)
             {
@@ -67,7 +67,7 @@ namespace GoingWide
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Subtract(ScalarWide* aBundle, ScalarWide* bBundle, ScalarWide* resultBundle)
+        public static void Subtract(ScalarWideU* aBundle, ScalarWideU* bBundle, ScalarWideU* resultBundle)
         {
             if (AllowAVX && Avx.IsSupported)
             {
@@ -121,7 +121,7 @@ namespace GoingWide
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Multiply(ScalarWide* aBundle, ScalarWide* bBundle, ScalarWide* resultBundle)
+        public static void Multiply(ScalarWideU* aBundle, ScalarWideU* bBundle, ScalarWideU* resultBundle)
         {
             if (AllowAVX && Avx.IsSupported)
             {

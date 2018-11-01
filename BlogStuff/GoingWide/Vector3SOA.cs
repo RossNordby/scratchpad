@@ -7,9 +7,9 @@ namespace GoingWide
 {
     public unsafe struct Vector3SOA
     {
-        public ScalarWide* X;
-        public ScalarWide* Y;
-        public ScalarWide* Z;
+        public ScalarWideU* X;
+        public ScalarWideU* Y;
+        public ScalarWideU* Z;
 
         public static void Cross(in Vector3SOA a, in Vector3SOA b)
         {
