@@ -5,7 +5,9 @@ VisualStudioVersion = 15.0.28010.2003
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BepuPhysics1Stuff", "BepuPhysics1Stuff\BepuPhysics1Stuff.csproj", "{419B5974-BD29-48D5-B6AD-E1B58AA69CD6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodegenTests", "CodegenTests\CodegenTests.csproj", "{6C3A46C4-4D89-4207-9AF2-6E516A7CE034}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodegenTests", "CodegenTests\CodegenTests.csproj", "{6C3A46C4-4D89-4207-9AF2-6E516A7CE034}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GoingWide", "GoingWide\GoingWide.csproj", "{2FA3358F-5443-4334-AB97-0A2C3504689A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{6C3A46C4-4D89-4207-9AF2-6E516A7CE034}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C3A46C4-4D89-4207-9AF2-6E516A7CE034}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6C3A46C4-4D89-4207-9AF2-6E516A7CE034}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FA3358F-5443-4334-AB97-0A2C3504689A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FA3358F-5443-4334-AB97-0A2C3504689A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FA3358F-5443-4334-AB97-0A2C3504689A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FA3358F-5443-4334-AB97-0A2C3504689A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
