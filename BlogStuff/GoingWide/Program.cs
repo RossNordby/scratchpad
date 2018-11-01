@@ -11,7 +11,11 @@ namespace GoingWide
             Console.WriteLine($"Testing {name}...");
             var benchmark = new T();
 
-            benchmark.Execute();
+            //Do a bit of warmup. Both to JIT and to give the processor time to adjust clocks for the instruction stream.
+            for (int i = 0; i < iterationCount; ++i)
+            {
+                benchmark.Execute();
+            }
             var minimumTime = double.MaxValue;
             var maximumTime = double.MinValue;
             for (int j = 0; j < runCount; ++j)
@@ -39,6 +43,7 @@ namespace GoingWide
             const int iterationCount = 10;
             Run<AOSScalar>(runCount, iterationCount);
             Run<AOSSSE>(runCount, iterationCount);
+            Run<AOSOA>(runCount, iterationCount);
         }
     }
 }
