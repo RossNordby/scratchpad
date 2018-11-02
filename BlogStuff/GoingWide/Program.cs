@@ -43,10 +43,10 @@ namespace GoingWide
         {
             const int runCount = 5;
             const int iterationCount = 10;
-            Run<SOA>(runCount, iterationCount);
             Run<AOSScalar>(runCount, iterationCount);
             Run<AOSSSE>(runCount, iterationCount);
             Run<AOSNumerics>(runCount, iterationCount);
+            Run<SOADoofy>(runCount, iterationCount);
             Run<AOSOAU>(runCount, iterationCount);
             Run<AOSOALS>(runCount, iterationCount);
             Run<AOSOANumerics>(runCount, iterationCount);

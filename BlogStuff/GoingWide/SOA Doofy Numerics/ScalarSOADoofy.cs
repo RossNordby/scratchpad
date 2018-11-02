@@ -8,19 +8,19 @@ using System.Text;
 
 namespace GoingWide
 {
-    public struct ScalarSOA
+    public struct ScalarSOADoofy
     {
         public Buffer<float> Values;
 
         [Conditional("DEBUG")]
-        static void Validate(in ScalarSOA a, in ScalarSOA b, in ScalarSOA result)
+        static void Validate(in ScalarSOADoofy a, in ScalarSOADoofy b, in ScalarSOADoofy result)
         {
             Debug.Assert(result.Values.Length >= a.Values.Length && result.Values.Length >= b.Values.Length && (result.Values.Length & (Vector<float>.Count - 1)) == 0,
                 "We assume that the result is bundle divisible and all inputs are large enough to feed it.");
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Add(ref ScalarSOA a, ref ScalarSOA b, ref ScalarSOA result)
+        public static void Add(ref ScalarSOADoofy a, ref ScalarSOADoofy b, ref ScalarSOADoofy result)
         {
             Validate(a, b, result);
             var lengthInBundles = result.Values.Length / Vector<float>.Count;
@@ -34,7 +34,7 @@ namespace GoingWide
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Subtract(ref ScalarSOA a, ref ScalarSOA b, ref ScalarSOA result)
+        public static void Subtract(ref ScalarSOADoofy a, ref ScalarSOADoofy b, ref ScalarSOADoofy result)
         {
             Validate(a, b, result);
             var lengthInBundles = result.Values.Length / Vector<float>.Count;
@@ -48,7 +48,7 @@ namespace GoingWide
         }
 
         //[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Multiply(ref ScalarSOA a, ref ScalarSOA b, ref ScalarSOA result)
+        public static void Multiply(ref ScalarSOADoofy a, ref ScalarSOADoofy b, ref ScalarSOADoofy result)
         {
             Validate(a, b, result);
             var lengthInBundles = result.Values.Length / Vector<float>.Count;
