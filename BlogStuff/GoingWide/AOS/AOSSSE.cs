@@ -30,8 +30,8 @@ namespace GoingWide
                 for (int i = 0; i < LaneCount; ++i)
                 {
                     ref var lane = ref input[i];
-                    Vector3AOS.Cross4ShuffleSSE(lane.A, lane.B, out var axb);
-                    Vector3AOS.Cross4ShuffleSSE(lane.C, lane.D, out var cxd);
+                    Vector3AOS.Cross3ShuffleSSE(lane.A, lane.B, out var axb);
+                    Vector3AOS.Cross3ShuffleSSE(lane.C, lane.D, out var cxd);
                     Vector3AOS.DotSSE(axb, lane.A, out var axbDotA);
                     Vector3AOS.DotSSE(cxd, lane.C, out var cxdDotC);
                     Vector3AOS.ScaleSSE(lane.B, axbDotA, out var left);

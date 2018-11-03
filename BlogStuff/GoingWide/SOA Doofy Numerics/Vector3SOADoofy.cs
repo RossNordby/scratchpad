@@ -16,6 +16,7 @@ namespace GoingWide
         //These are pretty doofy SOA usages.
         //Realistically, you would want to execute in bundles to avoid allocating big chunks of temporary memory and evicting local cache over and over.
         //These are just here to contrast with AOSOA.
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Cross(ref Vector3SOADoofy a, ref Vector3SOADoofy b, ArenaPool pool, ref Vector3SOADoofy result)
         {
             var left = new ScalarSOADoofy { Values = pool.Allocate<float>(result.X.Values.Length) };
@@ -33,6 +34,7 @@ namespace GoingWide
             ScalarSOADoofy.Subtract(ref left, ref right, ref result.Z);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Dot(ref Vector3SOADoofy a, ref Vector3SOADoofy b, ArenaPool pool, ref ScalarSOADoofy result)
         {
             ScalarSOADoofy.Multiply(ref a.X, ref b.X, ref result);
@@ -43,6 +45,7 @@ namespace GoingWide
             ScalarSOADoofy.Add(ref result, ref temp, ref result);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Scale(ref Vector3SOADoofy v, ref ScalarSOADoofy scale, ref Vector3SOADoofy result)
         {
             ScalarSOADoofy.Multiply(ref v.X, ref scale, ref result.X);

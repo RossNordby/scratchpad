@@ -41,12 +41,13 @@ namespace GoingWide
         }
         static void Main(string[] args)
         {
-            const int runCount = 5;
+            const int runCount = 10;
             const int iterationCount = 10;
             Run<AOSScalar>(runCount, iterationCount);
             Run<AOSSSE>(runCount, iterationCount);
             Run<AOSNumerics>(runCount, iterationCount);
             Run<SOADoofy>(runCount, iterationCount);
+            Run<SOABundled>(runCount, iterationCount);
             Run<AOSOAU>(runCount, iterationCount);
             Run<AOSOALS>(runCount, iterationCount);
             Run<AOSOANumerics>(runCount, iterationCount);

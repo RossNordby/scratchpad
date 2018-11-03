@@ -19,7 +19,7 @@ namespace GoingWide
                 "We assume that the result is bundle divisible and all inputs are large enough to feed it.");
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Add(ref ScalarSOADoofy a, ref ScalarSOADoofy b, ref ScalarSOADoofy result)
         {
             Validate(a, b, result);
@@ -33,7 +33,7 @@ namespace GoingWide
             }
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Subtract(ref ScalarSOADoofy a, ref ScalarSOADoofy b, ref ScalarSOADoofy result)
         {
             Validate(a, b, result);
@@ -47,7 +47,7 @@ namespace GoingWide
             }
         }
 
-        //[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void Multiply(ref ScalarSOADoofy a, ref ScalarSOADoofy b, ref ScalarSOADoofy result)
         {
             Validate(a, b, result);
