@@ -2,10 +2,9 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <RuntimeFrameworkVersion>3.0.0-preview1-27029-03</RuntimeFrameworkVersion>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
-    <!--<TargetFramework>netcoreapp2.1</TargetFramework>-->
-    <LangVersion>7.3</LangVersion>
+    <!--<RuntimeFrameworkVersion>3.0.0-preview1-27029-03</RuntimeFrameworkVersion>-->
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!--<DebugType>full</DebugType>
     <DebugSymbols>true</DebugSymbols>
@@ -14,7 +13,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.6.0-preview1-26903-01" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.7.0" />
   </ItemGroup>
 
 </Project>

@@ -89,7 +89,7 @@ namespace IntrinsicsTesting
             var avxValues = new VAvx[innerIterationCount];
             for (int i = 0; i < innerIterationCount; ++i)
             {
-                avxValues[i] = new VAvx { X = Avx.SetAllVector256(i * 0.25f), Y = Avx.SetAllVector256(i * 0.5f), Z = Avx.SetAllVector256(i * 0.75f) };
+                avxValues[i] = new VAvx { X = System.Runtime.Intrinsics.Vector256.Create(i * 0.25f), Y = System.Runtime.Intrinsics.Vector256.Create(i * 0.5f), Z = System.Runtime.Intrinsics.Vector256.Create(i * 0.75f) };
             }
 
             var avxHandle = GCHandle.Alloc(avxValues, GCHandleType.Pinned);

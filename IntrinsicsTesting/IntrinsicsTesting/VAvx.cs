@@ -36,9 +36,9 @@ namespace IntrinsicsTesting
         public static unsafe float ManuallyInlinedAVX(void* setupData, int innerIterationCount)
         {
             ref var baseValue = ref Unsafe.AsRef<VAvx>(setupData);
-            Vector256<float> accumulatorX = Avx.SetAllVector256(0f);
-            Vector256<float> accumulatorY = Avx.SetAllVector256(0f);
-            Vector256<float> accumulatorZ = Avx.SetAllVector256(0f);
+            Vector256<float> accumulatorX = System.Runtime.Intrinsics.Vector256.Create(0f);
+            Vector256<float> accumulatorY = System.Runtime.Intrinsics.Vector256.Create(0f);
+            Vector256<float> accumulatorZ = System.Runtime.Intrinsics.Vector256.Create(0f);
             for (int i = 0; i < innerIterationCount; ++i)
             {
                 ref var value = ref Unsafe.Add(ref baseValue, i);
