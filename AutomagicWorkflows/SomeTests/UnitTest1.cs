@@ -17,7 +17,6 @@ namespace SomeTests
         public void Test2()
         {
             Assert.True(Environment.ProcessorCount > 1);
-            Assert.True(Environment.ProcessorCount > 40000, $"count: {Environment.ProcessorCount}");
         }
     }
 }
