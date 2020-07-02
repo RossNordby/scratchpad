@@ -24,5 +24,6 @@ jobs:
     - name: Test
       run: dotnet test AutomagicWorkflows --no-restore --verbosity normal
     - name: Publish
-      run: dotnet pack -c Release
-      run: dotnet nuget "AutomagicWorkflows\SomeLibrary\bin\Release\SomeLibrary.1.0.0.nupkg" push -k "${{ secrets.GITHUB_TOKEN }}" -s "github"
+      run: |
+dotnet pack -c Release
+dotnet nuget "AutomagicWorkflows\SomeLibrary\bin\Release\SomeLibrary.1.0.0.nupkg" push -k "${{ secrets.GITHUB_TOKEN }}" -s "github"
