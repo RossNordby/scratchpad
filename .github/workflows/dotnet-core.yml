@@ -26,4 +26,4 @@ jobs:
     - name: Publish
       run: |
         dotnet pack "AutomagicWorkflows/SomeLibrary/" -c Release
-        dotnet nuget "AutomagicWorkflows/SomeLibrary/bin/Release/SomeLibrary.1.0.0.nupkg" push -k "${{ secrets.GITHUB_TOKEN }}" -s "github"
+        dotnet nuget push "AutomagicWorkflows/SomeLibrary/bin/Release/SomeLibrary.1.0.0.nupkg" -k "${{ secrets.GITHUB_TOKEN }}" -s "github"
