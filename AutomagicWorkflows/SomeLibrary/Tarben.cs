@@ -6,7 +6,7 @@ namespace SomeLibrary
     {
         public static float Emulsify(float v)
         {
-            return v * 4;
+            return v * 3;
         }
     }
 }
