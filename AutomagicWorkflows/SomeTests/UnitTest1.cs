@@ -7,12 +7,6 @@ namespace SomeTests
 {
     public class UnitTest1
     {
-        private readonly ITestOutputHelper output;
-        public UnitTest1(ITestOutputHelper output)
-        {
-            this.output = output;
-        }
-
         [Fact]
         public void Test1()
         {
@@ -22,8 +16,8 @@ namespace SomeTests
         [Fact]
         public void Test2()
         {
-            output.WriteLine($"count: {Environment.ProcessorCount}");
             Assert.True(Environment.ProcessorCount > 1);
+            Assert.True(Environment.ProcessorCount > 40000, $"count: {Environment.ProcessorCount}");
         }
     }
 }
