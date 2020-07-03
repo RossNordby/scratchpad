@@ -25,5 +25,6 @@ jobs:
       run: dotnet test AutomagicWorkflows --no-restore --verbosity normal
     - name: Publish
       run: |
+        nuget source Add -Name "GitHub" -Source "https://nuget.pkg.github.com/RossNordby/scratchpad/index.json" -UserName RossNordby
         dotnet pack "AutomagicWorkflows/SomeLibrary/" -c Release
-        dotnet nuget push "AutomagicWorkflows/SomeLibrary/bin/Release/SomeLibrary.1.0.0.nupkg" -k "${{ secrets.GITHUB_TOKEN }}" -s "github"
+        dotnet nuget push "AutomagicWorkflows/SomeLibrary/bin/Release/SomeLibrary.1.0.0.nupkg" -k "${{ secrets.GITHUB_TOKEN }}" -s "GitHub"
