@@ -8,6 +8,7 @@ namespace Repro
         {
             ExecutionEngineExceptionRepro.Test();
             BoundingBoxRepro.Test();
+            NullPointerInAssemblyRepro.TestRepro();
         }
     }
 }

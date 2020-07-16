@@ -2,8 +2,10 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
-    <!--<RuntimeFrameworkVersion>2.0.0-preview3-25518-01</RuntimeFrameworkVersion>-->
+    <TargetFramework>net5.0</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Platforms>AnyCPU;x64</Platforms>
+    <TieredCompilation>false</TieredCompilation>
   </PropertyGroup>
 
 </Project>
