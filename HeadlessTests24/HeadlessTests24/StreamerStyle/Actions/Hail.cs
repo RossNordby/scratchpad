@@ -36,7 +36,7 @@ public class Hail : IAction
     }
 
 
-    public bool Update(Scene scene, Random random, float accumulatedTime, float accumulatedRealTime)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
         accumulatedHail += hailPerFrame;
         var sceneSpan = scene.RegionOfInterest.Max - scene.RegionOfInterest.Min;

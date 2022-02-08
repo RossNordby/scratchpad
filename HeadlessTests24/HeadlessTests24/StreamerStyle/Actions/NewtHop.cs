@@ -2,13 +2,6 @@
 using BepuPhysics.Collidables;
 using BepuUtilities;
 using BepuUtilities.Collections;
-using DemoContentLoader;
-using DemoRenderer;
-using Demos;
-using Demos.Demos.Sponsors;
-using SharpDX.Mathematics.Interop;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace HeadlessTests24.StreamerStyle.Actions;
@@ -102,16 +95,19 @@ public struct HoppyNewt
 public class NewtHop : IAction
 {
     float targetTime;
-    CameraDirector director;
 
     QuickList<HoppyNewt> newts;
 
-    public void Initialize(ContentArchive content, Random random, Scene scene)
+    public void Initialize(Random random, Scene scene)
     {
         var newtCount = random.Next(1, 6);
 
         var span = scene.RegionOfInterest.Max - scene.RegionOfInterest.Min;
-        DemoMeshHelper.LoadModel(content, scene.BufferPool, @"Content\newt.obj", Vector3.One, out var templateMesh);
+        Mesh templateMesh;
+        using (var stream = File.Open(@"Content\newt.obj", FileMode.Open))
+        {
+            templateMesh = MeshLoader.LoadMesh(stream, Vector3.One, scene.BufferPool);
+        }
         newts = new QuickList<HoppyNewt>(newtCount, scene.Simulation.BufferPool);
 
         Span<float> scales = stackalloc float[newtCount];
@@ -136,19 +132,10 @@ public class NewtHop : IAction
         }
 
         targetTime = 30 + (float)random.NextDouble() * 10;
-        var controllers = new List<ICameraController>();
-        var angle1 = (float)random.NextDouble() * MathF.PI * 2;
-        controllers.Add(new RotatingCamera(MathF.PI * 0.15f, angle1, 0.03f, 6, 0.5f * newts.Count, 0.9f)); ;
-        controllers.Add(new RotatingCamera(MathF.PI * 0.15f, angle1 + MathF.PI, 0.03f, 6, 0.5f * newts.Count, 0.6f));
-        for (int i = 0; i < newts.Count; ++i)
-        {
-            controllers.Add(new FollowCamera(newts[i].BodyHandle, scene, 5 * scales[i], 5 + 1.5f * scales[i], 6, 1));
-        }
-        director = new CameraDirector(controllers.ToArray(), random);
     }
 
 
-    public bool Update(Scene scene, Random random, Camera camera, float accumulatedTime, float accumulatedRealTime, bool controlCamera)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
         var inverseDt = 1f / scene.TimestepDuration;
         var arenaMin = new Vector2(scene.RegionOfInterest.Min.X, scene.RegionOfInterest.Min.Z);
@@ -157,8 +144,6 @@ public class NewtHop : IAction
         {
             newts[i].Update(scene.Simulation, accumulatedTime, 0, arenaMin, arenaMax, random, inverseDt);
         }
-        if (controlCamera)
-            director.Update(scene, camera, random, accumulatedTime, accumulatedRealTime);
         return accumulatedTime < targetTime;
     }
 }

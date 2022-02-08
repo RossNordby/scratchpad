@@ -1,20 +1,26 @@
-﻿using System.Diagnostics;
+﻿using HeadlessTests24.StreamerStyle.Actions;
+using System.Diagnostics;
 
-namespace HeadlessTests24.DemoStyle;
-static class HeadlessTest
+namespace HeadlessTests24.StreamerStyle;
+static class StreamerHeadlessTest
 {
-    public static void Test<T>(int threadCount, int runCount, int framesBeforeMeasurement, int framesToMeasure, List<double> times) where T : Demo, new()
+    public static void Test<TScene, TAction>(Random random, int threadCount, int runCount, int framesBeforeMeasurement, int framesToMeasure, List<double> times) where TScene : Scene, new() where TAction : IAction, new()
     {
         var runFrameTimes = new double[runCount];
         for (int runIndex = -1; runIndex < runCount; ++runIndex)
         {
-            var demo = new T();
-            demo.Initialize(threadCount);
+            var scene = new TScene();
+            scene.Initialize(random, threadCount);
+            var action = new TAction();
+            action.Initialize(random, scene);
             Console.Write($"Preframes for {runIndex} completed: ");
             GC.Collect(3, GCCollectionMode.Forced, true, true);
+            float accumulatedTime = 0;
             for (int i = 0; i < framesBeforeMeasurement; ++i)
             {
-                demo.Update();
+                scene.Update();
+                accumulatedTime += scene.TimestepDuration;
+                action.Update(scene, random, accumulatedTime);
                 if (i % 32 == 0)
                     Console.Write($"{i}, ");
             }
@@ -24,8 +30,10 @@ static class HeadlessTest
             for (int i = 0; i < framesToMeasure; ++i)
             {
                 var start = Stopwatch.GetTimestamp();
-                demo.Update();
+                scene.Update();
                 var end = Stopwatch.GetTimestamp();
+                accumulatedTime += scene.TimestepDuration;
+                action.Update(scene, random, accumulatedTime);
                 time += (end - start) / (double)Stopwatch.Frequency;
                 if (i % 32 == 0)
                     Console.Write($"{i}, ");
@@ -35,7 +43,7 @@ static class HeadlessTest
             Console.WriteLine($"Time per frame average (ms): {1e3 * frameTime}");
             if (runIndex >= 0)
                 runFrameTimes[runIndex] = frameTime;
-            demo.Dispose();
+            scene.Dispose();
         }
         var min = double.MaxValue;
         var max = double.MinValue;

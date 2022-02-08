@@ -1,12 +1,6 @@
 ﻿using BepuPhysics;
 using BepuPhysics.Collidables;
 using BepuUtilities;
-using BepuUtilities.Collections;
-using DemoContentLoader;
-using DemoRenderer;
-using Demos;
-using SharpDX.Mathematics.Interop;
-using System;
 using System.Numerics;
 
 
@@ -15,14 +9,17 @@ namespace HeadlessTests24.StreamerStyle.Actions;
 public class NewtZoom : IAction
 {
     float targetTime;
-    CameraDirector director;
 
-    public void Initialize(ContentArchive content, Random random, Scene scene)
+    public void Initialize(Random random, Scene scene)
     {
         var newtCount = random.Next(1, 6);
 
-        var span = scene.RegionOfInterest.Max - scene.RegionOfInterest.Min;
-        DemoMeshHelper.LoadModel(content, scene.BufferPool, @"Content\newt.obj", Vector3.One, out var templateMesh);
+        var span = scene.RegionOfInterest.Max - scene.RegionOfInterest.Min; 
+        Mesh templateMesh;
+        using (var stream = File.Open(@"Content\newt.obj", FileMode.Open))
+        {
+            templateMesh = MeshLoader.LoadMesh(stream, Vector3.One, scene.BufferPool);
+        }
 
         var longestTime = 0f;
 
@@ -48,17 +45,11 @@ public class NewtZoom : IAction
         }
 
         targetTime = 5 + 2 * longestTime;
-        director = new CameraDirector(new ICameraController[]
-        {
-            new RotatingCamera(MathF.PI * 0.15f, (float)random.NextDouble() * MathF.PI * 2, 0f, 4, 0.5f, 0.8f),
-        }, random);
     }
 
 
-    public bool Update(Scene scene, Random random, Camera camera, float accumulatedTime, float accumulatedRealTime, bool controlCamera)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
-        if (controlCamera)
-            director.Update(scene, camera, random, accumulatedTime, accumulatedRealTime);
         return accumulatedTime < targetTime;
     }
 }

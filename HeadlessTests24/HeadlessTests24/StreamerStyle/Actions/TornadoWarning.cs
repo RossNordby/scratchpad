@@ -258,7 +258,7 @@ public class TornadoWarning : IAction
     }
 
 
-    public bool Update(Scene scene, Random random, float accumulatedTime, float accumulatedRealTime)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
         for (int i = 0; i < tornadoes.Length; ++i)
         {

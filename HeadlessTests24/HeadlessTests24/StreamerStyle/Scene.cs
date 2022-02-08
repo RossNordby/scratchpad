@@ -21,9 +21,7 @@ public abstract class Scene : IDisposable
     /// <summary>
     /// Gets the thread dispatcher available for use by the simulation.
     /// </summary>
-    public ThreadDispatcher ThreadDispatcher { get; private set; }
-
-    public const int ThreadCount = 32;
+    public ThreadDispatcher ThreadDispatcher { get; protected set; }
 
     public abstract float TimestepDuration { get; }
 
@@ -32,11 +30,10 @@ public abstract class Scene : IDisposable
     public Scene()
     {
         BufferPool = new BufferPool();
-        ThreadDispatcher = new ThreadDispatcher(ThreadCount);
     }
 
 
-    public abstract void Initialize(Random random);
+    public abstract void Initialize(Random random, int threadCount);
 
     public BoundingBox RegionOfInterest { get; protected set; }
     protected void CreateRegionOfInterest()

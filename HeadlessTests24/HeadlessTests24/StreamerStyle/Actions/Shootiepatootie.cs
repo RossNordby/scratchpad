@@ -1,10 +1,6 @@
 ﻿using BepuPhysics;
 using BepuPhysics.Collidables;
 using BepuUtilities.Collections;
-using DemoContentLoader;
-using DemoRenderer;
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace HeadlessTests24.StreamerStyle.Actions;
@@ -13,8 +9,7 @@ public class Shootiepatootie : IAction
 {
     float targetTime;
     QuickList<BodyHandle> handles;
-    CameraDirector director;
-    public unsafe void Initialize(ContentArchive content, Random random, Scene scene)
+    public unsafe void Initialize(Random random, Scene scene)
     {
         var rand = random.NextDouble();
         var count = 5 + (int)(9 * rand * rand);
@@ -56,22 +51,11 @@ public class Shootiepatootie : IAction
         }
 
         targetTime = 12 + 1.5f * longestTimeUntilTarget;
-        List<ICameraController> controllers = new List<ICameraController>();
-        var angle1 = (float)random.NextDouble() * MathF.PI * 2;
-        controllers.Add(new RotatingCamera(MathF.PI * 0.15f, angle1, 0.03f, 4, handles.Count, 0.9f));
-        controllers.Add(new RotatingCamera(MathF.PI * 0.15f, angle1 + MathF.PI, 0.03f, 4, handles.Count, 0.5f));
-        for (int i = 0; i < handles.Count; ++i)
-        {
-            controllers.Add(new FollowCamera(handles[i], scene, 6 + radii[i], radii[i] * 1.5f, 1.5f, 1));
-        }
-        director = new CameraDirector(controllers.ToArray(), random);
     }
 
 
-    public bool Update(Scene scene, Random random, Camera camera, float accumulatedTime, float accumulatedRealTime, bool controlCamera)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
-        if (controlCamera)
-            director.Update(scene, camera, random, accumulatedTime, accumulatedRealTime);
         return accumulatedTime < targetTime;
     }
 }

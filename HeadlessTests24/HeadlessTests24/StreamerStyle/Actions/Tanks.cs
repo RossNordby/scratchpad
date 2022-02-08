@@ -875,7 +875,7 @@ public class Tanks : IAction
     }
 
 
-    public bool Update(Scene scene, Random random, float accumulatedTime, float accumulatedRealTime)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
         var aimMin = scene.RegionOfInterest.Min;
         var aimSpan = scene.RegionOfInterest.Max - aimMin;

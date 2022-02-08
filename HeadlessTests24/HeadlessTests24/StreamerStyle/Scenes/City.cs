@@ -44,8 +44,9 @@ public class City : Scene
     public override float TimestepDuration => 1 / 60f;
     public override Vector3 Gravity => new Vector3(0, -10, 0);
 
-    public override void Initialize(Random random)
+    public override void Initialize(Random random, int threadCount)
     {
+        ThreadDispatcher = new ThreadDispatcher(threadCount);
         Simulation = Simulation.Create(BufferPool, new NarrowPhaseCallbacks() { SpringSettings = new SpringSettings(30, 1) }, new DemoPoseIntegratorCallbacks(Gravity), new SolveDescription(8, 1));
 
         var ringBoxShape = new Box(0.5f, 1, 3);

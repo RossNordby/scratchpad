@@ -3,13 +3,6 @@ using BepuPhysics.Collidables;
 using BepuPhysics.CollisionDetection;
 using BepuPhysics.Constraints;
 using BepuUtilities;
-using BepuUtilities.Memory;
-using DemoContentLoader;
-using DemoRenderer;
-using DemoRenderer.UI;
-using Demos;
-using DemoUtilities;
-using System;
 using System.Numerics;
 
 namespace HeadlessTests24.StreamerStyle.Scenes;
@@ -253,8 +246,9 @@ public class InterlockedBars : Scene
         return actualFloorCount;
     }
 
-    public override void Initialize(ContentArchive content, Random random)
+    public override void Initialize(Random random, int threadCount)
     {
+        ThreadDispatcher = new ThreadDispatcher(threadCount);
         var floors = random.Next(20, 50);
         var planksPerFloor = random.Next(2, 5);
         var cellInset = 0f;

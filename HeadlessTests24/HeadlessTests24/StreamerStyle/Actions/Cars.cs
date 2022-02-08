@@ -387,7 +387,7 @@ public class Cars : IAction
     }
 
 
-    public bool Update(Scene scene, Random random, float accumulatedTime, float accumulatedRealTime)
+    public bool Update(Scene scene, Random random, float accumulatedTime)
     {
         var targetMin = new Vector2(scene.RegionOfInterest.Min.X, scene.RegionOfInterest.Min.Z);
         var targetSpan = new Vector2(scene.RegionOfInterest.Max.X, scene.RegionOfInterest.Max.Z) - targetMin;

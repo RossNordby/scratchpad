@@ -68,8 +68,9 @@ public class Colosseum : Scene
     public override float TimestepDuration => 1 / 60f;
     public override Vector3 Gravity => new Vector3(0, -10, 0);
 
-    public override void Initialize(Random random)
+    public override void Initialize(Random random, int threadCount)
     {
+        ThreadDispatcher = new ThreadDispatcher(threadCount);
 
         var layerRand = random.NextDouble();
         var heightPerRand = random.NextDouble();
