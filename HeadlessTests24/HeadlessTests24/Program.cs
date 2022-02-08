@@ -1,5 +1,8 @@
 ﻿using HeadlessTests24.DemoStyle;
 using HeadlessTests24.DemoStyle.Dancers;
+using HeadlessTests24.StreamerStyle;
+using HeadlessTests24.StreamerStyle.Actions;
+using HeadlessTests24.StreamerStyle.Scenes;
 using System.Numerics;
 using System.Text;
 
@@ -39,6 +42,7 @@ catch
     }
     Console.Write($"No {threadCountsPath} detected; defaulting to thread counts of: ");
 }
+threadCounts.Sort();
 for (int i = 0; i < threadCounts.Count; ++i)
 {
     Console.Write(i < threadCounts.Count - 1 ? $"{threadCounts[i]}, " : threadCounts[i]);
@@ -52,13 +56,13 @@ var builder = new StringBuilder(2048);
 builder.Append("Demo");
 for (int i = 0; i < threadCounts.Count; ++i)
 {
-    builder.Append(" ").Append(threadCounts[i]);
+    builder.Append(", ").Append(threadCounts[i]);
 }
 builder.AppendLine();
 void ExecuteDemoStyle<T>(int runCount, int preframeCount, int frameCount) where T : Demo, new()
 {
     string name = typeof(T).Name;
-    builder.Append(name).Append(" ");
+    builder.Append(name).Append(", ");
     for (int i = 0; i < threadCounts.Count; ++i)
     {
         Console.WriteLine($"@@ Testing {name} with {threadCounts[i]} threads. @@");
@@ -70,12 +74,39 @@ void ExecuteDemoStyle<T>(int runCount, int preframeCount, int frameCount) where 
         {
             minimum = Math.Min(minimum, times[j]);
         }
-        builder.Append(minimum);
+        builder.Append(minimum).Append(", ");
     }
     builder.AppendLine();
 }
 
-ExecuteDemoStyle<ColosseumDemo>(2, 32, 256);
-ExecuteDemoStyle<DancerDemo>(2, 32, 256);
+void ExecuteStreamerStyle<TScene, TAction>(int randomSeed, int runCount, int preframeCount, int frameCount) where TScene : Scene, new() where TAction : IAction, new()
+{
+    string name = $"{typeof(TScene).Name} with {typeof(TAction).Name}";
+    builder.Append(name).Append(", ");
+    for (int i = 0; i < threadCounts.Count; ++i)
+    {
+        Console.WriteLine($"@@ Testing {name} with {threadCounts[i]} threads. @@");
+        var times = new List<double>();
+        StreamerHeadlessTest.Test<TScene, TAction>(randomSeed, threadCounts[i], runCount, preframeCount, frameCount, times);
+        //Just write the minimum for now.
+        double minimum = times[0];
+        for (int j = 1; j < times.Count; ++j)
+        {
+            minimum = Math.Min(minimum, times[j]);
+        }
+        builder.Append(minimum).Append(", ");
+    }
+    builder.AppendLine();
+}
+
+ExecuteDemoStyle<ColosseumDemo>(2, 32, 32);
+ExecuteDemoStyle<DancerDemo>(2, 32, 32);
+ExecuteStreamerStyle<City, Hail>(2, 2, 32, 32);
 
 Console.WriteLine(builder.ToString());
+const string outputPath = "results.txt";
+Console.WriteLine($"Writing results to {outputPath}.");
+using(var outputStream = new StreamWriter(File.OpenWrite(outputPath)))
+{
+    outputStream.Write(builder);
+}

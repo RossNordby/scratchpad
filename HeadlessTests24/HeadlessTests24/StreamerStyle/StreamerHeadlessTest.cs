@@ -4,12 +4,13 @@ using System.Diagnostics;
 namespace HeadlessTests24.StreamerStyle;
 static class StreamerHeadlessTest
 {
-    public static void Test<TScene, TAction>(Random random, int threadCount, int runCount, int framesBeforeMeasurement, int framesToMeasure, List<double> times) where TScene : Scene, new() where TAction : IAction, new()
+    public static void Test<TScene, TAction>(int randomSeed, int threadCount, int runCount, int framesBeforeMeasurement, int framesToMeasure, List<double> times) where TScene : Scene, new() where TAction : IAction, new()
     {
         var runFrameTimes = new double[runCount];
         for (int runIndex = -1; runIndex < runCount; ++runIndex)
         {
             var scene = new TScene();
+            var random = new Random(randomSeed);
             scene.Initialize(random, threadCount);
             var action = new TAction();
             action.Initialize(random, scene);
