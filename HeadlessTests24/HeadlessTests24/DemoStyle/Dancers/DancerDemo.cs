@@ -98,7 +98,7 @@ public class DancerDemo : Demo
         //That's a little trickier, but doable. Going low to high, for example, requires creating bodies at interpolated positions between existing bodies, while going to a lower level of detail removes them.
         levelOfDetail = MathF.Max(0f, MathF.Min(1.5f, levelOfDetail));
         var targetDressDiameter = 2.6f;
-        var fullDetailWidthInBodies = 29;
+        var fullDetailWidthInBodies = 40;
         float spacingAtFullDetail = targetDressDiameter / fullDetailWidthInBodies;
         float bodyRadius = spacingAtFullDetail / 1.75f;
         var scale = MathF.Pow(2, levelOfDetail);
@@ -151,7 +151,7 @@ public class DancerDemo : Demo
         var collisionFilters = new CollidableProperty<SubgroupCollisionFilter>();
         Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(collisionFilters), new DemoPoseIntegratorCallbacks(new Vector3(0, 0, 0)), new SolveDescription(8, 1));
 
-        dancers = new DemoDancers().Initialize<ClothCallbacks, ClothCollisionFilter>(16, 16, Simulation, collisionFilters, ThreadDispatcher, BufferPool, new SolveDescription(1, 4), TailorDress, new ClothCollisionFilter(0, 0, -1));
+        dancers = new DemoDancers().Initialize<ClothCallbacks, ClothCollisionFilter>(40, 40, Simulation, collisionFilters, ThreadDispatcher, BufferPool, new SolveDescription(1, 4), TailorDress, new ClothCollisionFilter(0, 0, -1));
 
     }
     public unsafe override void Update()
