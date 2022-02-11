@@ -1,5 +1,6 @@
 ﻿using HeadlessTests24.DemoStyle;
 using HeadlessTests24.DemoStyle.Dancers;
+using HeadlessTests24.DemoStyle.Sponsors;
 using HeadlessTests24.StreamerStyle;
 using HeadlessTests24.StreamerStyle.Actions;
 using HeadlessTests24.StreamerStyle.Scenes;
@@ -67,7 +68,7 @@ void ExecuteDemoStyle<T>(int runCount, int preframeCount, int frameCount) where 
     {
         Console.WriteLine($"@@ Testing {name} with {threadCounts[i]} threads. @@");
         var times = new List<double>();
-        DemoHeadlessTest.Test<ColosseumDemo>(threadCounts[i], runCount, preframeCount, frameCount, times);
+        DemoHeadlessTest.Test<T>(threadCounts[i], runCount, preframeCount, frameCount, times);
         //Just write the minimum for now.
         double minimum = times[0];
         for (int j = 1; j < times.Count; ++j)
@@ -99,9 +100,9 @@ void ExecuteStreamerStyle<TScene, TAction>(int randomSeed, int runCount, int pre
     builder.AppendLine();
 }
 
-ExecuteDemoStyle<ColosseumDemo>(2, 32, 32);
-ExecuteDemoStyle<DancerDemo>(2, 32, 32);
-ExecuteStreamerStyle<City, Hail>(2, 2, 32, 32);
+ExecuteDemoStyle<RagdollTubeVideoDemo>(2, 32, 32);
+//ExecuteDemoStyle<DancerDemo>(2, 32, 32);
+//ExecuteStreamerStyle<City, Hail>(2, 2, 32, 32);
 
 Console.WriteLine(builder.ToString());
 const string outputPath = "results.txt";

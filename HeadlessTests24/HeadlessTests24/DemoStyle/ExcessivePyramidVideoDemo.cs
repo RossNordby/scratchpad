@@ -48,8 +48,8 @@ public class ExcessivePyramidVideoDemo : Demo
         if (frameCount == 128)
         {
             var bulletShape = new Sphere(6);
-            var bodyDescription = BodyDescription.CreateConvexDynamic(
-                new Vector3(0, 8, -1200), new Vector3(0, 0, 230), 5000000, Simulation.Shapes, bulletShape);
+            var bodyDescription = BodyDescription.CreateDynamic(
+                new Vector3(0, 8, -1200), new Vector3(0, 0, 230), bulletShape.ComputeInertia(5000000), new(Simulation.Shapes.Add(bulletShape), 0.1f), 0.01f);
             Simulation.Bodies.Add(bodyDescription);
         }
         base.Update();

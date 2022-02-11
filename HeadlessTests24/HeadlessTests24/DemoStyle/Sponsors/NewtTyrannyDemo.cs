@@ -78,8 +78,6 @@ public class NewtTyrannyDemo : Demo
 
     CharacterInput character;
 
-
-
     double simulationTime;
     public override void Update()
     {
