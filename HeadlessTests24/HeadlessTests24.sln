@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.1.32120.378
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeadlessTests24", "HeadlessTests24\HeadlessTests24.csproj", "{E801291D-AADF-4D05-BBED-4667F62B5839}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HeadlessTests24", "HeadlessTests24\HeadlessTests24.csproj", "{E801291D-AADF-4D05-BBED-4667F62B5839}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "HeadlessTests23", "HeadlessTests23\HeadlessTests23.csproj", "{781CCE93-C725-492F-BC0A-FD61F6F09992}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{E801291D-AADF-4D05-BBED-4667F62B5839}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E801291D-AADF-4D05-BBED-4667F62B5839}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E801291D-AADF-4D05-BBED-4667F62B5839}.Release|Any CPU.Build.0 = Release|Any CPU
+		{781CCE93-C725-492F-BC0A-FD61F6F09992}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{781CCE93-C725-492F-BC0A-FD61F6F09992}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{781CCE93-C725-492F-BC0A-FD61F6F09992}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{781CCE93-C725-492F-BC0A-FD61F6F09992}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
