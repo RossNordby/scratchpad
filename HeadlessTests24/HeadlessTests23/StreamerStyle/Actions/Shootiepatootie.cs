@@ -46,8 +46,8 @@ public class Shootiepatootie : IAction
             var r8 = r4 * r4;
             var sphere = new Sphere(3.5f + 11 * (float)(r8 * r8 * r8 * r8));
             radii[i] = sphere.Radius;
-            var inertia = sphere.ComputeInertia(4 * sphere.Radius * sphere.Radius * sphere.Radius);
-            handles.AllocateUnsafely() = scene.Simulation.Bodies.Add(BodyDescription.CreateDynamic(start, new BodyVelocity(velocity), inertia, scene.Simulation.Shapes.Add(sphere), -1));
+            sphere.ComputeInertia(4 * sphere.Radius * sphere.Radius * sphere.Radius, out var inertia);
+            handles.AllocateUnsafely() = scene.Simulation.Bodies.Add(BodyDescription.CreateDynamic(start, new BodyVelocity(velocity), inertia, new (scene.Simulation.Shapes.Add(sphere), float.MaxValue), new (-1)));
         }
 
         targetTime = 12 + 1.5f * longestTimeUntilTarget;

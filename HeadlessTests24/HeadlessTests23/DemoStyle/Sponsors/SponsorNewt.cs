@@ -14,7 +14,7 @@ public struct SponsorNewt
         var arenaSpan = arenaMax - arenaMin;
         var position = arenaMin + arenaSpan * new Vector2(random.NextSingle(), random.NextSingle());
         var angle = MathF.PI * 2 * random.NextSingle();
-        BodyHandle = simulation.Bodies.Add(BodyDescription.CreateKinematic((new Vector3(position.X, height, position.Y), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle)), shape, -1));
+        BodyHandle = simulation.Bodies.Add(BodyDescription.CreateKinematic(new RigidPose(new Vector3(position.X, height, position.Y), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle)), new (shape, float.MaxValue), new (-1)));
         SponsorIndex = sponsorIndex;
     }
 
@@ -28,7 +28,7 @@ public struct SponsorNewt
     public void Update(Simulation simulation, double time, float height, in Vector2 arenaMin, in Vector2 arenaMax, Random random, float inverseDt)
     {
         const float jumpDuration = 1;
-        var body = simulation.Bodies[BodyHandle];
+        var body = simulation.Bodies.GetBodyReference(BodyHandle);
         if (time >= nextAllowedJump)
         {
             //Choose a jump location. It should be within the arena, and generally somewhere ahead of the newt.

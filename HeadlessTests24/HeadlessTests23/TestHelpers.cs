@@ -19,7 +19,7 @@ public static class TestHelpers
         float accumulated = 0;
         for (int index = 0; index < bodies.ActiveSet.Count; ++index)
         {
-            ref var velocity = ref bodies.ActiveSet.SolverStates[index].Motion.Velocity;
+            ref var velocity = ref bodies.ActiveSet.Velocities[index];
             accumulated += Vector3.Dot(velocity.Linear, velocity.Linear);
             accumulated += Vector3.Dot(velocity.Angular, velocity.Angular);
         }

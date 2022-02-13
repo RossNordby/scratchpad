@@ -145,7 +145,7 @@ public struct TankPartDescription
     {
         TankPartDescription description;
         description.Shape = shapes.Add(shape);
-        description.Inertia = shape.ComputeInertia(mass);
+        shape.ComputeInertia(mass, out description.Inertia);
         description.Pose = pose;
         description.Friction = friction;
         return description;
@@ -307,9 +307,9 @@ public struct Tank
         ref var barrelPose = ref barrel.Pose;
         RigidPose.Transform(BarrelLocalProjectileSpawn, barrelPose, out var projectileSpawn);
         QuaternionEx.Transform(BarrelLocalDirection, barrelPose.Orientation, out var barrelDirection);
-        var projectileHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(projectileSpawn, new BodyVelocity(barrelDirection * ProjectileSpeed + barrel.Velocity.Linear), ProjectileInertia,
+        var projectileHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(new RigidPose(projectileSpawn), new BodyVelocity(barrelDirection * ProjectileSpeed + barrel.Velocity.Linear), ProjectileInertia,
             //The projectile moves pretty fast, so we'll use continuous collision detection.
-            new CollidableDescription(ProjectileShape, ContinuousDetection.Continuous(1e-3f, 1e-3f, 0, 0.1f)), 0.01f));
+            new CollidableDescription(ProjectileShape, 0.1f, ContinuousDetectionSettings.Continuous(1e-3f, 1e-3f)), new (0.01f)));
         ref var filter = ref filters.Allocate(projectileHandle);
         ref var friction = ref frictions.Allocate(projectileHandle);
         friction = 1f;
@@ -333,7 +333,7 @@ public struct Tank
         RigidPose.Transform(bodyToWheelSuspension + suspensionDirection * suspensionLength, tankPose, out wheelPose.Position);
         QuaternionEx.ConcatenateWithoutOverlap(localWheelOrientation, tankPose.Orientation, out wheelPose.Orientation);
 
-        var wheelHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(wheelPose, wheelInertia, wheelShape, 0.01f));
+        var wheelHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(wheelPose, wheelInertia, new (wheelShape, float.MaxValue), new (0.01f)));
         wheelHandles.AllocateUnsafely() = wheelHandle;
 
         //We need a LinearAxisServo to act as the suspension spring, pushing the wheel down.
@@ -388,7 +388,7 @@ public struct Tank
     static ref SubgroupCollisionFilter CreatePart(Simulation simulation, in TankPartDescription part, RigidPose pose, CollidableProperty<SubgroupCollisionFilter> filters, CollidableProperty<float> frictions, out BodyHandle handle)
     {
         RigidPose.MultiplyWithoutOverlap(part.Pose, pose, out var bodyPose);
-        handle = simulation.Bodies.Add(BodyDescription.CreateDynamic(bodyPose, part.Inertia, part.Shape, 0.01f));
+        handle = simulation.Bodies.Add(BodyDescription.CreateDynamic(bodyPose, part.Inertia, new (part.Shape, float.MaxValue), new (0.01f)));
         ref var partFilter = ref filters.Allocate(handle);
         ref var partFriction = ref frictions.Allocate(handle);
         partFriction = part.Friction;
@@ -829,8 +829,8 @@ public class Tanks : IAction
             //Don't scale up the projectile mass on a supertooter.
             const float baseMassMultiplier = 10f;
             float massMultiplier = supertooter ? baseMassMultiplier * 8 : baseMassMultiplier;
-            var wheelInertia = wheelShape.ComputeInertia(0.25f * massMultiplier);
-            var projectileInertia = projectileShape.ComputeInertia(0.2f * baseMassMultiplier);
+            wheelShape.ComputeInertia(0.25f * massMultiplier, out var wheelInertia);
+            projectileShape.ComputeInertia(0.2f * baseMassMultiplier, out var projectileInertia);
             var tankDescription = new TankDescription
             {
                 Body = TankPartDescription.Create(10 * massMultiplier, new Box(4f, 1, 5), RigidPose.Identity, 0.5f, scene.Simulation.Shapes),

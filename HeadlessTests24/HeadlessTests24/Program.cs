@@ -44,8 +44,6 @@ catch
     }
     Console.Write($"No {threadCountsPath} detected; defaulting to thread counts of: ");
 }
-threadCounts.Clear();
-threadCounts.Add(32);
 threadCounts.Sort();
 for (int i = 0; i < threadCounts.Count; ++i)
 {

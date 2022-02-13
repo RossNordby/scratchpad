@@ -41,7 +41,7 @@ public class NewtZoom : IAction
             //sometimes, a backward newt
             var orientation = QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, random.NextDouble() < 0.02 ? theta : theta + MathF.PI);
 
-            scene.Simulation.Bodies.Add(BodyDescription.CreateKinematic(new RigidPose(start, orientation), new BodyVelocity(Vector3.Normalize(target - start) * newtVelocity), scene.Simulation.Shapes.Add(mesh), -1));
+            scene.Simulation.Bodies.Add(BodyDescription.CreateKinematic(new RigidPose(start, orientation), new BodyVelocity(Vector3.Normalize(target - start) * newtVelocity), new (scene.Simulation.Shapes.Add(mesh), float.MaxValue), new BodyActivityDescription(-1)));
         }
 
         targetTime = 5 + 2 * longestTime;

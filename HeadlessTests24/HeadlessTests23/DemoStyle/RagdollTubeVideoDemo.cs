@@ -19,7 +19,7 @@ namespace HeadlessTests23.DemoStyle
             //Note the lowered material stiffness compared to many of the other demos. Ragdolls aren't made of concrete.
             //Increasing the maximum recovery velocity helps keep deeper contacts strong, stopping objects from interpenetrating.
             //Higher friction helps the bodies clump and flop, rather than just sliding down the slope in the tube.
-            Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(filters, new PairMaterialProperties(2, float.MaxValue, new SpringSettings(10, 1))), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SolveDescription(4, 1));
+            Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(filters, new PairMaterialProperties { FrictionCoefficient = 2, MaximumRecoveryVelocity = float.MaxValue, SpringSettings = new SpringSettings(10, 1) }), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new PositionFirstTimestepper(), 4);
 
             int ragdollIndex = 0;
             var spacing = new Vector3(1.7f, 1.8f, 0.5f);
@@ -49,18 +49,18 @@ namespace HeadlessTests23.DemoStyle
                 var rotation = QuaternionEx.CreateFromAxisAngle(Vector3.UnitZ, i * MathHelper.TwoPi / panelCount);
                 QuaternionEx.TransformUnitY(rotation, out var localUp);
                 var position = localUp * tubeRadius;
-                builder.AddForKinematic(panelShapeIndex, (position, rotation), 1);
+                builder.AddForKinematic(panelShapeIndex, new (position, rotation), 1);
             }
-            builder.AddForKinematic(Simulation.Shapes.Add(new Box(1, 2, panelShape.Length)), new Vector3(0, tubeRadius - 1, 0), 0);
+            builder.AddForKinematic(Simulation.Shapes.Add(new Box(1, 2, panelShape.Length)), new RigidPose(new Vector3(0, tubeRadius - 1, 0)), 0);
             builder.BuildKinematicCompound(out var children);
             var compound = new BigCompound(children, Simulation.Shapes, BufferPool);
-            var tubeHandle = Simulation.Bodies.Add(BodyDescription.CreateKinematic(tubeCenter, (default, new Vector3(0, 0, .25f)), Simulation.Shapes.Add(compound), 0f));
+            var tubeHandle = Simulation.Bodies.Add(BodyDescription.CreateKinematic(new RigidPose(tubeCenter), new (default, new Vector3(0, 0, .25f)), new (Simulation.Shapes.Add(compound), 0.1f), new BodyActivityDescription(0f)));
             filters[tubeHandle] = new SubgroupCollisionFilter(int.MaxValue);
             builder.Dispose();
 
             var staticShape = new Box(300, 1, 300);
             var staticShapeIndex = Simulation.Shapes.Add(staticShape);
-            var staticDescription = new StaticDescription(new Vector3(0, -0.5f, 0), staticShapeIndex);
+            var staticDescription = new StaticDescription(new Vector3(0, -0.5f, 0), new (staticShapeIndex, 0.1f));
             Simulation.Statics.Add(staticDescription);
 
             Mesh newtMesh;
@@ -68,7 +68,7 @@ namespace HeadlessTests23.DemoStyle
             {
                 newtMesh = MeshLoader.LoadMesh(stream, Vector3.One, BufferPool);
             }
-            Simulation.Statics.Add(new StaticDescription(new Vector3(0, 0.5f, 80), Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI), Simulation.Shapes.Add(newtMesh)));
+            Simulation.Statics.Add(new StaticDescription(new Vector3(0, 0.5f, 80), Quaternion.CreateFromAxisAngle(Vector3.UnitY, MathF.PI), new (Simulation.Shapes.Add(newtMesh), 0.1f)));
 
         }
 

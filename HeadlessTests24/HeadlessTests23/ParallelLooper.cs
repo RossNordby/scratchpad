@@ -78,7 +78,7 @@ public class ParallelLooper
             this.end = exclusiveEnd;
             this.iteration = workAction;
             this.workerDone = workerDone;
-            Dispatcher.DispatchWorkers(dispatcherWorker, exclusiveEnd - start);
+            Dispatcher.DispatchWorkers(dispatcherWorker);
             this.iteration = null;
             this.workerDone = workerDone;
         }

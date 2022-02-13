@@ -44,8 +44,6 @@ catch
     }
     Console.Write($"No {threadCountsPath} detected; defaulting to thread counts of: ");
 }
-threadCounts.Clear();
-threadCounts.Add(32);
 threadCounts.Sort();
 for (int i = 0; i < threadCounts.Count; ++i)
 {
@@ -105,7 +103,7 @@ void ExecuteStreamerStyle<TScene, TAction>(int randomSeed, int runCount, int pre
 
 const int runCount = 3;
 ExecuteDemoStyle<RagdollTubeVideoDemo>(runCount, 128, 512);
-ExecuteDemoStyle<VideoDancerDemo>(runCount, 32, 512);
+//ExecuteDemoStyle<VideoDancerDemo>(runCount, 32, 512); //2.3 doesn't have a CenterDistanceLimit, just a CenterDistanceConstraint, which produces significantly different results for this use case. so we just omit it.
 ExecuteDemoStyle<VideoPlumpDancerDemo>(runCount, 32, 512);
 ExecuteDemoStyle<NewtTyrannyDemo>(runCount, 32, 512);
 ExecuteDemoStyle<ExcessivePyramidVideoDemo>(runCount, 32, 512);

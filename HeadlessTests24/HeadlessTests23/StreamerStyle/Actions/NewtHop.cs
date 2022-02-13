@@ -20,7 +20,7 @@ public struct HoppyNewt
         } while (Vector2.Max(rejectMin, Vector2.Min(rejectMax, position)) == position);
         var offset = (rejectMin + rejectMax) * 0.5f - position;
         var angle = MathF.Atan2(offset.X, offset.Y) + MathF.PI;
-        BodyHandle = simulation.Bodies.Add(BodyDescription.CreateKinematic(new RigidPose(new Vector3(position.X, height, position.Y), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle)), shape, -1));
+        BodyHandle = simulation.Bodies.Add(BodyDescription.CreateKinematic(new RigidPose(new Vector3(position.X, height, position.Y), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle)), new (shape, float.MaxValue), new (-1)));
     }
 
     //The newt hops between predetermined points unstoppably, waiting a moment in between jumps.
