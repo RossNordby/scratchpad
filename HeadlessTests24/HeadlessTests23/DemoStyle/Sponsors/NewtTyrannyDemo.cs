@@ -20,7 +20,7 @@ public class NewtTyrannyDemo : Demo
         ThreadDispatcher = new ThreadDispatcher(threadCount);
 
         characterControllers = new CharacterControllers(BufferPool);
-        Simulation = Simulation.Create(BufferPool, new CharacterNarrowphaseCallbacks(characterControllers), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SolveDescription(8, 1));
+        Simulation = Simulation.Create(BufferPool, new CharacterNarrowphaseCallbacks(characterControllers), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new PositionFirstTimestepper(), 8);
         Simulation.Deterministic = true;
         Mesh newtMesh;
         using (var stream = File.Open(@"Content\newt.obj", FileMode.Open))
@@ -41,11 +41,11 @@ public class NewtTyrannyDemo : Demo
 
         const float floorSize = 520;
         const float wallThickness = 200;
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -10f, 0), Simulation.Shapes.Add(new Box(floorSize, 20, floorSize))));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(floorSize * -0.5f - wallThickness * 0.5f, -5, 0), Simulation.Shapes.Add(new Box(wallThickness, 30, floorSize + wallThickness * 2))));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(floorSize * 0.5f + wallThickness * 0.5f, -5, 0), Simulation.Shapes.Add(new Box(wallThickness, 30, floorSize + wallThickness * 2))));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -5, floorSize * -0.5f - wallThickness * 0.5f), Simulation.Shapes.Add(new Box(floorSize, 30, wallThickness))));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -5, floorSize * 0.5f + wallThickness * 0.5f), Simulation.Shapes.Add(new Box(floorSize, 30, wallThickness))));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -10f, 0), new(Simulation.Shapes.Add(new Box(floorSize, 20, floorSize)), 0.1f)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(floorSize * -0.5f - wallThickness * 0.5f, -5, 0), new(Simulation.Shapes.Add(new Box(wallThickness, 30, floorSize + wallThickness * 2)), 0.1f)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(floorSize * 0.5f + wallThickness * 0.5f, -5, 0), new(Simulation.Shapes.Add(new Box(wallThickness, 30, floorSize + wallThickness * 2)), 0.1f)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -5, floorSize * -0.5f - wallThickness * 0.5f), new(Simulation.Shapes.Add(new Box(floorSize, 30, wallThickness)), 0.1f)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -5, floorSize * 0.5f + wallThickness * 0.5f), new(Simulation.Shapes.Add(new Box(floorSize, 30, wallThickness)), 0.1f)));
 
         const int characterCount = 2000;
         characterAIs = new QuickList<SponsorCharacterAI>(characterCount, BufferPool);
@@ -54,12 +54,13 @@ public class NewtTyrannyDemo : Demo
         {
             var position2D = newtArenaMin + (newtArenaMax - newtArenaMin) * new Vector2(random.NextSingle(), random.NextSingle());
             var targetPosition = 0.5f * (newtArenaMin + (newtArenaMax - newtArenaMin) * new Vector2(random.NextSingle(), random.NextSingle()));
-            characterAIs.AllocateUnsafely() = new SponsorCharacterAI(characterControllers, characterCollidable, new Vector3(position2D.X, 5, position2D.Y), targetPosition);
+            characterAIs.AllocateUnsafely() = new SponsorCharacterAI(characterControllers, new(characterCollidable, float.MaxValue), new Vector3(position2D.X, 5, position2D.Y), targetPosition);
         }
 
         const int hutCount = 120;
         var hutBoxShape = new Box(0.4f, 2, 3);
-        var obstacleDescription = BodyDescription.CreateDynamic(new Vector3(), hutBoxShape.ComputeInertia(20), new CollidableDescription(Simulation.Shapes.Add(hutBoxShape), 0.1f), 1e-2f);
+        hutBoxShape.ComputeInertia(20, out var hutBoxInertia);
+        var obstacleDescription = BodyDescription.CreateDynamic(new RigidPose(new Vector3()), hutBoxInertia, new CollidableDescription(Simulation.Shapes.Add(hutBoxShape), 0.1f), new(1e-2f));
 
         for (int i = 0; i < hutCount; ++i)
         {
@@ -70,7 +71,7 @@ public class NewtTyrannyDemo : Demo
 
         var overlordNewtShape = newtMesh;
         overlordNewtShape.Scale = new Vector3(60, 60, 60);
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, 10, -floorSize * 0.5f - 70), Simulation.Shapes.Add(overlordNewtShape)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, 10, -floorSize * 0.5f - 70), new (Simulation.Shapes.Add(overlordNewtShape), 0.1f)));
 
 
         character = new CharacterInput(characterControllers, new Vector3(-108.89504f, 28.403418f, 38.27505f), new Capsule(0.5f, 1), 0.1f, .1f, 20, 100, 6, 4, MathF.PI * 0.4f);

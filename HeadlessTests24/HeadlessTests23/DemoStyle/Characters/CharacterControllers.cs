@@ -279,7 +279,7 @@ public class CharacterControllers : IDisposable
                 //Have to take into account the current potentially inactive location.
                 ref var bodyLocation = ref Simulation.Bodies.HandleToLocation[character.BodyHandle.Value];
                 ref var set = ref Simulation.Bodies.Sets[bodyLocation.SetIndex];
-                ref var pose = ref set.SolverStates[bodyLocation.Index].Motion.Pose;
+                ref var pose = ref set.Poses[bodyLocation.Index];
                 QuaternionEx.Transform(character.LocalUp, pose.Orientation, out var up);
                 //Note that this branch is compiled out- the generic constraints force type specialization.
                 if (manifold.Convex)
@@ -420,7 +420,7 @@ public class CharacterControllers : IDisposable
         for (int i = start; i < end; ++i)
         {
             ref var character = ref characters[i];
-            var characterBody = Simulation.Bodies[character.BodyHandle];
+            var characterBody = Simulation.Bodies.GetBodyReference(character.BodyHandle);
             if (characterBody.Awake)
             {
                 Simulation.BroadPhase.GetActiveBoundsPointers(characterBody.Collidable.BroadPhaseIndex, out var min, out var max);
@@ -488,7 +488,7 @@ public class CharacterControllers : IDisposable
             }
 
             boundingBoxExpansionJobIndex = -1;
-            threadDispatcher.DispatchWorkers(expandBoundingBoxesWorker, boundingBoxExpansionJobs.Length);
+            threadDispatcher.DispatchWorkers(expandBoundingBoxesWorker);
             pool.Return(ref boundingBoxExpansionJobs);
 
         }
@@ -594,16 +594,16 @@ public class CharacterControllers : IDisposable
                 //If the character is jumping, don't create a constraint.
                 if (supportCandidate.Depth > float.MinValue && character.TryJump)
                 {
-                    QuaternionEx.Transform(character.LocalUp, Simulation.Bodies.ActiveSet.SolverStates[bodyLocation.Index].Motion.Pose.Orientation, out var characterUp);
+                    QuaternionEx.Transform(character.LocalUp, Simulation.Bodies.ActiveSet.Poses[bodyLocation.Index].Orientation, out var characterUp);
                     //Note that we assume that character orientations are constant. This isn't necessarily the case in all uses, but it's a decent approximation.
-                    var characterUpVelocity = Vector3.Dot(Simulation.Bodies.ActiveSet.SolverStates[bodyLocation.Index].Motion.Velocity.Linear, characterUp);
+                    var characterUpVelocity = Vector3.Dot(Simulation.Bodies.ActiveSet.Velocities[bodyLocation.Index].Linear, characterUp);
                     //We don't want the character to be able to 'superboost' by simply adding jump speed on top of horizontal motion.
                     //Instead, jumping targets a velocity change necessary to reach character.JumpVelocity along the up axis.
                     if (character.Support.Mobility != CollidableMobility.Static)
                     {
                         ref var supportingBodyLocation = ref Simulation.Bodies.HandleToLocation[character.Support.BodyHandle.Value];
                         Debug.Assert(supportingBodyLocation.SetIndex == 0, "If the character is active, any support should be too.");
-                        ref var supportVelocity = ref Simulation.Bodies.ActiveSet.SolverStates[supportingBodyLocation.Index].Motion.Velocity;
+                        ref var supportVelocity = ref Simulation.Bodies.ActiveSet.Velocities[supportingBodyLocation.Index];
                         var wxr = Vector3.Cross(supportVelocity.Angular, supportCandidate.OffsetFromSupport);
                         var supportContactVelocity = supportVelocity.Linear + wxr;
                         var supportUpVelocity = Vector3.Dot(supportContactVelocity, characterUp);
@@ -644,7 +644,7 @@ public class CharacterControllers : IDisposable
                     Matrix3x3 surfaceBasis;
                     surfaceBasis.Y = supportCandidate.Normal;
                     //Note negation: we're using a right handed basis where -Z is forward, +Z is backward.
-                    QuaternionEx.Transform(character.LocalUp, Simulation.Bodies.ActiveSet.SolverStates[bodyLocation.Index].Motion.Pose.Orientation, out var up);
+                    QuaternionEx.Transform(character.LocalUp, Simulation.Bodies.ActiveSet.Poses[bodyLocation.Index].Orientation, out var up);
                     var rayDistance = Vector3.Dot(character.ViewDirection, surfaceBasis.Y);
                     var rayVelocity = Vector3.Dot(up, surfaceBasis.Y);
                     Debug.Assert(rayVelocity > 0,
@@ -784,7 +784,7 @@ public class CharacterControllers : IDisposable
                     previousEnd = job.ExclusiveEnd;
                 }
                 analysisJobIndex = -1;
-                threadDispatcher.DispatchWorkers(analyzeContactsWorker, analysisJobCount);
+                threadDispatcher.DispatchWorkers(analyzeContactsWorker);
                 pool.Return(ref jobs);
             }
         }
@@ -828,10 +828,10 @@ public class CharacterControllers : IDisposable
                 for (int i = 0; i < workerCache.Jumps.Count; ++i)
                 {
                     ref var jump = ref workerCache.Jumps[i];
-                    activeSet.SolverStates[jump.CharacterBodyIndex].Motion.Velocity.Linear += jump.CharacterVelocityChange;
+                    activeSet.Velocities[jump.CharacterBodyIndex].Linear += jump.CharacterVelocityChange;
                     if (jump.SupportBodyIndex >= 0)
                     {
-                        BodyReference.ApplyImpulse(Simulation.Bodies.ActiveSet, jump.SupportBodyIndex, jump.CharacterVelocityChange / -activeSet.SolverStates[jump.CharacterBodyIndex].Inertia.Local.InverseMass, jump.SupportImpulseOffset);
+                        BodyReference.ApplyImpulse(Simulation.Bodies.ActiveSet, jump.SupportBodyIndex, jump.CharacterVelocityChange / -activeSet.LocalInertias[jump.CharacterBodyIndex].InverseMass, jump.SupportImpulseOffset);
                     }
                 }
                 workerCache.Dispose(pool);

@@ -12,7 +12,7 @@ public struct SponsorCharacterAI
     Vector2 targetLocation;
     public SponsorCharacterAI(CharacterControllers characters, in CollidableDescription characterCollidable, in Vector3 initialPosition, in Vector2 targetLocation)
     {
-        bodyHandle = characters.Simulation.Bodies.Add(BodyDescription.CreateDynamic(initialPosition, new BodyInertia { InverseMass = 1f }, characterCollidable, -1f));
+        bodyHandle = characters.Simulation.Bodies.Add(BodyDescription.CreateDynamic(initialPosition, new BodyInertia { InverseMass = 1f }, characterCollidable, new (-1f)));
 
         ref var character = ref characters.AllocateCharacter(bodyHandle);
         character.LocalUp = new Vector3(0, 1, 0);
@@ -28,12 +28,12 @@ public struct SponsorCharacterAI
 
     public void Update(CharacterControllers characters, Simulation simulation, ref QuickList<SponsorNewt> newts, in Vector2 arenaMin, in Vector2 arenaMax, Random random)
     {
-        var body = simulation.Bodies[bodyHandle];
+        var body = simulation.Bodies.GetBodyReference(bodyHandle);
         Vector2 influenceSum = default;
         bool spooked = false;
         for (int i = 0; i < newts.Count; ++i)
         {
-            ref var newtPosition = ref simulation.Bodies[newts[i].BodyHandle].Pose.Position;
+            ref var newtPosition = ref simulation.Bodies.GetBodyReference(newts[i].BodyHandle).Pose.Position;
             var offset = newtPosition - body.Pose.Position;
             var distance = offset.Length();
             if (distance > 1e-10f)

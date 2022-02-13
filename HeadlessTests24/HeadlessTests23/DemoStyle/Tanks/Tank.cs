@@ -113,7 +113,7 @@ public struct Tank
         //Decompose the aim direction into target angles for the turret and barrel servos.
         //First, we need to compute the frame of reference and transform the aim direction into the tank's local space.
         //aimDirection * inverse(body.Pose.Orientation) * Tank.LocalBodyPose.Orientation * inverse(Tank.TurretBasis)
-        QuaternionEx.ConcatenateWithoutOverlap(QuaternionEx.Conjugate(simulation.Bodies[Body].Pose.Orientation), FromBodyLocalToTurretBasisLocal, out var toTurretBasis);
+        QuaternionEx.ConcatenateWithoutOverlap(QuaternionEx.Conjugate(simulation.Bodies.GetBodyReference(Body).Pose.Orientation), FromBodyLocalToTurretBasisLocal, out var toTurretBasis);
         //-Z in the turret basis points along the 0 angle direction for both swivel and pitch.
         //+Y is 90 degrees for pitch.
         //+X is 90 degres for swivel.
@@ -150,7 +150,7 @@ public struct Tank
     /// <param name="barrelDirection">Direction in which the barrel points.</param>
     public readonly void ComputeBarrelDirection(Simulation simulation, out Vector3 barrelDirection)
     {
-        QuaternionEx.Transform(BarrelLocalDirection, simulation.Bodies[Barrel].Pose.Orientation, out barrelDirection);
+        QuaternionEx.Transform(BarrelLocalDirection, simulation.Bodies.GetBodyReference(Barrel).Pose.Orientation, out barrelDirection);
     }
 
     /// <summary>
@@ -161,13 +161,13 @@ public struct Tank
     /// <returns>Handle of the created projectile body.</returns>
     public BodyHandle Fire(Simulation simulation, CollidableProperty<TankDemoBodyProperties> bodyProperties)
     {
-        var barrel = simulation.Bodies[Barrel];
+        var barrel = simulation.Bodies.GetBodyReference(Barrel);
         ref var barrelPose = ref barrel.Pose;
         RigidPose.Transform(BarrelLocalProjectileSpawn, barrelPose, out var projectileSpawn);
         QuaternionEx.Transform(BarrelLocalDirection, barrelPose.Orientation, out var barrelDirection);
-        var projectileHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(projectileSpawn, barrelDirection * ProjectileSpeed + barrel.Velocity.Linear, ProjectileInertia,
+        var projectileHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(new RigidPose(projectileSpawn), new BodyVelocity(barrelDirection * ProjectileSpeed + barrel.Velocity.Linear), ProjectileInertia,
             //The projectile moves pretty fast, so we'll use continuous collision detection.
-            new(ProjectileShape, ContinuousDetection.Continuous(1e-3f, 1e-3f, 0, 0.1f)), 0.01f));
+            new(ProjectileShape, 0.1f, ContinuousDetectionSettings.Continuous(1e-3f, 1e-3f)), new BodyActivityDescription(0.01f)));
         ref var projectileProperties = ref bodyProperties.Allocate(projectileHandle);
         projectileProperties.Friction = 1f;
         //Prevent the projectile from colliding with the firing tank.
@@ -191,7 +191,7 @@ public struct Tank
         RigidPose.Transform(bodyToWheelSuspension + suspensionDirection * suspensionLength, tankPose, out wheelPose.Position);
         QuaternionEx.ConcatenateWithoutOverlap(localWheelOrientation, tankPose.Orientation, out wheelPose.Orientation);
 
-        var wheelHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(wheelPose, wheelInertia, wheelShape, 0.01f));
+        var wheelHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(wheelPose, wheelInertia, new (wheelShape, float.MaxValue), new (0.01f)));
         wheelHandles.AllocateUnsafely() = wheelHandle;
 
         //We need a LinearAxisServo to act as the suspension spring, pushing the wheel down.
@@ -244,7 +244,7 @@ public struct Tank
     static ref SubgroupCollisionFilter CreatePart(Simulation simulation, in TankPartDescription part, RigidPose pose, CollidableProperty<TankDemoBodyProperties> properties, out BodyHandle handle)
     {
         RigidPose.MultiplyWithoutOverlap(part.Pose, pose, out var bodyPose);
-        handle = simulation.Bodies.Add(BodyDescription.CreateDynamic(bodyPose, part.Inertia, part.Shape, 0.01f));
+        handle = simulation.Bodies.Add(BodyDescription.CreateDynamic(bodyPose, part.Inertia, new (part.Shape, float.MaxValue), new (0.01f)));
         ref var partProperties = ref properties.Allocate(handle);
         partProperties = new TankDemoBodyProperties { Friction = part.Friction, TankPart = true };
         return ref partProperties.Filter;
@@ -413,7 +413,7 @@ public struct Tank
         ClearBodyProperties(ref properties[Body]);
         ClearBodyProperties(ref properties[Turret]);
         ClearBodyProperties(ref properties[Barrel]);
-        var turret = simulation.Bodies[Turret];
+        var turret = simulation.Bodies.GetBodyReference(Turret);
         turret.Awake = true;
         turret.Velocity.Linear += new Vector3(0, 10, 0);
         for (int i = 0; i < Constraints.Length; ++i)

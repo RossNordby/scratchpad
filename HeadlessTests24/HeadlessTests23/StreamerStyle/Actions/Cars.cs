@@ -53,7 +53,7 @@ struct SimpleCar
         RigidPose.Transform(bodyToWheelSuspension + suspensionDirection * suspensionLength, bodyPose, out wheelPose.Position);
         QuaternionEx.ConcatenateWithoutOverlap(localWheelOrientation, bodyPose.Orientation, out wheelPose.Orientation);
         WheelHandles handles;
-        handles.Wheel = simulation.Bodies.Add(BodyDescription.CreateDynamic(wheelPose, wheelInertia, wheelShape, -0.01f));
+        handles.Wheel = simulation.Bodies.Add(BodyDescription.CreateDynamic(wheelPose, wheelInertia, new (wheelShape, float.MaxValue), new (-0.01f)));
 
         handles.SuspensionSpring = simulation.Solver.Add(bodyHandle, handles.Wheel, new LinearAxisServo
         {
@@ -96,7 +96,7 @@ struct SimpleCar
         in Vector3 suspensionDirection, float suspensionLength, in SpringSettings suspensionSettings, in Quaternion localWheelOrientation)
     {
         SimpleCar car;
-        car.Body = simulation.Bodies.Add(BodyDescription.CreateDynamic(pose, bodyInertia, bodyShape, -0.01f));
+        car.Body = simulation.Bodies.Add(BodyDescription.CreateDynamic(pose, bodyInertia, new (bodyShape, float.MaxValue), new (-0.01f)));
         ref var bodyFilter = ref filters.Allocate(car.Body);
         frictions.Allocate(car.Body) = bodyFriction;
         bodyFilter = new SubgroupCollisionFilter(car.Body.Value, 0);
@@ -317,7 +317,7 @@ public class Cars : IAction
         var bodyShape = new Compound(children);
         var bodyShapeIndex = scene.Simulation.Shapes.Add(bodyShape);
         var wheelShape = new Cylinder(0.4f, .18f);
-        var wheelInertia = wheelShape.ComputeInertia(0.25f * massMultiplier);
+        wheelShape.ComputeInertia(0.25f * massMultiplier, out var wheelInertia);
         var wheelShapeIndex = scene.Simulation.Shapes.Add(wheelShape);
 
         const float x = 0.9f;
