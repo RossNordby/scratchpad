@@ -1,10 +1,8 @@
 ﻿using BepuPhysics;
 using BepuPhysics.Collidables;
-using BepuPhysics.CollisionDetection;
 using BepuPhysics.Constraints;
 using BepuUtilities;
 using BepuUtilities.Memory;
-using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -15,7 +13,7 @@ namespace HeadlessTests24.DemoStyle.Dancers;
 /// A bunch of somewhat overweight background dancers struggle to keep up with the masterful purple prancer.
 /// Combined with the <see cref="DemoDancers"/> implementation, this shows an example of how cosmetic deformable physics could be applied to characters.
 /// </summary>
-public class PlumpDancerDemo : Demo
+public class VideoPlumpDancerDemo : Demo
 {
     //This demo relies on the DemoDancers to manage all the ragdolls and their simulations. 
     //All this demo needs to do is make the fatsuits.
@@ -209,12 +207,11 @@ public class PlumpDancerDemo : Demo
     public unsafe override void Initialize(int threadCount)
     {
         ThreadDispatcher = new ThreadDispatcher(threadCount);
-
         var collisionFilters = new CollidableProperty<SubgroupCollisionFilter>();
         Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(collisionFilters), new DemoPoseIntegratorCallbacks(new Vector3(0, 0, 0)), new SolveDescription(8, 1));
 
         //Note that, because the constraints in the fat suit are quite soft, we can get away with extremely minimal solving time. There's one substep with one velocity iteration.
-        dancers = new DemoDancers().Initialize<DeformableCallbacks, DeformableCollisionFilter>(8, 8, Simulation, collisionFilters, ThreadDispatcher, BufferPool, new SolveDescription(1, 1), CreateFatSuit, new DeformableCollisionFilter(0, 0, 0, -1));
+        dancers = new DemoDancers().Initialize<DeformableCallbacks, DeformableCollisionFilter>(32, 32, Simulation, collisionFilters, ThreadDispatcher, BufferPool, new SolveDescription(1, 1), CreateFatSuit, new DeformableCollisionFilter(0, 0, 0, -1));
 
     }
     public unsafe override void Update()

@@ -1,6 +1,7 @@
 ﻿using HeadlessTests24.DemoStyle;
 using HeadlessTests24.DemoStyle.Dancers;
 using HeadlessTests24.DemoStyle.Sponsors;
+using HeadlessTests24.DemoStyle.Tanks;
 using HeadlessTests24.StreamerStyle;
 using HeadlessTests24.StreamerStyle.Actions;
 using HeadlessTests24.StreamerStyle.Scenes;
@@ -43,6 +44,8 @@ catch
     }
     Console.Write($"No {threadCountsPath} detected; defaulting to thread counts of: ");
 }
+threadCounts.Clear();
+threadCounts.Add(32);
 threadCounts.Sort();
 for (int i = 0; i < threadCounts.Count; ++i)
 {
@@ -100,9 +103,19 @@ void ExecuteStreamerStyle<TScene, TAction>(int randomSeed, int runCount, int pre
     builder.AppendLine();
 }
 
-ExecuteDemoStyle<RagdollTubeVideoDemo>(2, 32, 32);
-//ExecuteDemoStyle<DancerDemo>(2, 32, 32);
-//ExecuteStreamerStyle<City, Hail>(2, 2, 32, 32);
+const int runCount = 3;
+ExecuteDemoStyle<RagdollTubeVideoDemo>(runCount, 128, 512);
+ExecuteDemoStyle<VideoDancerDemo>(runCount, 32, 512);
+ExecuteDemoStyle<VideoPlumpDancerDemo>(runCount, 32, 512);
+ExecuteDemoStyle<NewtTyrannyDemo>(runCount, 32, 512);
+ExecuteDemoStyle<ExcessivePyramidVideoDemo>(runCount, 32, 512);
+ExecuteDemoStyle<RopeTwistVideoDemo>(runCount, 32, 512);
+ExecuteDemoStyle<TankSwarmDemo>(runCount, 32, 512);
+ExecuteDemoStyle<ChainFountainDemo>(runCount, 32, 512);
+ExecuteDemoStyle<Colosseum24VideoDemo>(runCount, 32, 512);
+ExecuteStreamerStyle<Colosseum, Cars>(26, runCount, 32, 512);
+ExecuteStreamerStyle<InterlockedBars, Hail>(12, runCount, 64, 512);
+ExecuteStreamerStyle<City, NewtZoom>(9, runCount, 256, 512);
 
 Console.WriteLine(builder.ToString());
 const string outputPath = "results.txt";

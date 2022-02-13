@@ -2,14 +2,17 @@
 using BepuPhysics.Collidables;
 using BepuPhysics.Constraints;
 using BepuUtilities;
+using HeadlessTests24;
+using HeadlessTests24.DemoStyle;
 using System.Numerics;
+
 namespace HeadlessTests24.DemoStyle.Dancers;
 
 /// <summary>
 /// A bunch of background dancers struggle to keep up with the masterful purple prancer while wearing dresses made of out of balls connected by constraints.
 /// Combined with the <see cref="DemoDancers"/> implementation, this provides a starting point for cosmetic cloth attached to characters. 
 /// </summary>
-public class DancerDemo : Demo
+public class VideoDancerDemo : Demo
 {
     //This demo relies on the DemoDancers to manage all the ragdolls and their simulations. 
     //All this demo needs to do is make a dress out of balls and drape it onto them.
@@ -147,7 +150,6 @@ public class DancerDemo : Demo
     public unsafe override void Initialize(int threadCount)
     {
         ThreadDispatcher = new ThreadDispatcher(threadCount);
-
         var collisionFilters = new CollidableProperty<SubgroupCollisionFilter>();
         Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(collisionFilters), new DemoPoseIntegratorCallbacks(new Vector3(0, 0, 0)), new SolveDescription(8, 1));
 

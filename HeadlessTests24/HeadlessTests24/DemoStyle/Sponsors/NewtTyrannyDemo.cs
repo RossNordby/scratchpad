@@ -64,7 +64,7 @@ public class NewtTyrannyDemo : Demo
         for (int i = 0; i < hutCount; ++i)
         {
             var position2D = newtArenaMin + (newtArenaMax - newtArenaMin) * new Vector2(random.NextSingle(), random.NextSingle());
-            ColosseumDemo.CreateRing(Simulation, new Vector3(position2D.X, 0, position2D.Y), hutBoxShape, obstacleDescription, 4 + random.NextSingle() * 8, 2, random.Next(1, 10));
+            Colosseum24VideoDemo.CreateRing(Simulation, new Vector3(position2D.X, 0, position2D.Y), hutBoxShape, obstacleDescription, 4 + random.NextSingle() * 8, 2, random.Next(1, 10));
 
         }
 
