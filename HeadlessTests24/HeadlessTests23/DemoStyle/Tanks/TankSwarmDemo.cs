@@ -38,26 +38,26 @@ public class TankSwarmDemo : Demo
         //contact data can become a little out of date during substepping, since the contact data is only updated once per frame rather than substep (apart from the depths, which are incrementally updated every substep).
         //In this demo, when using substepping, a wheel resting on another wheel from a destroyed tank can keep rocking back and forth for a long time as the error in contact offsets over substeps can introduce energy.
         //(I'd like to address this issue more directly to make substepping an unconditional win.)
-        Simulation = Simulation.Create(BufferPool, new TankCallbacks() { Properties = bodyProperties }, new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SolveDescription(6, 1));
+        Simulation = Simulation.Create(BufferPool, new TankCallbacks() { Properties = bodyProperties }, new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new PositionFirstTimestepper(), 6);
 
         var builder = new CompoundBuilder(BufferPool, Simulation.Shapes, 2);
         builder.Add(new Box(1.85f, 0.7f, 4.73f), RigidPose.Identity, 10);
-        builder.Add(new Box(1.85f, 0.6f, 2.5f), new Vector3(0, 0.65f, -0.35f), 0.5f);
+        builder.Add(new Box(1.85f, 0.6f, 2.5f), new(new Vector3(0, 0.65f, -0.35f)), 0.5f);
         builder.BuildDynamicCompound(out var children, out var bodyInertia, out _);
         builder.Dispose();
         var bodyShape = new Compound(children);
         var bodyShapeIndex = Simulation.Shapes.Add(bodyShape);
         var wheelShape = new Cylinder(0.4f, .18f);
-        var wheelInertia = wheelShape.ComputeInertia(0.25f);
+        wheelShape.ComputeInertia(0.25f, out var wheelInertia);
         var wheelShapeIndex = Simulation.Shapes.Add(wheelShape);
 
         var projectileShape = new Sphere(0.1f);
-        var projectileInertia = projectileShape.ComputeInertia(0.2f);
+        projectileShape.ComputeInertia(0.2f, out var projectileInertia);
         var tankDescription = new TankDescription
         {
             Body = TankPartDescription.Create(10, new Box(4f, 1, 5), RigidPose.Identity, 0.5f, Simulation.Shapes),
-            Turret = TankPartDescription.Create(1, new Box(1.5f, 0.7f, 2f), new Vector3(0, 0.85f, 0.4f), 0.5f, Simulation.Shapes),
-            Barrel = TankPartDescription.Create(0.5f, new Box(0.2f, 0.2f, 3f), new Vector3(0, 0.85f, 0.4f - 1f - 1.5f), 0.5f, Simulation.Shapes),
+            Turret = TankPartDescription.Create(1, new Box(1.5f, 0.7f, 2f), new(new Vector3(0, 0.85f, 0.4f)), 0.5f, Simulation.Shapes),
+            Barrel = TankPartDescription.Create(0.5f, new Box(0.2f, 0.2f, 3f), new(new Vector3(0, 0.85f, 0.4f - 1f - 1.5f)), 0.5f, Simulation.Shapes),
             TurretAnchor = new Vector3(0f, 0.5f, 0.4f),
             BarrelAnchor = new Vector3(0, 0.5f + 0.35f, 0.4f - 1f),
             TurretBasis = Quaternion.Identity,
@@ -83,7 +83,7 @@ public class TankSwarmDemo : Demo
             WheelOrientation = QuaternionEx.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI * -0.5f),
         };
 
-        playerController = new TankController(Tank.Create(Simulation, bodyProperties, BufferPool, (new Vector3(0, 10, 0), Quaternion.Identity), tankDescription), 20, 5, 2, 1, 3.5f);
+        playerController = new TankController(Tank.Create(Simulation, bodyProperties, BufferPool, new(new Vector3(0, 10, 0), Quaternion.Identity), tankDescription), 20, 5, 2, 1, 3.5f);
 
 
         const int planeWidth = 257;
@@ -103,7 +103,7 @@ public class TankSwarmDemo : Demo
             Simulation.Statics.Add(new StaticDescription(
                 new Vector3(0, buildingShape.HalfHeight - 4f + GetHeightForPosition(position.X, position.Z, planeWidth, inverseTerrainScale, terrainPosition), 0) + position,
                 QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, random.NextSingle() * MathF.PI),
-                Simulation.Shapes.Add(buildingShape)));
+                new(Simulation.Shapes.Add(buildingShape), 0.1f)));
         }
 
         TestHelpers.CreateDeformedPlane(planeWidth, planeWidth,
@@ -112,7 +112,7 @@ public class TankSwarmDemo : Demo
                     var position2D = new Vector2(vX, vY) * terrainScale + terrainPosition;
                     return new Vector3(position2D.X, GetHeightForPosition(position2D.X, position2D.Y, planeWidth, inverseTerrainScale, terrainPosition), position2D.Y);
                 }, new Vector3(1, 1, 1), BufferPool, out var planeMesh);
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, 0, 0), Simulation.Shapes.Add(planeMesh)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, 0, 0), new(Simulation.Shapes.Add(planeMesh), 0.1f)));
 
         explosions = new QuickList<Explosion>(32, BufferPool);
 
@@ -129,7 +129,7 @@ public class TankSwarmDemo : Demo
             {
                 Controller = new TankController(
                     Tank.Create(Simulation, bodyProperties, BufferPool,
-                        (new Vector3(horizontalPosition.X, 10, horizontalPosition.Y), QuaternionEx.CreateFromAxisAngle(new Vector3(0, 1, 0), random.NextSingle() * 0.1f)),
+                        new(new Vector3(horizontalPosition.X, 10, horizontalPosition.Y), QuaternionEx.CreateFromAxisAngle(new Vector3(0, 1, 0), random.NextSingle() * 0.1f)),
                         tankDescription), 20, 5, 2, 1, 3.5f),
                 HitPoints = 5
             };
@@ -185,7 +185,7 @@ public class TankSwarmDemo : Demo
             ref var impact = ref projectileImpacts[i];
             ref var explosion = ref explosions.Allocate(BufferPool);
             explosion.Age = 0;
-            explosion.Position = Simulation.Bodies[impact.ProjectileHandle].Pose.Position;
+            explosion.Position = Simulation.Bodies.GetBodyReference(impact.ProjectileHandle).Pose.Position;
             explosion.Scale = 1f;
             explosion.Color = new Vector3(1f, 0.5f, 0);
             Simulation.Bodies.Remove(impact.ProjectileHandle);
@@ -201,7 +201,7 @@ public class TankSwarmDemo : Demo
                         if (aiTank.HitPoints == 0)
                         {
                             ref var deathExplosion = ref explosions.Allocate(BufferPool);
-                            deathExplosion.Position = Simulation.Bodies[aiTank.Controller.Tank.Turret].Pose.Position;
+                            deathExplosion.Position = Simulation.Bodies.GetBodyReference(aiTank.Controller.Tank.Turret).Pose.Position;
                             deathExplosion.Scale = 3;
                             deathExplosion.Age = 0;
                             deathExplosion.Color = new Vector3(1, 0, 0);

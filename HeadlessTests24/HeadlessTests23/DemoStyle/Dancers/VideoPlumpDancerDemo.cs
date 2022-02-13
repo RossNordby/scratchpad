@@ -30,7 +30,7 @@ public class VideoPlumpDancerDemo : Demo
     }
     static TestCapsule CreateTestCapsule(Simulation simulation, BodyHandle handle)
     {
-        var body = simulation.Bodies[handle];
+        var body = simulation.Bodies.GetBodyReference(handle);
         Debug.Assert(body.Collidable.Shape.Type == Capsule.Id, "For the purposes of this demo, we assume that all of the bodies that are being tested are capsules.");
         ref var shape = ref simulation.Shapes.GetShape<Capsule>(body.Collidable.Shape.Index);
         var pose = body.Pose;
@@ -50,7 +50,8 @@ public class VideoPlumpDancerDemo : Demo
         //Note that, unlike the DancerDemo where cloth nodes cannot rotate, the deformable sub-bodies can rotate.
         //That's because this demo is going to connect bodies together using Weld constraints, which control all six degrees of freedom.
         //You could also use a CenterDistanceConstraint/Limit with VolumeConstraints to maintain shape, but a bunch of Weld constraints is a little simpler.
-        var description = BodyDescription.CreateDynamic(QuaternionEx.Identity, shape.ComputeInertia(massPerBody), shapeIndex, 0.01f);
+        shape.ComputeInertia(massPerBody, out var bodyInertia);
+        var description = BodyDescription.CreateDynamic(new RigidPose(default, QuaternionEx.Identity), bodyInertia, new(shapeIndex, float.MaxValue), new(0.01f));
         BodyHandle[,,] handles = new BodyHandle[axisSizeInBodies.X, axisSizeInBodies.Y, axisSizeInBodies.Z];
         BodyHandle[,,] nearestHandles = new BodyHandle[axisSizeInBodies.X, axisSizeInBodies.Y, axisSizeInBodies.Z];
         var gridSpan = gridMaximum - gridMinimum;
@@ -107,7 +108,7 @@ public class VideoPlumpDancerDemo : Demo
                             filters.Allocate(handle) = new DeformableCollisionFilter(x, y, z, instanceId);
 
                         var nearestHandle = handlesBuffer[minimumIndex];
-                        var nearestPose = simulation.Bodies[nearestHandle].Pose;
+                        var nearestPose = simulation.Bodies.GetBodyReference(nearestHandle).Pose;
                         var conjugate = Quaternion.Conjugate(nearestPose.Orientation);
 
                     }
@@ -132,11 +133,11 @@ public class VideoPlumpDancerDemo : Demo
                             (y != handles.GetLength(1) - 1 && handles[x, y + 1, z].Value == -2) ||
                             (z != 0 && handles[x, y, z - 1].Value == -2) ||
                             (z != handles.GetLength(2) - 1 && handles[x, y, z + 1].Value == -2);
-                        var source = simulation.Bodies[handle];
+                        var source = simulation.Bodies.GetBodyReference(handle);
                         if (needsAnchor)
                         {
                             var nearestHandle = nearestHandles[x, y, z];
-                            var nearestPose = simulation.Bodies[nearestHandle].Pose;
+                            var nearestPose = simulation.Bodies.GetBodyReference(nearestHandle).Pose;
                             var conjugate = Quaternion.Conjugate(nearestPose.Orientation);
                             simulation.Solver.Add(nearestHandle, handle, new Weld
                             {
@@ -158,7 +159,7 @@ public class VideoPlumpDancerDemo : Demo
                         {
                             if (targetHandle.Value >= 0)
                             {
-                                var target = simulation.Bodies[targetHandle];
+                                var target = simulation.Bodies.GetBodyReference(targetHandle);
                                 simulation.Solver.Add(source.Handle, targetHandle, new Weld { LocalOffset = target.Pose.Position - source.Pose.Position, LocalOrientation = Quaternion.Identity, SpringSettings = new SpringSettings(6, 0.4f) });
                             }
                         }
@@ -194,7 +195,7 @@ public class VideoPlumpDancerDemo : Demo
         var axisBodyCounts = new Int3 { X = (int)MathF.Ceiling(fullDetailAxisBodyCounts.X / scale), Y = (int)MathF.Ceiling(fullDetailAxisBodyCounts.Y / scale), Z = (int)MathF.Ceiling(fullDetailAxisBodyCounts.Z / scale) };
         var bodyRadius = MathF.Min(suitSize.X / axisBodyCounts.X, MathF.Min(suitSize.Y / axisBodyCounts.Y, suitSize.Z / axisBodyCounts.Z));
 
-        var chest = simulation.Bodies[bodyHandles.Chest];
+        var chest = simulation.Bodies.GetBodyReference(bodyHandles.Chest);
         ref var chestShape = ref simulation.Shapes.GetShape<Capsule>(chest.Collidable.Shape.Index);
         var topOfChestHeight = chest.Pose.Position.Y + chestShape.Radius;
         var topOfChestPosition = new Vector3(0, topOfChestHeight, 0) + DemoDancers.GetOffsetForDancer(dancerIndex, dancerGridWidth);
@@ -208,10 +209,10 @@ public class VideoPlumpDancerDemo : Demo
     {
         ThreadDispatcher = new ThreadDispatcher(threadCount);
         var collisionFilters = new CollidableProperty<SubgroupCollisionFilter>();
-        Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(collisionFilters), new DemoPoseIntegratorCallbacks(new Vector3(0, 0, 0)), new SolveDescription(8, 1));
+        Simulation = Simulation.Create(BufferPool, new SubgroupFilteredCallbacks(collisionFilters), new DemoPoseIntegratorCallbacks(new Vector3(0, 0, 0)), new PositionFirstTimestepper(), 8);
 
         //Note that, because the constraints in the fat suit are quite soft, we can get away with extremely minimal solving time. There's one substep with one velocity iteration.
-        dancers = new DemoDancers().Initialize<DeformableCallbacks, DeformableCollisionFilter>(32, 32, Simulation, collisionFilters, ThreadDispatcher, BufferPool, new SolveDescription(1, 1), CreateFatSuit, new DeformableCollisionFilter(0, 0, 0, -1));
+        dancers = new DemoDancers().Initialize<DeformableCallbacks, DeformableCollisionFilter>(32, 32, Simulation, collisionFilters, ThreadDispatcher, BufferPool, (1, 1), CreateFatSuit, new DeformableCollisionFilter(0, 0, 0, -1));
 
     }
     public unsafe override void Update()

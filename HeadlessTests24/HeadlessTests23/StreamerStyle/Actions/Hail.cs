@@ -49,8 +49,8 @@ public class Hail : IAction
             var radiusRand = random.NextDouble();
             var r2 = radiusRand * radiusRand;
             var sphere = new Sphere(.75f + 1 * (float)(r2 * r2));
-            var inertia = sphere.ComputeInertia(2 * sphere.Radius * sphere.Radius * sphere.Radius);
-            scene.Simulation.Bodies.Add(BodyDescription.CreateDynamic(spawnLocation, spawnVelocity, inertia, new (scene.Simulation.Shapes.Add(sphere)), -1));
+            sphere.ComputeInertia(2 * sphere.Radius * sphere.Radius * sphere.Radius, out var inertia);
+            scene.Simulation.Bodies.Add(BodyDescription.CreateDynamic(new RigidPose(spawnLocation), new BodyVelocity(spawnVelocity), inertia, new (scene.Simulation.Shapes.Add(sphere), float.MaxValue), new (-1)));
 
         }
         return accumulatedTime < targetTime;

@@ -29,7 +29,7 @@ public struct TankPartDescription
     {
         TankPartDescription description;
         description.Shape = shapes.Add(shape);
-        description.Inertia = shape.ComputeInertia(mass);
+        shape.ComputeInertia(mass, out description.Inertia);
         description.Pose = pose;
         description.Friction = friction;
         return description;

@@ -21,7 +21,7 @@ namespace HeadlessTests23.DemoStyle
                 for (int i = 0; i < boxCountPerRing; i++)
                 {
                     var angle = ((ringIndex & 1) == 0 ? i + 0.5f : i) * increment;
-                    bodyDescription.Pose = (position + new Vector3(-MathF.Cos(angle) * radius, (ringIndex + 0.5f) * ringBoxShape.Height, MathF.Sin(angle) * radius), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle));
+                    bodyDescription.Pose = new (position + new Vector3(-MathF.Cos(angle) * radius, (ringIndex + 0.5f) * ringBoxShape.Height, MathF.Sin(angle) * radius), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle));
                     simulation.Bodies.Add(bodyDescription);
                 }
             }
@@ -35,7 +35,7 @@ namespace HeadlessTests23.DemoStyle
             for (int i = 0; i < boxCount; i++)
             {
                 var angle = i * increment;
-                bodyDescription.Pose = (position + new Vector3(-MathF.Cos(angle) * radius, ringBoxShape.HalfWidth, MathF.Sin(angle) * radius),
+                bodyDescription.Pose = new (position + new Vector3(-MathF.Cos(angle) * radius, ringBoxShape.HalfWidth, MathF.Sin(angle) * radius),
                     QuaternionEx.Concatenate(QuaternionEx.CreateFromAxisAngle(Vector3.UnitZ, MathF.PI * 0.5f), QuaternionEx.CreateFromAxisAngle(Vector3.UnitY, angle + MathF.PI * 0.5f)));
                 simulation.Bodies.Add(bodyDescription);
             }
@@ -57,11 +57,11 @@ namespace HeadlessTests23.DemoStyle
         public unsafe override void Initialize(int threadCount)
         {
             ThreadDispatcher = new ThreadDispatcher(threadCount);
-            Simulation = Simulation.Create(BufferPool, new DemoNarrowPhaseCallbacks(new SpringSettings(90, 1), maximumRecoveryVelocity: 20), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SolveDescription(2, 7));
+            Simulation = Simulation.Create(BufferPool, new DemoNarrowPhaseCallbacks(new SpringSettings(90, 1), maximumRecoveryVelocity: 20), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SubsteppingTimestepper(7), 2);
 
             var ringBoxShape = new Box(0.5f, 1, 3);
             ringBoxShape.ComputeInertia(1, out var ringBoxInertia);
-            var boxDescription = BodyDescription.CreateDynamic(new Vector3(), ringBoxInertia, new(Simulation.Shapes.Add(ringBoxShape), 0.1f), -0.01f);
+            var boxDescription = BodyDescription.CreateDynamic(new Vector3(), ringBoxInertia, new(Simulation.Shapes.Add(ringBoxShape), 0.1f), new (-0.01f));
 
             //CreateRingWall(Simulation, default, ringBoxShape, boxDescription, 400, 45);
             var layerPosition = new Vector3();
@@ -81,7 +81,7 @@ namespace HeadlessTests23.DemoStyle
             }
 
             Console.WriteLine($"box count: {Simulation.Bodies.ActiveSet.Count}");
-            Simulation.Statics.Add(new StaticDescription(new Vector3(0, -0.5f, 0), Simulation.Shapes.Add(new Box(500, 1, 500))));
+            Simulation.Statics.Add(new StaticDescription(new Vector3(0, -0.5f, 0), new (Simulation.Shapes.Add(new Box(500, 1, 500)), 0.1f)));
 
         }
 

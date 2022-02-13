@@ -265,26 +265,26 @@ public class InterlockedBars : Scene
         var dependencyChainLength = floors * (planksPerFloor + 1);
         GetSimulationPropertiesForDependencyChain(dependencyChainLength, out var substepCount, out int hz, out int solverIterationCount);
 
-        Simulation = Simulation.Create(BufferPool, new NarrowPhaseCallbacks() { SpringSettings = new SpringSettings(hz, 1) }, new DemoPoseIntegratorCallbacks(Gravity), new SolveDescription(solverIterationCount, substepCount));
+        Simulation = Simulation.Create(BufferPool, new NarrowPhaseCallbacks() { SpringSettings = new SpringSettings(hz, 1) }, new DemoPoseIntegratorCallbacks(Gravity), new SubsteppingTimestepper(substepCount), solverIterationCount);
 
         var plankShape = new Box(0.75f, 1.75f, 4);
-        var plankInertia = plankShape.ComputeInertia(1);
-        var plankDescription = BodyDescription.CreateDynamic(new Vector3(), plankInertia, new(Simulation.Shapes.Add(plankShape), 0.1f), -0.01f);
+        plankShape.ComputeInertia(1, out var plankInertia);
+        var plankDescription = BodyDescription.CreateDynamic(new RigidPose(new Vector3()), plankInertia, new(Simulation.Shapes.Add(plankShape), 0.1f), new(-0.01f));
         var floorShape = new Box(plankShape.Length + cellSpacing * 0.9f, 0.25f, plankShape.Length + cellSpacing * 0.9f);
-        var floorInertia = floorShape.ComputeInertia(1);
-        var floorDescription = BodyDescription.CreateDynamic(new Vector3(), floorInertia, new(Simulation.Shapes.Add(floorShape), 0.1f), -0.01f);
+        floorShape.ComputeInertia(1, out var floorInertia);
+        var floorDescription = BodyDescription.CreateDynamic(new RigidPose(new Vector3()), floorInertia, new(Simulation.Shapes.Add(floorShape), 0.1f), new(-0.01f));
 
 
         //CreateBuilding(Simulation, new RigidPose(new Vector3(10, 0, 0), QuaternionEx.Identity), floors, planksPerFloor, widthInCells, lengthInCells, cellSpacing, cellInset, plankShape, plankDescription, floorShape, floorDescription);
         var actualFloorCount = CreateProceduralBuilding(widthInCells, lengthInCells, random, Simulation, new RigidPose(new Vector3(10, 0, 0), QuaternionEx.Identity), floors, planksPerFloor, cellSpacing, cellInset, plankShape, plankDescription, floorShape, floorDescription);
         GetSimulationPropertiesForDependencyChain(actualFloorCount * (planksPerFloor + 1), out substepCount, out hz, out solverIterationCount);
         (Simulation.NarrowPhase as NarrowPhase<NarrowPhaseCallbacks>).Callbacks.SpringSettings.Frequency = hz;
-        Simulation.Solver.VelocityIterationCount = solverIterationCount;
-        Simulation.Solver.SubstepCount = substepCount;
+        Simulation.Solver.IterationCount = solverIterationCount;
+        (Simulation.Timestepper as SubsteppingTimestepper).SubstepCount = substepCount;
 
         CreateRegionOfInterest();
 
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -5, 0), Simulation.Shapes.Add(new Box(2500, 10, 2500))));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -5, 0), new (Simulation.Shapes.Add(new Box(2500, 10, 2500)), 0.1f)));
     }
 
 

@@ -17,11 +17,12 @@ public class ChainFountainDemo : Demo
         ThreadDispatcher = new ThreadDispatcher(threadCount);
 
         var filters = new CollidableProperty<RopeFilter>();
-        Simulation = Simulation.Create(BufferPool, new RopeNarrowPhaseCallbacks(filters, new PairMaterialProperties(0.1f, float.MaxValue, new SpringSettings(240, 0)), 3), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SolveDescription(1, 12));
+        Simulation = Simulation.Create(BufferPool, new RopeNarrowPhaseCallbacks(filters, new PairMaterialProperties { FrictionCoefficient = 0.1f, MaximumRecoveryVelocity = float.MaxValue, SpringSettings = new SpringSettings(240, 0) }, 3), new DemoPoseIntegratorCallbacks(new Vector3(0, -10, 0)), new SubsteppingTimestepper(12), 1);
 
         var beadSpacing = 0.3f;
         var beadShape = new Capsule(0.05f, beadSpacing);
-        var beadDescription = BodyDescription.CreateDynamic(new Vector3(), beadShape.ComputeInertia(1), Simulation.Shapes.Add(beadShape), 0.01f);
+        beadShape.ComputeInertia(1, out var beadInertia);
+        var beadDescription = BodyDescription.CreateDynamic(new RigidPose(new Vector3()), beadInertia, new (Simulation.Shapes.Add(beadShape), float.MaxValue), new (0.01f));
 
         const int beadCount = 4096;
         var handles = new BodyHandle[beadCount];
@@ -56,11 +57,11 @@ public class ChainFountainDemo : Demo
             }
         }
 
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, 0f, 0), Simulation.Shapes.Add(new Box(11.6f, .2f, 40))));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, 0f, 0), new (Simulation.Shapes.Add(new Box(11.6f, .2f, 40)), 0.1f)));
         var wall = Simulation.Shapes.Add(new Box(.4f, 1, 40));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(5.65f, 2.4f - 2f, 0), wall));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(-5.65f, 2.4f - 2f, 0), wall));
-        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -500f, 0), Simulation.Shapes.Add(new Box(500, 1, 500))));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(5.65f, 2.4f - 2f, 0), new (wall, 0.1f)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(-5.65f, 2.4f - 2f, 0), new (wall, 0.1f)));
+        Simulation.Statics.Add(new StaticDescription(new Vector3(0, -500f, 0), new (Simulation.Shapes.Add(new Box(500, 1, 500)), 0.1f)));
 
     }
 }
