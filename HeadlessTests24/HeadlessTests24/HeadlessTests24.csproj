@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BepuPhysics" Version="2.4.0-beta12" />
+    <PackageReference Include="BepuPhysics" Version="2.4.0-beta13" />
     <PackageReference Include="CjClutter.ObjLoader" Version="1.0.0" />
   </ItemGroup>
 

@@ -309,7 +309,7 @@ public struct Tank
         QuaternionEx.Transform(BarrelLocalDirection, barrelPose.Orientation, out var barrelDirection);
         var projectileHandle = simulation.Bodies.Add(BodyDescription.CreateDynamic(projectileSpawn, new BodyVelocity(barrelDirection * ProjectileSpeed + barrel.Velocity.Linear), ProjectileInertia,
             //The projectile moves pretty fast, so we'll use continuous collision detection.
-            new CollidableDescription(ProjectileShape, ContinuousDetection.Continuous(1e-3f, 1e-3f, 0, 0.1f)), 0.01f));
+            new CollidableDescription(ProjectileShape, 0.1f, ContinuousDetection.Continuous(1e-3f, 1e-3f)), 0.01f));
         ref var filter = ref filters.Allocate(projectileHandle);
         ref var friction = ref frictions.Allocate(projectileHandle);
         friction = 1f;

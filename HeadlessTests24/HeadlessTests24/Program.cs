@@ -14,7 +14,7 @@ try
 {
     using (var reader = new StreamReader(File.Open(threadCountsPath, FileMode.Open)))
     {
-        if (int.TryParse(reader.ReadLine(), out var count))
+        while (int.TryParse(reader.ReadLine(), out var count))
         {
             if (count < 0)
                 Console.WriteLine($"(no we're not going to use a negative thread count of {count})");
