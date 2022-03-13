@@ -38,6 +38,6 @@ struct RayHitDispatcher<TRayHitHandler> : IBroadPhaseRayTester where TRayHitHand
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public unsafe void RayTest(RayData* rayData, float* maximumT)
     {
-        Shapes[0].RayTest(0, RigidPose.Identity, *rayData, ref *maximumT, ref ShapeHitHandler);
+        Shapes[0].RayTest(ref ShapeHitHandler);
     }
 }

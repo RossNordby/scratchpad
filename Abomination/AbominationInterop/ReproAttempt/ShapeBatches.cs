@@ -26,9 +26,7 @@ public abstract class ShapeBatch
     /// </summary>
     public int ShapeDataSize { get { return shapeDataSize; } }
 
-    protected abstract void Dispose(int index, BufferPool pool);
-
-    public abstract void RayTest<TRayHitHandler>(int shapeIndex, in RigidPose pose, in RayData ray, ref float maximumT, ref TRayHitHandler hitHandler) where TRayHitHandler : struct, IShapeRayHitHandler;
+    public abstract void RayTest<TRayHitHandler>(ref TRayHitHandler hitHandler) where TRayHitHandler : struct, IShapeRayHitHandler;
 
     /// <summary>
     /// Gets a raw untyped pointer to a shape's data.
@@ -174,37 +172,10 @@ public class HomogeneousCompoundShapeBatch<TShape, TChildShape, TChildShapeWide>
         Compound = true;
     }
 
-    protected override void Dispose(int index, BufferPool pool)
+
+    public override void RayTest<TRayHitHandler>(ref TRayHitHandler hitHandler)
     {
-        shapes[index].Dispose(pool);
-    }
-
-    public override void RayTest<TRayHitHandler>(int shapeIndex, in RigidPose pose, in RayData ray, ref float maximumT, ref TRayHitHandler hitHandler)
-    {
-        shapes[shapeIndex].RayTest(pose, ray, ref maximumT, ref hitHandler);
-    }
-
-}
-
-public class CompoundShapeBatch<TShape> : ShapeBatch<TShape> where TShape : unmanaged, ICompoundShape
-{
-    Shapes shapeBatches;
-
-    public CompoundShapeBatch(BufferPool pool, int initialShapeCount, Shapes shapeBatches) : base(pool, initialShapeCount)
-    {
-        this.shapeBatches = shapeBatches;
-        Compound = true;
-    }
-
-    protected override void Dispose(int index, BufferPool pool)
-    {
-        shapes[index].Dispose(pool);
-    }
-
-
-    public override void RayTest<TRayHitHandler>(int shapeIndex, in RigidPose pose, in RayData ray, ref float maximumT, ref TRayHitHandler hitHandler)
-    {
-        shapes[shapeIndex].RayTest(pose, ray, ref maximumT, shapeBatches, ref hitHandler);
+        shapes[0].RayTest(ref hitHandler);
     }
 
 }

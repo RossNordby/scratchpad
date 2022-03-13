@@ -34,7 +34,7 @@ public static class Program
         float hmm = 0;
         HitHandler hitHandler = default;
         hitHandler.Objeto = new object();
-        shapes[mesh.TypeId].RayTest(0, RigidPose.Identity, new RayData { Direction = new Vector3(1, 1, 1), Id = 0, Origin = default }, ref hmm, ref hitHandler);
+        shapes[mesh.TypeId].RayTest(ref hitHandler);
 
         Console.WriteLine($"Yeah! objeto: {hitHandler.Objeto}");
         pool.Clear();

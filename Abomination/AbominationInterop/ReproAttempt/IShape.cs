@@ -65,15 +65,7 @@ public interface IHomogeneousCompoundShape<TChildShape, TChildShapeWide> : IShap
     where TChildShape : IConvexShape
     where TChildShapeWide : IShapeWide<TChildShape>
 {
-    void ComputeBounds(in Quaternion orientation, out Vector3 min, out Vector3 max);
-
-    void RayTest<TRayHitHandler>(in RigidPose pose, in RayData ray, ref float maximumT, ref TRayHitHandler hitHandler) where TRayHitHandler : struct, IShapeRayHitHandler;
-
-    int ChildCount { get; }
-    void GetLocalChild(int childIndex, out TChildShape childData);
-    void GetPosedLocalChild(int childIndex, out TChildShape childData, out RigidPose childPose);
-    void GetLocalChild(int childIndex, ref TChildShapeWide childData);
-    void Dispose(BufferPool pool);
+    void RayTest<TRayHitHandler>(ref TRayHitHandler hitHandler) where TRayHitHandler : struct, IShapeRayHitHandler;
 }
 
 public interface IShapeWide<TShape> where TShape : IShape
