@@ -28,13 +28,13 @@ public static class Program
             trianglesBuffer[i] = new Triangle(new Vector3(0, i, 0), new Vector3(1, i, 0), new Vector3(0, i, 1));
 
         }
-        Mesh mesh = new Mesh(trianglesBuffer, Vector3.One, pool);
+        Mesh mesh = new Mesh();
         //shapes.Add(mesh);
 
         float hmm = 0;
         HitHandler hitHandler = default;
         hitHandler.Objeto = new object();
-        shapes[mesh.TypeId].RayTest(ref hitHandler);
+        shapes[0].RayTest(ref hitHandler);
 
         Console.WriteLine($"Yeah! objeto: {hitHandler.Objeto}");
         pool.Clear();

@@ -13,21 +13,6 @@ using System.Threading.Tasks;
 /// </summary>
 public interface IShape
 {
-    //TODO: Note that these should really be *static* as they do not need any information about an instance, but static abstract interface methods are not yet out of preview.
-    /// <summary>
-    /// Unique type id for this shape type.
-    /// </summary>
-    int TypeId { get; }
-
-    /// <summary>
-    /// Creates a shape batch for this type of shape.
-    /// </summary>
-    /// <param name="pool">Buffer pool used to create the batch.</param>
-    /// <param name="initialCapacity">Initial capacity to allocate within the batch.</param>
-    /// <param name="shapeBatches">The set of shapes to contain this batch.</param>
-    /// <returns>Shape batch for the shape type.</returns>
-    /// <remarks>This is typically used internally to initialize new shape collections in response to shapes being added. It is not likely to be useful outside of the engine.</remarks>
-    ShapeBatch CreateShapeBatch(BufferPool pool, int initialCapacity, Shapes shapeBatches);
 }
 
 //Note that the following bounds functions require only an orientation because the effect of the position on the bounding box is the same for all shapes.
@@ -43,18 +28,8 @@ public interface IShape
 /// </summary>
 public interface IConvexShape : IShape
 {
-    bool RayTest(in RigidPose pose, in Vector3 origin, in Vector3 direction, out float t, out Vector3 normal);
 }
 
-/// <summary>
-/// Defines a compound shape type that has children of potentially different types.
-/// </summary>
-public interface ICompoundShape : IShape
-{
-    void RayTest<TRayHitHandler>(in RigidPose pose, in RayData ray, ref float maximumT, Shapes shapeBatches, ref TRayHitHandler hitHandler) where TRayHitHandler : struct, IShapeRayHitHandler;
-    int ChildCount { get; }
-    void Dispose(BufferPool pool);
-}
 
 /// <summary>
 /// Defines a compound shape type that has children of only one type.
@@ -71,39 +46,5 @@ public interface IHomogeneousCompoundShape<TChildShape, TChildShapeWide> : IShap
 public interface IShapeWide<TShape> where TShape : IShape
 {
 
-    /// <summary>
-    /// Gets whether this type supports accessing its memory by lane offsets. If false, WriteSlot must be used instead of WriteFirst.
-    /// </summary>
-    bool AllowOffsetMemoryAccess { get; }
-    /// <summary>
-    /// Gets the number of bytes required for allocations within the wide shape.
-    /// </summary>
-    int InternalAllocationSize { get; }
-    /// <summary>
-    /// For types with a nonzero internal allocation size, provides memory to the shape for internal allocations.
-    /// Memory should be assumed to be stack allocated.
-    /// </summary>
-    /// <param name="memory">Memory to use for internal allocations in the wide shape.</param>
-    void Initialize(in Buffer<byte> memory);
 
-    /// <summary>
-    /// Places the specified AOS-formatted shape into the first lane of the wide 'this' reference.
-    /// </summary>
-    /// <remarks>Note that we are effectively using the TShapeWide as a stride.
-    /// The base address is offset by the user of this function, so the implementation only ever considers the first slot.</remarks>
-    /// <param name="source">AOS-formatted shape to gather from.</param>
-    void WriteFirst(in TShape source);
-    /// <summary>
-    /// Places the specified AOS-formatted shape into the selected slot of the wide 'this' reference.
-    /// </summary>
-    /// <param name="index">Index of the slot to put the data into.</param>
-    /// <param name="source">Source of the data to insert.</param>
-    void WriteSlot(int index, in TShape source);
-    void Broadcast(in TShape shape);
-
-    void GetBounds(ref QuaternionWide orientations, int countInBundle, out Vector<float> maximumRadius, out Vector<float> maximumAngularExpansion, out Vector3Wide min, out Vector3Wide max);
-    /// <summary>
-    /// Gets the lower bound on the number of rays to execute in a wide fashion. Ray bundles with fewer rays will fall back to the single ray code path.
-    /// </summary>
-    int MinimumWideRayCount { get; }
 }
