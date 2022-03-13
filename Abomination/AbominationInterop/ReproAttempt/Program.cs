@@ -20,7 +20,7 @@ public static class Program
         Console.WriteLine("Hello, World!");
 
         BufferPool pool = new BufferPool();
-        Shapes shapes = new Shapes(pool, 32);
+        Shapes shapes = new Shapes();
         //This is a bit poopy. that's ok.
         pool.Take<Triangle>(4, out var trianglesBuffer);
         for (int i = 0; i < trianglesBuffer.Length; ++i)
@@ -29,7 +29,7 @@ public static class Program
 
         }
         Mesh mesh = new Mesh(trianglesBuffer, Vector3.One, pool);
-        shapes.Add(mesh);
+        //shapes.Add(mesh);
 
         float hmm = 0;
         HitHandler hitHandler = default;

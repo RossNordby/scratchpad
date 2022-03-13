@@ -49,7 +49,7 @@ public struct Mesh : IHomogeneousCompoundShape<Triangle, TriangleWide>
 
     public readonly ShapeBatch CreateShapeBatch(BufferPool pool, int initialCapacity, Shapes shapeBatches)
     {
-        return new HomogeneousCompoundShapeBatch<Mesh, Triangle, TriangleWide>(pool, initialCapacity);
+        return new HomogeneousCompoundShapeBatch<Mesh, Triangle, TriangleWide>();
     }
 
 
