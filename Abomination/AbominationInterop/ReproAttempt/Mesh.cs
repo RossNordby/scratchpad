@@ -162,7 +162,7 @@ public struct Mesh : IHomogeneousCompoundShape<Triangle, TriangleWide>
                 //Pull the hit back into world space before handing it off to the user. This does cost a bit more, but not much, and you can always add a specialized no-transform path later.
                 Matrix3x3.Transform(normal * InverseScale, Orientation, out normal);
                 normal = Vector3.Normalize(normal);
-                HitHandler.OnRayHit(OriginalRay, ref *maximumT, t, normal, leafIndex);
+                HitHandler.OnRayHit();
             }
         }
     }

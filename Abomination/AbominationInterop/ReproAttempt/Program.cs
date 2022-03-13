@@ -5,15 +5,10 @@ using System.Numerics;
 public struct HitHandler : IShapeRayHitHandler
 {
     public object Objeto;
-    public bool AllowTest(int childIndex)
-    {
-        Console.WriteLine($"testing: {childIndex}");
-        return true;
-    }
 
-    public void OnRayHit(in RayData ray, ref float maximumT, float t, in Vector3 normal, int childIndex)
+    public void OnRayHit()
     {
-        Console.WriteLine($"hit: {t}");
+        Console.WriteLine($"hit");
     }
 }
 
