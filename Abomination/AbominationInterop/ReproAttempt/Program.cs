@@ -1,41 +1,35 @@
-﻿public interface IHomogeneousCompoundShape
+﻿static class Program
 {
-    void RayTest<TRayHitHandler>() where TRayHitHandler : struct;
-}
-
-public struct Mesh : IHomogeneousCompoundShape
-{
-    public readonly unsafe void RayTest<TRayHitHandler>() where TRayHitHandler : struct
+    interface IHomogeneousCompoundShape
     {
-
+        void RayTest<TRayHitHandler>();
     }
-}
-public class HomogeneousCompoundShapeBatch<TShape> where TShape : unmanaged, IHomogeneousCompoundShape
-{
-    public void RayTest<TRayHitHandler>() where TRayHitHandler : struct
+
+    struct Mesh : IHomogeneousCompoundShape
+    {
+        public unsafe void RayTest<TRayHitHandler>()
+        {
+
+        }
+    }
+
+    struct ShapeRayHitHandler<TRayHitHandler>
+    {
+    }
+
+
+    static void RayTest<TShape, TRayHitHandler>() where TShape : unmanaged, IHomogeneousCompoundShape
     {
         default(TShape).RayTest<TRayHitHandler>();
     }
-
-}
-
-struct ShapeRayHitHandler<TRayHitHandler>
-{
-}
-
-struct RayHitDispatcher<TRayHitHandler>
-{
-    public unsafe void RayTest()
+    static void Do<T>()
     {
-        new HomogeneousCompoundShapeBatch<Mesh>().RayTest<ShapeRayHitHandler<TRayHitHandler>>();
+        RayTest<Mesh, ShapeRayHitHandler<T>>();
     }
-}
 
-public static class Program
-{
     public static void Main()
     {
-        new HomogeneousCompoundShapeBatch<Mesh>().RayTest<int>();
+        Do<int>();
     }
 }
 
