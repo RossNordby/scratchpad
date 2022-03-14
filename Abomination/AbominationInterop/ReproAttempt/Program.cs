@@ -21,17 +21,8 @@ public static class Program
 
         BufferPool pool = new BufferPool();
         Shapes shapes = new Shapes();
-        //This is a bit poopy. that's ok.
-        pool.Take<Triangle>(4, out var trianglesBuffer);
-        for (int i = 0; i < trianglesBuffer.Length; ++i)
-        {
-            trianglesBuffer[i] = new Triangle(new Vector3(0, i, 0), new Vector3(1, i, 0), new Vector3(0, i, 1));
-
-        }
         Mesh mesh = new Mesh();
-        //shapes.Add(mesh);
-
-        float hmm = 0;
+        Console.WriteLine($"mesh: {mesh}");
         HitHandler hitHandler = default;
         hitHandler.Objeto = new object();
         shapes[0].RayTest(ref hitHandler);
