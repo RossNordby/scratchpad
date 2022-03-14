@@ -9,13 +9,6 @@ using System.Runtime.CompilerServices;
 /// </summary>
 public struct Mesh : IHomogeneousCompoundShape<Triangle, TriangleWide>
 {
-
-    public readonly ShapeBatch CreateShapeBatch(BufferPool pool, int initialCapacity, Shapes shapeBatches)
-    {
-        return new HomogeneousCompoundShapeBatch<Mesh, Triangle, TriangleWide>();
-    }
-
-
     /// <summary>
     /// Casts a ray against the mesh. Executes a callback for every test candidate and every hit.
     /// </summary>

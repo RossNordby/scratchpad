@@ -16,7 +16,7 @@ public interface IRayHitHandler
 
 public interface IBroadPhaseRayTester
 {
-    unsafe void RayTest(RayData* rayData, float* maximumT);
+    unsafe void RayTest(float* maximumT);
 }
 
 struct ShapeRayHitHandler<TRayHitHandler> : IShapeRayHitHandler where TRayHitHandler : IRayHitHandler
@@ -32,12 +32,12 @@ struct ShapeRayHitHandler<TRayHitHandler> : IShapeRayHitHandler where TRayHitHan
 
 struct RayHitDispatcher<TRayHitHandler> : IBroadPhaseRayTester where TRayHitHandler : IRayHitHandler
 {
-    public Shapes Shapes;
+    public ShapeBatch Shapes;
     public ShapeRayHitHandler<TRayHitHandler> ShapeHitHandler;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public unsafe void RayTest(RayData* rayData, float* maximumT)
+    public unsafe void RayTest(float* maximumT)
     {
-        Shapes[0].RayTest(ref ShapeHitHandler);
+        Shapes.RayTest(ref ShapeHitHandler);
     }
 }
