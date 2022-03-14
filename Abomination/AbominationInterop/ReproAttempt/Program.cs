@@ -1,50 +1,29 @@
-﻿
-using System.Runtime.CompilerServices;
-
-public interface IShapeRayHitHandler
+﻿public interface IHomogeneousCompoundShape
 {
-    void OnRayHit();
+    void RayTest<TRayHitHandler>() where TRayHitHandler : struct;
 }
-
-public interface IHomogeneousCompoundShape
-{
-    void RayTest<TRayHitHandler>() where TRayHitHandler : struct, IShapeRayHitHandler;
-}
-
-
 
 public struct Mesh : IHomogeneousCompoundShape
 {
-    public readonly unsafe void RayTest<TRayHitHandler>() where TRayHitHandler : struct, IShapeRayHitHandler
+    public readonly unsafe void RayTest<TRayHitHandler>() where TRayHitHandler : struct
     {
 
     }
-
-
 }
 public class HomogeneousCompoundShapeBatch<TShape> where TShape : unmanaged, IHomogeneousCompoundShape
 {
-    public void RayTest<TRayHitHandler>() where TRayHitHandler : struct, IShapeRayHitHandler
+    public void RayTest<TRayHitHandler>() where TRayHitHandler : struct
     {
         default(TShape).RayTest<TRayHitHandler>();
     }
 
 }
 
-public interface IRayHitHandler
+struct ShapeRayHitHandler<TRayHitHandler>
 {
-    void OnRayHit();
 }
 
-
-struct ShapeRayHitHandler<TRayHitHandler> : IShapeRayHitHandler where TRayHitHandler : IRayHitHandler
-{
-    public void OnRayHit()
-    {
-    }
-}
-
-struct RayHitDispatcher<TRayHitHandler> where TRayHitHandler : IRayHitHandler
+struct RayHitDispatcher<TRayHitHandler>
 {
     public unsafe void RayTest()
     {
@@ -52,34 +31,11 @@ struct RayHitDispatcher<TRayHitHandler> where TRayHitHandler : IRayHitHandler
     }
 }
 
-
-public struct HitHandler : IShapeRayHitHandler
-{
-    public object Objeto;
-
-    public void OnRayHit()
-    {
-        Console.WriteLine($"hit");
-    }
-}
-
 public static class Program
 {
     public static void Main()
     {
-
-        Console.WriteLine("Hello, World!");
-
-        //Shapes shapes = new Shapes();
-        Mesh mesh = new Mesh();
-        Console.WriteLine($"mesh: {mesh}");
-        HitHandler hitHandler = default;
-        hitHandler.Objeto = new object();
-        var batch = new HomogeneousCompoundShapeBatch<Mesh>();
-        batch.RayTest<HitHandler>();
-        //shapes[0].RayTest(ref hitHandler);
-
-        Console.WriteLine($"Yeah! objeto: {hitHandler.Objeto}");
+        new HomogeneousCompoundShapeBatch<Mesh>().RayTest<int>();
     }
 }
 
