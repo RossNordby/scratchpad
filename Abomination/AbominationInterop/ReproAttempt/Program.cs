@@ -9,7 +9,7 @@
 
     struct ExtremelySmallCat : ITechnique
     {
-        public unsafe void CatSlaps<T>() { }
+        public void CatSlaps<T>() { }
     }
 
     static void Consider<TSomeCat, TAnotherFormOfCat>() where TSomeCat : struct, ITechnique
