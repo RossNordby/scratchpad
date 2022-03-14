@@ -1,35 +1,30 @@
 ﻿static class Program
 {
-    interface IHomogeneousCompoundShape
+    struct SmallCat<T> { }
+
+    interface ITechnique
     {
-        void RayTest<TRayHitHandler>();
+        void CatSlaps<TRayHitHandler>();
     }
 
-    struct Mesh : IHomogeneousCompoundShape
+    struct ExtremelySmallCat : ITechnique
     {
-        public unsafe void RayTest<TRayHitHandler>()
-        {
-
-        }
+        public unsafe void CatSlaps<T>() { }
     }
 
-    struct ShapeRayHitHandler<TRayHitHandler>
+    static void Consider<TSomeCat, TAnotherFormOfCat>() where TSomeCat : struct, ITechnique
     {
+        default(TSomeCat).CatSlaps<TAnotherFormOfCat>();
     }
 
-
-    static void RayTest<TShape, TRayHitHandler>() where TShape : unmanaged, IHomogeneousCompoundShape
+    static void CatConcepts<T>()
     {
-        default(TShape).RayTest<TRayHitHandler>();
-    }
-    static void Do<T>()
-    {
-        RayTest<Mesh, ShapeRayHitHandler<T>>();
+        Consider<ExtremelySmallCat, SmallCat<T>>();
     }
 
-    public static void Main()
+    static void Main()
     {
-        Do<int>();
+        CatConcepts<int>();
     }
 }
 
