@@ -4,7 +4,7 @@
 
     interface ITechnique
     {
-        void CatSlaps<TRayHitHandler>();
+        void CatSlaps<T>();
     }
 
     struct ExtremelySmallCat : ITechnique
