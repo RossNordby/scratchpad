@@ -6,17 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
-    <IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
-    <Optimize>true</Optimize>
-    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-*" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\..\bepuphysics2\BepuUtilities\BepuUtilities.csproj" />
   </ItemGroup>
 
 </Project>
