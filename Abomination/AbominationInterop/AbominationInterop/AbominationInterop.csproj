@@ -10,7 +10,7 @@
     <!--<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>-->
     <!--<Optimize>true</Optimize>-->
     <!--<IlcOptimizationPreference>Speed</IlcOptimizationPreference>-->
-    <NativeLib>Static</NativeLib>
+    <NativeLib>Shared</NativeLib>
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
     
   </PropertyGroup>
