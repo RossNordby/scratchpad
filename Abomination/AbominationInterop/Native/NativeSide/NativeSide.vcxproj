@@ -71,20 +71,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(ReferencePath)</ReferencePath>
+    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(LibraryPath)</LibraryPath>
+    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(ReferencePath)</ReferencePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(ReferencePath)</ReferencePath>
+    <LibraryPath>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(LibraryPath)</LibraryPath>
+    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk\;$(ReferencePath)</ReferencePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(ReferencePath)</ReferencePath>
+    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(LibraryPath)</LibraryPath>
+    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(ReferencePath)</ReferencePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(ReferencePath)</ReferencePath>
+    <LibraryPath>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(LibraryPath)</LibraryPath>
+    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk\;$(ReferencePath)</ReferencePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -92,12 +92,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
       <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -109,15 +110,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
-      <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
+      <AdditionalDependencies>AbominationInterop.lib;bootstrapperdll.lib;bootstrapper.lib;bootstrapper.GuardCF.lib;bootstrapperdll.GuardCF.lib;Runtime.ServerGC.lib;Runtime.WorkstationGC.lib;System.IO.Compression.Native.Aot.GuardCF.lib;System.IO.Compression.Native.Aot.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -126,12 +128,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
       <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -143,15 +146,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
+      <AdditionalDependencies>AbominationInterop.lib;bootstrapperdll.lib;bootstrapper.lib;bootstrapper.GuardCF.lib;bootstrapperdll.GuardCF.lib;Runtime.ServerGC.lib;Runtime.WorkstationGC.lib;System.IO.Compression.Native.Aot.GuardCF.lib;System.IO.Compression.Native.Aot.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

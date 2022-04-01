@@ -12,6 +12,7 @@
     <!--<IlcOptimizationPreference>Speed</IlcOptimizationPreference>-->
     <NativeLib>Static</NativeLib>
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    
   </PropertyGroup>
 
   <ItemGroup>

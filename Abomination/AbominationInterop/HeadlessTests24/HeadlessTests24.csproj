@@ -6,9 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
+		<!--<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>
 		<Optimize>true</Optimize>
-		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>-->
   </PropertyGroup>
   
   <ItemGroup>
