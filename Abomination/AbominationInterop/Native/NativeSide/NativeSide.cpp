@@ -2,7 +2,7 @@
 //
 
 #include <iostream>
-extern "C" void __cdecl Goingtr(void);
+extern "C" void Goingtr(void);
 
 int main()
 {

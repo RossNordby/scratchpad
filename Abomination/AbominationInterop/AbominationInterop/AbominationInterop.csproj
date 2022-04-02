@@ -12,7 +12,6 @@
     <!--<IlcOptimizationPreference>Speed</IlcOptimizationPreference>-->
     <NativeLib>Shared</NativeLib>
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
-    
   </PropertyGroup>
 
   <ItemGroup>
