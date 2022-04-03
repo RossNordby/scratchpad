@@ -6,14 +6,15 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace AbominationInterop
+namespace AbominationInterop;
+
+internal static class Entrypoints
 {
-    internal static class Entrypoints
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = "Goingtr")]
+    public static void Greetings()
     {
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = "Goingtr")]
-        public static void Greetings()
-        {
-            Console.WriteLine("Proing");
-        }
+        Console.WriteLine("Proing");
+        SimpleSelfContainedDemo.Run();
+        Console.WriteLine("Proinged");
     }
 }
