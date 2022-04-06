@@ -1,15 +1,15 @@
 ﻿
 using BepuPhysics;
+using BepuUtilities.Memory;
 using System.Reflection;
 
 
-var type = typeof(Solver);
+var generator = new Generator("bepu");
+generator.RegisterInstanceDirectory<BufferPool>();
+generator.RegisterInstanceDirectory<Simulation>();
 
-//static void ExposeField()
-
-var fields = type.GetFields(BindingFlags.Public | BindingFlags.Instance);
-
-foreach (var field in fields)
+var simulation = typeof(Simulation);
+foreach (var method in simulation.GetMethods(BindingFlags.Public | BindingFlags.Instance))
 {
-    Console.WriteLine(field);
+    generator.AddFunction(method);
 }
