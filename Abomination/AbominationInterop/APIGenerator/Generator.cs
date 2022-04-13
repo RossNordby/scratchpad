@@ -5,14 +5,17 @@ using System.Runtime.InteropServices;
 public class Generator
 {
     string prefix;
-    CallingConvention convention;
+    string callingConvention;
     public Generator(string prefix, CallingConvention convention)
     {
         //toot.
-        if (convention != CallingConvention.Cdecl && convention != CallingConvention.StdCall)
-            throw new NotSupportedException("Supported calling conventions are currently only Cdecl and StdCall.");
+        callingConvention = convention switch
+        {
+            CallingConvention.Cdecl => nameof(CallConvCdecl),
+            CallingConvention.StdCall => nameof(CallConvStdcall),
+            _ => throw new NotSupportedException("Only CDecl and Stdcall calling conventions are currently supported.")
+        };
         this.prefix = prefix;
-        this.convention = convention;
     }
 
     List<Type> typesRequiringDirectories = new List<Type>();
@@ -40,13 +43,7 @@ public class Generator
     private void WriteFunction(string indent, MethodInfo methodInfo, List<string> lines)
     {
         var exposedFunctionName = prefix + methodInfo.Name;
-        lines.Add($"{indent}[UnmanagedCallersOnly(CallConvs = new[] {{ {convention switch
-        {
-            CallingConvention.Cdecl => typeof(CallConvCdecl),
-            CallingConvention.StdCall => typeof(CallConvStdcall),
-            _ => throw new NotSupportedException(),
-        }}, EntryPoint = "{exposedFunctionName}")]");
-        [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = "Goingtr")]
+        lines.Add($"{indent}[UnmanagedCallersOnly(CallConvs = new[] {{ { callingConvention } }}, EntryPoint = \"{exposedFunctionName}\")]");
     }
     public void WriteCSharp(Stream csharpStream, string entryPointsNamespace, string entryPointsClassName)
     {
