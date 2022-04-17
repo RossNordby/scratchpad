@@ -1,6 +1,8 @@
-﻿using System.Reflection;
+﻿using Microsoft.CSharp;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public class Generator
 {
@@ -24,9 +26,16 @@ public class Generator
         typesRequiringDirectories.Add(typeof(T));
     }
 
-    public void AddFunction(MethodInfo function)
+    struct Function
     {
-        function.
+        public MethodInfo MethodInfo;
+        public string TypePrefix;
+    }
+
+    List<Function> functions = new List<Function>();
+    public void AddFunction(string typePrefix, MethodInfo function)
+    {
+        functions.Add(new() { TypePrefix = typePrefix, MethodInfo = function });
     }
 
     private void Write(StreamWriter writer, Span<string> lines)
@@ -40,10 +49,49 @@ public class Generator
         }
     }
 
-    private void WriteFunction(string indent, MethodInfo methodInfo, List<string> lines)
+    string GetFriendlyCSharpTypeName(Type type)
     {
-        var exposedFunctionName = prefix + methodInfo.Name;
-        lines.Add($"{indent}[UnmanagedCallersOnly(CallConvs = new[] {{ { callingConvention } }}, EntryPoint = \"{exposedFunctionName}\")]");
+        return new CSharpCodeProvider().GetTypeOutput(new System.CodeDom.CodeTypeReference(type));
+    }
+
+    string GetExposedFunctionName(Function function)
+    {
+        ReadOnlySpan<char> name = function.MethodInfo.Name;
+        if (function.MethodInfo.IsSpecialName)
+        {
+            //This is hacky, but it works given that no functions in bepuphysics2 violate the required assumptions.
+            if (name.StartsWith("get_"))
+            {
+                return string.Concat(prefix, function.TypePrefix, "Get", name[4..]);
+            }
+            if (name.StartsWith("set_"))
+            {
+                return string.Concat(prefix, function.TypePrefix, "Get", name[4..]);
+            }
+        }
+        return string.Concat(prefix, function.TypePrefix, name);
+    }
+
+    private void WriteCSharpFunction(string indent, Function function, List<string> lines)
+    {
+        string exposedFunctionName = GetExposedFunctionName(function);
+
+        lines.Add($"{indent}[UnmanagedCallersOnly(CallConvs = new[] {{ typeof({callingConvention}) }}, EntryPoint = \"{exposedFunctionName}\")]");
+        StringBuilder builder = new StringBuilder();
+        builder.Append(indent).Append("public static ").Append(GetFriendlyCSharpTypeName(function.MethodInfo.ReturnType)).Append(' ').Append(exposedFunctionName).Append('(');
+        var parameters = function.MethodInfo.GetParameters();
+        for (int i = 0; i < parameters.Length; ++i)
+        {
+            var parameter = parameters[i];
+            builder.Append(GetFriendlyCSharpTypeName(parameter.ParameterType)).Append(' ').Append(parameter.Name);
+            if (i < parameters.Length - 1)
+                builder.Append(", ");
+        }
+        builder.Append(')');
+        lines.Add(builder.ToString());
+        lines.Add($"{indent}{{");
+
+        lines.Add($"{indent}}}");
     }
     public void WriteCSharp(Stream csharpStream, string entryPointsNamespace, string entryPointsClassName)
     {
@@ -60,6 +108,10 @@ public class Generator
         {
             var type = typesRequiringDirectories[typeIndex];
             lines.Add($"{indent}public static InstanceDirectory<{type.Name}> instancesOf{type.Name} = new InstanceDirectory<{type.Name}>({typeIndex});");
+        }
+        foreach (var function in functions)
+        {
+            WriteCSharpFunction(indent, function, lines);
         }
         lines.Add("}");
         var v = new StreamWriter(csharpStream);
