@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\bepuphysics2\BepuPhysics\BepuPhysics.csproj" />
     <ProjectReference Include="..\..\..\..\bepuphysics2\BepuUtilities\BepuUtilities.csproj" />
+    <ProjectReference Include="..\APIGenerator\APIGenerator.csproj" />
   </ItemGroup>
 
 </Project>

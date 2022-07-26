@@ -14,6 +14,7 @@ public class InstanceDirectory<T> where T : class
     DirectoryEntry[] instances;
     ManagedIdPool pool;
     int typeIndex;
+    object locker = new object();
 
     public T this[InstanceHandle handle]
     {
@@ -41,12 +42,23 @@ public class InstanceDirectory<T> where T : class
     /// </summary>
     /// <param name="instance">Instance to add.</param>
     /// <returns>Handle to the instance.</returns>
+    /// <remarks>Takes a lock internally with respect to other adds and removes and any resizes will maintain a valid object in the <see cref="instances"/> field.</remarks>
     public InstanceHandle Add(T instance)
     {
-        var index = pool.Take();
-        ref var slot = ref instances[index];
-        slot.Instance = instance;
-        return new InstanceHandle(index, slot.Version++, typeIndex);
+        lock (locker)
+        {
+            var index = pool.Take();
+            if (index >= instances.Length)
+            {
+                var newInstances = new DirectoryEntry[Math.Max(instances.Length * 2, index + 1)];
+                instances.CopyTo(newInstances, 0);
+                //The array reference will never have a torn read, assignment is safe with respect to any parallel indexers.
+                instances = newInstances;
+            }
+            ref var slot = ref instances[index];
+            slot.Instance = instance;
+            return new InstanceHandle(index, slot.Version++, typeIndex);
+        }
     }
     /// <summary>
     /// Removes the instance associated with the given handle.
@@ -54,15 +66,18 @@ public class InstanceDirectory<T> where T : class
     /// <param name="handle">Handle of the instance to remove.</param>
     public void Remove(InstanceHandle handle)
     {
-        if (handle.TypeIndex != typeIndex)
-            throw new ArgumentException("Handle does not match the type of this instance directory.");
-        if (handle.Index < 0 || handle.Index > instances.Length)
-            throw new ArgumentOutOfRangeException("Handle points to an index outside of the instance directory.");
-        if (handle.Version != instances[handle.TypeIndex].Version)
-            throw new ArgumentException("Handle is out of date. Is a handle being used after being removed?");
-        if (instances[handle.Index].Instance == null)
-            throw new ArgumentException("There is no instance associated with this handle.");
-        instances[handle.Index].Instance = null;
-        pool.Return(handle.Index);
+        lock (locker)
+        {
+            if (handle.TypeIndex != typeIndex)
+                throw new ArgumentException("Handle does not match the type of this instance directory.");
+            if (handle.Index < 0 || handle.Index > instances.Length)
+                throw new ArgumentOutOfRangeException("Handle points to an index outside of the instance directory.");
+            if (handle.Version != instances[handle.TypeIndex].Version)
+                throw new ArgumentException("Handle is out of date. Is a handle being used after being removed?");
+            if (instances[handle.Index].Instance == null)
+                throw new ArgumentException("There is no instance associated with this handle.");
+            instances[handle.Index].Instance = null;
+            pool.Return(handle.Index);
+        }
     }
 }
