@@ -9,24 +9,24 @@ namespace AbominationInterop;
 [StructLayout(LayoutKind.Sequential)]
 public unsafe struct NarrowPhaseCallbacksInterop
 {
-    public delegate*<InstanceHandle, void> InitializeFunction;
-    public delegate*<InstanceHandle, void> DisposeFunction;
-    public delegate*<InstanceHandle, int, CollidableReference, CollidableReference, float*, byte> AllowContactGenerationFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, int, int, byte> AllowContactGenerationBetweenChildrenFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, ConvexContactManifold*, PairMaterialProperties*, byte> ConfigureConvexContactManifoldFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, NonconvexContactManifold*, PairMaterialProperties*, byte> ConfigureNonconvexContactManifoldFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, int, int, ConvexContactManifold*, byte> ConfigureChildContactManifoldFunction;
+    public delegate* unmanaged<InstanceHandle, void> InitializeFunction;
+    public delegate* unmanaged<InstanceHandle, void> DisposeFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidableReference, CollidableReference, float*, byte> AllowContactGenerationFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, int, int, byte> AllowContactGenerationBetweenChildrenFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, ConvexContactManifold*, PairMaterialProperties*, byte> ConfigureConvexContactManifoldFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, NonconvexContactManifold*, PairMaterialProperties*, byte> ConfigureNonconvexContactManifoldFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, int, int, ConvexContactManifold*, byte> ConfigureChildContactManifoldFunction;
 }
 
 public unsafe struct NarrowPhaseCallbacks : INarrowPhaseCallbacks
 {
-    public delegate*<InstanceHandle, void> InitializeFunction;
-    public delegate*<InstanceHandle, void> DisposeFunction;
-    public delegate*<InstanceHandle, int, CollidableReference, CollidableReference, float*, byte> AllowContactGenerationFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, int, int, byte> AllowContactGenerationBetweenChildrenFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, ConvexContactManifold*, PairMaterialProperties*, byte> ConfigureConvexContactManifoldFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, NonconvexContactManifold*, PairMaterialProperties*, byte> ConfigureNonconvexContactManifoldFunction;
-    public delegate*<InstanceHandle, int, CollidablePair, int, int, ConvexContactManifold*, byte> ConfigureChildContactManifoldFunction;
+    public delegate* unmanaged<InstanceHandle, void> InitializeFunction;
+    public delegate* unmanaged<InstanceHandle, void> DisposeFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidableReference, CollidableReference, float*, byte> AllowContactGenerationFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, int, int, byte> AllowContactGenerationBetweenChildrenFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, ConvexContactManifold*, PairMaterialProperties*, byte> ConfigureConvexContactManifoldFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, NonconvexContactManifold*, PairMaterialProperties*, byte> ConfigureNonconvexContactManifoldFunction;
+    public delegate* unmanaged<InstanceHandle, int, CollidablePair, int, int, ConvexContactManifold*, byte> ConfigureChildContactManifoldFunction;
 
     public InstanceHandle Simulation;
 
