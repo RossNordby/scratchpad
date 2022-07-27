@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using BepuUtilities;
+using System.Numerics;
 using System.Runtime.Intrinsics;
 
 namespace AbominationInterop;
@@ -69,4 +70,22 @@ public struct BodyInertiaSIMD256
     public Vector256<float> InverseInertiaZY;
     public Vector256<float> InverseInertiaZZ;
     public Vector256<float> InverseMass;
+}
+
+/// <summary>
+/// BodyVelocityWide interop type used when <see cref="Vector{float}"/> is 128 bits wide.
+/// </summary>
+public struct BodyVelocitySIMD128
+{
+    public Vector3SIMD128 Linear;
+    public Vector3SIMD128 Angular;
+}
+
+/// <summary>
+/// BodyVelocityWide interop type used when <see cref="Vector{float}"/> is 256 bits wide.
+/// </summary>
+public struct BodyVelocitySIMD256
+{
+    public Vector3SIMD256 Linear;
+    public Vector3SIMD256 Angular;
 }
