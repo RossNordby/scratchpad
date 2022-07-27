@@ -142,6 +142,27 @@ internal static class Entrypoints
         return CreateSimulation(bufferPools[bufferPool], narrowPhaseCallbacks, poseIntegratorCallbacksInterop, solveDescription, initialAllocationSizes);
     }
 
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AddBody))]
+    public unsafe static BodyHandle AddBody(InstanceHandle simulationHandle, BodyDescription bodyDescription)
+    {
+        return simulations[simulationHandle].Bodies.Add(bodyDescription);
+    }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveBody))]
+    public unsafe static void RemoveBody(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    {
+        simulations[simulationHandle].Bodies.Remove(bodyHandle);
+    }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AddStatic))]
+    public unsafe static StaticHandle AddStatic(InstanceHandle simulationHandle, StaticDescription staticDescription)
+    {
+        return simulations[simulationHandle].Statics.Add(staticDescription);
+    }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveStatic))]
+    public unsafe static void RemoveStatic(InstanceHandle simulationHandle, StaticHandle staticHandle)
+    {
+        simulations[simulationHandle].Statics.Remove(staticHandle);
+    }
+
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = "Goingtr")]
     public static void Greetings()
     {
