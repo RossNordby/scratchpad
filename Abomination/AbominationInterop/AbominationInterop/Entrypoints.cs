@@ -2,9 +2,11 @@
 using BepuPhysics.Collidables;
 using BepuPhysics.CollisionDetection;
 using BepuUtilities;
+using BepuUtilities.Collections;
 using BepuUtilities.Memory;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -221,6 +223,83 @@ internal static class Entrypoints
     {
         simulations[simulationHandle].Bodies.Remove(bodyHandle);
     }
+
+    /// <summary>
+    /// Gets a pointer to the dynamic state associated with a body. Includes pose, velocity, and inertia.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a body's state from.</param>
+    /// <param name="bodyHandle">Body handle to pull data about.</param>
+    /// <returns>Pointer to the body's dynamic state.</returns>
+    /// <remarks>This is a direct pointer. The memory location associated with a body can move other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyDynamics))]
+    public unsafe static BodyDynamics* GetBodyDynamics(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    {
+        return (BodyDynamics*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Dynamics);
+    }
+
+    /// <summary>
+    /// Gets a pointer to the collidable associated with a body.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a body's state from.</param>
+    /// <param name="bodyHandle">Body handle to pull data about.</param>
+    /// <returns>Pointer to the body's collidable.</returns>
+    /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyCollidable))]
+    public unsafe static Collidable* GetBodyCollidable(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    {
+        return (Collidable*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Collidable);
+    }
+
+    /// <summary>
+    /// Gets a pointer to the activity state associated with a body.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a body's state from.</param>
+    /// <param name="bodyHandle">Body handle to pull data about.</param>
+    /// <returns>Pointer to the body's activity state.</returns>
+    /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyActivity))]
+    public unsafe static BodyActivity* GetBodyActivity(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    {
+        return (BodyActivity*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Activity);
+    }
+
+    /// <summary>
+    /// Gets a pointer to the list of constraints associated with a body.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a body's state from.</param>
+    /// <param name="bodyHandle">Body handle to pull data about.</param>
+    /// <returns>Pointer to the body's constraint list.</returns>
+    /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyConstraints))]
+    public unsafe static QuickList<ConstraintReference>* GetBodyConstraints(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    {
+        return (QuickList<ConstraintReference>*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Constraints);
+    }
+
+    /// <summary>
+    /// Gets a description of a body.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a body's state from.</param>
+    /// <param name="bodyHandle">Body handle to pull data about.</param>
+    /// <returns>Description of a body.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyDescription))]
+    public unsafe static BodyDescription GetBodyDescription(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    {
+        return simulations[simulationHandle].Bodies.GetDescription(bodyHandle);
+    }
+
+    /// <summary>
+    /// Applies a description to a body.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a body's state from.</param>
+    /// <param name="bodyHandle">Body handle to pull data about.</param>
+    /// <param name="description">Description to apply to the body.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ApplyBodyDescription))]
+    public unsafe static void ApplyBodyDescription(InstanceHandle simulationHandle, BodyHandle bodyHandle, BodyDescription description)
+    {
+        simulations[simulationHandle].Bodies.ApplyDescription(bodyHandle, description);
+    }
+
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AddStatic))]
     public unsafe static StaticHandle AddStatic(InstanceHandle simulationHandle, StaticDescription staticDescription)
     {
@@ -230,6 +309,54 @@ internal static class Entrypoints
     public unsafe static void RemoveStatic(InstanceHandle simulationHandle, StaticHandle staticHandle)
     {
         simulations[simulationHandle].Statics.Remove(staticHandle);
+    }
+    /// <summary>
+    /// Gets a pointer to data associated with a static.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a static's state from.</param>
+    /// <param name="staticHandle">Static handle to pull data about.</param>
+    /// <returns>Pointer to the static's data.</returns>
+    /// <remarks>This is a direct pointer. The memory location associated with a static can move if other statics are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStatic))]
+    public unsafe static Static* GetStatic(InstanceHandle simulationHandle, StaticHandle staticHandle)
+    {        
+        return (Static*)Unsafe.AsPointer(ref simulations[simulationHandle].Statics.GetDirectReference(staticHandle));
+    }
+
+    /// <summary>
+    /// Gets a static's description.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a static's state from.</param>
+    /// <param name="staticHandle">Static handle to pull data about.</param>
+    /// <returns>Description of the static..</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStaticDescription))]
+    public unsafe static StaticDescription GetStaticDescription(InstanceHandle simulationHandle, StaticHandle staticHandle)
+    {
+        return simulations[simulationHandle].Statics.GetDescription(staticHandle);
+    }
+
+    /// <summary>
+    /// Applies a description to a static.
+    /// </summary>
+    /// <param name="simulationHandle">Simulation to pull a static's state from.</param>
+    /// <param name="staticHandle">Static handle to pull data about.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ApplyStaticDescription))]
+    public unsafe static void ApplyStaticDescription(InstanceHandle simulationHandle, StaticHandle staticHandle, StaticDescription description)
+    {
+        simulations[simulationHandle].Statics.ApplyDescription(staticHandle, description);
+    }
+
+    /// <summary>
+    /// Steps the simulation forward a single time.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to step.</param>
+    /// <param name="dt">Duration of the timestep.</param>
+    /// <param name="threadDispatcherHandle">Handle of the thread dispatcher to use, if any. Can be a null reference.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Timestep))]
+    public unsafe static void Timestep(InstanceHandle simulationHandle, float dt, InstanceHandle threadDispatcherHandle)
+    {
+        var threadDispatcher = threadDispatcherHandle.Null ? null : threadDispatchers[threadDispatcherHandle];
+        simulations[simulationHandle].Timestep(dt, threadDispatcher);
     }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = "Goingtr")]
