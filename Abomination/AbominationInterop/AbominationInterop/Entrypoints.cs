@@ -1,6 +1,7 @@
 ﻿using BepuPhysics;
 using BepuPhysics.Collidables;
 using BepuPhysics.CollisionDetection;
+using BepuUtilities;
 using BepuUtilities.Memory;
 using System;
 using System.Collections.Generic;
@@ -25,6 +26,7 @@ internal static class Entrypoints
 {
     static InstanceDirectory<BufferPool> bufferPools;
     static InstanceDirectory<Simulation> simulations;
+    static InstanceDirectory<ThreadDispatcher> threadDispatchers;
 
     public const string FunctionNamePrefix = "Bepu";
 
@@ -33,6 +35,7 @@ internal static class Entrypoints
     {
         bufferPools = new InstanceDirectory<BufferPool>(0);
         simulations = new InstanceDirectory<Simulation>(1);
+        threadDispatchers = new InstanceDirectory<ThreadDispatcher>(2);
     }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetSIMDWidth))]
@@ -56,6 +59,51 @@ internal static class Entrypoints
     {
         return bufferPools.Add(new BufferPool(minimumBlockAllocationSize, expectedUsedSlotCountPerPool));
     }
+
+    /// <summary>
+    /// Releases all allocations held by the buffer pool. The buffer pool remains in a usable state.
+    /// </summary>
+    /// <param name="handle">Buffer pool to clear.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ClearBufferPool))]
+    public static void ClearBufferPool(InstanceHandle handle)
+    {
+        bufferPools[handle].Clear();
+    }
+
+    /// <summary>
+    /// Releases all allocations held by the buffer pool and releases the buffer pool reference. The handle is invalidated.
+    /// </summary>
+    /// <param name="handle">Buffer pool to destroy.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyBufferPool))]
+    public static void DestroyBufferPool(InstanceHandle handle)
+    {
+        bufferPools[handle].Clear();
+        bufferPools.Remove(handle);
+    }
+
+    /// <summary>
+    /// Creates a new thread dispatcher.
+    /// </summary>
+    /// <param name="workerCount">Number of threads to use within the thread dispatcher.</param>
+    /// <param name="threadPoolAllocationBlockSize">Minimum size in bytes of blocks allocated in per-thread buffer pools. Allocations requiring more space can result in larger block sizes, but no pools will allocate smaller blocks.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateThreadDispatcher))]
+    public static InstanceHandle CreateThreadDispatcher(int threadCount, int threadPoolAllocationBlockSize)
+    {
+        return threadDispatchers.Add(new ThreadDispatcher(threadCount, threadPoolAllocationBlockSize));
+    }
+
+    /// <summary>
+    /// Releases all resources held by a thread dispatcher and invalidates its handle.
+    /// </summary>
+    /// <param name="handle">Thread dispatcher to destroy.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyThreadDispatcher))]
+    public static void DestroyThreadDispatcher(InstanceHandle handle)
+    {
+        threadDispatchers[handle].Dispose();
+        threadDispatchers.Remove(handle);
+    }
+
+
 
     //We don't want to do runtime checks in the callbacks, so we jump through some fun hoops to construct a type.
     private static unsafe InstanceHandle CreateSimulationWithScalarIntegrationState<TConservationType, TSubstepUnconstrained, TIntegrateKinematicVelocities, TScalarIntegration>(
@@ -118,6 +166,15 @@ internal static class Entrypoints
     }
 
 
+    /// <summary>
+    /// Creates a new simulation.
+    /// </summary>
+    /// <param name="bufferPool">Buffer pool for the simulation's main allocations.</param>
+    /// <param name="narrowPhaseCallbacksInterop">Narrow phase callbacks to be invoked by the simulation.</param>
+    /// <param name="poseIntegratorCallbacksInterop">Pose integration state and callbacks to be invoked by the simulation.</param>
+    /// <param name="solveDescriptionInterop">Defines velocity iteration count and substep counts for the simulation's solver.</param>
+    /// <param name="initialAllocationSizes">Initial capacities to allocate within the simulation.</param>
+    /// <returns></returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateSimulation))]
     public unsafe static InstanceHandle CreateSimulation(InstanceHandle bufferPool, NarrowPhaseCallbacksInterop narrowPhaseCallbacksInterop, PoseIntegratorCallbacksInterop poseIntegratorCallbacksInterop,
         SolveDescriptionInterop solveDescriptionInterop, SimulationAllocationSizes initialAllocationSizes)
@@ -140,6 +197,18 @@ internal static class Entrypoints
             ConfigureChildContactManifoldFunction = narrowPhaseCallbacksInterop.ConfigureChildContactManifoldFunction
         };
         return CreateSimulation(bufferPools[bufferPool], narrowPhaseCallbacks, poseIntegratorCallbacksInterop, solveDescription, initialAllocationSizes);
+    }
+
+    /// <summary>
+    /// Destroys a simulation and invalidates its handle.
+    /// </summary>
+    /// <param name="handle">Simulation to destroy.</param>
+
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroySimulation))]
+    public static unsafe void DestroySimulation(InstanceHandle handle)
+    {
+        simulations[handle].Dispose();
+        simulations.Remove(handle);
     }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AddBody))]

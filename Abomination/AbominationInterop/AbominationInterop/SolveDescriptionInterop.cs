@@ -24,5 +24,5 @@ public unsafe struct SolveDescriptionInterop
     /// Callback executed to determine how many velocity iterations should be used for a given substep. If null, or if it returns a non-positive value, the <see cref="VelocityIterationCount"/> will be used instead.
     /// </summary>
     [FieldOffset(16)]
-    public delegate*<int, int> VelocityIterationScheduler;
+    public delegate* unmanaged<int, int> VelocityIterationScheduler;
 }
