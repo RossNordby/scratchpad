@@ -5,6 +5,7 @@ using BepuUtilities;
 using BepuUtilities.Collections;
 using BepuUtilities.Memory;
 using System;
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,6 +13,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using static AbominationInterop.SimpleSelfContainedDemo;
@@ -24,13 +26,27 @@ public enum SIMDWidth
     SIMD256 = 1
 }
 
-internal static class Entrypoints
+public class TypeNameAttribute : Attribute
+{
+    public string TypeName;
+    public TypeNameAttribute(string typeName)
+    {
+        TypeName = typeName;
+    }
+}
+
+public static class Entrypoints
 {
     static InstanceDirectory<BufferPool>? bufferPools;
     static InstanceDirectory<Simulation>? simulations;
     static InstanceDirectory<ThreadDispatcher>? threadDispatchers;
 
-    public const string FunctionNamePrefix = "Bepu";
+    public const string FunctionNamePrefix = "";
+    //These look a little odd. They're just the names of the handle types on the native side. On the C# side, they're all just InstanceHandle since we didn't want to bother doing type reinterpretation.
+    public const string BufferPoolName = nameof(BufferPool) + "Handle";
+    public const string SimulationName = nameof(Simulation) + "Handle";
+    public const string ThreadDispatcherName = nameof(ThreadDispatcher) + "Handle";
+
 
     /// <summary>
     /// Initializes the interop structures.
@@ -51,7 +67,7 @@ internal static class Entrypoints
     /// <summary>
     /// Destroys all resources created through the interop API and releases interop structures.
     /// </summary>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Initialize))]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Destroy))]
     public static void Destroy()
     {
         if (bufferPools == null || bufferPools == null || simulations == null)
@@ -100,6 +116,7 @@ internal static class Entrypoints
     /// <param name="expectedUsedSlotCountPerPool">Number of suballocations to preallocate reference space for.
     /// This does not preallocate actual blocks, just the space to hold references that are waiting in the pool.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateBufferPool))]
+    [return: TypeName(BufferPoolName)]
     public static InstanceHandle CreateBufferPool(int minimumBlockAllocationSize, int expectedUsedSlotCountPerPool)
     {
         return bufferPools.Add(new BufferPool(minimumBlockAllocationSize, expectedUsedSlotCountPerPool));
@@ -110,7 +127,7 @@ internal static class Entrypoints
     /// </summary>
     /// <param name="handle">Buffer pool to clear.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ClearBufferPool))]
-    public static void ClearBufferPool(InstanceHandle handle)
+    public static void ClearBufferPool([TypeName(BufferPoolName)] InstanceHandle handle)
     {
         bufferPools[handle].Clear();
     }
@@ -120,7 +137,7 @@ internal static class Entrypoints
     /// </summary>
     /// <param name="handle">Buffer pool to destroy.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyBufferPool))]
-    public static void DestroyBufferPool(InstanceHandle handle)
+    public static void DestroyBufferPool([TypeName(BufferPoolName)] InstanceHandle handle)
     {
         bufferPools[handle].Clear();
         bufferPools.Remove(handle);
@@ -132,6 +149,7 @@ internal static class Entrypoints
     /// <param name="workerCount">Number of threads to use within the thread dispatcher.</param>
     /// <param name="threadPoolAllocationBlockSize">Minimum size in bytes of blocks allocated in per-thread buffer pools. Allocations requiring more space can result in larger block sizes, but no pools will allocate smaller blocks.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateThreadDispatcher))]
+    [return: TypeName(ThreadDispatcherName)]
     public static InstanceHandle CreateThreadDispatcher(int threadCount, int threadPoolAllocationBlockSize)
     {
         return threadDispatchers.Add(new ThreadDispatcher(threadCount, threadPoolAllocationBlockSize));
@@ -142,7 +160,7 @@ internal static class Entrypoints
     /// </summary>
     /// <param name="handle">Thread dispatcher to destroy.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyThreadDispatcher))]
-    public static void DestroyThreadDispatcher(InstanceHandle handle)
+    public static void DestroyThreadDispatcher([TypeName(ThreadDispatcherName)] InstanceHandle handle)
     {
         threadDispatchers[handle].Dispose();
         threadDispatchers.Remove(handle);
@@ -153,7 +171,7 @@ internal static class Entrypoints
     /// </summary>
     /// <param name="handle">Thread dispatcher to check the thread count of.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetThreadCount))]
-    public static int GetThreadCount(InstanceHandle handle)
+    public static int GetThreadCount([TypeName(ThreadDispatcherName)] InstanceHandle handle)
     {
         return threadDispatchers[handle].ThreadCount;
     }
@@ -231,7 +249,8 @@ internal static class Entrypoints
     /// <param name="initialAllocationSizes">Initial capacities to allocate within the simulation.</param>
     /// <returns></returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateSimulation))]
-    public unsafe static InstanceHandle CreateSimulation(InstanceHandle bufferPool, NarrowPhaseCallbacksInterop narrowPhaseCallbacksInterop, PoseIntegratorCallbacksInterop poseIntegratorCallbacksInterop,
+    [return: TypeName(SimulationName)]
+    public unsafe static InstanceHandle CreateSimulation([TypeName(BufferPoolName)] InstanceHandle bufferPool, NarrowPhaseCallbacksInterop narrowPhaseCallbacksInterop, PoseIntegratorCallbacksInterop poseIntegratorCallbacksInterop,
         SolveDescriptionInterop solveDescriptionInterop, SimulationAllocationSizes initialAllocationSizes)
     {
         var solveDescription = new SolveDescription
@@ -260,19 +279,19 @@ internal static class Entrypoints
     /// <param name="handle">Simulation to destroy.</param>
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroySimulation))]
-    public static unsafe void DestroySimulation(InstanceHandle handle)
+    public static unsafe void DestroySimulation([TypeName(SimulationName)] InstanceHandle handle)
     {
         simulations[handle].Dispose();
         simulations.Remove(handle);
     }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AddBody))]
-    public unsafe static BodyHandle AddBody(InstanceHandle simulationHandle, BodyDescription bodyDescription)
+    public unsafe static BodyHandle AddBody([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyDescription bodyDescription)
     {
         return simulations[simulationHandle].Bodies.Add(bodyDescription);
     }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveBody))]
-    public unsafe static void RemoveBody(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    public unsafe static void RemoveBody([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         simulations[simulationHandle].Bodies.Remove(bodyHandle);
     }
@@ -285,7 +304,7 @@ internal static class Entrypoints
     /// <returns>Pointer to the body's dynamic state.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a body can move other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyDynamics))]
-    public unsafe static BodyDynamics* GetBodyDynamics(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    public unsafe static BodyDynamics* GetBodyDynamics([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return (BodyDynamics*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Dynamics);
     }
@@ -298,7 +317,7 @@ internal static class Entrypoints
     /// <returns>Pointer to the body's collidable.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyCollidable))]
-    public unsafe static Collidable* GetBodyCollidable(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    public unsafe static Collidable* GetBodyCollidable([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return (Collidable*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Collidable);
     }
@@ -311,7 +330,7 @@ internal static class Entrypoints
     /// <returns>Pointer to the body's activity state.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyActivity))]
-    public unsafe static BodyActivity* GetBodyActivity(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    public unsafe static BodyActivity* GetBodyActivity([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return (BodyActivity*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Activity);
     }
@@ -324,7 +343,7 @@ internal static class Entrypoints
     /// <returns>Pointer to the body's constraint list.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyConstraints))]
-    public unsafe static QuickList<ConstraintReference>* GetBodyConstraints(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    public unsafe static QuickList<ConstraintReference>* GetBodyConstraints([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return (QuickList<ConstraintReference>*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Constraints);
     }
@@ -336,7 +355,7 @@ internal static class Entrypoints
     /// <param name="bodyHandle">Body handle to pull data about.</param>
     /// <returns>Description of a body.</returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyDescription))]
-    public unsafe static BodyDescription GetBodyDescription(InstanceHandle simulationHandle, BodyHandle bodyHandle)
+    public unsafe static BodyDescription GetBodyDescription([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return simulations[simulationHandle].Bodies.GetDescription(bodyHandle);
     }
@@ -348,18 +367,18 @@ internal static class Entrypoints
     /// <param name="bodyHandle">Body handle to pull data about.</param>
     /// <param name="description">Description to apply to the body.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ApplyBodyDescription))]
-    public unsafe static void ApplyBodyDescription(InstanceHandle simulationHandle, BodyHandle bodyHandle, BodyDescription description)
+    public unsafe static void ApplyBodyDescription([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle, BodyDescription description)
     {
         simulations[simulationHandle].Bodies.ApplyDescription(bodyHandle, description);
     }
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AddStatic))]
-    public unsafe static StaticHandle AddStatic(InstanceHandle simulationHandle, StaticDescription staticDescription)
+    public unsafe static StaticHandle AddStatic([TypeName(SimulationName)] InstanceHandle simulationHandle, StaticDescription staticDescription)
     {
         return simulations[simulationHandle].Statics.Add(staticDescription);
     }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveStatic))]
-    public unsafe static void RemoveStatic(InstanceHandle simulationHandle, StaticHandle staticHandle)
+    public unsafe static void RemoveStatic([TypeName(SimulationName)] InstanceHandle simulationHandle, StaticHandle staticHandle)
     {
         simulations[simulationHandle].Statics.Remove(staticHandle);
     }
@@ -371,7 +390,7 @@ internal static class Entrypoints
     /// <returns>Pointer to the static's data.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a static can move if other statics are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStatic))]
-    public unsafe static Static* GetStatic(InstanceHandle simulationHandle, StaticHandle staticHandle)
+    public unsafe static Static* GetStatic([TypeName(SimulationName)] InstanceHandle simulationHandle, StaticHandle staticHandle)
     {
         return (Static*)Unsafe.AsPointer(ref simulations[simulationHandle].Statics.GetDirectReference(staticHandle));
     }
@@ -383,7 +402,7 @@ internal static class Entrypoints
     /// <param name="staticHandle">Static handle to pull data about.</param>
     /// <returns>Description of the static..</returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStaticDescription))]
-    public unsafe static StaticDescription GetStaticDescription(InstanceHandle simulationHandle, StaticHandle staticHandle)
+    public unsafe static StaticDescription GetStaticDescription([TypeName(SimulationName)] InstanceHandle simulationHandle, StaticHandle staticHandle)
     {
         return simulations[simulationHandle].Statics.GetDescription(staticHandle);
     }
@@ -394,7 +413,7 @@ internal static class Entrypoints
     /// <param name="simulationHandle">Simulation to pull a static's state from.</param>
     /// <param name="staticHandle">Static handle to pull data about.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ApplyStaticDescription))]
-    public unsafe static void ApplyStaticDescription(InstanceHandle simulationHandle, StaticHandle staticHandle, StaticDescription description)
+    public unsafe static void ApplyStaticDescription([TypeName(SimulationName)] InstanceHandle simulationHandle, StaticHandle staticHandle, StaticDescription description)
     {
         simulations[simulationHandle].Statics.ApplyDescription(staticHandle, description);
     }
@@ -406,17 +425,9 @@ internal static class Entrypoints
     /// <param name="dt">Duration of the timestep.</param>
     /// <param name="threadDispatcherHandle">Handle of the thread dispatcher to use, if any. Can be a null reference.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Timestep))]
-    public unsafe static void Timestep(InstanceHandle simulationHandle, float dt, InstanceHandle threadDispatcherHandle)
+    public unsafe static void Timestep([TypeName(SimulationName)] InstanceHandle simulationHandle, float dt, [TypeName(ThreadDispatcherName)] InstanceHandle threadDispatcherHandle)
     {
         var threadDispatcher = threadDispatcherHandle.Null ? null : threadDispatchers[threadDispatcherHandle];
         simulations[simulationHandle].Timestep(dt, threadDispatcher);
-    }
-
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = "Goingtr")]
-    public static void Greetings()
-    {
-        Console.WriteLine("Proing");
-        SimpleSelfContainedDemo.Run();
-        Console.WriteLine("Proinged");
     }
 }
