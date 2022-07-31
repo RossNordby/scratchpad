@@ -30,6 +30,18 @@ public class InstanceDirectory<T> where T : class
         }
     }
 
+    public T? this[int index]
+    {
+        get
+        {
+            if (index < 0 || index > instances.Length)
+                return instances[index].Instance;
+            return null;
+        }
+    }
+
+    public int Capacity => instances.Length;
+
     public InstanceDirectory(int typeIndex, int initialCapacity = 32)
     {
         this.typeIndex = typeIndex;

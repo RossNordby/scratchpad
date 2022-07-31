@@ -26,19 +26,62 @@ public enum SIMDWidth
 
 internal static class Entrypoints
 {
-    static InstanceDirectory<BufferPool> bufferPools;
-    static InstanceDirectory<Simulation> simulations;
-    static InstanceDirectory<ThreadDispatcher> threadDispatchers;
+    static InstanceDirectory<BufferPool>? bufferPools;
+    static InstanceDirectory<Simulation>? simulations;
+    static InstanceDirectory<ThreadDispatcher>? threadDispatchers;
 
     public const string FunctionNamePrefix = "Bepu";
 
+    /// <summary>
+    /// Initializes the interop structures.
+    /// </summary>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Initialize))]
     public static void Initialize()
     {
+        if (bufferPools != null || bufferPools != null || simulations != null)
+        {
+            throw new InvalidOperationException("Interop structures already exist, can't initialize again. Is a destroy missing somewhere?");
+        }
         bufferPools = new InstanceDirectory<BufferPool>(0);
         simulations = new InstanceDirectory<Simulation>(1);
         threadDispatchers = new InstanceDirectory<ThreadDispatcher>(2);
     }
+
+
+    /// <summary>
+    /// Destroys all resources created through the interop API and releases interop structures.
+    /// </summary>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Initialize))]
+    public static void Destroy()
+    {
+        if (bufferPools == null || bufferPools == null || simulations == null)
+        {
+            throw new InvalidOperationException("Interop structures are not initialized; cannot destroy anything.");
+        }
+        for (int i = 0; i < bufferPools.Capacity; ++i)
+        {
+            var pool = bufferPools[i];
+            if (pool != null)
+            {
+                pool.Clear();
+            }
+        }
+        bufferPools = null;
+        //The only resources held by the simulations that need to be released were allocated from the buffer pools, which we just destroyed. Nothing left to do!
+        simulations = null;
+
+        for (int i = 0; i < threadDispatchers.Capacity; ++i)
+        {
+            var dispatcher = threadDispatchers[i];
+            if (dispatcher != null)
+            {
+                dispatcher.Dispose();
+            }
+        }
+        threadDispatchers = null;
+    }
+
+
 
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetSIMDWidth))]
     public static SIMDWidth GetSIMDWidth()
@@ -103,6 +146,16 @@ internal static class Entrypoints
     {
         threadDispatchers[handle].Dispose();
         threadDispatchers.Remove(handle);
+    }
+
+    /// <summary>
+    /// Releases all resources held by a thread dispatcher and invalidates its handle.
+    /// </summary>
+    /// <param name="handle">Thread dispatcher to check the thread count of.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetThreadCount))]
+    public static int GetThreadCount(InstanceHandle handle)
+    {
+        return threadDispatchers[handle].ThreadCount;
     }
 
 
@@ -319,7 +372,7 @@ internal static class Entrypoints
     /// <remarks>This is a direct pointer. The memory location associated with a static can move if other statics are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStatic))]
     public unsafe static Static* GetStatic(InstanceHandle simulationHandle, StaticHandle staticHandle)
-    {        
+    {
         return (Static*)Unsafe.AsPointer(ref simulations[simulationHandle].Statics.GetDirectReference(staticHandle));
     }
 

@@ -21,8 +21,8 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{9751a21a-7422-4ed1-aa17-fa73e09e4a98}</ProjectGuid>
-    <RootNamespace>NativeSide</RootNamespace>
+    <ProjectGuid>{cd5d96ef-4c93-4d77-90d6-04a9ffcfad40}</ProjectGuid>
+    <RootNamespace>BepuPhysicsCPP</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -31,7 +31,6 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -39,14 +38,12 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -54,7 +51,6 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -74,36 +70,16 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(ReferencePath)</ReferencePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(ReferencePath)</ReferencePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(ReferencePath)</ReferencePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LibraryPath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(LibraryPath)</LibraryPath>
-    <ReferencePath>$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(ReferencePath)</ReferencePath>
-  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
-      <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -114,16 +90,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
-      <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -132,14 +104,10 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22173.2\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
-      <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -150,20 +118,16 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\native;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>AbominationInterop.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\norbe\.nuget\packages\runtime.win-x64.microsoft.dotnet.ilcompiler\7.0.0-preview.4.22201.3\sdk;$(SolutionDir)\AbominationInterop\bin\Release\net7.0\win10-x64\publish</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="NativeSide.cpp" />
+    <ClInclude Include="BepuPhysics.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
