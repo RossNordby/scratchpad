@@ -866,7 +866,7 @@ namespace Bepu
 	extern "C" BodyDynamics * GetBodyDynamics(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" Collidable * GetBodyCollidable(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" BodyActivity * GetBodyActivity(SimulationHandle simulationHandle, BodyHandle bodyHandle);
-	extern "C" QuickList<BodyConstraintReference> GetBodyConstraints(SimulationHandle simulationHandle, BodyHandle bodyHandle);
+	extern "C" QuickList<BodyConstraintReference>*GetBodyConstraints(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" BodyDescription GetBodyDescription(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" void ApplyBodyDescription(SimulationHandle simulationHandle, BodyHandle bodyHandle, BodyDescription description);
 	extern "C" StaticHandle AddStatic(SimulationHandle simulationHandle, StaticDescription staticDescription);

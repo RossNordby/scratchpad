@@ -346,7 +346,7 @@ public static class Entrypoints
     /// <returns>Pointer to the body's constraint list.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyConstraints))]
-    [return:TypeName("QuickList<BodyConstraintReference>")]
+    [return:TypeName("QuickList<BodyConstraintReference>*")]
     public unsafe static QuickList<ConstraintReference>* GetBodyConstraints([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return (QuickList<ConstraintReference>*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Constraints);
