@@ -1,7 +1,11 @@
 #pragma once
+//TODO: Once this isn't a megaheader, make sure the includes are pruned.
 #include <stdint.h>
 #include <assert.h>
 #include <limits>
+
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 namespace Bepu
 {
@@ -839,6 +843,158 @@ namespace Bepu
 		CollidableReference B;
 	};
 
+	/// <summary>
+	/// Information about a single contact in a convex collidable pair. Convex collidable pairs share one surface basis across the manifold, since the contact surface is guaranteed to be a plane.
+	/// </summary>    
+	struct ConvexContact
+	{
+		/// <summary>
+		/// Offset from the position of collidable A to the contact position. 
+		/// </summary>
+		Vector3 Offset;
+		/// <summary>
+		/// Penetration depth between the two collidables at this contact. Negative values represent separation.
+		/// </summary>
+		float Depth;
+		/// <summary>
+		/// Id of the features involved in the collision that generated this contact. If a contact has the same feature id as in a previous frame, it is an indication that the
+		/// same parts of the shape contributed to its creation. This is useful for carrying information from frame to frame.
+		/// </summary>
+		int32_t FeatureId;
+	};
+
+	/// <summary>
+	/// Contains the data associated with a convex contact manifold.
+	/// </summary>
+	struct ConvexContactManifold
+	{
+		/// <summary>
+		/// Offset from collidable A to collidable B.
+		/// </summary>
+		Vector3 OffsetB;
+		int32_t Count;
+
+		/// <summary>
+		/// Surface normal shared by all contacts. Points from collidable B to collidable A.
+		/// </summary>
+		Vector3 Normal;
+
+		ConvexContact Contacts[4];
+
+		void ValidateIndex(int contactIndex)
+		{
+			assert(contactIndex >= 0 && contactIndex < Count, "Contact index must be within the contact count.");
+		}
+	};
+
+	/// <summary>
+	/// Information about a single contact in a nonconvex collidable pair.
+	/// Nonconvex pairs can have different surface bases at each contact point, since the contact surface is not guaranteed to be a plane.
+	/// </summary>
+	struct NonconvexContact
+	{
+		/// <summary>
+		/// Offset from the position of collidable A to the contact position. 
+		/// </summary>
+		Vector3 Offset;
+		/// <summary>
+		/// Penetration depth between the two collidables at this contact. Negative values represent separation.
+		/// </summary>
+		float Depth;
+		/// <summary>
+		/// Surface basis of the contact. If transformed into a rotation matrix, X and Z represent tangent directions and Y represents the contact normal. Points from collidable B to collidable A.
+		/// </summary>
+		Vector3 Normal;
+		/// <summary>
+		/// Id of the features involved in the collision that generated this contact. If a contact has the same feature id as in a previous frame, it is an indication that the
+		/// same parts of the shape contributed to its creation. This is useful for carrying information from frame to frame.
+		/// </summary>
+		int32_t FeatureId;
+	};
+
+	/// <summary>
+	/// Contains the data associated with a nonconvex contact manifold.
+	/// </summary>
+	struct NonconvexContactManifold
+	{
+		/// <summary>
+		/// Offset from collidable A to collidable B.
+		/// </summary>
+		Vector3 OffsetB;
+		int32_t Count;
+
+		NonconvexContact Contacts[4];
+	};
+
+	struct SpringSettings
+	{
+		/// <summary>
+		/// Target number of undamped oscillations per unit of time, scaled by 2 * PI.
+		/// </summary>
+		float AngularFrequency;
+		/// <summary>
+		/// Twice the ratio of the spring's actual damping to its critical damping.
+		/// </summary>
+		float TwiceDampingRatio;
+
+		/// <summary>
+		/// Gets or sets the target number of undamped oscillations per unit of time.
+		/// </summary>
+		float GetFrequency() { return AngularFrequency / (2 * M_PI); }
+		void SetFrequency(float value) { AngularFrequency = value * (2 * M_PI); }
+
+		/// <summary>
+		/// Gets or sets the ratio of the spring's actual damping to its critical damping. 0 is undamped, 1 is critically damped, and higher values are overdamped.
+		/// </summary>
+		float GetDampingRatio() { return TwiceDampingRatio / 2.0f; }
+		void SetDampingRatio(float value) { TwiceDampingRatio = value * 2.0f; }
+
+		SpringSettings() { AngularFrequency = 0; TwiceDampingRatio = 0; }
+
+		/// <summary>
+		/// Constructs a new spring settings instance.
+		/// </summary>
+		/// <param name="frequency">Target number of undamped oscillations per unit of time.</param>
+		/// <param name="dampingRatio">Ratio of the spring's actual damping to its critical damping. 0 is undamped, 1 is critically damped, and higher values are overdamped.</param>
+		SpringSettings(float frequency, float dampingRatio)
+		{
+			AngularFrequency = frequency * (2 * M_PI);
+			TwiceDampingRatio = dampingRatio * 2;
+		}
+	};
+
+	/// <summary>
+	/// Material properties governing the interaction between colliding bodies. Used by the narrow phase to create constraints of the appropriate configuration.
+	/// </summary>
+	struct PairMaterialProperties
+	{
+		/// <summary>
+		/// Coefficient of friction to apply for the constraint. Maximum friction force will be equal to the normal force times the friction coefficient.
+		/// </summary>
+		float FrictionCoefficient;
+		/// <summary>
+		/// Maximum relative velocity along the contact normal at which the collision constraint will recover from penetration. Clamps the velocity goal created from the spring settings.
+		/// </summary>
+		float MaximumRecoveryVelocity;
+		/// <summary>
+		/// Defines the constraint's penetration recovery spring properties.
+		/// </summary>
+		SpringSettings ContactSpringSettings;
+
+		/// <summary>
+		/// Constructs a pair's material properties.
+		/// </summary>
+		/// <param name="frictionCoefficient">Coefficient of friction to apply for the constraint. Maximum friction force will be equal to the normal force times the friction coefficient.</param>
+		/// <param name="maximumRecoveryVelocity">Maximum relative velocity along the contact normal at which the collision constraint will recover from penetration. Clamps the velocity goal created from the spring settings.</param>
+		/// <param name="springSettings">Defines the constraint's penetration recovery spring properties.</param>
+		PairMaterialProperties(float frictionCoefficient, float maximumRecoveryVelocity, SpringSettings springSettings)
+		{
+			FrictionCoefficient = frictionCoefficient;
+			MaximumRecoveryVelocity = maximumRecoveryVelocity;
+			ContactSpringSettings = springSettings;
+		}
+	};
+
 	struct NarrowPhaseCallbacks
 	{
 		void (*InitializeFunction)(SimulationHandle);
@@ -848,6 +1004,230 @@ namespace Bepu
 		bool (*ConfigureConvexContactManifoldFunction)(SimulationHandle, int, CollidablePair, ConvexContactManifold*, PairMaterialProperties*);
 		bool (*ConfigureNonconvexContactManifoldFunction)(SimulationHandle, int, CollidablePair, NonconvexContactManifold*, PairMaterialProperties*);
 		bool (*ConfigureChildContactManifoldFunction)(SimulationHandle, int, CollidablePair, int, int, ConvexContactManifold*);
+	};
+
+	/// <summary>
+	/// Defines how a pose integrator should handle angular velocity integration.
+	/// </summary>
+	enum struct AngularIntegrationMode
+	{
+		/// <summary>
+		/// Angular velocity is directly integrated and does not change as the body pose changes. Does not conserve angular momentum.
+		/// </summary>
+		Nonconserving = 0,
+		/// <summary>
+		/// Approximately conserves angular momentum by updating the angular velocity according to the change in orientation. Does a decent job for gyroscopes, but angular velocities will tend to drift towards a minimal inertia axis.
+		/// </summary>
+		ConserveMomentum = 1,
+		/// <summary>
+		/// Approximately conserves angular momentum by including an implicit gyroscopic torque. Best option for Dzhanibekov effect simulation, but applies a damping effect that can make gyroscopes less useful.
+		/// </summary>
+		ConserveMomentumWithGyroscopicTorque = 2,
+	};
+
+	struct Vector128F
+	{
+		float V0;
+		float V1;
+		float V2;
+		float V3;
+	};
+	struct Vector256F
+	{
+		float V0;
+		float V1;
+		float V2;
+		float V3;
+		float V4;
+		float V5;
+		float V6;
+		float V7;
+	};
+	struct Vector128I
+	{
+		int32_t V0;
+		int32_t V1;
+		int32_t V2;
+		int32_t V3;
+	};
+	struct Vector256I
+	{
+		int32_t V0;
+		int32_t V1;
+		int32_t V2;
+		int32_t V3;
+		int32_t V4;
+		int32_t V5;
+		int32_t V6;
+		int32_t V7;
+	};
+
+	/// <summary>
+	/// Vector3Wide interop type used when <see cref="Vector{float}"/> is 128 bits wide.
+	/// </summary>
+	struct Vector3SIMD128
+	{
+		Vector128F X;
+		Vector128F Y;
+		Vector128F Z;
+	};
+
+	/// <summary>
+	/// Vector3Wide interop type used when <see cref="Vector{float}"/> is 256 bits wide.
+	/// </summary>
+	struct Vector3SIMD256
+	{
+		Vector256F X;
+		Vector256F Y;
+		Vector256F Z;
+	};
+
+	/// <summary>
+	/// QuaternionWide interop type used when <see cref="Vector{float}"/> is 128 bits wide.
+	/// </summary>
+	struct QuaternionSIMD128
+	{
+		Vector128F X;
+		Vector128F Y;
+		Vector128F Z;
+	};
+
+	/// <summary>
+	/// QuaternionWide interop type used when <see cref="Vector{float}"/> is 256 bits wide.
+	/// </summary>
+	struct QuaternionSIMD256
+	{
+		Vector256F X;
+		Vector256F Y;
+		Vector256F Z;
+	};
+
+	/// <summary>
+	/// BodyInertiaWide interop type used when <see cref="Vector{float}"/> is 128 bits wide.
+	/// </summary>
+	struct BodyInertiaSIMD128
+	{
+		Vector128F InverseInertiaXX;
+		Vector128F InverseInertiaYX;
+		Vector128F InverseInertiaYY;
+		Vector128F InverseInertiaZX;
+		Vector128F InverseInertiaZY;
+		Vector128F InverseInertiaZZ;
+		Vector128F InverseMass;
+	};
+
+	/// <summary>
+	/// BodyInertiaWide interop type used when <see cref="Vector{float}"/> is 256 bits wide.
+	/// </summary>
+	struct BodyInertiaSIMD256
+	{
+		Vector256F InverseInertiaXX;
+		Vector256F InverseInertiaYX;
+		Vector256F InverseInertiaYY;
+		Vector256F InverseInertiaZX;
+		Vector256F InverseInertiaZY;
+		Vector256F InverseInertiaZZ;
+		Vector256F InverseMass;
+	};
+
+	/// <summary>
+	/// BodyVelocityWide interop type used when <see cref="Vector{float}"/> is 128 bits wide.
+	/// </summary>
+	struct BodyVelocitySIMD128
+	{
+		Vector3SIMD128 Linear;
+		Vector3SIMD128 Angular;
+	};
+
+	/// <summary>
+	/// BodyVelocityWide interop type used when <see cref="Vector{float}"/> is 256 bits wide.
+	/// </summary>
+	struct BodyVelocitySIMD256
+	{
+		Vector3SIMD256 Linear;
+		Vector3SIMD256 Angular;
+	};
+
+	/// <summary>
+	/// Defines pose integrator state and callbacks.
+	/// </summary>
+	struct PoseIntegratorCallbacks
+	{
+		/// <summary>
+		/// How the pose integrator should handle angular velocity integration.
+		/// </summary>
+		AngularIntegrationMode AngularIntegrationMode;
+		/// <summary>
+		/// Whether the integrator should use only one step for unconstrained bodies when using a substepping solver.
+		/// If true, unconstrained bodies use a single step of length equal to the dt provided to <see cref="Simulation.Timestep"/>. 
+		/// If false, unconstrained bodies will be integrated with the same number of substeps as the constrained bodies in the solver.
+		/// </summary>
+		bool AllowSubstepsForUnconstrainedBodies;
+		/// <summary>
+		/// Whether the velocity integration callback should be called for kinematic bodies.
+		/// If true, <see cref="IntegrateVelocity"/> will be called for bundles including kinematic bodies.
+		/// If false, kinematic bodies will just continue using whatever velocity they have set.
+		/// Most use cases should set this to false.
+		/// </summary>
+		bool IntegrateVelocityForKinematics;
+		/// <summary>
+		/// Whether to use a scalar or vectorized integrator callback. If true, <see cref="IntegrateVelocityScalar"/> will be used.
+		/// The scalar callback has much higher overhead due to the required data transpositions.
+		/// If false, <see cref="IntegrateVelocitySIMD128"/> or <see cref="IntegrateVelocitySIMD256"/> will be called. 
+		/// Use <see cref="GetSIMDWidth"/> to know which vectorized callback would be invoked.
+		/// </summary>
+		bool UseScalarCallback;
+
+		/// <summary>
+		/// Called after the simulation is created.
+		/// </summary>
+		/// <param name="simulation">Simulation to which these callbacks belong.</param>
+		void (*Initialize)(SimulationHandle simulation);
+		/// <summary>
+		/// Called before each simulation stage which could execute velocity integration.
+		/// </summary>
+		/// <param name="simulation">Simulation to which these callbacks belong.</param>
+		/// <param name="dt">Timestep duration that subsequent velocity integrations will be invoked with.</param>
+		void (*PrepareForIntegration)(SimulationHandle simulation, float dt);
+		//There is technically no need to expose all three of these in the interop type as separate fields; we may want to change that.
+		//Right now, we're doing it just so that the signature is more explicit... but that could be better handled on the native side.
+
+		/// <summary>
+		/// Called for every active body during each integration pass when <see cref="UseScalarCallback"/> is true.
+		/// </summary>
+		/// <param name="simulation">Simulation to which these callbacks belong.</param>
+		/// <param name="bodyIndex">Current index of the body being integrated in the active body set. This is distinct from the <see cref="BodyHandle"/>; the body index can change over time.</param>
+		/// <param name="position">Current position of the body.</param>
+		/// <param name="orientation">Current orientation of the body.</param>
+		/// <param name="localInertia">Inertia properties of the body in its local space.</param>
+		/// <param name="workerIndex">Index of the thread worker processing this callback.</param>
+		/// <param name="dt">Timestep duration that subsequent velocity integrations will be invoked with.</param>
+		/// <param name="velocity">Velocity of the body to be updated by this callback.</param>
+		void (*IntegrateVelocityScalar)(SimulationHandle simulation, int32_t bodyIndex, Vector3 position, Quaternion orientation, BodyInertia localInertia, int32_t workerIndex, float dt, BodyVelocity* velocity);
+		/// <summary>
+		/// Called for every active body bundle during each integration pass when <see cref="UseScalarCallback"/> is false and SIMD width is 128.
+		/// </summary>
+		/// <param name="simulation">Simulation to which these callbacks belong.</param>
+		/// <param name="bodyIndices">Current indices of the body bundle being integrated in the active body set. This is distinct from the <see cref="BodyHandle"/>; the body index can change over time.</param>
+		/// <param name="position">Current positions of the body bundle.</param>
+		/// <param name="orientation">Current orientations of the body bundle.</param>
+		/// <param name="localInertia">Inertia properties of the body bundle in their local space.</param>
+		/// <param name="workerIndex">Index of the thread worker processing this callback.</param>
+		/// <param name="dt">Timestep duration that subsequent velocity integrations will be invoked with.</param>
+		/// <param name="velocity">Velocity of the body bundle to be updated by this callback.</param>
+		void (*IntegrateVelocitySIMD128)(SimulationHandle simulation, Vector128I bodyIndices, Vector3SIMD128* positions, QuaternionSIMD128* orientations, BodyInertiaSIMD128* localInertias, Vector128I integrationMask, int32_t workerIndex, Vector128F dt, BodyVelocitySIMD128* bodyVelocities);
+		/// <summary>
+		/// Called for every active body bundle during each integration pass when <see cref="UseScalarCallback"/> is false and SIMD width is 256.
+		/// </summary>
+		/// <param name="simulation">Simulation to which these callbacks belong.</param>
+		/// <param name="bodyIndices">Current indices of the body bundle being integrated in the active body set. This is distinct from the <see cref="BodyHandle"/>; the body index can change over time.</param>
+		/// <param name="position">Current positions of the body bundle.</param>
+		/// <param name="orientation">Current orientations of the body bundle.</param>
+		/// <param name="localInertia">Inertia properties of the body bundle in their local space.</param>
+		/// <param name="workerIndex">Index of the thread worker processing this callback.</param>
+		/// <param name="dt">Timestep duration that subsequent velocity integrations will be invoked with.</param>
+		/// <param name="velocity">Velocity of the body bundle to be updated by this callback.</param>
+		void (*IntegrateVelocitySIMD256)(SimulationHandle simulation, Vector256I bodyIndices, Vector3SIMD256* positions, QuaternionSIMD256* orientations, BodyInertiaSIMD256* localInertias, Vector256I integrationMask, int32_t workerIndex, Vector256F dt, BodyVelocitySIMD256* bodyVelocities);
 	};
 
 	extern "C" void Initialize();
