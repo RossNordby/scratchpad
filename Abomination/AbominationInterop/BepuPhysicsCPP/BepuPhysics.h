@@ -1,10 +1,13 @@
 #pragma once
 #include <stdint.h>
+#include <assert.h>
+#include <limits>
 
 namespace Bepu
 {
 	typedef int32_t BodyHandle;
 	typedef int32_t StaticHandle;
+	typedef int32_t ConstraintHandle;
 	typedef int32_t SimulationHandle;
 	typedef int32_t BufferPoolHandle;
 	typedef int32_t ThreadDispatcherHandle;
@@ -341,7 +344,7 @@ namespace Bepu
 		/// <summary>
 		/// Index of the collidable in the broad phase. Used to look up the target location for bounding box scatters. Under normal circumstances, this should not be set externally.
 		/// </summary>
-		int BroadPhaseIndex;
+		int32_t BroadPhaseIndex;
 	};
 
 	/// <summary>
@@ -379,6 +382,389 @@ namespace Bepu
 		bool SleepCandidate;
 	};
 
+	/// <summary>
+	/// Describes a collidable and how it should handle continuous collision detection.
+	/// </summary>
+	struct CollidableDescription
+	{
+		/// <summary>
+		/// Shape of the collidable.
+		/// </summary>
+		TypedIndex Shape;
+		/// <summary>
+		/// Continuous collision detection settings used by the collidable.
+		/// </summary>
+		ContinuousDetection Continuity;
+		/// <summary>
+		/// Lower bound on the value of the speculative margin used by the collidable.
+		/// </summary>
+		/// <remarks>0 tends to be a good default value. Higher values can be chosen if velocity magnitude is a poor proxy for speculative margins, but these cases are rare.
+		/// In those cases, try to use the smallest value that still satisfies requirements to avoid creating unnecessary contact constraints.</remarks>
+		float MinimumSpeculativeMargin;
+		/// <summary>
+		/// Upper bound on the value of the speculative margin used by the collidable.
+		/// </summary>
+		/// <remarks><see cref="float.MaxValue"/> tends to be a good default value for discrete or passive mode collidables. 
+		/// The speculative margin will increase in size proportional to velocity magnitude, so having an unlimited maximum won't cost extra if the body isn't moving fast.
+		/// <para>Smaller values can be useful for improving performance in chaotic situations where missing a collision is acceptable. When using <see cref="ContinuousDetectionMode.Continuous"/>, a speculative margin larger than the velocity magnitude will result in the sweep test being skipped, so lowering the maximum margin can help avoid ghost collisions.</para>
+		/// </remarks>
+		float MaximumSpeculativeMargin;
+
+		/// <summary>
+		/// Constructs a new collidable description.
+		/// </summary>
+		/// <param name="shape">Shape used by the collidable.</param>
+		/// <param name="minimumSpeculativeMargin">Lower bound on the value of the speculative margin used by the collidable.</param>
+		/// <param name="maximumSpeculativeMargin">Upper bound on the value of the speculative margin used by the collidable.</param>
+		/// <param name="continuity">Continuous collision detection settings for the collidable.</param>
+		CollidableDescription(TypedIndex shape, float minimumSpeculativeMargin, float maximumSpeculativeMargin, ContinuousDetection continuity)
+		{
+			Shape = shape;
+			MinimumSpeculativeMargin = minimumSpeculativeMargin;
+			MaximumSpeculativeMargin = maximumSpeculativeMargin;
+			Continuity = continuity;
+		}
+
+		/// <summary>
+		/// Constructs a new collidable description with <see cref="ContinuousDetectionMode.Discrete"/>.
+		/// </summary>
+		/// <param name="shape">Shape used by the collidable.</param>
+		/// <param name="minimumSpeculativeMargin">Lower bound on the value of the speculative margin used by the collidable.</param>
+		/// <param name="maximumSpeculativeMargin">Upper bound on the value of the speculative margin used by the collidable.</param>
+		CollidableDescription(TypedIndex shape, float minimumSpeculativeMargin, float maximumSpeculativeMargin)
+		{
+			Shape = shape;
+			MinimumSpeculativeMargin = minimumSpeculativeMargin;
+			MaximumSpeculativeMargin = maximumSpeculativeMargin;
+			Continuity = ContinuousDetection::Discrete();
+		}
+
+		/// <summary>
+		/// Constructs a new collidable description. Uses 0 for the <see cref="MinimumSpeculativeMargin"/> .
+		/// </summary>
+		/// <param name="shape">Shape used by the collidable.</param>
+		/// <param name="maximumSpeculativeMargin">Upper bound on the value of the speculative margin used by the collidable.</param>
+		/// <param name="continuity">Continuous collision detection settings for the collidable.</param>
+		CollidableDescription(TypedIndex shape, float maximumSpeculativeMargin, ContinuousDetection continuity)
+		{
+			Shape = shape;
+			MinimumSpeculativeMargin = 0;
+			MaximumSpeculativeMargin = maximumSpeculativeMargin;
+			Continuity = continuity;
+		}
+
+		/// <summary>
+		/// Constructs a new collidable description. Uses 0 for the <see cref="MinimumSpeculativeMargin"/> and <see cref="float.MaxValue"/> for the <see cref="MaximumSpeculativeMargin"/> .
+		/// </summary>
+		/// <param name="shape">Shape used by the collidable.</param>
+		/// <param name="continuity">Continuous collision detection settings for the collidable.</param>
+		CollidableDescription(TypedIndex shape, ContinuousDetection continuity)
+		{
+			Shape = shape;
+			MinimumSpeculativeMargin = 0;
+			MaximumSpeculativeMargin = std::numeric_limits<float>::max();
+			Continuity = continuity;
+		}
+
+		/// <summary>
+		/// Constructs a new collidable description with <see cref="ContinuousDetectionMode.Passive"/>. Will use a <see cref="MinimumSpeculativeMargin"/> of 0 and a <see cref="MaximumSpeculativeMargin"/> of <see cref="float.MaxValue"/>.
+		/// </summary>
+		/// <param name="shape">Shape used by the collidable.</param>
+		/// <remarks><see cref="ContinuousDetectionMode.Passive"/> and <see cref="ContinuousDetectionMode.Discrete"/> are equivalent in behavior when the <see cref="MaximumSpeculativeMargin"/>  is <see cref="float.MaxValue"/> since they both result in the same (unbounded) expansion of body bounding boxes in response to velocity.</remarks>
+		CollidableDescription(TypedIndex shape) : CollidableDescription(shape, 0, std::numeric_limits<float>::max(), ContinuousDetection::Passive())
+		{
+		}
+
+		/// <summary>
+		/// Constructs a new collidable description with <see cref="ContinuousDetectionMode.Discrete"/>. Will use a minimum speculative margin of 0 and the given maximumSpeculativeMargin.
+		/// </summary>
+		/// <param name="shape">Shape used by the collidable.</param>
+		/// <param name="maximumSpeculativeMargin">Maximum speculative margin to be used with the discrete continuity configuration.</param>
+		CollidableDescription(TypedIndex shape, float maximumSpeculativeMargin) : CollidableDescription(shape, 0, maximumSpeculativeMargin, ContinuousDetection::Discrete())
+		{
+		}
+	};
+
+	/// <summary>
+	/// Describes the thresholds for a body going to sleep.
+	/// </summary>
+	struct BodyActivityDescription
+	{
+		/// <summary>
+		/// Threshold of squared velocity under which the body is allowed to go to sleep. This is compared against dot(linearVelocity, linearVelocity) + dot(angularVelocity, angularVelocity).
+		/// </summary>
+		float SleepThreshold;
+		/// <summary>
+		/// The number of time steps that the body must be under the sleep threshold before the body becomes a sleep candidate.
+		/// Note that the body is not guaranteed to go to sleep immediately after meeting this minimum.
+		/// </summary>
+		uint8_t MinimumTimestepCountUnderThreshold;
+
+		/// <summary>
+		/// Creates a body activity description.
+		/// </summary>
+		/// <param name="sleepThreshold">Threshold of squared velocity under which the body is allowed to go to sleep. This is compared against dot(linearVelocity, linearVelocity) + dot(angularVelocity, angularVelocity).</param>
+		/// <param name="minimumTimestepCountUnderThreshold">The number of time steps that the body must be under the sleep threshold before the body becomes a sleep candidate.
+		/// Note that the body is not guaranteed to go to sleep immediately after meeting this minimum.</param>
+		BodyActivityDescription(float sleepThreshold, uint8_t minimumTimestepCountUnderThreshold = 32)
+		{
+			SleepThreshold = sleepThreshold;
+			MinimumTimestepCountUnderThreshold = minimumTimestepCountUnderThreshold;
+		}
+
+		/// <summary>
+		/// Creates a body activity description. Uses a <see cref="MinimumTimestepCountUnderThreshold"/> of 32.
+		/// </summary>
+		/// <param name="sleepThreshold">Threshold of squared velocity under which the body is allowed to go to sleep. This is compared against dot(linearVelocity, linearVelocity) + dot(angularVelocity, angularVelocity).</param>
+		/// <param name="minimumTimestepCountUnderThreshold">The number of time steps that the body must be under the sleep threshold before the body becomes a sleep candidate.
+		/// Note that the body is not guaranteed to go to sleep immediately after meeting this minimum.</param>
+		BodyActivityDescription(float sleepThreshold) : BodyActivityDescription(sleepThreshold, 32)
+		{
+		}
+	};
+
+	/// <summary>
+	/// Describes a body's state.
+	/// </summary>
+	struct BodyDescription
+	{
+		/// <summary>
+		/// Position and orientation of the body.
+		/// </summary>
+		RigidPose Pose;
+		/// <summary>
+		/// Linear and angular velocity of the body.
+		/// </summary>
+		BodyVelocity Velocity;
+		/// <summary>
+		/// Mass and inertia tensor of the body.
+		/// </summary>
+		BodyInertia LocalInertia;
+		/// <summary>
+		/// Shape and collision detection settings for the body.
+		/// </summary>
+		CollidableDescription Collidable;
+		/// <summary>
+		/// Sleeping settings for the body.
+		/// </summary>
+		BodyActivityDescription Activity;
+
+		/// <summary>
+		/// Creates a dynamic body description.
+		/// </summary>
+		/// <param name="pose">Pose of the body.</param>
+		/// <param name="velocity">Initial velocity of the body.</param>
+		/// <param name="inertia">Local inertia of the body.</param>
+		/// <param name="collidable">Collidable to associate with the body.</param>
+		/// <param name="activity">Activity settings for the body.</param>
+		/// <returns>Constructed description for the body.</returns>
+		static BodyDescription CreateDynamic(RigidPose pose, BodyVelocity velocity, BodyInertia inertia, CollidableDescription collidable, BodyActivityDescription activity)
+		{
+			return BodyDescription{ pose, velocity, inertia, collidable, activity };
+		}
+
+		/// <summary>
+		/// Creates a dynamic body description with zero initial velocity.
+		/// </summary>
+		/// <param name="pose">Pose of the body.</param>
+		/// <param name="inertia">Local inertia of the body.</param>
+		/// <param name="collidable">Collidable to associate with the body.</param>
+		/// <param name="activity">Activity settings for the body.</param>
+		/// <returns>Constructed description for the body.</returns>
+		static BodyDescription CreateDynamic(RigidPose pose, BodyInertia inertia, CollidableDescription collidable, BodyActivityDescription activity)
+		{
+			return BodyDescription{ pose, {}, inertia, collidable, activity };
+		}
+
+		/// <summary>
+		/// Creates a kinematic body description.
+		/// </summary>
+		/// <param name="pose">Pose of the body.</param>
+		/// <param name="velocity">Initial velocity of the body.</param>
+		/// <param name="collidable">Collidable to associate with the body.</param>
+		/// <param name="activity">Activity settings for the body.</param>
+		/// <returns>Constructed description for the body.</returns>
+		static BodyDescription CreateKinematic(RigidPose pose, BodyVelocity velocity, CollidableDescription collidable, BodyActivityDescription activity)
+		{
+			return BodyDescription{ pose, velocity, {}, collidable, activity };
+		}
+
+		/// <summary>
+		/// Creates a kinematic body description with zero initial velocity.
+		/// </summary>
+		/// <param name="pose">Pose of the body.</param>
+		/// <param name="collidable">Collidable to associate with the body.</param>
+		/// <param name="activity">Activity settings for the body.</param>
+		/// <returns>Constructed description for the body.</returns>
+		static BodyDescription CreateKinematic(RigidPose pose, CollidableDescription collidable, BodyActivityDescription activity)
+		{
+			return BodyDescription{ pose, {}, {}, collidable, activity };
+		}
+	};
+
+
+	struct BodyConstraintReference
+	{
+		ConstraintHandle ConnectingConstraintHandle;
+		int32_t BodyIndexInConstraint;
+	};
+
+	/// <summary>
+	/// Describes the properties of a static object. When added to a simulation, static objects can collide but have no velocity and will not move in response to forces.
+	/// </summary>
+	struct StaticDescription
+	{
+		/// <summary>
+		/// Position and orientation of the static.
+		/// </summary>
+		RigidPose Pose;
+		/// <summary>
+		/// Shape of the static.
+		/// </summary>
+		TypedIndex Shape;
+		/// <summary>
+		/// Continuous collision detection settings for the static.
+		/// </summary>
+		ContinuousDetection Continuity;
+
+		/// <summary>
+		/// Builds a new static description.
+		/// </summary>
+		/// <param name="pose">Pose of the static collidable.</param>
+		/// <param name="shape">Shape of the static.</param>
+		/// <param name="continuity">Continuous collision detection settings for the static.</param>
+		StaticDescription(RigidPose pose, TypedIndex shape, ContinuousDetection continuity)
+		{
+			Pose = pose;
+			Shape = shape;
+			Continuity = continuity;
+		}
+
+		/// <summary>
+		/// Builds a new static description with <see cref="ContinuousDetectionMode.Discrete"/> continuity.
+		/// </summary>
+		/// <param name="pose">Pose of the static collidable.</param>
+		/// <param name="shape">Shape of the static.</param>
+		StaticDescription(RigidPose pose, TypedIndex shape)
+		{
+			Pose = pose;
+			Shape = shape;
+			Continuity = ContinuousDetection::Discrete();
+		}
+
+		/// <summary>
+		/// Builds a new static description.
+		/// </summary>
+		/// <param name="position">Position of the static.</param>
+		/// <param name="orientation">Orientation of the static.</param>
+		/// <param name="shape">Shape of the static.</param>
+		/// <param name="continuity">Continuous collision detection settings for the static.</param>
+		StaticDescription(Vector3 position, Quaternion orientation, TypedIndex shape, ContinuousDetection continuity)
+		{
+			Pose.Position = position;
+			Pose.Orientation = orientation;
+			Shape = shape;
+			Continuity = continuity;
+		}
+
+		/// <summary>
+		/// Builds a new static description with <see cref="ContinuousDetectionMode.Discrete"/> continuity.
+		/// </summary>
+		/// <param name="position">Position of the static.</param>
+		/// <param name="orientation">Orientation of the static.</param>
+		/// <param name="shape">Shape of the static.</param>
+		StaticDescription(Vector3 position, Quaternion orientation, TypedIndex shape)
+		{
+			Pose.Position = position;
+			Pose.Orientation = orientation;
+			Shape = shape;
+			Continuity = ContinuousDetection::Discrete();
+		}
+	};
+
+
+	/// <summary>
+	/// Stores data for a static collidable in the simulation. Statics can be posed and collide, but have no velocity and no dynamic behavior.
+	/// </summary>
+	/// <remarks>Unlike bodies, statics have a very simple access pattern. Most data is referenced together and there are no extreme high frequency data accesses like there are in the solver.
+	/// Everything can be conveniently stored within a single location contiguously.</remarks>
+	struct Static
+	{
+		/// <summary>
+		/// Pose of the static collidable.
+		/// </summary>
+		RigidPose Pose;
+
+		/// <summary>
+		/// Continuous collision detection settings for this collidable. Includes the collision detection mode to use and tuning variables associated with those modes.
+		/// </summary>
+		/// <remarks>Note that statics cannot move, so there is no difference between <see cref="ContinuousDetectionMode.Discrete"/> and <see cref="ContinuousDetectionMode.Passive"/> for them.
+		/// Enabling <see cref="ContinuousDetectionMode.Continuous"/> will still require that pairs associated with the static use swept continuous collision detection.</remarks>
+		ContinuousDetection Continuity;
+
+		/// <summary>
+		/// Index of the shape used by the static. While this can be changed, any transition from shapeless->shapeful or shapeful->shapeless must be reported to the broad phase. 
+		/// If you need to perform such a transition, consider using <see cref="Statics.SetShape"/> or Statics.ApplyDescription; those functions update the relevant state.
+		/// </summary>
+		TypedIndex Shape;
+		//Note that statics do not store a 'speculative margin' independently of the contini
+		/// <summary>
+		/// Index of the collidable in the broad phase. Used to look up the target location for bounding box scatters. Under normal circumstances, this should not be set externally.
+		/// </summary>
+		int32_t BroadPhaseIndex;
+	};
+
+
+	/// <summary>
+	/// Span over an unmanaged memory region.
+	/// </summary>
+	/// <typeparam name="T">Type of the memory exposed by the span.</typeparam>
+	template<typename T>
+	struct Buffer
+	{
+		/// <summary>
+		/// Pointer to the beginning of the memory backing this buffer.
+		/// </summary>
+		T* Memory; //going to just assume 64 bit here.
+
+		/// <summary>
+		/// Length of the  to the beginning of the memory backing this buffer.
+		/// </summary>
+		int32_t Length;
+
+		/// <summary>
+		/// Implementation specific identifier of the raw buffer set by its source. If taken from a BufferPool, Id includes the index in the power pool from which it was taken.
+		/// </summary>
+		int32_t Id;
+
+		T& operator[](int32_t index)
+		{
+			assert(index >= 0 && index < Length);
+			return Memory[index];
+		}
+	};
+
+	template<typename T>
+	struct QuickList
+	{
+		/// <summary>
+		/// Backing memory containing the elements of the list.
+		/// Indices from 0 to Count-1 hold actual data. All other data is undefined.
+		/// </summary>
+		Buffer<T> Span;
+
+		/// <summary>
+		/// Number of elements in the list.
+		/// </summary>
+		int32_t Count;
+
+		T& operator[](int32_t index)
+		{
+			assert(index >= 0 && index < Count);
+			return Span[index];
+		}
+	};
+
 	extern "C" void Initialize();
 	extern "C" void Destroy();
 	extern "C" SIMDWidth GetSIMDWidth();
@@ -395,7 +781,7 @@ namespace Bepu
 	extern "C" BodyDynamics * GetBodyDynamics(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" Collidable * GetBodyCollidable(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" BodyActivity * GetBodyActivity(SimulationHandle simulationHandle, BodyHandle bodyHandle);
-	extern "C" QuickList`1* GetBodyConstraints(SimulationHandle simulationHandle, BodyHandle bodyHandle);
+	extern "C" QuickList<BodyConstraintReference> GetBodyConstraints(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" BodyDescription GetBodyDescription(SimulationHandle simulationHandle, BodyHandle bodyHandle);
 	extern "C" void ApplyBodyDescription(SimulationHandle simulationHandle, BodyHandle bodyHandle, BodyDescription description);
 	extern "C" StaticHandle AddStatic(SimulationHandle simulationHandle, StaticDescription staticDescription);
