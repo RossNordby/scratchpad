@@ -1230,6 +1230,45 @@ namespace Bepu
 		void (*IntegrateVelocitySIMD256)(SimulationHandle simulation, Vector256I bodyIndices, Vector3SIMD256* positions, QuaternionSIMD256* orientations, BodyInertiaSIMD256* localInertias, Vector256I integrationMask, int32_t workerIndex, Vector256F dt, BodyVelocitySIMD256* bodyVelocities);
 	};
 
+	/// <summary>
+	/// Defines properties of the solver 
+	/// </summary>
+	struct SolveDescription
+	{
+		/// <summary>
+		/// Number of velocity iterations to use in the solver if there is no <see cref="VelocityIterationScheduler"/> or if it returns a non-positive value for a substep.
+		/// </summary>
+		int32_t VelocityIterationCount;
+		/// <summary>
+		/// Number of substeps to execute each time the solver runs.
+		/// </summary>
+		int32_t SubstepCount;
+		/// <summary>
+		/// Number of synchronzed constraint batches to use before using a fallback approach.
+		/// </summary>
+		int32_t FallbackBatchThreshold;
+		/// <summary>
+		/// Callback executed to determine how many velocity iterations should be used for a given substep. If null, or if it returns a non-positive value, the <see cref="VelocityIterationCount"/> will be used instead.
+		/// </summary>	
+		/// <param name="substepIndex">Index of the substep to schedule velocity iterations for.</param>
+		/// <returns>Number of velocity iterations to run during this substep.</returns>
+		int32_t(*VelocityIterationScheduler)(int32_t substepIndex);
+	
+		/// <summary>
+		/// Creates a solve description.
+		/// </summary>
+		/// <param name="velocityIterationCount">Number of velocity iterations per substep.</param>
+		/// <param name="substepCount">Number of substeps in the solve.</param>
+		/// <param name="fallbackBatchThreshold">Number of synchronzed constraint batches to use before using a fallback approach.</param>
+		SolveDescription(int velocityIterationCount, int substepCount, int fallbackBatchThreshold = 64)
+		{
+			VelocityIterationCount = velocityIterationCount;
+			SubstepCount = substepCount;
+			FallbackBatchThreshold = fallbackBatchThreshold;
+			VelocityIterationScheduler = NULL;
+		}
+	};
+
 	extern "C" void Initialize();
 	extern "C" void Destroy();
 	extern "C" SIMDWidth GetSIMDWidth();
