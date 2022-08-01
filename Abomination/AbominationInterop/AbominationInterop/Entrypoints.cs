@@ -243,15 +243,18 @@ public static class Entrypoints
     /// Creates a new simulation.
     /// </summary>
     /// <param name="bufferPool">Buffer pool for the simulation's main allocations.</param>
-    /// <param name="narrowPhaseCallbacksInterop">Narrow phase callbacks to be invoked by the simulation.</param>
-    /// <param name="poseIntegratorCallbacksInterop">Pose integration state and callbacks to be invoked by the simulation.</param>
+    /// <param name="narrowPhaseCallbacks">Narrow phase callbacks to be invoked by the simulation.</param>
+    /// <param name="poseIntegratorCallbacks">Pose integration state and callbacks to be invoked by the simulation.</param>
     /// <param name="solveDescriptionInterop">Defines velocity iteration count and substep counts for the simulation's solver.</param>
     /// <param name="initialAllocationSizes">Initial capacities to allocate within the simulation.</param>
     /// <returns></returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateSimulation))]
     [return: TypeName(SimulationName)]
-    public unsafe static InstanceHandle CreateSimulation([TypeName(BufferPoolName)] InstanceHandle bufferPool, NarrowPhaseCallbacksInterop narrowPhaseCallbacksInterop, PoseIntegratorCallbacksInterop poseIntegratorCallbacksInterop,
-        SolveDescriptionInterop solveDescriptionInterop, SimulationAllocationSizes initialAllocationSizes)
+    public unsafe static InstanceHandle CreateSimulation(
+        [TypeName(BufferPoolName)] InstanceHandle bufferPool, 
+        [TypeName("NarrowPhaseCallbacks")] NarrowPhaseCallbacksInterop narrowPhaseCallbacks,
+        [TypeName("PoseIntegratorCallbacks")] PoseIntegratorCallbacksInterop poseIntegratorCallbacks,
+        [TypeName("SolveDescription")] SolveDescriptionInterop solveDescriptionInterop, SimulationAllocationSizes initialAllocationSizes)
     {
         var solveDescription = new SolveDescription
         {
@@ -260,17 +263,17 @@ public static class Entrypoints
             FallbackBatchThreshold = solveDescriptionInterop.FallbackBatchThreshold,
             VelocityIterationScheduler = solveDescriptionInterop.VelocityIterationScheduler != null ? Marshal.GetDelegateForFunctionPointer<SubstepVelocityIterationScheduler>((IntPtr)solveDescriptionInterop.VelocityIterationScheduler) : null
         };
-        var narrowPhaseCallbacks = new NarrowPhaseCallbacks
+        var narrowPhaseCallbacksImpl = new NarrowPhaseCallbacks
         {
-            InitializeFunction = narrowPhaseCallbacksInterop.InitializeFunction,
-            DisposeFunction = narrowPhaseCallbacksInterop.DisposeFunction,
-            AllowContactGenerationFunction = narrowPhaseCallbacksInterop.AllowContactGenerationFunction,
-            AllowContactGenerationBetweenChildrenFunction = narrowPhaseCallbacksInterop.AllowContactGenerationBetweenChildrenFunction,
-            ConfigureConvexContactManifoldFunction = narrowPhaseCallbacksInterop.ConfigureConvexContactManifoldFunction,
-            ConfigureNonconvexContactManifoldFunction = narrowPhaseCallbacksInterop.ConfigureNonconvexContactManifoldFunction,
-            ConfigureChildContactManifoldFunction = narrowPhaseCallbacksInterop.ConfigureChildContactManifoldFunction
+            InitializeFunction = narrowPhaseCallbacks.InitializeFunction,
+            DisposeFunction = narrowPhaseCallbacks.DisposeFunction,
+            AllowContactGenerationFunction = narrowPhaseCallbacks.AllowContactGenerationFunction,
+            AllowContactGenerationBetweenChildrenFunction = narrowPhaseCallbacks.AllowContactGenerationBetweenChildrenFunction,
+            ConfigureConvexContactManifoldFunction = narrowPhaseCallbacks.ConfigureConvexContactManifoldFunction,
+            ConfigureNonconvexContactManifoldFunction = narrowPhaseCallbacks.ConfigureNonconvexContactManifoldFunction,
+            ConfigureChildContactManifoldFunction = narrowPhaseCallbacks.ConfigureChildContactManifoldFunction
         };
-        return CreateSimulation(bufferPools[bufferPool], narrowPhaseCallbacks, poseIntegratorCallbacksInterop, solveDescription, initialAllocationSizes);
+        return CreateSimulation(bufferPools[bufferPool], narrowPhaseCallbacksImpl, poseIntegratorCallbacks, solveDescription, initialAllocationSizes);
     }
 
     /// <summary>
