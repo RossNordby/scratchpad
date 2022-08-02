@@ -35,7 +35,7 @@ public class TypeNameAttribute : Attribute
     }
 }
 
-public static class Entrypoints
+public static partial class Entrypoints
 {
     static InstanceDirectory<BufferPool>? bufferPools;
     static InstanceDirectory<Simulation>? simulations;
