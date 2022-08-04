@@ -23,7 +23,8 @@ namespace AbominationInterop;
 public enum SIMDWidth
 {
     SIMD128 = 0,
-    SIMD256 = 1
+    SIMD256 = 1,
+    SIMD512 = 2
 }
 
 public class TypeNameAttribute : Attribute
@@ -103,7 +104,7 @@ public static partial class Entrypoints
     public static SIMDWidth GetSIMDWidth()
     {
         //This will have to change later, but it technically works now.
-        return Vector<float>.Count == 8 ? SIMDWidth.SIMD256 : SIMDWidth.SIMD128;
+        return Vector<float>.Count switch { 16 => SIMDWidth.SIMD512, 8 => SIMDWidth.SIMD256, _ => SIMDWidth.SIMD128 };
     }
 
 

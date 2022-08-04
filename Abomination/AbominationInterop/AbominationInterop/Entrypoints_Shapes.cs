@@ -127,7 +127,7 @@ public static partial class Entrypoints
     /// <param name="bufferPoolHandle">Buffer pool to return shape resources to, if any.</param>
     /// <param name="shape">Shape to remove from the simulation.</param>
     /// <remarks>The same buffer pool must be used for both allocation and deallocation.</remarks>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveShape))]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveAndDestroyShape))]
     public unsafe static void RemoveAndDestroyShape([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, TypedIndex shape)
     {
         simulations[simulationHandle].Shapes.RemoveAndDispose(shape, bufferPools[bufferPoolHandle]);
@@ -140,7 +140,7 @@ public static partial class Entrypoints
     /// <param name="bufferPoolHandle">Buffer pool to return shape resources to, if any.</param>
     /// <param name="shape">Shape to remove from the simulation.</param>
     /// <remarks>The same buffer pool must be used for both allocation and deallocation.</remarks>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveShape))]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(RemoveAndDestroyShapeRecursively))]
     public unsafe static void RemoveAndDestroyShapeRecursively([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, TypedIndex shape)
     {
         simulations[simulationHandle].Shapes.RecursivelyRemoveAndDispose(shape, bufferPools[bufferPoolHandle]);
@@ -154,7 +154,7 @@ public static partial class Entrypoints
     /// <param name="bufferPoolHandle">Buffer pool to allocate resources from for the compound's acceleration structures.</param>
     /// <param name="children">Children of the compound.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateBigCompound))]
-    public unsafe static BigCompound CreateBigCompound([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, Buffer<CompoundChild> children)
+    public unsafe static BigCompound CreateBigCompound([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children)
     {
         return new BigCompound(children, simulations[simulationHandle].Shapes, bufferPools[bufferPoolHandle]);
     }
@@ -163,7 +163,7 @@ public static partial class Entrypoints
     /// </summary>
     /// <param name="bufferPoolHandle">Buffer pool to return resources to. Must be the same pool that resources were allocated from.</param>
     /// <param name="bigCompound">Big compound to destroy.</param>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateBigCompound))]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyBigCompound))]
     public unsafe static void DestroyBigCompound([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, BigCompound* bigCompound)
     {
         bigCompound->Dispose(bufferPools[bufferPoolHandle]);
@@ -176,7 +176,7 @@ public static partial class Entrypoints
     /// <param name="children">Children of the compound.</param>
     /// <param name="childMasses">Masses of the children composing the compound.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCompoundInertiaWithoutRecentering))]
-    public unsafe static BodyInertia ComputeCompoundInertiaWithoutRecentering([TypeName(SimulationName)] InstanceHandle simulationHandle, Buffer<CompoundChild> children, Buffer<float> childMasses)
+    public unsafe static BodyInertia ComputeCompoundInertiaWithoutRecentering([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children, [TypeName("Buffer<float>")] Buffer<float> childMasses)
     {
         return CompoundBuilder.ComputeInertia(children, childMasses, simulations[simulationHandle].Shapes);
     }
@@ -189,7 +189,7 @@ public static partial class Entrypoints
     /// <param name="childMasses">Masses of the children composing the compound.</param>
     /// <param name="centerOfMass">Computed center of mass that was subtracted from the position of compound children.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCompoundInertia))]
-    public unsafe static BodyInertia ComputeCompoundInertia([TypeName(SimulationName)] InstanceHandle simulationHandle, Buffer<CompoundChild> children, Buffer<float> childMasses, Vector3* centerOfMass)
+    public unsafe static BodyInertia ComputeCompoundInertia([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children, [TypeName("Buffer<float>")] Buffer<float> childMasses, Vector3* centerOfMass)
     {
         return CompoundBuilder.ComputeInertia(children, childMasses, simulations[simulationHandle].Shapes, out *centerOfMass);
     }

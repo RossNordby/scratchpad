@@ -128,6 +128,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="BepuPhysics.h" />
+    <ClInclude Include="Bodies.h" />
+    <ClInclude Include="Collisions.h" />
+    <ClInclude Include="Constraints.h" />
+    <ClInclude Include="Continuity.h" />
+    <ClInclude Include="Handles.h" />
+    <ClInclude Include="Math.h" />
+    <ClInclude Include="PoseIntegration.h" />
+    <ClInclude Include="Shapes.h" />
+    <ClInclude Include="Statics.h" />
+    <ClInclude Include="Tree.h" />
+    <ClInclude Include="Utilities.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
