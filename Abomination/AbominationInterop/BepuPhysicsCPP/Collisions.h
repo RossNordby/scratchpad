@@ -194,15 +194,73 @@ namespace Bepu
 		}
 	};
 
+	/// <summary>
+	/// Defines the callbacks invoked during narrow phase collision detection execution.
+	/// </summary>
 	struct NarrowPhaseCallbacks
 	{
-		void (*InitializeFunction)(SimulationHandle);
-		void (*DisposeFunction)(SimulationHandle);
-		bool (*AllowContactGenerationFunction)(SimulationHandle, int, CollidableReference, CollidableReference, float*);
-		bool (*AllowContactGenerationBetweenChildrenFunction)(SimulationHandle, int, CollidablePair, int, int);
-		bool (*ConfigureConvexContactManifoldFunction)(SimulationHandle, int, CollidablePair, ConvexContactManifold*, PairMaterialProperties*);
-		bool (*ConfigureNonconvexContactManifoldFunction)(SimulationHandle, int, CollidablePair, NonconvexContactManifold*, PairMaterialProperties*);
-		bool (*ConfigureChildContactManifoldFunction)(SimulationHandle, int, CollidablePair, int, int, ConvexContactManifold*);
+		/// <summary>
+		/// Called after the simulation is created. Can be null.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		void (*InitializeFunction)(SimulationHandle simulationHandle);
+		/// <summary>
+		/// Called when the simulation is being torn down. Can be null.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		void (*DisposeFunction)(SimulationHandle simulationHandle);
+		/// <summary>
+		/// Called for each pair of collidables with overlapping bounding boxes found by the broad phase.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		/// <param name="workerIndex">Index of the worker within the thread dispatcher that's running this callback.</param>
+		/// <param name="a">First collidable in the pair.</param>
+		/// <param name="b">Second collidable in the pair.</param>
+		/// <param name="speculativeMargin">Speculative contact margin for the pair. Calculated ahead of time, but can be overridden.</param>
+		/// <returns>True if the collision detection should run for this pair, false otherwise.</returns>
+		bool (*AllowContactGenerationFunction)(SimulationHandle simulationHandle, int32_t workerIndex, CollidableReference a, CollidableReference b, float* speculativeMargin);
+		/// <summary>
+		/// For pairs involving compound collidables (any type that has children, e.g. Compound, BigCompound, and Mesh), this is invoked for each pair of children with overlapping bounds.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		/// <param name="workerIndex">Index of the worker within the thread dispatcher that's running this callback.</param>
+		/// <param name="collidablePair">References to the parent collidables in this pair.</param>
+		/// <param name="childIndexA">Index of the child belonging to the first collidable in the pair.</param>
+		/// <param name="childIndexB">Index of the child belonging to the second collidable in the pair.</param>
+		/// <returns>True if the collision detection should run for these children, false otherwise.</returns>
+		bool (*AllowContactGenerationBetweenChildrenFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, int32_t childIndexA, int32_t childIndexB);
+		/// <summary>
+		/// Called after contacts have been found for a collidable pair that resulted in a convex manifold.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		/// <param name="workerIndex">Index of the worker within the thread dispatcher that's running this callback.</param>
+		/// <param name="collidablePair">References to the parent collidables in this pair.</param>
+		/// <param name="contactManifold">Contacts identified between the pair.</param>
+		/// <param name="materialProperties">Contact constraint material properties to use for the constraint, if any.</param>
+		/// <returns>True if a contact constraint should be created for this contact manifold, false otherwise.</returns>
+		bool (*ConfigureConvexContactManifoldFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, ConvexContactManifold* contactManifold, PairMaterialProperties* materialProperties);
+		/// <summary>
+		/// Called after contacts have been found for a collidable pair that resulted in a nonconvex manifold.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		/// <param name="workerIndex">Index of the worker within the thread dispatcher that's running this callback.</param>
+		/// <param name="collidablePair">References to the parent collidables in this pair.</param>
+		/// <param name="contactManifold">Contacts identified between the pair.</param>
+		/// <param name="materialProperties">Contact constraint material properties to use for the constraint, if any.</param>
+		/// <returns>True if a contact constraint should be created for this contact manifold, false otherwise.</returns>
+		bool (*ConfigureNonconvexContactManifoldFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, NonconvexContactManifold* contactManifold, PairMaterialProperties* materialProperties);
+		/// <summary>
+		/// Called for contacts identified between children in a compound-involving pair prior to being processed into the top level contact manifold.
+		/// </summary>
+		/// <param name="simulationHandle">Handle of the simulation owning these callbacks.</param>
+		/// <param name="workerIndex">Index of the worker within the thread dispatcher that's running this callback.</param>
+		/// <param name="collidablePair">References to the parent collidables in this pair.</param>
+		/// <param name="childIndexA">Index of the child belonging to the first collidable in the pair.</param>
+		/// <param name="childIndexB">Index of the child belonging to the second collidable in the pair.</param>
+		/// <param name="contactManifold">Contacts identified between the pair.</param>
+		/// <returns>True if the contacts in this child pair should be considered for constraint generation, false otherwise.</returns>
+		/// <remarks>Note that all children are required to be convex, so there is no nonconvex version of this callback.</remarks>
+		bool (*ConfigureChildContactManifoldFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, int32_t childIndexA, int32_t childIndexB, ConvexContactManifold* contactManifold);
 	};
 
 }
