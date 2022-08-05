@@ -57,4 +57,7 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\AbominationInterop\bin\Release\net7.0\win10-x64\native\AbominationInterop.dll" />
+  </ItemGroup>
 </Project>

@@ -20,6 +20,9 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GeneratorTests", "GeneratorTests\GeneratorTests.csproj", "{1D1A03F3-697D-47BB-BA6C-6E44BD832BE1}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BepuPhysicsCPP", "BepuPhysicsCPP\BepuPhysicsCPP.vcxproj", "{CD5D96EF-4C93-4D77-90D6-04A9FFCFAD40}"
+	ProjectSection(ProjectDependencies) = postProject
+		{83325C88-4AC2-41BB-8FF4-BBE4E01F4A49} = {83325C88-4AC2-41BB-8FF4-BBE4E01F4A49}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
