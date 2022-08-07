@@ -7,6 +7,20 @@ struct Vector3
 	float X;
 	float Y;
 	float Z;
+
+	Vector3()
+	{
+		X = 0;
+		Y = 0;
+		Z = 0;
+	}
+
+	Vector3(float x, float y, float z)
+	{
+		X = x;
+		Y = y;
+		Z = z;
+	}
 };
 struct Quaternion
 {
@@ -14,6 +28,11 @@ struct Quaternion
 	float Y;
 	float Z;
 	float W;
+
+	static Quaternion GetIdentity()
+	{
+		return Quaternion{ 0, 0, 0, 1 };
+	}
 };
 
 
@@ -68,6 +87,17 @@ struct RigidPose
 	/// </summary>
 	Vector3 Position;
 	int32_t Pad;
+
+	RigidPose(Vector3 position, Quaternion orientation)
+	{
+		Position = position;
+		Orientation = orientation;
+		Pad = 0;
+	}
+
+	RigidPose(Vector3 position) : RigidPose(position, Quaternion::GetIdentity()) { }
+
+	RigidPose() : RigidPose(Vector3(), Quaternion::GetIdentity()) { }
 };
 
 /// <summary>

@@ -107,6 +107,15 @@ public static partial class Entrypoints
         return Vector<float>.Count switch { 16 => SIMDWidth.SIMD512, 8 => SIMDWidth.SIMD256, _ => SIMDWidth.SIMD128 };
     }
 
+    /// <summary>
+    /// Gets the number of threads exposed by the operating system on this platform. Cores with SMT can show as having multiple threads.
+    /// </summary>
+    /// <returns>Number of threads exposed by the operating system on this platform.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetPlatformThreadCount))]
+    public static int GetPlatformThreadCount()
+    {
+        return Environment.ProcessorCount;
+    }
 
     /// <summary>
     /// Creates a new buffer pool.
@@ -118,7 +127,7 @@ public static partial class Entrypoints
     /// This does not preallocate actual blocks, just the space to hold references that are waiting in the pool.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateBufferPool))]
     [return: TypeName(BufferPoolName)]
-    public static InstanceHandle CreateBufferPool(int minimumBlockAllocationSize, int expectedUsedSlotCountPerPool)
+    public static InstanceHandle CreateBufferPool(int minimumBlockAllocationSize = 131072, int expectedUsedSlotCountPerPool = 16)
     {
         return bufferPools.Add(new BufferPool(minimumBlockAllocationSize, expectedUsedSlotCountPerPool));
     }
@@ -147,11 +156,11 @@ public static partial class Entrypoints
     /// <summary>
     /// Creates a new thread dispatcher.
     /// </summary>
-    /// <param name="workerCount">Number of threads to use within the thread dispatcher.</param>
+    /// <param name="threadCount">Number of threads to use within the thread dispatcher.</param>
     /// <param name="threadPoolAllocationBlockSize">Minimum size in bytes of blocks allocated in per-thread buffer pools. Allocations requiring more space can result in larger block sizes, but no pools will allocate smaller blocks.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateThreadDispatcher))]
     [return: TypeName(ThreadDispatcherName)]
-    public static InstanceHandle CreateThreadDispatcher(int threadCount, int threadPoolAllocationBlockSize)
+    public static InstanceHandle CreateThreadDispatcher(int threadCount, int threadPoolAllocationBlockSize = 16384)
     {
         return threadDispatchers.Add(new ThreadDispatcher(threadCount, threadPoolAllocationBlockSize));
     }
@@ -430,7 +439,7 @@ public static partial class Entrypoints
     /// <param name="dt">Duration of the timestep.</param>
     /// <param name="threadDispatcherHandle">Handle of the thread dispatcher to use, if any. Can be a null reference.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Timestep))]
-    public unsafe static void Timestep([TypeName(SimulationName)] InstanceHandle simulationHandle, float dt, [TypeName(ThreadDispatcherName)] InstanceHandle threadDispatcherHandle)
+    public unsafe static void Timestep([TypeName(SimulationName)] InstanceHandle simulationHandle, float dt, [TypeName(ThreadDispatcherName)] InstanceHandle threadDispatcherHandle = new())
     {
         var threadDispatcher = threadDispatcherHandle.Null ? null : threadDispatchers[threadDispatcherHandle];
         simulations[simulationHandle].Timestep(dt, threadDispatcher);

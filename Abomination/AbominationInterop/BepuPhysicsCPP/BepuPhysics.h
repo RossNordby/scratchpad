@@ -120,10 +120,11 @@ namespace Bepu
 	extern "C" void Initialize();
 	extern "C" void Destroy();
 	extern "C" SIMDWidth GetSIMDWidth();
-	extern "C" BufferPoolHandle CreateBufferPool(int32_t minimumBlockAllocationSize, int32_t expectedUsedSlotCountPerPool);
+	extern "C" int32_t GetPlatformThreadCount();
+	extern "C" BufferPoolHandle CreateBufferPool(int32_t minimumBlockAllocationSize = 131072, int32_t expectedUsedSlotCountPerPool = 16);
 	extern "C" void ClearBufferPool(BufferPoolHandle handle);
 	extern "C" void DestroyBufferPool(BufferPoolHandle handle);
-	extern "C" ThreadDispatcherHandle CreateThreadDispatcher(int32_t threadCount, int32_t threadPoolAllocationBlockSize);
+	extern "C" ThreadDispatcherHandle CreateThreadDispatcher(int32_t threadCount, int32_t threadPoolAllocationBlockSize = 16384);
 	extern "C" void DestroyThreadDispatcher(ThreadDispatcherHandle handle);
 	extern "C" int32_t GetThreadCount(ThreadDispatcherHandle handle);
 	extern "C" SimulationHandle CreateSimulation(BufferPoolHandle bufferPool, NarrowPhaseCallbacks narrowPhaseCallbacks, PoseIntegratorCallbacks poseIntegratorCallbacks, SolveDescription solveDescriptionInterop, SimulationAllocationSizes initialAllocationSizes);

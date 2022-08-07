@@ -192,6 +192,8 @@ namespace Bepu
 			MaximumRecoveryVelocity = maximumRecoveryVelocity;
 			ContactSpringSettings = springSettings;
 		}
+
+		PairMaterialProperties() : PairMaterialProperties(0, 0, SpringSettings(0, 0)) {}
 	};
 
 	/// <summary>
@@ -228,7 +230,7 @@ namespace Bepu
 		/// <param name="childIndexA">Index of the child belonging to the first collidable in the pair.</param>
 		/// <param name="childIndexB">Index of the child belonging to the second collidable in the pair.</param>
 		/// <returns>True if the collision detection should run for these children, false otherwise.</returns>
-		bool (*AllowContactGenerationBetweenChildrenFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, int32_t childIndexA, int32_t childIndexB);
+		bool (*AllowContactGenerationBetweenChildrenFunction)(SimulationHandle simulationHandle, int32_t workerIndex, CollidablePair collidablePair, int32_t childIndexA, int32_t childIndexB);
 		/// <summary>
 		/// Called after contacts have been found for a collidable pair that resulted in a convex manifold.
 		/// </summary>
@@ -238,7 +240,7 @@ namespace Bepu
 		/// <param name="contactManifold">Contacts identified between the pair.</param>
 		/// <param name="materialProperties">Contact constraint material properties to use for the constraint, if any.</param>
 		/// <returns>True if a contact constraint should be created for this contact manifold, false otherwise.</returns>
-		bool (*ConfigureConvexContactManifoldFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, ConvexContactManifold* contactManifold, PairMaterialProperties* materialProperties);
+		bool (*ConfigureConvexContactManifoldFunction)(SimulationHandle simulationHandle, int32_t workerIndex, CollidablePair collidablePair, ConvexContactManifold* contactManifold, PairMaterialProperties* materialProperties);
 		/// <summary>
 		/// Called after contacts have been found for a collidable pair that resulted in a nonconvex manifold.
 		/// </summary>
@@ -248,7 +250,7 @@ namespace Bepu
 		/// <param name="contactManifold">Contacts identified between the pair.</param>
 		/// <param name="materialProperties">Contact constraint material properties to use for the constraint, if any.</param>
 		/// <returns>True if a contact constraint should be created for this contact manifold, false otherwise.</returns>
-		bool (*ConfigureNonconvexContactManifoldFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, NonconvexContactManifold* contactManifold, PairMaterialProperties* materialProperties);
+		bool (*ConfigureNonconvexContactManifoldFunction)(SimulationHandle simulationHandle, int32_t workerIndex, CollidablePair collidablePair, NonconvexContactManifold* contactManifold, PairMaterialProperties* materialProperties);
 		/// <summary>
 		/// Called for contacts identified between children in a compound-involving pair prior to being processed into the top level contact manifold.
 		/// </summary>
@@ -260,7 +262,7 @@ namespace Bepu
 		/// <param name="contactManifold">Contacts identified between the pair.</param>
 		/// <returns>True if the contacts in this child pair should be considered for constraint generation, false otherwise.</returns>
 		/// <remarks>Note that all children are required to be convex, so there is no nonconvex version of this callback.</remarks>
-		bool (*ConfigureChildContactManifoldFunction)(SimulationHandle, int32_t workerIndex, CollidablePair collidablePair, int32_t childIndexA, int32_t childIndexB, ConvexContactManifold* contactManifold);
+		bool (*ConfigureChildContactManifoldFunction)(SimulationHandle simulationHandle, int32_t workerIndex, CollidablePair collidablePair, int32_t childIndexA, int32_t childIndexB, ConvexContactManifold* contactManifold);
 	};
 
 }

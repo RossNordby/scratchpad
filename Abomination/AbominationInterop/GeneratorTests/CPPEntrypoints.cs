@@ -81,6 +81,15 @@ public static class CPPEntrypoints
                 {
                     var parameter = parameters[i];
                     signature += $"{GetParameterTypeName(parameter.ParameterType, parameter.CustomAttributes)} {parameter.Name}";
+                    if (parameter.HasDefaultValue)
+                    {
+                        signature += parameter.DefaultValue switch
+                        {
+                            int value => $" = {value}",
+                            float value => $" = {value}f",
+                            _ => ""
+                        };
+                    }
                     if (i < parameters.Length - 1)
                         signature += ", ";
                 }

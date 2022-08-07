@@ -73,6 +73,18 @@ namespace Bepu
 		/// </summary>
 		Vector3 Angular;
 		int32_t Pad1;
+
+		BodyVelocity(Vector3 linear, Vector3 angular)
+		{
+			Linear = linear;
+			Pad0 = 0;
+			Angular = angular;
+			Pad1 = 0;
+		}
+
+		BodyVelocity(Vector3 linear) : BodyVelocity(linear, Vector3()) {}
+
+		BodyVelocity() : BodyVelocity(Vector3(), Vector3()) {}
 	};
 
 	/// <summary>
@@ -308,16 +320,6 @@ namespace Bepu
 			SleepThreshold = sleepThreshold;
 			MinimumTimestepCountUnderThreshold = minimumTimestepCountUnderThreshold;
 		}
-
-		/// <summary>
-		/// Creates a body activity description. Uses a <see cref="MinimumTimestepCountUnderThreshold"/> of 32.
-		/// </summary>
-		/// <param name="sleepThreshold">Threshold of squared velocity under which the body is allowed to go to sleep. This is compared against dot(linearVelocity, linearVelocity) + dot(angularVelocity, angularVelocity).</param>
-		/// <param name="minimumTimestepCountUnderThreshold">The number of time steps that the body must be under the sleep threshold before the body becomes a sleep candidate.
-		/// Note that the body is not guaranteed to go to sleep immediately after meeting this minimum.</param>
-		BodyActivityDescription(float sleepThreshold) : BodyActivityDescription(sleepThreshold, 32)
-		{
-		}
 	};
 
 	/// <summary>
@@ -370,7 +372,7 @@ namespace Bepu
 		/// <returns>Constructed description for the body.</returns>
 		static BodyDescription CreateDynamic(RigidPose pose, BodyInertia inertia, CollidableDescription collidable, BodyActivityDescription activity)
 		{
-			return BodyDescription{ pose, {}, inertia, collidable, activity };
+			return BodyDescription{ pose, BodyVelocity(), inertia, collidable, activity };
 		}
 
 		/// <summary>

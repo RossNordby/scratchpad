@@ -112,6 +112,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>"..\AbominationInterop\bin\Debug\net7.0\win10-x64\native\AbominationInterop.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -141,6 +142,7 @@
     <ClInclude Include="Constraints.h" />
     <ClInclude Include="Continuity.h" />
     <ClInclude Include="Handles.h" />
+    <ClInclude Include="Main.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="PoseIntegration.h" />
     <ClInclude Include="Shapes.h" />

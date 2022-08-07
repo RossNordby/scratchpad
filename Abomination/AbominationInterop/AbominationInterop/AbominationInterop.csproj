@@ -8,8 +8,7 @@
     <Nullable>enable</Nullable>
 
     <!--<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>-->
-    <!--<Optimize>true</Optimize>-->
-    <!--<IlcOptimizationPreference>Speed</IlcOptimizationPreference>-->
+    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
     <NativeLib>Shared</NativeLib>
     <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
   </PropertyGroup>

@@ -48,6 +48,13 @@ namespace Bepu
 		/// Half of the box's length along its local Z axis.
 		/// </summary>
 		float HalfLength;
+
+		Box(float width, float height, float length)
+		{
+			HalfWidth = width * 0.5f;
+			HalfHeight = height * 0.5f;
+			HalfLength = length * 0.5f;
+		}
 	};
 
 	/// <summary>
