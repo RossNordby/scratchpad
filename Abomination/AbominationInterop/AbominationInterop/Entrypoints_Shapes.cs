@@ -368,4 +368,112 @@ public static partial class Entrypoints
     {
         return mesh.ComputeClosedInertia(mass, out *centerOfMass);
     }
+
+    /// <summary>
+    /// Gets a pointer to a sphere shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBoxShapeData))]
+    public unsafe static Sphere* GetSphereShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Sphere*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Sphere>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a capsule shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetCapsuleShapeData))]
+    public unsafe static Capsule* GetCapsuleShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Capsule*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Capsule>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a box shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBoxShapeData))]
+    public unsafe static Box* GetBoxShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Box*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Box>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a triangle shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetTriangleShapeData))]
+    public unsafe static Triangle* GetTriangleShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Triangle*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Triangle>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a cylinder shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetCylinderShapeData))]
+    public unsafe static Cylinder* GetCylinderShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Cylinder*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Cylinder>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a convex hull shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetConvexHullShapeData))]
+    public unsafe static ConvexHull* GetConvexHullShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (ConvexHull*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<ConvexHull>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a compound shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetCompoundShapeData))]
+    public unsafe static Compound* GetCompoundShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Compound*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Compound>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBigCompoundShapeData))]
+    public unsafe static BigCompound* GetBigCompoundShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (BigCompound*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<BigCompound>(shape.Index));
+    }
+
+    /// <summary>
+    /// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+    /// <param name="shape">Shape reference to request from the simulation.</param>
+    /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetMeshShapeData))]
+    public unsafe static Mesh* GetMeshShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
+    {
+        return (Mesh*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Mesh>(shape.Index));
+    }
 }
