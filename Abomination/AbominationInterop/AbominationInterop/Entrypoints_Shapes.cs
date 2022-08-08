@@ -147,6 +147,41 @@ public static partial class Entrypoints
     }
 
     /// <summary>
+    /// Creates a convex hull shape from a point set.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to allocate resources from for the compound's acceleration structures.</param>
+    /// <param name="points">Points in the convex hull.</param>
+    /// <param name="centerOfMass">Center of mass computed for the hull and subtracted from all the points in the points used for the final shape.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateBigCompound))]
+    public unsafe static ConvexHull CreateConvexHull([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<CompoundChild>")] Buffer<Vector3> points, Vector3* centerOfMass)
+    {
+        ConvexHullHelper.CreateShape(points, bufferPools[bufferPoolHandle], out *centerOfMass, out var hull);
+        return hull;
+    }
+
+    /// <summary>
+    /// Returns buffers allocated for a convex hull shape.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to return resources to. Must be the same pool that resources were allocated from.</param>
+    /// <param name="convexHull">Convex hull to destroy.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyConvexHull))]
+    public unsafe static void DestroyConvexHull([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, ConvexHull* convexHull)
+    {
+        convexHull->Dispose(bufferPools[bufferPoolHandle]);
+    }
+
+    /// <summary>
+    /// Returns buffers allocated for a compound shape.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to return resources to. Must be the same pool that resources were allocated from.</param>
+    /// <param name="compound">Compound to destroy.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyCompound))]
+    public unsafe static void DestroyCompound([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, Compound* compound)
+    {
+        compound->Dispose(bufferPools[bufferPoolHandle]);
+    }
+
+    /// <summary>
     /// Creates a big compound shape from a list of children.
     /// </summary>
     /// <param name="simulationHandle">Handle of the simulation to which the shapes referenced by the compound children belong.</param>
@@ -157,6 +192,7 @@ public static partial class Entrypoints
     {
         return new BigCompound(children, simulations[simulationHandle].Shapes, bufferPools[bufferPoolHandle]);
     }
+
     /// <summary>
     /// Returns buffers allocated for a big compound shape.
     /// </summary>
@@ -166,6 +202,30 @@ public static partial class Entrypoints
     public unsafe static void DestroyBigCompound([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, BigCompound* bigCompound)
     {
         bigCompound->Dispose(bufferPools[bufferPoolHandle]);
+    }
+
+    /// <summary>
+    /// Creates a mesh shape from triangles.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to allocate resources from for the compound's acceleration structures.</param>
+    /// <param name="triangles">Triangles composing the mesh.</param>
+    /// <param name="scale">Scale of the mesh.</param>
+    /// <remarks>This uses a pretty old sweep builder. Large meshes will take a while. There are ways to do this much faster if required; see https://github.com/bepu/bepuphysics2/blob/master/Demos/DemoMeshHelper.cs#L186.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateMesh))]
+    public unsafe static Mesh CreateMesh([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<Triangle>")] Buffer<Triangle> triangles, Vector3 scale)
+    {
+        return new Mesh(triangles, scale, bufferPools[bufferPoolHandle]);
+    }
+
+    /// <summary>
+    /// Returns buffers allocated for a mesh shape.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to return resources to. Must be the same pool that resources were allocated from.</param>
+    /// <param name="mesh">Mesh to destroy.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DestroyMesh))]
+    public unsafe static void DestroyMesh([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, Mesh* mesh)
+    {
+        mesh->Dispose(bufferPools[bufferPoolHandle]);
     }
 
     /// <summary>
