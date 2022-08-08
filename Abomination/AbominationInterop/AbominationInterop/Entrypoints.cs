@@ -154,6 +154,57 @@ public static partial class Entrypoints
     }
 
     /// <summary>
+    /// Allocates a buffer from the buffer pool of the given size.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to allocate from.</param>
+    /// <param name="sizeInBytes">Size of the buffer to allocate in bytes.</param>
+    /// <returns>Allocated buffer.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Allocate))]
+    [return: TypeName("Buffer<byte>")]
+    public static Buffer<byte> Allocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, int sizeInBytes)
+    {
+        bufferPools[bufferPoolHandle].Take<byte>(sizeInBytes, out var buffer);
+        return buffer;
+    }
+
+    /// <summary>
+    /// Allocates a buffer from the buffer pool with at least the given size.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to allocate from.</param>
+    /// <param name="sizeInBytes">Size of the buffer to allocate in bytes.</param>
+    /// <returns>Allocated buffer.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AllocateAtLeast))]
+    [return: TypeName("Buffer<byte>")]
+    public static Buffer<byte> AllocateAtLeast([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, int sizeInBytes)
+    {
+        bufferPools[bufferPoolHandle].TakeAtLeast<byte>(sizeInBytes, out var buffer);
+        return buffer;
+    }
+
+    /// <summary>
+    /// Returns a buffer to the buffer pool.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to return the buffer to.</param>
+    /// <param name="buffer">Buffer to return to the pool.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Deallocate))]
+    public unsafe static void Deallocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<byte>*")] Buffer<byte>* buffer)
+    {
+        bufferPools[bufferPoolHandle].Return(ref *buffer);
+    }
+
+    /// <summary>
+    /// Returns a buffer to the buffer pool by its id.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to return the buffer to.</param>
+    /// <param name="bufferId">Id of the buffer to return to the pool.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(DeallocateById))]
+    public unsafe static void DeallocateById([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, int bufferId)
+    {
+        bufferPools[bufferPoolHandle].ReturnUnsafely(bufferId);
+    }
+
+
+    /// <summary>
     /// Creates a new thread dispatcher.
     /// </summary>
     /// <param name="threadCount">Number of threads to use within the thread dispatcher.</param>
@@ -261,7 +312,7 @@ public static partial class Entrypoints
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateSimulation))]
     [return: TypeName(SimulationName)]
     public unsafe static InstanceHandle CreateSimulation(
-        [TypeName(BufferPoolName)] InstanceHandle bufferPool, 
+        [TypeName(BufferPoolName)] InstanceHandle bufferPool,
         [TypeName("NarrowPhaseCallbacks")] NarrowPhaseCallbacksInterop narrowPhaseCallbacks,
         [TypeName("PoseIntegratorCallbacks")] PoseIntegratorCallbacksInterop poseIntegratorCallbacks,
         [TypeName("SolveDescription")] SolveDescriptionInterop solveDescriptionInterop, SimulationAllocationSizes initialAllocationSizes)
@@ -356,7 +407,7 @@ public static partial class Entrypoints
     /// <returns>Pointer to the body's constraint list.</returns>
     /// <remarks>This is a direct pointer. The memory location associated with a body can move if other bodies are removed from the simulation; do not hold a pointer beyond the point where it may be invalidated.</remarks>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyConstraints))]
-    [return:TypeName("QuickList<BodyConstraintReference>*")]
+    [return: TypeName("QuickList<BodyConstraintReference>*")]
     public unsafe static QuickList<ConstraintReference>* GetBodyConstraints([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle)
     {
         return (QuickList<ConstraintReference>*)Unsafe.AsPointer(ref simulations[simulationHandle].Bodies[bodyHandle].Constraints);
