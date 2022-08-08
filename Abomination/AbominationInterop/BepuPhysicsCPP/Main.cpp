@@ -83,6 +83,22 @@ void IntegrateVelocityScalar(SimulationHandle simulation, int32_t bodyIndex, Vec
 
 int main()
 {
+	//std::cout << sizeof(BodyVelocity) << '\n';
+	//std::cout << sizeof(BodyDynamics) << '\n';
+	//std::cout << sizeof(Vector3) << '\n';
+	//std::cout << sizeof(Quaternion) << '\n';
+	//std::cout << sizeof(RigidPose) << '\n';
+
+	std::cout << sizeof(ConvexContact) << '\n';
+	std::cout << sizeof(ConvexContactManifold) << '\n';
+	std::cout << sizeof(NonconvexContact) << '\n';
+	std::cout << sizeof(NonconvexContactManifold) << '\n';
+
+	std::cout << sizeof(PoseIntegratorCallbacks) << '\n';
+	std::cout << offsetof(PoseIntegratorCallbacks, PoseIntegratorCallbacks::Initialize) << '\n';
+	std::cout << offsetof(SolveDescription, SolveDescription::VelocityIterationScheduler) << '\n';
+	std::cout << sizeof(SimulationAllocationSizes) << '\n';
+
 	Initialize();
 
 	BufferPoolHandle pool = CreateBufferPool();

@@ -146,7 +146,6 @@ public static partial class Entrypoints
         simulations[simulationHandle].Shapes.RecursivelyRemoveAndDispose(shape, bufferPools[bufferPoolHandle]);
     }
 
-
     /// <summary>
     /// Creates a big compound shape from a list of children.
     /// </summary>
@@ -170,13 +169,85 @@ public static partial class Entrypoints
     }
 
     /// <summary>
+    /// Computes the inertia of a sphere.
+    /// </summary>
+    /// <param name="sphere">Shape to compute the inertia of.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeSphereInertia))]
+    public unsafe static BodyInertia ComputeSphereInertia(Sphere sphere, float mass)
+    {
+        return sphere.ComputeInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia of a capsule.
+    /// </summary>
+    /// <param name="capsule">Shape to compute the inertia of.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCapsuleInertia))]
+    public unsafe static BodyInertia ComputeCapsuleInertia(Capsule capsule, float mass)
+    {
+        return capsule.ComputeInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia of a box.
+    /// </summary>
+    /// <param name="box">Shape to compute the inertia of.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeBoxInertia))]
+    public unsafe static BodyInertia ComputeBoxInertia(Box box, float mass)
+    {
+        return box.ComputeInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia of a triangle.
+    /// </summary>
+    /// <param name="triangle">Shape to compute the inertia of.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeTriangleInertia))]
+    public unsafe static BodyInertia ComputeTriangleInertia(Triangle triangle, float mass)
+    {
+        return triangle.ComputeInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia of a cylinder.
+    /// </summary>
+    /// <param name="cylinder">Shape to compute the inertia of.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCylinderInertia))]
+    public unsafe static BodyInertia ComputeCylinderInertia(Cylinder cylinder, float mass)
+    {
+        return cylinder.ComputeInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia of a convex hull.
+    /// </summary>
+    /// <param name="convexHull">Shape to compute the inertia of.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeConvexHullInertia))]
+    public unsafe static BodyInertia ComputeConvexHullInertia(ConvexHull convexHull, float mass)
+    {
+        return convexHull.ComputeInertia(mass);
+    }
+
+    /// <summary>
     /// Computes the inertia associated with a set of compound children. Does not recenter the children.
     /// </summary>
     /// <param name="simulationHandle">Handle of the simulation to which the shapes referenced by the compound children belong.</param>
     /// <param name="children">Children of the compound.</param>
     /// <param name="childMasses">Masses of the children composing the compound.</param>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCompoundInertiaWithoutRecentering))]
-    public unsafe static BodyInertia ComputeCompoundInertiaWithoutRecentering([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children, [TypeName("Buffer<float>")] Buffer<float> childMasses)
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCompoundInertia))]
+    public unsafe static BodyInertia ComputeCompoundInertia([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children, [TypeName("Buffer<float>")] Buffer<float> childMasses)
     {
         return CompoundBuilder.ComputeInertia(children, childMasses, simulations[simulationHandle].Shapes);
     }
@@ -188,9 +259,53 @@ public static partial class Entrypoints
     /// <param name="children">Children of the compound.</param>
     /// <param name="childMasses">Masses of the children composing the compound.</param>
     /// <param name="centerOfMass">Computed center of mass that was subtracted from the position of compound children.</param>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCompoundInertia))]
-    public unsafe static BodyInertia ComputeCompoundInertia([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children, [TypeName("Buffer<float>")] Buffer<float> childMasses, Vector3* centerOfMass)
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeCompoundInertiaWithRecentering))]
+    public unsafe static BodyInertia ComputeCompoundInertiaWithRecentering([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<CompoundChild>")] Buffer<CompoundChild> children, [TypeName("Buffer<float>")] Buffer<float> childMasses, Vector3* centerOfMass)
     {
         return CompoundBuilder.ComputeInertia(children, childMasses, simulations[simulationHandle].Shapes, out *centerOfMass);
+    }
+
+    /// <summary>
+    /// Computes the inertia associated with a mesh by treating its triangles as a soup with no volume. Does not recenter the triangles on a computed center of mass.
+    /// </summary>
+    /// <param name="mesh">Mesh to compute the inertia of.</param>
+    /// <param name="mass">Mass of the mesh.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeOpenMeshInertia))]
+    public unsafe static BodyInertia ComputeOpenMeshInertia(Mesh mesh, float mass)
+    {
+        return mesh.ComputeOpenInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia associated with a mesh by treating it as a closed volume. Does not recenter the triangles on a computed center of mass.
+    /// </summary>
+    /// <param name="mesh">Mesh to compute the inertia of.</param>
+    /// <param name="mass">Mass of the mesh.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeClosedMeshInertia))]
+    public unsafe static BodyInertia ComputeClosedMeshInertia(Mesh mesh, float mass)
+    {
+        return mesh.ComputeClosedInertia(mass);
+    }
+
+    /// <summary>
+    /// Computes the inertia associated with a mesh by treating its triangles as a soup with no volume. Recenters all children onto the computed local center of mass.
+    /// </summary>
+    /// <param name="mesh">Mesh to compute the inertia of.</param>
+    /// <param name="mass">Mass of the mesh.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeOpenMeshInertiaWithRecentering))]
+    public unsafe static BodyInertia ComputeOpenMeshInertiaWithRecentering(Mesh mesh, float mass, Vector3* centerOfMass)
+    {
+        return mesh.ComputeOpenInertia(mass, out *centerOfMass);
+    }
+
+    /// <summary>
+    /// Computes the inertia associated with a mesh by treating it as a closed volume. Recenters all children onto the computed local center of mass.
+    /// </summary>
+    /// <param name="mesh">Mesh to compute the inertia of.</param>
+    /// <param name="mass">Mass of the mesh.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeClosedMeshInertiaWithRecentering))]
+    public unsafe static BodyInertia ComputeClosedMeshInertiaWithRecentering(Mesh mesh, float mass, Vector3* centerOfMass)
+    {
+        return mesh.ComputeClosedInertia(mass, out *centerOfMass);
     }
 }
