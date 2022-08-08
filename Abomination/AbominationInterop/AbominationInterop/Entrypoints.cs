@@ -160,7 +160,7 @@ public static partial class Entrypoints
     /// <param name="sizeInBytes">Size of the buffer to allocate in bytes.</param>
     /// <returns>Allocated buffer.</returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Allocate))]
-    [return: TypeName("Buffer<byte>")]
+    [return: TypeName("ByteBuffer")]
     public static Buffer<byte> Allocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, int sizeInBytes)
     {
         bufferPools[bufferPoolHandle].Take<byte>(sizeInBytes, out var buffer);
@@ -174,7 +174,7 @@ public static partial class Entrypoints
     /// <param name="sizeInBytes">Size of the buffer to allocate in bytes.</param>
     /// <returns>Allocated buffer.</returns>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(AllocateAtLeast))]
-    [return: TypeName("Buffer<byte>")]
+    [return: TypeName("ByteBuffer")]
     public static Buffer<byte> AllocateAtLeast([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, int sizeInBytes)
     {
         bufferPools[bufferPoolHandle].TakeAtLeast<byte>(sizeInBytes, out var buffer);
@@ -187,7 +187,7 @@ public static partial class Entrypoints
     /// <param name="bufferPoolHandle">Buffer pool to return the buffer to.</param>
     /// <param name="buffer">Buffer to return to the pool.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Deallocate))]
-    public unsafe static void Deallocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<byte>*")] Buffer<byte>* buffer)
+    public unsafe static void Deallocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<uint8_t>*")] Buffer<byte>* buffer)
     {
         bufferPools[bufferPoolHandle].Return(ref *buffer);
     }

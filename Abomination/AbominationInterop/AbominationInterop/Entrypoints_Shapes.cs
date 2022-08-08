@@ -152,7 +152,7 @@ public static partial class Entrypoints
     /// <param name="bufferPoolHandle">Buffer pool to allocate resources from for the compound's acceleration structures.</param>
     /// <param name="points">Points in the convex hull.</param>
     /// <param name="centerOfMass">Center of mass computed for the hull and subtracted from all the points in the points used for the final shape.</param>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateBigCompound))]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateConvexHull))]
     public unsafe static ConvexHull CreateConvexHull([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<CompoundChild>")] Buffer<Vector3> points, Vector3* centerOfMass)
     {
         ConvexHullHelper.CreateShape(points, bufferPools[bufferPoolHandle], out *centerOfMass, out var hull);
@@ -375,7 +375,7 @@ public static partial class Entrypoints
     /// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
     /// <param name="shape">Shape reference to request from the simulation.</param>
     /// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBoxShapeData))]
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetSphereShapeData))]
     public unsafe static Sphere* GetSphereShapeData([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex shape)
     {
         return (Sphere*)Unsafe.AsPointer(ref simulations[simulationHandle].Shapes.GetShape<Sphere>(shape.Index));

@@ -4,6 +4,24 @@
 
 namespace Bepu
 {
+	struct ByteBuffer
+	{
+		/// <summary>
+		/// Pointer to the beginning of the memory backing this buffer.
+		/// </summary>
+		uint8_t* Memory; //going to just assume 64 bit here.
+
+		/// <summary>
+		/// Length of the buffer in bytes.
+		/// </summary>
+		int32_t Length;
+
+		/// <summary>
+		/// Implementation specific identifier of the raw buffer set by its source. If taken from a BufferPool, Id includes the index in the power pool from which it was taken.
+		/// </summary>
+		int32_t Id;
+	};
+
 	/// <summary>
 	/// Span over an unmanaged memory region.
 	/// </summary>
@@ -17,7 +35,7 @@ namespace Bepu
 		T* Memory; //going to just assume 64 bit here.
 
 		/// <summary>
-		/// Length of the  to the beginning of the memory backing this buffer.
+		/// Length of the buffer in typed elements.
 		/// </summary>
 		int32_t Length;
 
@@ -31,7 +49,14 @@ namespace Bepu
 			assert(index >= 0 && index < Length);
 			return Memory[index];
 		}
+
+		operator ByteBuffer() { return { Memory, sizeof(T) * Length, Id }; }
+		Buffer(ByteBuffer buffer) 
+		{
+			return { buffer.Memory, buffer.Length / sizeof(T), buffer.Id };
+		}
 	};
+
 
 	template<typename T>
 	struct QuickList
