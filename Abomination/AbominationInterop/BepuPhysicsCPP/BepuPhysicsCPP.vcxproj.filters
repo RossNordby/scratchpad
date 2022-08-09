@@ -61,6 +61,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\AbominationInterop\bin\Release\net7.0\win10-x64\native\AbominationInterop.dll" />
+    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net7.0\win10-x64\native\AbominationInterop.dll" />
   </ItemGroup>
 </Project>
