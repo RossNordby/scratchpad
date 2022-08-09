@@ -9,7 +9,7 @@
 
     <PublishAot>true</PublishAot>
     <NativeLib>Shared</NativeLib>
-    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <IlcInstructionSet>base,sse,sse2,sse3,sse4.1,sse4.2,avx,avx2,aes,bmi,bmi2,fma,lzcnt,pclmul,popcnt</IlcInstructionSet>
     
   </PropertyGroup>
