@@ -24,7 +24,7 @@ public class InstanceDirectory<T> where T : class
             //This does imply that the C API will be shipped with a debug version...
             Debug.Assert(handle.TypeIndex == typeIndex, "Handle type must match the type of this instance directory. Did a bad handle get passed in?");
             Debug.Assert(handle.Index >= 0 && handle.Index < instances.Length, "Handle index must point to a slot within the directory. Did a bad handle get passed in?");
-            Debug.Assert(handle.Version == instances[handle.TypeIndex].Version, "Handle version must match directory contained version. Did a handle get used after being removed?");
+            Debug.Assert(handle.Version == instances[handle.Index].Version, "Handle version must match directory contained version. Did a handle get used after being removed?");
             Debug.Assert(instances[handle.Index].Instance != null, "There must be an instance associated with a handle.");
             return instances[handle.Index].Instance;
         }
@@ -69,7 +69,7 @@ public class InstanceDirectory<T> where T : class
             }
             ref var slot = ref instances[index];
             slot.Instance = instance;
-            return new InstanceHandle(index, slot.Version++, typeIndex);
+            return new InstanceHandle(index, ++slot.Version, typeIndex);
         }
     }
     /// <summary>

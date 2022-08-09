@@ -10,10 +10,6 @@
 		<Optimize>true</Optimize>
 		<IlcOptimizationPreference>Speed</IlcOptimizationPreference>-->
   </PropertyGroup>
-  
-  <ItemGroup>
-    <IlcArg Include="--instructionset:avx2" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="CjClutter.ObjLoader" Version="1.0.0" />

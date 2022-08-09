@@ -6,11 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
-
-    <!--<IlcGenerateStackTraceData>false</IlcGenerateStackTraceData>-->
-    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+    
+    <PublishAot>true</PublishAot>
     <NativeLib>Shared</NativeLib>
-    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>
+    <RuntimeIdentifier>win10-x64</RuntimeIdentifier>    
   </PropertyGroup>
 
   <ItemGroup>
