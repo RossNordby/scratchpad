@@ -8,6 +8,19 @@
 
 namespace Bepu
 {
+	enum struct ShapeTypes
+	{
+		Sphere = 0,
+		Capsule = 1,
+		Box = 2,
+		Triangle = 3,
+		Cylinder = 4,
+		ConvexHull = 5,
+		Compound = 6,
+		BigCompound = 7,
+		Mesh = 8
+	};
+
 	struct Sphere
 	{
 		/// <summary>

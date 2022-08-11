@@ -40,7 +40,7 @@ namespace Bepu
 		/// <summary>
 		/// Gets the mobility state of the owner of this collidable.
 		/// </summary>
-		CollidableMobility GetMobility()
+		CollidableMobility GetMobility() const
 		{
 			return (CollidableMobility)(Packed >> 30);
 		}
@@ -48,7 +48,7 @@ namespace Bepu
 		/// <summary>
 		/// Gets the body handle of the owner of the collidable referred to by this instance.
 		/// </summary>
-		BodyHandle GetBodyHandle()
+		BodyHandle GetBodyHandle() const
 		{
 			assert(GetMobility() == CollidableMobility::Dynamic || GetMobility() == CollidableMobility::Kinematic, "Extracting a body handle from a collidable reference requires that the collidable is owned by a body.");
 			return BodyHandle{ GetRawHandleValue() };
@@ -58,7 +58,7 @@ namespace Bepu
 		/// <summary>
 		/// Gets the static handle of the owner of the collidable referred to by this instance.
 		/// </summary>
-		StaticHandle GetStaticHandle()
+		StaticHandle GetStaticHandle() const
 		{
 			assert(GetMobility() == CollidableMobility::Static, "Extracting a static handle from a collidable reference requires that the collidable is owned by a static.");
 			return StaticHandle{ GetRawHandleValue() };
@@ -67,7 +67,7 @@ namespace Bepu
 		/// <summary>
 		/// Gets the integer value of the handle of the owner of the collidable referred to by this instance.
 		/// </summary>
-		int32_t GetRawHandleValue()
+		int32_t GetRawHandleValue() const
 		{
 			return (int)(Packed & 0x3FFFFFFF);
 		}

@@ -495,4 +495,35 @@ public static partial class Entrypoints
         var threadDispatcher = threadDispatcherHandle.Null ? null : threadDispatchers[threadDispatcherHandle];
         simulations[simulationHandle].Timestep(dt, threadDispatcher);
     }
+
+    /// <summary>
+    /// Grabs a collidable's bounding boxes in the broad phase.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+    /// <param name="bodyHandle">Body to pull bounding box data about.</param>
+    /// <param name="min">Minimum bounds of the collidable's bounding box.</param>
+    /// <param name="max">Maximum bounds of the collidable's bounding box.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyBoundingBoxInBroadPhase))]
+    public unsafe static void GetBodyBoundingBoxInBroadPhase([TypeName(SimulationName)] InstanceHandle simulationHandle, BodyHandle bodyHandle, Vector3* min, Vector3* max)
+    {
+        simulations[simulationHandle].Bodies[bodyHandle].GetBoundsReferencesFromBroadPhase(out var minPointer, out var maxPointer);
+        *min = *minPointer;
+        *max = *maxPointer;
+    }
+
+    /// <summary>
+    /// Grabs a collidable's bounding boxes in the broad phase.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+    /// <param name="staticHandle">Static to pull bounding box data about.</param>
+    /// <param name="min">Minimum bounds of the collidable's bounding box.</param>
+    /// <param name="max">Maximum bounds of the collidable's bounding box.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStaticBoundingBoxInBroadPhase))]
+    public unsafe static void GetStaticBoundingBoxInBroadPhase([TypeName(SimulationName)] InstanceHandle simulationHandle, StaticHandle staticHandle, Vector3* min, Vector3* max)
+    {
+        simulations[simulationHandle].Statics[staticHandle].GetBoundsReferencesFromBroadPhase(out var minPointer, out var maxPointer);
+        *min = *minPointer;
+        *max = *maxPointer;
+    }
+
 }

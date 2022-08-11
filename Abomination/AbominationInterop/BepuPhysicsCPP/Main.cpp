@@ -130,7 +130,7 @@ int main()
 
 	for (int i = 0; i < 1000; ++i)
 	{
-		Timestep(simulation, 1.0f / 60.0f, 0);
+		Timestep(simulation, 1.0f / 60.0f, InstanceHandle());
 		BodyDynamics* dynamics = GetBodyDynamics(simulation, bodyHandles[bodyCount - 1]);
 		std::cout << dynamics->Motion.Pose.Position.Y << "\n";
 	}

@@ -142,7 +142,6 @@ namespace Bepu
 	/// <summary>
 	/// Stores all body information needed by the solver together.
 	/// </summary>
-	/// <remarks>
 	struct BodyDynamics
 	{
 		/// <summary>
