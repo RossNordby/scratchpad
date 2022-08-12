@@ -15,13 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BepuPhysics.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="Shapes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Math.h">
+    <ClInclude Include="InteropMath.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Bodies.h">
@@ -51,7 +48,7 @@
     <ClInclude Include="Tree.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Main.h">
+    <ClInclude Include="BepuPhysics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -61,6 +58,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net7.0\win10-x64\native\AbominationInterop.dll" />
+    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net7.0\win-x64\native\AbominationInterop.dll" />
+    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net7.0\win-x64\native\AbominationInterop.pdb" />
   </ItemGroup>
 </Project>

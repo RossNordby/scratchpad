@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <assert.h>
-#include "Math.h"
+#include "InteropMath.h"
 #include "Bodies.h"
 #include "Statics.h"
 #include "Utilities.h"
@@ -563,6 +563,5 @@ namespace Bepu
 	/// <param name="shape">Shape reference to request from the simulation.</param>
 	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
 	extern "C" Mesh * GetMeshShapeData(SimulationHandle simulationHandle, TypedIndex shape);
-
 
 }

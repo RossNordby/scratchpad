@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <limits>
-#include "Math.h"
+#include "InteropMath.h"
 #include "Handles.h"
 #include "Continuity.h"
 

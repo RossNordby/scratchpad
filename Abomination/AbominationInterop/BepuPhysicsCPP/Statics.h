@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "Handles.h"
 #include "Continuity.h"
-#include "Math.h"
+#include "InteropMath.h"
 
 namespace Bepu
 {
@@ -31,11 +31,13 @@ namespace Bepu
 		/// <param name="pose">Pose of the static collidable.</param>
 		/// <param name="shape">Shape of the static.</param>
 		/// <param name="continuity">Continuous collision detection settings for the static.</param>
-		StaticDescription(RigidPose pose, TypedIndex shape, ContinuousDetection continuity)
+		static StaticDescription Create(RigidPose pose, TypedIndex shape, ContinuousDetection continuity)
 		{
-			Pose = pose;
-			Shape = shape;
-			Continuity = continuity;
+			StaticDescription description;
+			description.Pose = pose;
+			description.Shape = shape;
+			description.Continuity = continuity;
+			return description;
 		}
 
 		/// <summary>
@@ -43,11 +45,13 @@ namespace Bepu
 		/// </summary>
 		/// <param name="pose">Pose of the static collidable.</param>
 		/// <param name="shape">Shape of the static.</param>
-		StaticDescription(RigidPose pose, TypedIndex shape)
+		static StaticDescription Create(RigidPose pose, TypedIndex shape)
 		{
-			Pose = pose;
-			Shape = shape;
-			Continuity = ContinuousDetection::Discrete();
+			StaticDescription description;
+			description.Pose = pose;
+			description.Shape = shape;
+			description.Continuity = ContinuousDetection::Discrete();
+			return description;
 		}
 
 		/// <summary>
@@ -57,12 +61,14 @@ namespace Bepu
 		/// <param name="orientation">Orientation of the static.</param>
 		/// <param name="shape">Shape of the static.</param>
 		/// <param name="continuity">Continuous collision detection settings for the static.</param>
-		StaticDescription(Vector3 position, Quaternion orientation, TypedIndex shape, ContinuousDetection continuity)
+		static StaticDescription Create(Vector3 position, Quaternion orientation, TypedIndex shape, ContinuousDetection continuity)
 		{
-			Pose.Position = position;
-			Pose.Orientation = orientation;
-			Shape = shape;
-			Continuity = continuity;
+			StaticDescription description;
+			description.Pose.Position = position;
+			description.Pose.Orientation = orientation;
+			description.Shape = shape;
+			description.Continuity = continuity;
+			return description;
 		}
 
 		/// <summary>
@@ -71,12 +77,14 @@ namespace Bepu
 		/// <param name="position">Position of the static.</param>
 		/// <param name="orientation">Orientation of the static.</param>
 		/// <param name="shape">Shape of the static.</param>
-		StaticDescription(Vector3 position, Quaternion orientation, TypedIndex shape)
+		static StaticDescription Create(Vector3 position, Quaternion orientation, TypedIndex shape)
 		{
-			Pose.Position = position;
-			Pose.Orientation = orientation;
-			Shape = shape;
-			Continuity = ContinuousDetection::Discrete();
+			StaticDescription description;
+			description.Pose.Position = position;
+			description.Pose.Orientation = orientation;
+			description.Shape = shape;
+			description.Continuity = ContinuousDetection::Discrete();
+			return description;
 		}
 	};
 

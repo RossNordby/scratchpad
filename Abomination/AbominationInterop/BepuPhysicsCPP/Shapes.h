@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Math.h"
+#include "InteropMath.h"
 #include "Handles.h"
 #include "Utilities.h"
 #include "Tree.h"
@@ -221,9 +221,9 @@ namespace Bepu
 		void SetScale(Vector3 scale)
 		{
 			Scale = scale;
-			InverseScale.X != 0 ? 1.0f / scale.X : std::numeric_limits<float>::max();
-			InverseScale.Y != 0 ? 1.0f / scale.Y : std::numeric_limits<float>::max();
-			InverseScale.Z != 0 ? 1.0f / scale.Z : std::numeric_limits<float>::max();
+			InverseScale.X = scale.X != 0 ? 1.0f / scale.X : std::numeric_limits<float>::max();
+			InverseScale.Y = scale.Y != 0 ? 1.0f / scale.Y : std::numeric_limits<float>::max();
+			InverseScale.Z = scale.Z != 0 ? 1.0f / scale.Z : std::numeric_limits<float>::max();
 		}
 	};
 }

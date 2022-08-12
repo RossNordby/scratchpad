@@ -2,7 +2,7 @@
 
 #include <assert.h>
 #include <stdint.h>
-#include "Math.h"
+#include "InteropMath.h"
 #include "Handles.h"
 #include "Constraints.h"
 

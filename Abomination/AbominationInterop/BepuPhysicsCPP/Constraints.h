@@ -1,10 +1,8 @@
 #pragma once
 
-#define _USE_MATH_DEFINES
-#include <math.h>
-
 namespace Bepu
 {
+	const float BPI = 3.14159265359f; //shrug!
 	struct SpringSettings
 	{
 		/// <summary>
@@ -19,8 +17,8 @@ namespace Bepu
 		/// <summary>
 		/// Gets or sets the target number of undamped oscillations per unit of time.
 		/// </summary>
-		float GetFrequency() { return AngularFrequency / (2 * M_PI); }
-		void SetFrequency(float value) { AngularFrequency = value * (2 * M_PI); }
+		float GetFrequency() { return AngularFrequency / (2 * BPI); }
+		void SetFrequency(float value) { AngularFrequency = value * (2 * BPI); }
 
 		/// <summary>
 		/// Gets or sets the ratio of the spring's actual damping to its critical damping. 0 is undamped, 1 is critically damped, and higher values are overdamped.
@@ -37,7 +35,7 @@ namespace Bepu
 		/// <param name="dampingRatio">Ratio of the spring's actual damping to its critical damping. 0 is undamped, 1 is critically damped, and higher values are overdamped.</param>
 		SpringSettings(float frequency, float dampingRatio)
 		{
-			AngularFrequency = frequency * (2 * M_PI);
+			AngularFrequency = frequency * (2 * BPI);
 			TwiceDampingRatio = dampingRatio * 2;
 		}
 	};

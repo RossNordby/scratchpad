@@ -114,7 +114,7 @@ int main()
 	SimulationHandle simulation = CreateSimulation(pool, narrowPhaseCallbacks, poseIntegratorCallbacks, SolveDescription(4, 1), SimulationAllocationSizes());
 
 	//Create a floor to drop stuff on!
-	AddStatic(simulation, StaticDescription(Vector3(), Quaternion::GetIdentity(), AddBox(simulation, Box(100, 1, 100))));
+	AddStatic(simulation, StaticDescription::Create(Vector3(), Quaternion::GetIdentity(), AddBox(simulation, Box(100, 1, 100))));
 
 	//Drop some boxes on it!
 	BodyInertia inertia = { Symmetric3x3 { 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f}, 1.0f };

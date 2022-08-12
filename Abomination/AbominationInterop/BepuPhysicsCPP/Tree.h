@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Utilities.h"
-#include "Math.h"
+#include "InteropMath.h"
 #include <assert.h>
 
 namespace Bepu

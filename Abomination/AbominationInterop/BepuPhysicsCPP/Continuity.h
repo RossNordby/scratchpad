@@ -7,7 +7,7 @@ namespace Bepu
 	/// <summary>
 	/// Defines how a collidable will handle collision detection in the presence of velocity.
 	/// </summary>
-	enum ContinuousDetectionMode : uint32_t
+	enum struct ContinuousDetectionMode : uint32_t
 	{
 		/// <summary>
 		/// <para>No sweep tests are performed. Default speculative contact generation will occur within the speculative margin.</para>
@@ -56,7 +56,7 @@ namespace Bepu
 		/// <summary>
 		/// Gets whether the continuous collision detection configuration will permit bounding box expansion beyond the calculated speculative margin.
 		/// </summary>
-		bool AllowExpansionBeyondSpeculativeMargin() { return Mode > 0; }
+		bool AllowExpansionBeyondSpeculativeMargin() { return Mode > ContinuousDetectionMode::Discrete; }
 
 		/// <summary>
 		/// <para>No sweep tests are performed. Default speculative contact generation will occur within the speculative margin.</para>
