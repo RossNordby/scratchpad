@@ -282,6 +282,22 @@ namespace Bepu
 	/// <param name="threadDispatcherHandle">Handle of the thread dispatcher to use, if any. Can be a null reference.</param>
 	extern "C" void Timestep(SimulationHandle simulationHandle, float dt, ThreadDispatcherHandle threadDispatcherHandle);
 	/// <summary>
+	/// Grabs a collidable's bounding boxes in the broad phase.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+	/// <param name="bodyHandle">Body to pull bounding box data about.</param>
+	/// <param name="min">Minimum bounds of the collidable's bounding box.</param>
+	/// <param name="max">Maximum bounds of the collidable's bounding box.</param>
+	extern "C" void GetBodyBoundingBoxInBroadPhase(SimulationHandle simulationHandle, BodyHandle bodyHandle, Vector3 * min, Vector3 * max);
+	/// <summary>
+	/// Grabs a collidable's bounding boxes in the broad phase.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+	/// <param name="staticHandle">Static to pull bounding box data about.</param>
+	/// <param name="min">Minimum bounds of the collidable's bounding box.</param>
+	/// <param name="max">Maximum bounds of the collidable's bounding box.</param>
+	extern "C" void GetStaticBoundingBoxInBroadPhase(SimulationHandle simulationHandle, StaticHandle staticHandle, Vector3 * min, Vector3 * max);
+	/// <summary>
 	/// Adds a sphere shape to the simulation.
 	/// </summary>
 	/// <param name="simulationHandle">Handle of the simulation to add the shape to.</param>
@@ -547,8 +563,6 @@ namespace Bepu
 	/// <param name="shape">Shape reference to request from the simulation.</param>
 	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
 	extern "C" Mesh * GetMeshShapeData(SimulationHandle simulationHandle, TypedIndex shape);
-
-
 
 
 }
