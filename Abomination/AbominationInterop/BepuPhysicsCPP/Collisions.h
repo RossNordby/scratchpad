@@ -50,7 +50,7 @@ namespace Bepu
 		/// </summary>
 		BodyHandle GetBodyHandle() const
 		{
-			assert(GetMobility() == CollidableMobility::Dynamic || GetMobility() == CollidableMobility::Kinematic, "Extracting a body handle from a collidable reference requires that the collidable is owned by a body.");
+			assert(GetMobility() == CollidableMobility::Dynamic || GetMobility() == CollidableMobility::Kinematic);
 			return BodyHandle{ GetRawHandleValue() };
 
 		}
@@ -60,7 +60,7 @@ namespace Bepu
 		/// </summary>
 		StaticHandle GetStaticHandle() const
 		{
-			assert(GetMobility() == CollidableMobility::Static, "Extracting a static handle from a collidable reference requires that the collidable is owned by a static.");
+			assert(GetMobility() == CollidableMobility::Static);
 			return StaticHandle{ GetRawHandleValue() };
 		}
 
@@ -119,7 +119,7 @@ namespace Bepu
 
 		void ValidateIndex(int contactIndex)
 		{
-			assert(contactIndex >= 0 && contactIndex < Count, "Contact index must be within the contact count.");
+			assert(contactIndex >= 0 && contactIndex < Count);
 		}
 	};
 

@@ -66,7 +66,7 @@ namespace Bepu
 
 		Leaf(int nodeIndex, int childIndex)
 		{
-			assert((childIndex & ~1) == 0, "Binary trees can't have children in slots other than 0 and 1!");
+			assert((childIndex & ~1) == 0);
 			packed = ((uint32_t)nodeIndex & 0x7FFFFFFF) | ((uint32_t)childIndex << 31);
 		}
 	};
