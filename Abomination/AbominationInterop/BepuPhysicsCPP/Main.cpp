@@ -81,6 +81,9 @@ void IntegrateVelocityScalar(SimulationHandle simulation, int32_t bodyIndex, Vec
 	velocity->Angular.Z = velocity->Angular.Z * poseIntegrationSettings.LinearDampingDt;
 }
 
+#include "CollidableProperty.h"
+CollidableProperty<int32_t> ints;
+
 int main()
 {
 	Initialize();

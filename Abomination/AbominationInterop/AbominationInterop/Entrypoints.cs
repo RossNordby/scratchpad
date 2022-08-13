@@ -182,12 +182,38 @@ public static partial class Entrypoints
     }
 
     /// <summary>
+    /// Resizes a buffer from the buffer pool to the given size, reallocating if necessary.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to allocate from.</param>
+    /// <param name="buffer">Buffer to resize.</param>
+    /// <param name="newSizeInBytes">Target size of the buffer to allocate in bytes.</param>
+    /// <param name="copyCount">Number of bytes to copy from the old buffer into the new buffer.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Resize))]
+    public static unsafe void Resize([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("ByteBuffer*")] Buffer<byte>* buffer, int newSizeInBytes, int copyCount)
+    {
+        bufferPools[bufferPoolHandle].Resize(ref *buffer, newSizeInBytes, copyCount);
+    }
+
+    /// <summary>
+    /// Resizes a buffer from the buffer pool to at least the given size, reallocating if necessary.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to allocate from.</param>
+    /// <param name="buffer">Buffer to resize.</param>
+    /// <param name="targetSizeInBytes">Target size of the buffer to allocate in bytes.</param>
+    /// <param name="copyCount">Number of bytes to copy from the old buffer into the new buffer.</param>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ResizeToAtLeast))]
+    public static unsafe void ResizeToAtLeast([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("ByteBuffer*")] Buffer<byte>* buffer, int targetSizeInBytes, int copyCount)
+    {
+        bufferPools[bufferPoolHandle].ResizeToAtLeast(ref *buffer, targetSizeInBytes, copyCount);
+    }
+
+    /// <summary>
     /// Returns a buffer to the buffer pool.
     /// </summary>
     /// <param name="bufferPoolHandle">Buffer pool to return the buffer to.</param>
     /// <param name="buffer">Buffer to return to the pool.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(Deallocate))]
-    public unsafe static void Deallocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<uint8_t>*")] Buffer<byte>* buffer)
+    public unsafe static void Deallocate([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("ByteBuffer*")] Buffer<byte>* buffer)
     {
         bufferPools[bufferPoolHandle].Return(ref *buffer);
     }
@@ -526,4 +552,53 @@ public static partial class Entrypoints
         *max = *maxPointer;
     }
 
+    /// <summary>
+    /// Gets the mapping from body handles to the body's location in storage.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+    /// <param name="bodyHandleToIndexMapping">Mapping from a body handle to the body's memory location.</param>
+    /// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodyHandleToLocationMapping))]
+    public unsafe static void GetBodyHandleToLocationMapping([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<BodyMemoryLocation>*")] Buffer<BodyMemoryLocation>* bodyHandleToIndexMapping)
+    {
+        *bodyHandleToIndexMapping = simulations[simulationHandle].Bodies.HandleToLocation;
+    }
+
+    /// <summary>
+    /// Gets the body sets for a simulation. Slot 0 is the active set. Subsequent sets are sleeping. Not every slot beyond slot 0 is filled.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+    /// <param name="bodySets">Mapping from a body handle to the body's memory location.</param>
+    /// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetBodySets))]
+    public unsafe static void GetBodySets([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<BodySet>*")] Buffer<BodySet>* bodySets)
+    {
+        *bodySets = simulations[simulationHandle].Bodies.Sets;
+    }
+
+    /// <summary>
+    /// Gets the mapping from body handles to the body's location in storage.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+    /// <param name="staticHandleToIndexMapping">Mapping from a static handle to the static's memory location.</param>
+    /// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStaticHandleToLocationMapping))]
+    public unsafe static void GetStaticHandleToLocationMapping([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<int32_t>*")] Buffer<int>* staticHandleToIndexMapping)
+    {
+        *staticHandleToIndexMapping = simulations[simulationHandle].Statics.HandleToIndex;
+    }
+
+    /// <summary>
+    /// Gets the statics set for a simulation.
+    /// </summary>
+    /// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+    /// <param name="statics">The set of all statics within a simulation.</param>
+    /// <param name="count">Number of statics in the simulation.</param>
+    /// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it. The count is a snapshot.</remarks>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetStatics))]
+    public unsafe static void GetStatics([TypeName(SimulationName)] InstanceHandle simulationHandle, [TypeName("Buffer<Static>*")] Buffer<Static>* statics, [TypeName("int32_t*")] int* count)
+    {
+        *statics = simulations[simulationHandle].Statics.StaticsBuffer;
+        *count = simulations[simulationHandle].Statics.Count;
+    }
 }

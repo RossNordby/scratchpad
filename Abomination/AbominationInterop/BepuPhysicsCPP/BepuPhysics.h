@@ -118,6 +118,67 @@ namespace Bepu
 	};
 
 	/// <summary>
+	/// Location of a body in memory.
+	/// </summary>
+	struct BodyMemoryLocation
+	{
+		/// <summary>
+		/// Index of the set owning the body reference. If the set index is 0, the body is awake. If the set index is greater than zero, the body is asleep.
+		/// </summary>
+		int32_t SetIndex;
+		/// <summary>
+		/// Index of the body within its owning set.
+		/// </summary>
+		int32_t Index;
+	};
+
+	/// <summary>
+	/// Stores a group of bodies- either the set of active bodies, or the bodies involved in an inactive simulation island.
+	/// </summary>
+	struct BodySet
+	{
+		/// <summary>
+		/// Remaps a body index to its handle.
+		/// </summary>
+		Buffer<BodyHandle> IndexToHandle;
+
+		/// <summary>
+		/// Stores all data involved in solving constraints for a body, including pose, velocity, and inertia.
+		/// </summary>
+		Buffer<BodyDynamics> DynamicsState;
+
+		/// <summary>
+		/// The collidables owned by each body in the set. Speculative margins, continuity settings, and shape indices can be changed directly.
+		/// Shape indices cannot transition between pointing at a shape and pointing at nothing or vice versa without notifying the broad phase of the collidable addition or removal.
+		/// </summary>
+		Buffer<Collidable> Collidables;
+		/// <summary>
+		/// Activity states of bodies in the set.
+		/// </summary>
+		Buffer<BodyActivity> Activity;
+		/// <summary>
+		/// List of constraints associated with each body in the set.
+		/// </summary>
+		Buffer<QuickList<BodyConstraintReference>> Constraints;
+
+		/// <summary>
+		/// Number of bodies in the body set.
+		/// </summary>
+		int32_t Count;
+		/// <summary>
+		/// Gets whether this instance is backed by allocated memory.
+		/// </summary>
+		bool IsAllocated() { return IndexToHandle.Memory != nullptr; }
+	};
+
+	/// <summary>
+	/// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+	/// <param name="shape">Shape reference to request from the simulation.</param>
+	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+	extern "C" Mesh * GetMeshShapeData(SimulationHandle simulationHandle, TypedIndex shape);
+	/// <summary>
 	/// Initializes the interop structures.
 	/// </summary>
 	extern "C" void Initialize();
@@ -165,11 +226,27 @@ namespace Bepu
 	/// <returns>Allocated buffer.</returns>
 	extern "C" ByteBuffer AllocateAtLeast(BufferPoolHandle bufferPoolHandle, int32_t sizeInBytes);
 	/// <summary>
+	/// Resizes a buffer from the buffer pool to the given size, reallocating if necessary.
+	/// </summary>
+	/// <param name="bufferPoolHandle">Buffer pool to allocate from.</param>
+	/// <param name="buffer">Buffer to resize.</param>
+	/// <param name="newSizeInBytes">Target size of the buffer to allocate in bytes.</param>
+	/// <param name="copyCount">Number of bytes to copy from the old buffer into the new buffer.</param>
+	extern "C" void Resize(BufferPoolHandle bufferPoolHandle, ByteBuffer * buffer, int32_t newSizeInBytes, int32_t copyCount);
+	/// <summary>
+	/// Resizes a buffer from the buffer pool to at least the given size, reallocating if necessary.
+	/// </summary>
+	/// <param name="bufferPoolHandle">Buffer pool to allocate from.</param>
+	/// <param name="buffer">Buffer to resize.</param>
+	/// <param name="targetSizeInBytes">Target size of the buffer to allocate in bytes.</param>
+	/// <param name="copyCount">Number of bytes to copy from the old buffer into the new buffer.</param>
+	extern "C" void ResizeToAtLeast(BufferPoolHandle bufferPoolHandle, ByteBuffer * buffer, int32_t targetSizeInBytes, int32_t copyCount);
+	/// <summary>
 	/// Returns a buffer to the buffer pool.
 	/// </summary>
 	/// <param name="bufferPoolHandle">Buffer pool to return the buffer to.</param>
 	/// <param name="buffer">Buffer to return to the pool.</param>
-	extern "C" void Deallocate(BufferPoolHandle bufferPoolHandle, Buffer<uint8_t>*buffer);
+	extern "C" void Deallocate(BufferPoolHandle bufferPoolHandle, ByteBuffer * buffer);
 	/// <summary>
 	/// Returns a buffer to the buffer pool by its id.
 	/// </summary>
@@ -297,6 +374,35 @@ namespace Bepu
 	/// <param name="min">Minimum bounds of the collidable's bounding box.</param>
 	/// <param name="max">Maximum bounds of the collidable's bounding box.</param>
 	extern "C" void GetStaticBoundingBoxInBroadPhase(SimulationHandle simulationHandle, StaticHandle staticHandle, Vector3 * min, Vector3 * max);
+	/// <summary>
+	/// Gets the mapping from body handles to the body's location in storage.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+	/// <param name="bodyHandleToIndexMapping">Mapping from a body handle to the body's memory location.</param>
+	/// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it.</remarks>
+	extern "C" void GetBodyHandleToLocationMapping(SimulationHandle simulationHandle, Buffer<BodyMemoryLocation>*bodyHandleToIndexMapping);
+	/// <summary>
+	/// Gets the body sets for a simulation. Slot 0 is the active set. Subsequent sets are sleeping. Not every slot beyond slot 0 is filled.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+	/// <param name="bodySets">Mapping from a body handle to the body's memory location.</param>
+	/// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it.</remarks>
+	extern "C" void GetBodySets(SimulationHandle simulationHandle, Buffer<BodySet>*bodySets);
+	/// <summary>
+	/// Gets the mapping from body handles to the body's location in storage.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+	/// <param name="staticHandleToIndexMapping">Mapping from a static handle to the static's memory location.</param>
+	/// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it.</remarks>
+	extern "C" void GetStaticHandleToLocationMapping(SimulationHandle simulationHandle, Buffer<int32_t>*staticHandleToIndexMapping);
+	/// <summary>
+	/// Gets the statics set for a simulation.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to pull data from.</param>
+	/// <param name="statics">The set of all statics within a simulation.</param>
+	/// <param name="count">Number of statics in the simulation.</param>
+	/// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it. The count is a snapshot.</remarks>
+	extern "C" void GetStatics(SimulationHandle simulationHandle, Buffer<Static>*statics, int32_t * count);
 	/// <summary>
 	/// Adds a sphere shape to the simulation.
 	/// </summary>
@@ -556,12 +662,5 @@ namespace Bepu
 	/// <param name="shape">Shape reference to request from the simulation.</param>
 	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
 	extern "C" BigCompound * GetBigCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
-	/// <summary>
-	/// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
-	/// </summary>
-	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
-	/// <param name="shape">Shape reference to request from the simulation.</param>
-	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
-	extern "C" Mesh * GetMeshShapeData(SimulationHandle simulationHandle, TypedIndex shape);
 
 }

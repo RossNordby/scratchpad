@@ -140,6 +140,7 @@
   <ItemGroup>
     <ClInclude Include="BepuPhysics.h" />
     <ClInclude Include="Bodies.h" />
+    <ClInclude Include="CollidableProperty.h" />
     <ClInclude Include="Collisions.h" />
     <ClInclude Include="Constraints.h" />
     <ClInclude Include="Continuity.h" />

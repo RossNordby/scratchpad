@@ -55,6 +55,13 @@ namespace Bepu
 		{
 			return { buffer.Memory, buffer.Length / sizeof(T), buffer.Id };
 		}
+
+		Buffer()
+		{
+			Memory = nullptr;
+			Length = 0;
+			Id = 0;
+		}
 	};
 
 

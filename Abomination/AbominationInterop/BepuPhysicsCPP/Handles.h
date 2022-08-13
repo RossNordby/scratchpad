@@ -44,9 +44,19 @@ namespace Bepu
 		bool IsNull() { return RawValue == 0; }
 	};
 
-	typedef int32_t BodyHandle;
-	typedef int32_t StaticHandle;
-	typedef int32_t ConstraintHandle;
+	struct BodyHandle
+	{
+		int32_t Value;
+	};
+	struct StaticHandle
+	{
+		int32_t Value;
+	};
+	struct ConstraintHandle
+	{
+		int32_t Value;
+	};
+
 	typedef InstanceHandle SimulationHandle;
 	typedef InstanceHandle BufferPoolHandle;
 	typedef InstanceHandle ThreadDispatcherHandle;
