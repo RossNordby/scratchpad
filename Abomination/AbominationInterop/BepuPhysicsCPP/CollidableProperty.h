@@ -107,7 +107,7 @@ namespace Bepu
 		/// <returns>Reference to the data for the given collidable.</returns>
 		T& Allocate(CollidableReference collidableReference)
 		{
-			if (collidableReference.GetMobility() == CollidableMobility.Static)
+			if (collidableReference.GetMobility() == CollidableMobility::Static)
 			{
 				return Allocate(collidableReference.GetStaticHandle());
 			}

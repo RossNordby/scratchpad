@@ -50,10 +50,19 @@ namespace Bepu
 			return Memory[index];
 		}
 
-		operator ByteBuffer() { return { Memory, sizeof(T) * Length, Id }; }
-		Buffer(ByteBuffer buffer) 
+		operator ByteBuffer()
 		{
-			return { buffer.Memory, buffer.Length / sizeof(T), buffer.Id };
+			ByteBuffer buffer;
+			buffer.Memory = (uint8_t*)Memory;
+			buffer.Length = Length * sizeof(T);
+			buffer.Id = Id;
+			return buffer;
+		}
+		Buffer(ByteBuffer buffer)
+		{
+			Memory = (T*)buffer.Memory;
+			Length = buffer.Length / sizeof(T);
+			Id = buffer.Id;
 		}
 
 		Buffer()

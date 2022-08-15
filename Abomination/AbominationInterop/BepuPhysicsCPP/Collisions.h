@@ -71,6 +71,19 @@ namespace Bepu
 		{
 			return (int)(Packed & 0x3FFFFFFF);
 		}
+
+		static CollidableReference CreateStatic(StaticHandle handle)
+		{
+			return CollidableReference{ ((uint32_t)CollidableMobility::Static << 30) | handle.Value };
+		}
+		static CollidableReference CreateDynamic(BodyHandle handle)
+		{
+			return CollidableReference{ ((uint32_t)CollidableMobility::Dynamic << 30) | handle.Value };
+		}
+		static CollidableReference CreateKinematic(BodyHandle handle)
+		{
+			return CollidableReference{ ((uint32_t)CollidableMobility::Kinematic << 30) | handle.Value };
+		}
 	};
 
 	struct CollidablePair
