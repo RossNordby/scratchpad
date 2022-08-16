@@ -104,7 +104,7 @@ public unsafe struct PoseIntegratorCallbacks<TAngularConservationMode, TUnconstr
                     integrateVelocity(Simulation, bodyIndices[i], scalarPosition, scalarOrientation, scalarInertia, workerIndex, dt[i], &scalarVelocity);
 
                     Vector3Wide.WriteSlot(scalarVelocity.Linear, i, ref velocity.Linear);
-                    Vector3Wide.WriteSlot(scalarVelocity.Linear, i, ref velocity.Angular);
+                    Vector3Wide.WriteSlot(scalarVelocity.Angular, i, ref velocity.Angular);
                 }
             }
         }

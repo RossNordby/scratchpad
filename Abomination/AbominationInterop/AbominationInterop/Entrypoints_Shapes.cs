@@ -301,6 +301,22 @@ public static partial class Entrypoints
     }
 
     /// <summary>
+    /// Computes the inertia of a convex.
+    /// </summary>
+    /// <param name="convex">Index of a convex to calculate the inertia for.</param>
+    /// <param name="mass">Mass to use in the inertia calculation.</param>
+    /// <returns>Inertia of the shape. If the shape index was not a convex, this returns a zeroed inverse inertia tensor.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(ComputeConvexInertia))]
+    public unsafe static BodyInertia ComputeConvexInertia([TypeName(SimulationName)] InstanceHandle simulationHandle, TypedIndex convex, float mass)
+    {
+        if (simulations[simulationHandle].Shapes[convex.Type] is IConvexShapeBatch convexBatch)
+        {
+            return convexBatch.ComputeInertia(convex.Index, mass);
+        }
+        return new BodyInertia() { InverseMass = 1f / mass };
+    }
+
+    /// <summary>
     /// Computes the inertia associated with a set of compound children. Does not recenter the children.
     /// </summary>
     /// <param name="simulationHandle">Handle of the simulation to which the shapes referenced by the compound children belong.</param>

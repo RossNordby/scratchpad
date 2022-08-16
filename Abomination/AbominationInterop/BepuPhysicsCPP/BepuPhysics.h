@@ -172,6 +172,13 @@ namespace Bepu
 	};
 
 	/// <summary>
+/// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
+/// </summary>
+/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+/// <param name="shape">Shape reference to request from the simulation.</param>
+/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+	extern "C" BigCompound * GetBigCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
+	/// <summary>
 	/// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
 	/// </summary>
 	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
@@ -568,6 +575,13 @@ namespace Bepu
 	/// <returns>Inertia of the shape.</returns>
 	extern "C" BodyInertia ComputeConvexHullInertia(ConvexHull convexHull, float mass);
 	/// <summary>
+	/// Computes the inertia of a convex.
+	/// </summary>
+	/// <param name="convex">Index of a convex to calculate the inertia for.</param>
+	/// <param name="mass">Mass to use in the inertia calculation.</param>
+	/// <returns>Inertia of the shape. If the shape index was not a convex, this returns a zeroed inverse inertia tensor.</returns>
+	extern "C" BodyInertia ComputeConvexInertia(SimulationHandle simulationHandle, TypedIndex convex, float mass);
+	/// <summary>
 	/// Computes the inertia associated with a set of compound children. Does not recenter the children.
 	/// </summary>
 	/// <param name="simulationHandle">Handle of the simulation to which the shapes referenced by the compound children belong.</param>
@@ -655,12 +669,5 @@ namespace Bepu
 	/// <param name="shape">Shape reference to request from the simulation.</param>
 	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
 	extern "C" Compound * GetCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
-	/// <summary>
-	/// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
-	/// </summary>
-	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
-	/// <param name="shape">Shape reference to request from the simulation.</param>
-	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
-	extern "C" BigCompound * GetBigCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
 
 }

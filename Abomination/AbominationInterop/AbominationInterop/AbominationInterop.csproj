@@ -8,15 +8,17 @@
     <Nullable>enable</Nullable>
 
     <PublishAot>true</PublishAot>
+    <!--<SelfContained>true</SelfContained>
     <PublishTrimmed>true</PublishTrimmed>
+    <IlcOptimizationPreference>speed</IlcOptimizationPreference>-->
     <NativeLib>Shared</NativeLib>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!--<RuntimeIdentifier>win10-x64</RuntimeIdentifier>-->
     <IlcInstructionSet>base,sse,sse2,sse3,sse4.1,sse4.2,avx,avx2,aes,bmi,bmi2,fma,lzcnt,pclmul,popcnt</IlcInstructionSet>
     
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-*" />
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-rc.1.22412.20" />
   </ItemGroup>
 
   <ItemGroup>
