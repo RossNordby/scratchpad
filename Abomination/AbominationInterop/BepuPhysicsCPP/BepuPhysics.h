@@ -172,11 +172,11 @@ namespace Bepu
 	};
 
 	/// <summary>
-/// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
-/// </summary>
-/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
-/// <param name="shape">Shape reference to request from the simulation.</param>
-/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+	/// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+	/// <param name="shape">Shape reference to request from the simulation.</param>
+	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
 	extern "C" BigCompound * GetBigCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
 	/// <summary>
 	/// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
@@ -492,7 +492,7 @@ namespace Bepu
 	/// <param name="bufferPoolHandle">Buffer pool to allocate resources from for the compound's acceleration structures.</param>
 	/// <param name="points">Points in the convex hull.</param>
 	/// <param name="centerOfMass">Center of mass computed for the hull and subtracted from all the points in the points used for the final shape.</param>
-	extern "C" ConvexHull CreateConvexHull(BufferPoolHandle bufferPoolHandle, Buffer<CompoundChild> points, Vector3 * centerOfMass);
+	extern "C" ConvexHull CreateConvexHull(BufferPoolHandle bufferPoolHandle, Buffer<Vector3> points, Vector3 * centerOfMass);
 	/// <summary>
 	/// Returns buffers allocated for a convex hull shape.
 	/// </summary>

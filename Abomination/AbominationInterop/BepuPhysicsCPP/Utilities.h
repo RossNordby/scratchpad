@@ -64,7 +64,12 @@ namespace Bepu
 			Length = buffer.Length / sizeof(T);
 			Id = buffer.Id;
 		}
-
+		Buffer(T* memory, int32_t length, int32_t id = 0)
+		{
+			Memory = memory;
+			Length = length;
+			Id = id;
+		}
 		Buffer()
 		{
 			Memory = nullptr;

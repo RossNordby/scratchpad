@@ -153,7 +153,7 @@ public static partial class Entrypoints
     /// <param name="points">Points in the convex hull.</param>
     /// <param name="centerOfMass">Center of mass computed for the hull and subtracted from all the points in the points used for the final shape.</param>
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(CreateConvexHull))]
-    public unsafe static ConvexHull CreateConvexHull([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<CompoundChild>")] Buffer<Vector3> points, Vector3* centerOfMass)
+    public unsafe static ConvexHull CreateConvexHull([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle, [TypeName("Buffer<Vector3>")] Buffer<Vector3> points, Vector3* centerOfMass)
     {
         ConvexHullHelper.CreateShape(points, bufferPools[bufferPoolHandle], out *centerOfMass, out var hull);
         return hull;
