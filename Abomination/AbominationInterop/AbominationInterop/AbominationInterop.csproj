@@ -18,10 +18,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="7.0.0-rc.1.22412.20" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\..\..\bepuphysics2\BepuPhysics\BepuPhysics.csproj" />
     <ProjectReference Include="..\..\..\..\bepuphysics2\BepuUtilities\BepuUtilities.csproj" />
     <ProjectReference Include="..\APIGenerator\APIGenerator.csproj" />
