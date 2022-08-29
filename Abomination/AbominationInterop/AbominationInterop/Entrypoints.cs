@@ -601,4 +601,48 @@ public static partial class Entrypoints
         *statics = simulations[simulationHandle].Statics.StaticsBuffer;
         *count = simulations[simulationHandle].Statics.Count;
     }
+
+    /// <summary>
+    /// Computes the total number of bytes allocated from native memory in this buffer pool.
+    /// Includes allocated memory regardless of whether it currently has outstanding references.
+    /// </summary>
+    /// <param name="bufferPoolHandle">Buffer pool to check the allocation size of.</param>
+    /// <returns>Total number of bytes allocated from native memory in this buffer pool.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetAllocatedMemorySizeInPool))]
+    public unsafe static ulong GetAllocatedMemorySizeInPool([TypeName(BufferPoolName)] InstanceHandle bufferPoolHandle)
+    {
+        return bufferPools[bufferPoolHandle].GetTotalAllocatedByteCount();
+    }
+
+    /// <summary>
+    /// Computes the total number of bytes allocated from native memory in a dispatcher's per-thread pools.
+    /// Includes allocated memory regardless of whether it currently has outstanding references.
+    /// </summary>
+    /// <param name="threadDispatcherHandle">Thread dispatcher to check allocations for.</param>
+    /// <returns>Total number of bytes allocated from native memory in this thread dispatcher's per-thread pool.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetAllocatedMemorySizeInThreadDispatcher))]
+    public unsafe static ulong GetAllocatedMemorySizeInThreadDispatcher([TypeName(ThreadDispatcherName)] InstanceHandle threadDispatcherHandle)
+    {
+        ulong sum = 0;
+        var dispatcher = threadDispatchers[threadDispatcherHandle];
+        for (int i = 0; i < dispatcher.ThreadCount; ++i)
+        {
+            sum += dispatcher.GetThreadMemoryPool(i).GetTotalAllocatedByteCount();
+        }
+        return sum;
+    }
+
+    /// <summary>
+    /// Estimates the number of bytes managed by the garbage collector.
+    /// </summary>
+    /// <returns>Estimated number of bytes allocated from managed memory.</returns>
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) }, EntryPoint = FunctionNamePrefix + nameof(GetGCAllocatedMemorySize))]
+    public unsafe static ulong GetGCAllocatedMemorySize()
+    {
+        return (ulong)GC.GetTotalMemory(false);
+    }
+
+
+
+
 }

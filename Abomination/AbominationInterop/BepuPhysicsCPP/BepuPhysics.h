@@ -172,20 +172,6 @@ namespace Bepu
 	};
 
 	/// <summary>
-	/// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
-	/// </summary>
-	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
-	/// <param name="shape">Shape reference to request from the simulation.</param>
-	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
-	extern "C" BigCompound * GetBigCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
-	/// <summary>
-	/// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
-	/// </summary>
-	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
-	/// <param name="shape">Shape reference to request from the simulation.</param>
-	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
-	extern "C" Mesh * GetMeshShapeData(SimulationHandle simulationHandle, TypedIndex shape);
-	/// <summary>
 	/// Initializes the interop structures.
 	/// </summary>
 	extern "C" void Initialize();
@@ -410,6 +396,25 @@ namespace Bepu
 	/// <param name="count">Number of statics in the simulation.</param>
 	/// <remarks>The buffer returned by this function can be invalidated if the simulation resizes it. The count is a snapshot.</remarks>
 	extern "C" void GetStatics(SimulationHandle simulationHandle, Buffer<Static>*statics, int32_t * count);
+	/// <summary>
+	/// Computes the total number of bytes allocated from native memory in this buffer pool.
+	/// Includes allocated memory regardless of whether it currently has outstanding references.
+	/// </summary>
+	/// <param name="bufferPoolHandle">Buffer pool to check the allocation size of.</param>
+	/// <returns>Total number of bytes allocated from native memory in this buffer pool.</returns>
+	extern "C" uint64_t GetAllocatedMemorySizeInPool(BufferPoolHandle bufferPoolHandle);
+	/// <summary>
+	/// Computes the total number of bytes allocated from native memory in a dispatcher's per-thread pools.
+	/// Includes allocated memory regardless of whether it currently has outstanding references.
+	/// </summary>
+	/// <param name="threadDispatcherHandle">Thread dispatcher to check allocations for.</param>
+	/// <returns>Total number of bytes allocated from native memory in this thread dispatcher's per-thread pool.</returns>
+	extern "C" uint64_t GetAllocatedMemorySizeInThreadDispatcher(ThreadDispatcherHandle threadDispatcherHandle);
+	/// <summary>
+	/// Estimates the number of bytes managed by the garbage collector.
+	/// </summary>
+	/// <returns>Estimated number of bytes allocated from managed memory.</returns>
+	extern "C" uint64_t GetGCAllocatedMemorySize();
 	/// <summary>
 	/// Adds a sphere shape to the simulation.
 	/// </summary>
@@ -669,5 +674,19 @@ namespace Bepu
 	/// <param name="shape">Shape reference to request from the simulation.</param>
 	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
 	extern "C" Compound * GetCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
+	/// <summary>
+	/// Gets a pointer to a big compound shape's data stored within the simulation's shapes buffers.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+	/// <param name="shape">Shape reference to request from the simulation.</param>
+	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+	extern "C" BigCompound * GetBigCompoundShapeData(SimulationHandle simulationHandle, TypedIndex shape);
+	/// <summary>
+	/// Gets a pointer to a mesh shape's data stored within the simulation's shapes buffers.
+	/// </summary>
+	/// <param name="simulationHandle">Handle of the simulation to remove the shape from.</param>
+	/// <param name="shape">Shape reference to request from the simulation.</param>
+	/// <returns>Pointer to the shape's data in the simulation's shapes buffers.</returns>
+	extern "C" Mesh * GetMeshShapeData(SimulationHandle simulationHandle, TypedIndex shape);
 
 }

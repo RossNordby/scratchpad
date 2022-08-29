@@ -16,6 +16,8 @@ public static class CPPEntrypoints
         {
             Type when type == typeof(int) => "int32_t",
             Type when type == typeof(uint) => "uint32_t",
+            Type when type == typeof(long) => "int64_t",
+            Type when type == typeof(ulong) => "uint64_t",
             Type when type == typeof(float) => "float",
             Type when type == typeof(void) => "void",
             Type when type == typeof(bool) => "bool",
