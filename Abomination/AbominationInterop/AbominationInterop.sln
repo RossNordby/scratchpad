@@ -11,8 +11,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BepuPhysics", "..\..\..\bep
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BepuUtilities", "..\..\..\bepuphysics2\BepuUtilities\BepuUtilities.csproj", "{8D3A8999-2ACD-4A6D-8B5D-7C7513C55336}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReproAttempt", "ReproAttempt\ReproAttempt.csproj", "{462B6B22-AEB0-4293-9E07-296AB0F555E9}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Native", "Native", "{BD6063F3-53E5-481E-9B4C-F641A1140078}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "APIGenerator", "APIGenerator\APIGenerator.csproj", "{86BE0C82-A692-4C75-AA1D-535E9C4B795C}"
@@ -109,24 +107,6 @@ Global
 		{8D3A8999-2ACD-4A6D-8B5D-7C7513C55336}.ReleaseNoProfiling|x64.Build.0 = Release|Any CPU
 		{8D3A8999-2ACD-4A6D-8B5D-7C7513C55336}.ReleaseNoProfiling|x86.ActiveCfg = Release|Any CPU
 		{8D3A8999-2ACD-4A6D-8B5D-7C7513C55336}.ReleaseNoProfiling|x86.Build.0 = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Debug|x64.Build.0 = Debug|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Debug|x86.Build.0 = Debug|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Release|x64.ActiveCfg = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Release|x64.Build.0 = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Release|x86.ActiveCfg = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.Release|x86.Build.0 = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.ReleaseNoProfiling|Any CPU.ActiveCfg = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.ReleaseNoProfiling|Any CPU.Build.0 = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.ReleaseNoProfiling|x64.ActiveCfg = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.ReleaseNoProfiling|x64.Build.0 = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.ReleaseNoProfiling|x86.ActiveCfg = Release|Any CPU
-		{462B6B22-AEB0-4293-9E07-296AB0F555E9}.ReleaseNoProfiling|x86.Build.0 = Release|Any CPU
 		{86BE0C82-A692-4C75-AA1D-535E9C4B795C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{86BE0C82-A692-4C75-AA1D-535E9C4B795C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{86BE0C82-A692-4C75-AA1D-535E9C4B795C}.Debug|x64.ActiveCfg = Debug|Any CPU

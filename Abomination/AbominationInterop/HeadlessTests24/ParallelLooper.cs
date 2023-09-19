@@ -62,7 +62,7 @@ public class ParallelLooper
     /// <param name="exclusiveEnd">Exclusive end index of the execution range.</param>
     /// <param name="workAction">Delegate to invoke for each index.</param>
     /// <param name="workerDone">Delegate to invoke after all workers are done.</param>
-    public void For(int start, int exclusiveEnd, LooperAction workAction, LooperWorkerDone workerDone = null)
+    public unsafe void For(int start, int exclusiveEnd, LooperAction workAction, LooperWorkerDone workerDone = null)
     {
         if (Dispatcher == null)
         {

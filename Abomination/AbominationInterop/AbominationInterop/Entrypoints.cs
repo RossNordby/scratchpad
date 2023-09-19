@@ -627,7 +627,7 @@ public static partial class Entrypoints
         var dispatcher = threadDispatchers[threadDispatcherHandle];
         for (int i = 0; i < dispatcher.ThreadCount; ++i)
         {
-            sum += dispatcher.GetThreadMemoryPool(i).GetTotalAllocatedByteCount();
+            sum += dispatcher.WorkerPools[i].GetTotalAllocatedByteCount();
         }
         return sum;
     }

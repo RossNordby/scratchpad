@@ -454,7 +454,7 @@ public class CharacterControllers : IDisposable
     /// <summary>
     /// Preallocates space for support data collected during the narrow phase. Should be called before the narrow phase executes.
     /// </summary>
-    void PrepareForContacts(float dt, IThreadDispatcher threadDispatcher = null)
+    unsafe void PrepareForContacts(float dt, IThreadDispatcher threadDispatcher = null)
     {
         Debug.Assert(!contactCollectionWorkerCaches.Allocated, "Worker caches were already allocated; did you forget to call AnalyzeContacts after collision detection to flush the previous frame's results?");
         var threadCount = threadDispatcher == null ? 1 : threadDispatcher.ThreadCount;
@@ -751,7 +751,7 @@ public class CharacterControllers : IDisposable
     /// Updates all character support states and motion constraints based on the current character goals and all the contacts collected since the last call to AnalyzeContacts. 
     /// Attach to a simulation callback where the most recent contact is available and before the solver executes.
     /// </summary>
-    void AnalyzeContacts(float dt, IThreadDispatcher threadDispatcher)
+    unsafe void AnalyzeContacts(float dt, IThreadDispatcher threadDispatcher)
     {
         //var start = Stopwatch.GetTimestamp();
         Debug.Assert(contactCollectionWorkerCaches.Allocated, "Worker caches weren't properly allocated; did you forget to call PrepareForContacts before collision detection?");
