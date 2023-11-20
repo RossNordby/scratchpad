@@ -114,7 +114,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>"..\AbominationInterop\bin\Debug\net7.0\win10-x64\native\AbominationInterop.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"..\AbominationInterop\bin\Debug\net8.0\win-x64\native\AbominationInterop.lib";%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -133,7 +133,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>"..\AbominationInterop\bin\Release\net7.0\win10-x64\native\AbominationInterop.lib";%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>"..\AbominationInterop\bin\Release\net8.0\win-x64\native\AbominationInterop.lib";%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
@@ -156,10 +156,10 @@
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net7.0\win10-x64\native\AbominationInterop.dll">
+    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net8.0\win-x64\native\AbominationInterop.dll">
       <FileType>Document</FileType>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net7.0\win10-x64\native\AbominationInterop.pdb">
+    <CopyFileToFolders Include="..\AbominationInterop\bin\$(Configuration)\net8.0\win-x64\native\AbominationInterop.pdb">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
